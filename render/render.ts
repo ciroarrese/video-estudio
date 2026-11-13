@@ -10,9 +10,11 @@ import { buildAudioGraph, resolveSrc, windowTracks, type Track } from './audio';
 import { launchChromium, type PwBrowser, type PwPage } from './browser';
 import { FileHashCache } from './filehash';
 import { trackChild, trackCloser, trackPath, untrackPath } from './cleanup';
-import { digestFiles, ENCODER_SETTINGS, evenFrames, frameFile, framePattern, planSegments, planShards, segmentKey } from './plan';
+import { digestFiles, ENCODER_SETTINGS, frameFile, planCheckFrames, framePattern, planSegments, planShards, segmentKey } from './plan';
 import { serveStatic } from './server';
-import { metaForFormat, pageQuery, resolveScene, sceneRange, type VideoMeta } from './meta';
+import { assetDirsFor, explicitAssetDirs } from './assets';
+import { cacheDirPorDefecto, salidaPorDefecto } from './dirs';
+import { cleanPageError, metaForFormat, NOSTAGE_QUERY, pageQuery, resolveScene, sceneRange, type VideoMeta } from './meta';
 import type { FormatName, SceneInfo } from '../engine';
 
 export type RenderOptions = {
@@ -36,8 +38,14 @@ export type RenderOptions = {
   checkMaxDelta?: number;
   checkMaxRatio?: number;
   checkStrict?: boolean;
-  /** Extra static / audio directories (searched first). */
+  /** `--check`: cuadros repartidos parejos (12), cuadros por escena con nombre (6) o todos. Ver `planCheckFrames`. */
+  checkCount?: number;
+  checkPerScene?: number;
+  checkAll?: boolean;
+  /** Extra static / audio directories (searched first). Además se sirven solas `videos/<slug>/assets|audio` y `<VE_VIDEOS_DIR>/assets` (ver render/assets.ts). */
   assets?: string[];
+  /** Borrador: una fuente que no carga solo avisa en vez de fallar (también VE_ALLOW_MISSING_FONTS=1). */
+  allowMissingFonts?: boolean;
   /** Formato de pantalla (`horizontal`, `vertical`, `cuadrado`); sin esto, el formato base del video. */
   format?: FormatName;
   /** Renderiza solo esta escena (id/nombre o índice desde 0; ver `listScenes`). No se combina con `frames`. */
@@ -50,6 +58,9 @@ export type RenderOptions = {
 
 export type RenderResult = { out: string; frames: number; seconds: number; renderedSegments: number; cachedSegments: number };
 export type CheckResult = { ok: boolean; frames: number[]; determinism: { frame: number; ok: boolean; reordered?: boolean }[]; mismatches: number[]; diffs: Record<number, string> };
+
+/** `--allow-missing-fonts` o `VE_ALLOW_MISSING_FONTS=1`: una fuente que no carga avisa y sigue en vez de fallar. */
+export const allowMissingFonts = (o: { allowMissingFonts?: boolean }): boolean => o.allowMissingFonts ?? /^(1|true|si|sí|yes)$/i.test(process.env.VE_ALLOW_MISSING_FONTS ?? '');
 
 export const defaultRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 export const defaultConcurrency = () => Math.max(1, Math.min(cpus().length, 6));
@@ -126,9 +137,10 @@ export async function ensureBundle(root: string, cacheDir: string, runId: string
     throw new Error(`VE_VIDEOS_DIR apunta a "${videosDir}", que no existe o no es una carpeta. Pasá la ruta de la carpeta que contiene los videos (<carpeta>/<slug>/index.ts) o quitá la variable.`);
   }
   const skipTop = new Set(['node_modules', 'dist', 'out', 'render', 'docs']);
+  const skipExt = new Set(['out', 'node_modules']); // salidas por defecto de la carpeta externa: no son código del video
   if (videosDir) skipTop.add('videos');
   const files = walk(root, [], (name, depth) => name.startsWith('.') || (depth === 0 && skipTop.has(name)) || name.endsWith('.md'));
-  const ext = videosDir && existsSync(videosDir) ? walk(videosDir, [], (name) => name.startsWith('.') || name.endsWith('.md')) : [];
+  const ext = videosDir && existsSync(videosDir) ? walk(videosDir, [], (name, depth) => name.startsWith('.') || name.endsWith('.md') || (depth === 0 && skipExt.has(name))) : [];
   const cache = new FileHashCache(join(cacheDir, 'filehash.json'));
   const h = createHash('sha256').update(await hashFiles(root, files, cache));
   if (videosDir) h.update('videos-dir\0').update(await hashFiles(videosDir, ext, cache));
@@ -250,8 +262,12 @@ async function openPage(browser: PwBrowser, ctxOpts: { width: number; height: nu
 
 const callReady = (page: PwPage) => page.evaluate(() => (window as any).__ve.ready as Promise<unknown>).then(() => undefined);
 
+/** Segundos acumulados (sumando todas las páginas en paralelo) de cada etapa de la captura: sirve para ver dónde se va el tiempo. */
+export type CaptureTiming = { setFrame: number; screenshot: number; write: number };
+
 type Env = {
   browser: PwBrowser;
+  timing: CaptureTiming;
   baseUrl: string;
   pageUrl: string;
   meta: VideoMeta;
@@ -284,19 +300,25 @@ async function captureFrames(
         for (let i = sh.start; i < sh.end; i++) {
           if (shared.error) return;
           const n = frames[i]!;
+          const t0 = performance.now();
           try {
             await page.evaluate((f: number) => (window as any).__ve.setFrame(f), n);
           } catch (e) {
             throw new Error(`setFrame(${n}) fallo: ${(e as Error).message}`);
           }
           if (shared.error) return;
+          const t1 = performance.now();
           // CDP capture: optimizeForSpeed (fast zlib, same pixels) is ~40% faster than page.screenshot for PNG.
           const r = await cdp.send('Page.captureScreenshot', {
             format: env.shot.format,
             ...(env.shot.format === 'jpeg' ? { quality: env.shot.quality } : { optimizeForSpeed: true }),
             clip: { x: 0, y: 0, width, height, scale: env.scale },
           });
+          const t2 = performance.now();
           await onFrame(n, Buffer.from(r.data as string, 'base64'));
+          env.timing.setFrame += (t1 - t0) / 1000;
+          env.timing.screenshot += (t2 - t1) / 1000;
+          env.timing.write += (performance.now() - t2) / 1000;
           done++;
           progressLabel?.(done, frames.length);
         }
@@ -329,34 +351,53 @@ async function setup(o: RenderOptions, needAudio: boolean) {
   const scale = o.scale ?? 1;
   const props = o.props ?? {};
   const runId = newRunId();
-  const cacheDir = resolve(o.cacheDir ?? join(root, '.ve-cache'));
+  const cacheDir = resolve(o.cacheDir ?? cacheDirPorDefecto(root));
   mkdirSync(cacheDir, { recursive: true });
   const bundleDir = await ensureBundle(root, cacheDir, runId, log);
   const hashes = new FileHashCache(join(cacheDir, 'filehash.json'));
-  const assets = (o.assets ?? []).map((a) => resolve(a));
-  const server = await serveStatic([...assets, bundleDir, join(root, 'public')], bundleDir);
+  // Carpetas estáticas: `--assets`/VE_ASSETS primero; las del propio video y `<VE_VIDEOS_DIR>/assets` se agregan en cuanto se sabe
+  // de qué carpeta es el video (la lista se lee en cada pedido, así que alcanza con completarla). Ver render/assets.ts.
+  const explicit = explicitAssetDirs(o.assets);
+  let assets = assetDirsFor(root, explicit, undefined).filter((d) => explicit.includes(d));
+  const roots = [...assets, bundleDir, join(root, 'public')];
+  const server = await serveStatic(roots, bundleDir);
   const browser = await launchChromium().catch(async (e) => {
     await server.close();
     throw e;
   });
-  const pageUrl = `${server.url}/${pageQuery(o.videoId, props, o.format)}`;
+  const pageUrl = `${server.url}/${pageQuery(o.videoId, props, o.format, { allowMissingFonts: allowMissingFonts(o) })}`;
   const untrack = trackCloser(() => browser.close());
   const cleanup = async () => {
     untrack();
     await browser.close().catch(() => {});
     await server.close();
   };
-  // Dedicated page: metadata, determinism check and the single audio scan.
   try {
+    // Primero una página que solo registra los videos (no dibuja): da la carpeta de origen y con ella las carpetas de estáticos,
+    // que tienen que estar antes de que la página del video pida su primera fuente o imagen.
+    const probeShared: Shared = { error: null };
+    const probe = await openPage(browser, { width: 320, height: 180, scale: 1 }, `${server.url}/${NOSTAGE_QUERY}`, probeShared);
+    let metas: VideoMeta[];
+    try {
+      await callReady(probe.page).catch(() => undefined);
+      metas = (await probe.page.evaluate(() => (window as any).__ve.videos)) as VideoMeta[];
+    } finally {
+      await probe.context.close().catch(() => {});
+    }
+    const found = metas.find((m) => m.id === o.videoId);
+    if (found) {
+      assets = assetDirsFor(root, explicit, found.source);
+      roots.splice(0, roots.length - 2, ...assets);
+      if (assets.length) log(`estáticos: ${assets.join(', ')}`);
+    }
+    // Dedicated page: metadata, determinism check and the single audio scan.
     const shared: Shared = { error: null };
     const { page, context } = await openPage(browser, { width: 320, height: 180, scale: 1 }, pageUrl, shared);
     try {
       await callReady(page).catch((e: Error) => {
-        throw new Error(`La pagina del video no arranco: ${e.message}`);
+        throw new Error(`La pagina del video no arranco: ${cleanPageError(e.message)}`);
       });
       if (shared.error) throw shared.error;
-      const metas = (await page.evaluate(() => (window as any).__ve.videos)) as VideoMeta[];
-      const found = metas.find((m) => m.id === o.videoId);
       if (!found) throw new Error(`Video desconocido "${o.videoId}". Disponibles: ${metas.map((m) => m.id).join(', ')}`);
       const meta = metaForFormat(found, o.format);
       const scenes = async (): Promise<SceneInfo[]> => (await page.evaluate(() => (window as any).__ve.scenes())) as SceneInfo[];
@@ -364,7 +405,7 @@ async function setup(o: RenderOptions, needAudio: boolean) {
       if (needAudio) tracks = (await page.evaluate(() => (window as any).__ve.scanAudio())) as Track[];
       const ffmpegVersion = (await run('ffmpeg', ['-version'])).split('\n')[0]!;
       const shot = { format: o.frameFormat ?? 'png', quality: o.jpegQuality ?? 95 } as const;
-      const env: Env = { browser, baseUrl: server.url, pageUrl, meta, scale, shot };
+      const env: Env = { browser, timing: { setFrame: 0, screenshot: 0, write: 0 }, baseUrl: server.url, pageUrl, meta, scale, shot };
       // Everything besides bundle/props/range/scale/crf that can change a segment's pixels.
       const keyEnv = {
         ffmpeg: ffmpegVersion,
@@ -438,7 +479,7 @@ export async function renderVideo(options: RenderOptions): Promise<RenderResult>
       sceneIndex = sc.index;
       log(`escena "${sc.id}" (índice ${sc.index}): cuadros ${first}-${last}`);
     }
-    out = resolve(options.out ?? join('out', `${options.videoId}${suffixOf(options, sceneIndex)}.mp4`));
+    out = resolve(options.out ?? salidaPorDefecto(`${options.videoId}${suffixOf(options, sceneIndex)}.mp4`));
     outTmp = `${out}.${s.runId}.tmp.mp4`;
     trackPath(outTmp);
     if (last > meta.durationInFrames - 1) throw new RangeError(`--frames ${first}-${last} excede el video (0-${meta.durationInFrames - 1})`);
@@ -520,7 +561,9 @@ export async function renderVideo(options: RenderOptions): Promise<RenderResult>
         await encodeChain;
       }
       if (encodeError) throw encodeError;
+      const tm = env.timing;
       log(`captura+codificacion: ${((Date.now() - tCap) / 1000).toFixed(1)} s (x264 acumulado ${encodeTime.toFixed(1)} s, solapado con la captura)`);
+      log(`tiempo por etapa (suma de las ${Math.min(concurrency, list.length)} páginas): dibujar el cuadro ${tm.setFrame.toFixed(1)} s, captura de pantalla ${tm.screenshot.toFixed(1)} s, escritura del PNG ${tm.write.toFixed(1)} s`);
       if (!options.keepFrames) rmSync(framesRoot, { recursive: true, force: true });
     }
 
@@ -608,16 +651,26 @@ export async function checkVideo(options: RenderOptions): Promise<CheckResult> {
   const s = await setup({ ...options, frameFormat: 'png' }, false);
   const { env, log } = s;
   try {
-    let total = env.meta.durationInFrames;
-    let offset = 0;
-    if (options.scene !== undefined) {
-      const sc = resolveScene(await s.scenes(), options.scene);
-      total = sc.durationInFrames;
-      offset = sc.from;
-      log(`escena "${sc.id}" (índice ${sc.index}): cuadros ${sc.from}-${sc.from + total - 1}`);
-    }
-    const frames = evenFrames(total, 12).map((n) => n + offset);
-    log(`check: cuadros ${frames.join(', ')}`);
+    const plan = await (async () => {
+      const common = { count: options.checkCount, perScene: options.checkPerScene, all: options.checkAll };
+      if (options.scene !== undefined) {
+        const sc = resolveScene(await s.scenes(), options.scene);
+        const [a, b] = sceneRange(sc);
+        log(`escena "${sc.id}" (índice ${sc.index}): cuadros ${a}-${b}`);
+        return planCheckFrames({ first: a, last: b, scenes: [sc], ...common });
+      }
+      if (options.frames) {
+        const [a, b] = options.frames;
+        if (b > env.meta.durationInFrames - 1) throw new RangeError(`--frames ${a}-${b} excede el video (0-${env.meta.durationInFrames - 1})`);
+        return planCheckFrames({ first: a, last: b, explicitRange: true, ...common });
+      }
+      // Por escena solo si no se pidió todo ni el video es enorme de escenas: leer las escenas recorre todos los cuadros una vez (solo DOM).
+      const scenes = options.checkAll ? [] : await s.scenes().catch(() => []);
+      return planCheckFrames({ first: 0, last: env.meta.durationInFrames - 1, scenes, ...common });
+    })();
+    const frames = plan.frames;
+    log(`check: ${plan.summary}`);
+    log(`check: cuadros ${frames.length > 60 ? `${frames.slice(0, 60).join(', ')}, ... (${frames.length} en total)` : frames.join(', ')}`);
     const det = (await s.page.evaluate((f: number[]) => (window as any).__ve.checkDeterminism(f), frames)) as { frame: number; ok: boolean; reordered?: boolean; error?: string; diffs?: string[] }[];
     for (const d of det) if (d.error) log(`check: cuadro ${d.frame}: ${d.error}`);
     const bad = det.filter((d) => !d.ok).map((d) => d.frame);
@@ -633,29 +686,35 @@ export async function checkVideo(options: RenderOptions): Promise<CheckResult> {
     const reordered = det.filter((d) => d.ok && d.reordered).length;
     if (reordered > 0) log(`check: nota: ${reordered} ${reordered === 1 ? 'cuadro difirió' : 'cuadros difirieron'} solo en el orden de atributos o estilos (no es un fallo)`);
 
-    const layoutA = new Map<number, Buffer>();
-    const layoutB = new Map<number, Buffer>();
-    // Layout A: 2 shards in order; layout B: reversed order in 3 shards (different pages, different history).
-    await captureFrames(env, frames, 2, (n, png) => void layoutA.set(n, png));
-    await captureFrames(env, [...frames].reverse(), 3, (n, png) => void layoutB.set(n, png));
     const tol: CheckTolerance = { maxDelta: options.checkMaxDelta ?? DEFAULT_TOLERANCE.maxDelta, maxRatio: options.checkMaxRatio ?? DEFAULT_TOLERANCE.maxRatio, strict: options.checkStrict ?? false };
     const mismatches: number[] = [];
     const diffs: Record<number, string> = {};
     let noisy = 0;
-    for (const n of frames) {
-      const stats = comparePngs(layoutA.get(n)!, layoutB.get(n)!);
-      if (stats.diffPixels === 0) continue;
-      noisy++;
-      const ok = withinTolerance(stats, tol) && !(tol.strict && !layoutA.get(n)!.equals(layoutB.get(n)!));
-      diffs[n] = formatDiff(stats);
-      log(`check: cuadro ${n} ${ok ? 'ruido tolerado' : 'DIFERENTE'}: ${diffs[n]}`);
-      if (!ok) {
-        mismatches.push(n);
-        if (stats.bbox) {
-          log(`check:   elementos en el bbox del cuadro ${n}:`);
-          for (const line of await describeBBox(s, n, stats.bbox)) log(`check:     ${line}`);
+    // De a tandas (no se guardan en memoria todos los PNG: con --check-all pueden ser miles).
+    const CHUNK = 48;
+    for (let at = 0; at < frames.length; at += CHUNK) {
+      const chunk = frames.slice(at, at + CHUNK);
+      const layoutA = new Map<number, Buffer>();
+      const layoutB = new Map<number, Buffer>();
+      // Layout A: 2 shards in order; layout B: reversed order in 3 shards (different pages, different history).
+      await captureFrames(env, chunk, 2, (n, png) => void layoutA.set(n, png));
+      await captureFrames(env, [...chunk].reverse(), 3, (n, png) => void layoutB.set(n, png));
+      for (const n of chunk) {
+        const stats = comparePngs(layoutA.get(n)!, layoutB.get(n)!);
+        if (stats.diffPixels === 0) continue;
+        noisy++;
+        const ok = withinTolerance(stats, tol) && !(tol.strict && !layoutA.get(n)!.equals(layoutB.get(n)!));
+        diffs[n] = formatDiff(stats);
+        log(`check: cuadro ${n} ${ok ? 'ruido tolerado' : 'DIFERENTE'}: ${diffs[n]}`);
+        if (!ok) {
+          mismatches.push(n);
+          if (stats.bbox) {
+            log(`check:   elementos en el bbox del cuadro ${n}:`);
+            for (const line of await describeBBox(s, n, stats.bbox)) log(`check:     ${line}`);
+          }
         }
       }
+      if (frames.length > CHUNK) log(`check: ${Math.min(at + CHUNK, frames.length)}/${frames.length} cuadros comparados`);
     }
     const mode = tol.strict ? 'estricto (byte a byte)' : `tolerante (ningun pixel con delta > ${tol.maxDelta}, <= ${(tol.maxRatio * 100).toFixed(3)}% con delta 2..${tol.maxDelta}, <= ${(DEFAULT_TOLERANCE.maxNoiseRatio * 100).toFixed(0)}% con delta 1)`;
     if (mismatches.length) {
@@ -663,6 +722,7 @@ export async function checkVideo(options: RenderOptions): Promise<CheckResult> {
       log(`check: ${CHECK_HINT}`);
     }
     else log(`check: PNG equivalentes en ambos layouts [${mode}]${noisy ? `, ${noisy} cuadros con ruido tolerado` : ', todos identicos'}`);
+    log(`check: ${frames.length} cuadros verificados`);
     return { ok: bad.length === 0 && mismatches.length === 0, frames, determinism: det, mismatches, diffs };
   } finally {
     await s.context.close().catch(() => {});
@@ -688,15 +748,15 @@ export type LoadErrorInfo = { folder: string; folders: string[]; ids: string[]; 
 /** Videos que el runtime descubrió (`examples/*` y `videos/*`) y los errores por carpeta (rota, `id` repetido) de las que no cargaron. */
 export async function discoverVideos(options: { root?: string; cacheDir?: string; log?: (m: string) => void } = {}): Promise<{ videos: VideoMeta[]; errors: LoadErrorInfo[] }> {
   const root = options.root ?? defaultRoot;
-  const cacheDir = resolve(options.cacheDir ?? join(root, '.ve-cache'));
+  const cacheDir = resolve(options.cacheDir ?? cacheDirPorDefecto(root));
   mkdirSync(cacheDir, { recursive: true });
   const bundleDir = await ensureBundle(root, cacheDir, newRunId(), options.log ?? (() => {}));
-  const server = await serveStatic([bundleDir, join(root, 'public')], bundleDir);
+  const server = await serveStatic([...assetDirsFor(root, explicitAssetDirs()), bundleDir, join(root, 'public')], bundleDir);
   let browser: PwBrowser | undefined;
   try {
     browser = await launchChromium();
     const shared: Shared = { error: null };
-    const { page, context } = await openPage(browser, { width: 320, height: 180, scale: 1 }, `${server.url}/`, shared);
+    const { page, context } = await openPage(browser, { width: 320, height: 180, scale: 1 }, `${server.url}/${NOSTAGE_QUERY}`, shared);
     try {
       // `ready` puede rechazar si el primer video es uno de los rotos: acá solo importa la lista y los errores.
       await page.evaluate(() => (window as any).__ve.ready as Promise<unknown>).catch(() => undefined);

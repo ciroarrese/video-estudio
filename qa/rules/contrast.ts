@@ -32,7 +32,7 @@ export const contrastRule: Rule = {
     const out: Finding[] = [];
     const seen = new Set<number>();
     for (const r of runs) {
-      if (!r.bg || r.transparentFill || r.opacity < 0.05 || ignored(r, 'contrast') || seen.has(r.elId)) continue;
+      if (!r.bg || r.transparentFill || r.opacity < 0.05 || ignored(r, 'contrast') || r.decor || seen.has(r.elId)) continue;
       const m = /rgba?\(([^)]+)\)/.exec(r.color);
       if (!m) continue;
       const [cr, cg, cb, ca = '1'] = m[1]!.split(/[,\s/]+/).filter(Boolean);

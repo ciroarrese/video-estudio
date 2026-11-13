@@ -28,4 +28,15 @@ npm run privacy -- <id> --deny videos/<slug>/prohibidos.txt --scan-source videos
 npm run sheet -- <id> --count 12        # y mirar la hoja
 ```
 
+## Si cambiás el toolkit (engine, kit, themes, stories, fx, qa, audio, render)
+
+Esto no es para hacer un video: es para quien modifica la herramienta. Además de `npm run typecheck`:
+
+```bash
+npm test                # pruebas rápidas (~1 a 2 min): todo menos los archivos `*.e2e.test.*`
+npm run test:e2e        # pruebas lentas (~10 min): `--check` por escena de varias historias; correr antes de cerrar un cambio en `stories/`, `kit/` o el render
+```
+
+Los casos lentos se llaman `*.e2e.test.ts` y quedan fuera de `npm test` (ver `vitest.config.ts` y `vitest.e2e.config.ts`).
+
 Los videos no se registran a mano: el runtime descubre toda carpeta `examples/*/index.ts(x)` y `videos/<slug>/index.ts(x)` (también `videos/<slug>/<carpeta>/index.ts(x)`); `npm run render -- --list` muestra los que ve. Un `id` repetido entre dos carpetas falla con un error que nombra las dos. Formatos: `--format horizontal|vertical|cuadrado` en render, qa y sheet (el video los habilita con `formats` en `defineVideo`); una escena sola: `--scene <id|índice>` y `--list-scenes`.

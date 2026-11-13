@@ -40,11 +40,52 @@ export function leerNum(op: Map<string, string>, k: string, def?: number, r: Res
   return n;
 }
 
-/** `--inicio`: la palabra `percusion` o un segundo (número >= 0). Devuelve undefined si no se pasó. */
-export function leerInicio(op: Map<string, string>): 'percusion' | number | undefined {
+export type Inicio = 'percusion' | number | { seccion: number };
+
+/** `--inicio`: `percusion`, `seccion:<n>` (n desde 1, de la lista `secciones` del tempo) o un segundo (número >= 0). Devuelve undefined si no se pasó. */
+export function leerInicio(op: Map<string, string>): Inicio | undefined {
   const v = op.get('inicio');
   if (v === undefined) return undefined;
   if (v === 'percusion') return 'percusion';
-  if (v.trim() === '') throw new Error('--inicio necesita un valor: "percusion" o un segundo (por ejemplo --inicio 4.5)');
+  if (v.trim() === '') throw new Error('--inicio necesita un valor: "percusion", "seccion:<n>" o un segundo (por ejemplo --inicio 4.5)');
+  const m = /^seccion:(.*)$/.exec(v);
+  if (m) {
+    const n = Number(m[1]);
+    if (m[1].trim() === '' || !Number.isInteger(n) || n < 1) throw new Error(`--inicio seccion:<n> necesita un entero desde 1 (recibió "${v}")`);
+    return { seccion: n };
+  }
   return leerNum(op, 'inicio', undefined, { min: 0 });
+}
+
+/**
+ * `--corte-en`: una lista separada por comas de instantes de la salida donde conviene un empalme.
+ * Cada uno es un segundo (`12.5`) o un cuadro con prefijo `f` (`f375`, se pasa a segundos con `fps`).
+ */
+export function leerCortes(op: Map<string, string>, fps: number): number[] | undefined {
+  const v = op.get('corte-en');
+  if (v === undefined) return undefined;
+  if (v.trim() === '') throw new Error('--corte-en necesita un valor: segundos de salida o cuadros con prefijo f (por ejemplo --corte-en 12.5,f450)');
+  return v.split(',').map((t) => {
+    const txt = t.trim();
+    const esCuadro = txt.startsWith('f');
+    const n = Number(esCuadro ? txt.slice(1) : txt);
+    if (txt === '' || txt === 'f' || !Number.isFinite(n) || n < 0) throw new Error(`--corte-en: "${txt}" no es un segundo ni un cuadro (f<n>) válido`);
+    return esCuadro ? n / fps : n;
+  });
+}
+
+/** `--fase medio`: corre la grilla de pulsos medio pulso. Cualquier otro valor es un error. */
+export function leerFase(op: Map<string, string>): 'medio' | undefined {
+  const v = op.get('fase');
+  if (v === undefined) return undefined;
+  if (v !== 'medio') throw new Error(`--fase solo acepta "medio" (recibió "${v}")`);
+  return 'medio';
+}
+
+/** `--final fade|real`: cómo termina el video (caída artificial o el final propio de la pista). */
+export function leerFinal(op: Map<string, string>): 'fade' | 'real' | undefined {
+  const v = op.get('final');
+  if (v === undefined) return undefined;
+  if (v !== 'fade' && v !== 'real') throw new Error(`--final solo acepta "fade" o "real" (recibió "${v}")`);
+  return v;
 }

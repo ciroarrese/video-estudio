@@ -4,7 +4,7 @@ import { ThemeProvider, dark, neutral, useTheme } from "../../themes";
 import type { Theme } from "../../themes";
 import {
   CloudBackground, CountUp, Cursor, DockedHeadline, DoodleArrow, DoodleCircle, DoodleUnderline, FlyingCard,
-  GradientText, Stage, Vignette, Wash, World, cameraAt, hideFromScale, kf, typed, zoomThrough,
+  GradientText, Stage, Vignette, Wash, World, cameraAt, flyInZ, hideFromScale, kf, typed, zoomThrough,
 } from "../../kit";
 import type { CameraKey } from "../../kit";
 
@@ -87,10 +87,11 @@ function Scene({ frame }: { frame: number }) {
         <Panel {...A} title="Panel de ejemplo" opacity={kf(frame, [148, 162, 180, 194], [1, 0.45, 0.45, 1])}>
           {[0, 1, 2].map((i) => {
             const p = cardPos(i);
-            const a = kf(frame, [i * 6 - 14, i * 6 + 8], [0, 1]);
+            const a = kf(frame, [i * 6 - 14, i * 6 + 18], [0, 1]);
             const hidden = i === PICK && left;
+            // Entrada en profundidad: perspective() propio de cada tarjeta, layout entero (ver docs/reglas.md).
             return (
-              <div key={i} style={{ position: "absolute", left: p.x - A.x, top: p.y - A.y + (1 - a) * 24, opacity: a }}>
+              <div key={i} style={{ position: "absolute", left: p.x - A.x, top: p.y - A.y, ...flyInZ(a, { from: 800, x: (i - 1) * 140, y: 60 }) }}>
                 {hidden ? (
                   <div style={{ width: CARD.w, height: CARD.h, boxSizing: "border-box", borderRadius: theme.radius.panel, border: `2px dashed ${theme.color.border}` }} />
                 ) : (
@@ -105,7 +106,7 @@ function Scene({ frame }: { frame: number }) {
               <div key={r} style={{ position: "absolute", left: 40, top: 360 + i * 64, width: A.w - 80, height: 52, boxSizing: "border-box", display: "flex", alignItems: "center", gap: 18, padding: "0 24px", background: theme.color.surface, border: `1px solid ${theme.color.border}`, borderRadius: theme.radius.md, opacity: a, fontSize: theme.type.caption, color: theme.color.text }}>
                 <span style={{ width: 16, height: 16, borderRadius: theme.radius.pill, background: rowDots[i] }} />
                 {r}
-                <span style={{ marginLeft: "auto", color: theme.color.textMuted, fontSize: theme.type.eyebrow }}>{(i + 1) * 7} min</span>
+                <span style={{ marginLeft: "auto", color: theme.color.textMuted, fontSize: theme.type.ui.md }}>{(i + 1) * 7} min</span>
               </div>
             );
           })}
@@ -114,7 +115,7 @@ function Scene({ frame }: { frame: number }) {
         <Panel {...B} title="Destino">
           <div style={{ position: "absolute", left: 0, top: 110, width: B.w, textAlign: "center" }}>
             <div style={{ fontSize: theme.type.eyebrow, color: theme.color.textMuted }}>{typed("Total acumulado", frame, 8, 0.7)}</div>
-            <GradientText frame={frame} pan={0.5} style={{ fontSize: theme.type.stat, fontWeight: theme.font.weights.stat, lineHeight: 1.1 }}>
+            <GradientText frame={frame} loop={120} style={{ fontSize: theme.type.stat, fontWeight: theme.font.weights.stat, lineHeight: 1.1 }}>
               <CountUp frame={frame} from={0} to={1284} start={land ? T.flight[1] + 2 : 9999} duration={40} />
             </GradientText>
           </div>

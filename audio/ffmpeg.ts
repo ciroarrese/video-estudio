@@ -41,15 +41,54 @@ export async function decodificar(
   return new Float32Array(copia.buffer);
 }
 
-/** Codifica PCM float32 entrelazado al formato que indique la extensión de `salida`. */
+/**
+ * Codifica PCM float32 entrelazado al formato que indique la extensión de `salida`. En `.wav`,
+ * `bits` elige 16, 24 o 32 (float); sin `bits` ffmpeg usa 16. Para un archivo que después se sigue
+ * procesando conviene 24 o 32: 16 bits recorta cualquier cresta que pase de 0 dBFS.
+ */
 export async function codificar(
   muestras: Float32Array,
-  opts: { sr: number; canales: 1 | 2; salida: string },
+  opts: { sr: number; canales: 1 | 2; salida: string; bits?: 16 | 24 | 32 },
 ): Promise<void> {
   const buf = Buffer.from(muestras.buffer, muestras.byteOffset, muestras.byteLength);
+  const codec = opts.bits && extname(opts.salida).toLowerCase() === '.wav' ? ['-c:a', { 16: 'pcm_s16le', 24: 'pcm_s24le', 32: 'pcm_f32le' }[opts.bits]] : [];
   await escribirAtomico(opts.salida, (tmp) =>
-    runFfmpeg(['-y', '-f', 'f32le', '-ar', String(opts.sr), '-ac', String(opts.canales), '-i', 'pipe:0', tmp], buf).then(() => undefined),
+    runFfmpeg(['-y', '-f', 'f32le', '-ar', String(opts.sr), '-ac', String(opts.canales), '-i', 'pipe:0', ...codec, tmp], buf).then(() => undefined),
   );
+}
+
+export interface Sonda {
+  canales: number;
+  codec: string;
+  sr: number;
+  /** `start_time` del contenedor (s). Un mp3 con etiqueta Xing/LAME marca ~0,025 s; sin etiqueta, 0. */
+  inicioSec: number;
+}
+
+/** Lee canales, códec y `start_time` con ffprobe; null si ffprobe no está o no entiende el archivo. */
+export function sondear(archivo: string): Sonda | null {
+  const r = spawnSync('ffprobe', ['-v', 'error', '-select_streams', 'a:0', '-show_entries', 'stream=channels,codec_name,sample_rate,start_time', '-of', 'json', resolve(archivo)], { encoding: 'utf8' });
+  if (r.status !== 0 || !r.stdout) return null;
+  try {
+    const st = (JSON.parse(r.stdout) as { streams?: { channels?: number; codec_name?: string; sample_rate?: string; start_time?: string }[] }).streams?.[0];
+    if (!st) return null;
+    return { canales: st.channels ?? 2, codec: st.codec_name ?? '', sr: Number(st.sample_rate ?? 0), inicioSec: Number(st.start_time ?? 0) || 0 };
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Aviso para un mp3 sin etiqueta Xing/LAME: sin ella no se sabe cuántas muestras de retardo del
+ * codificador hay que descartar (unos 25 ms), así que según el decodificador el audio arranca ese
+ * tiempo antes o después. Para que el análisis y la reproducción midan sobre las mismas muestras
+ * conviene convertirlo una vez a wav y usar el wav en todos los pasos. Devuelve undefined si no es
+ * mp3, si tiene la etiqueta o si no se pudo sondear.
+ */
+export function avisoMp3SinEtiqueta(archivo: string): string | undefined {
+  const s = sondear(archivo);
+  if (!s || s.codec !== 'mp3' || s.inicioSec > 0.0005) return undefined;
+  return `"${archivo}" es un mp3 sin etiqueta Xing/LAME: ffmpeg no descarta el retardo del codificador y lo decodifica unos 25 ms tarde respecto de otros reproductores. Convertilo una vez a wav (ffmpeg -i entrada.mp3 salida.wav) y usá el wav en tempo, empalme y mezcla, así todo mide sobre las mismas muestras.`;
 }
 
 /**

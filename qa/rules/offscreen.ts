@@ -22,7 +22,7 @@ export const offscreenRule: Rule = {
     const out: Finding[] = [];
     const seen = new Set<number>();
     for (const r of runs) {
-      if (r.opacity < t.minOpacity || ignored(r, 'offscreen') || seen.has(r.elId) || isHuge(r.rect, width, height, t.maxFrames)) continue;
+      if (r.opacity < t.minOpacity || ignored(r, 'offscreen') || (r.decor && !r.decorMain) || seen.has(r.elId) || isHuge(r.rect, width, height, t.maxFrames)) continue;
       for (const line of r.lines) {
         if (!intersect(line, box)) continue; // fully outside: leaving on purpose
         const px = protrusion(line, box);

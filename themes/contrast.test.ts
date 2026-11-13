@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { contrastRatio, relativeLuminance, checkTheme, neutral, dark, themeFromTokensWithReport } from "./index";
+import { readableOn, contrastRatio, relativeLuminance, checkTheme, neutral, dark, themeFromTokensWithReport } from "./index";
 
 describe("contraste", () => {
   it("negro/blanco = 21", () => {
@@ -68,5 +68,16 @@ describe("checkTheme: estados, acentos y gráfico", () => {
     const { report } = themeFromTokensWithReport({ color: { success: "#7fd6a4", "chart-1": "#ffffff" } });
     expect(report.warnings.some((x) => x.includes("success/surface"))).toBe(true);
     expect(report.warnings.some((x) => x.includes("chart[0]/surface"))).toBe(true);
+  });
+});
+
+describe("readableOn", () => {
+  it("elige el candidato con mejor contraste sobre un relleno cualquiera", () => {
+    expect(readableOn(neutral, "#ffd400")).toBe(neutral.color.text); // amarillo: texto oscuro
+    expect(readableOn(neutral, "#0a2a66")).not.toBe(neutral.color.text); // azul oscuro: texto claro
+  });
+  it("acepta candidatos propios y devuelve el primero en un empate", () => {
+    expect(readableOn(neutral, "#ffd400", { candidates: ["#ffffff", "#000000"] })).toBe("#000000");
+    expect(readableOn(neutral, "#808080", { candidates: ["#111111", "#111111"] })).toBe("#111111");
   });
 });

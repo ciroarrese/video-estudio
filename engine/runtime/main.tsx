@@ -1,4 +1,4 @@
-import { checkDeterminism, describeAtPoint, createStage, scanAudio, getVideo, getVideos, waitForHolds, collectAudio, resolveScenes, isFormatName, FORMAT_NAMES, formatOf } from '../index';
+import { checkFontFailures, checkDeterminism, describeAtPoint, createStage, scanAudio, getVideo, getVideos, waitForHolds, collectAudio, resolveScenes, isFormatName, FORMAT_NAMES, formatOf } from '../index';
 import type { DeterminismResult, FormatName, FormatSize, SceneInfo, Stage } from '../index';
 import { videosReady } from './videos';
 import type { LoadError } from './discover';
@@ -35,16 +35,23 @@ const nextFrames = (n: number) =>
     step(n);
   });
 
+const params = new URLSearchParams(location.search);
+// `?fonts=warn` (--allow-missing-fonts / VE_ALLOW_MISSING_FONTS=1): una fuente que no carga solo avisa (borradores).
+const allowMissingFonts = params.get('fonts') === 'warn';
+// `?nostage=1`: solo registra los videos (lista y carpeta de origen), sin dibujar nada. El render lo usa para saber de qué carpeta
+// es el video (y qué carpetas de estáticos servir) antes de que la página pida fuentes o imágenes.
+const noStage = params.get('nostage') === '1';
+
 const settle = async () => {
   await document.fonts.ready;
   await waitForHolds();
   await nextFrames(2);
+  // Una fuente que no cargó haría salir el video con otra tipografía sin avisar: es un error de render (salvo borrador).
+  checkFontFailures(allowMissingFonts);
 };
 
 const wire = (tracks: ReturnType<typeof collectAudio>): WireTrack[] =>
   tracks.map((t) => ({ ...t, to: Number.isFinite(t.to) ? t.to : null }));
-
-const params = new URLSearchParams(location.search);
 
 let meta: VideoMeta[] = [];
 let loadErrors: LoadError[] = [];
@@ -86,7 +93,7 @@ const init = (async () => {
     if (isFormatName(formatParam)) format = formatParam;
     else setupError = new Error(`Formato desconocido "${formatParam}" (los válidos son ${FORMAT_NAMES.join(', ')})`);
   }
-  if (!setupError && def) {
+  if (!setupError && def && !noStage) {
     try {
       stage = createStage(document.getElementById('stage')!, def, inputProps, format);
     } catch (e) {
@@ -116,6 +123,7 @@ window.__ve = {
     return loadErrors;
   },
   ready: init.then(async () => {
+    if (noStage) return;
     const s = need();
     s.render(0);
     await settle();

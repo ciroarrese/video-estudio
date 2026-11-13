@@ -73,6 +73,21 @@ describe("kit: reposo e historial", () => {
   });
 });
 
+describe("kit: World en reposo", () => {
+  const cam = (scale: number, rx = 0) => ({ x: 960, y: 540, scale, rx, ry: 0, blur: 0 });
+  const transformDe = (c: ReturnType<typeof cam>) => /transform:([^;"]*)/.exec(ssr(<World camera={c} width={1920} height={1080}><div /></World>, 0))![1]!;
+  it("con la cámara quieta en escala 1 y sin inclinación no emite scale(1) ni perspective", () => {
+    const t = transformDe(cam(1));
+    expect(t).not.toMatch(/scale|perspective|rotate/);
+    expect(t).toBe("translate(960px, 540px) translate(-960px, -540px)");
+    expect(transformDe(cam(1.0004))).not.toMatch(/scale/);
+  });
+  it("con zoom o inclinación sí emite esas partes", () => {
+    expect(transformDe(cam(1.5))).toContain("scale(1.5)");
+    expect(transformDe(cam(1, 10))).toMatch(/perspective\(2400px\) rotateX\(10deg\)/);
+  });
+});
+
 describe("kit: Stage en cada formato", () => {
   const spread = (cfg: { width: number; height: number }) => {
     const markup = ssr(<Stage><div /></Stage>, 0, { ...config, ...cfg });

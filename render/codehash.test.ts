@@ -17,7 +17,7 @@ describe('videoCodeHash (cache por video)', () => {
       const bundle = join(root, 'bundle');
       mkdirSync(bundle);
       writeFileSync(join(bundle, 've-deps.json'), JSON.stringify({ runtime: ['engine/a.ts'], videos: { 'videos/uno': ['videos/uno/index.ts', 'videos/uno/escena.ts'], 'videos/dos': ['videos/dos/index.ts'] } }));
-      const h = (s: string) => videoCodeHash(root, bundle, s);
+      const h = (s: string) => videoCodeHash(root, bundle, s, { videosDir: null });
       const [uno, dos] = [await h('videos/uno'), await h('videos/dos')];
       expect(uno).not.toBe(dos);
       w('videos/dos/index.ts', 'cambió');

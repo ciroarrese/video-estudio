@@ -20,6 +20,10 @@ export type PrivacyOptions = Partial<SampleSpec> & {
   scanSource?: string[];
   /** Archivos que el escaneo del codigo salta (rutas): las listas `--deny`/`--allow` contienen los terminos a proposito. */
   skipFiles?: string[];
+  /** Carpetas extra de estáticos (`--assets`), como en `render`. */
+  assets?: string[];
+  /** Borrador: una fuente que no carga solo avisa. */
+  allowMissingFonts?: boolean;
   log?: (m: string) => void;
 };
 export type PrivacyResult = { ok: boolean; findings: PrivacyFinding[]; frames: number[]; scannedTexts: number; scannedFiles: number };
@@ -73,7 +77,7 @@ export async function runPrivacy(o: PrivacyOptions): Promise<PrivacyResult> {
   let scannedFiles = 0;
 
   if (o.videoId) {
-    const session = await openSession({ videoId: o.videoId, props: o.props, format: o.format, log: o.log });
+    const session = await openSession({ videoId: o.videoId, props: o.props, format: o.format, assets: o.assets, allowMissingFonts: o.allowMissingFonts, log: o.log });
     try {
       frames = sampleFrames(o, session.meta.durationInFrames, 24, await sceneFrames(session, o.scene));
       for (const s of collectStrings(o.props ?? {})) {

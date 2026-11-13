@@ -27,7 +27,7 @@ npm run qa -- story-demo --list-scenes     # lo mismo y, en una historia, el pre
 npm run sheet -- fx-text --count 8         # galería del catálogo de efectos (también fx-3d y fx-data-ui-art)
 ```
 
-Catálogo de efectos listos (texto, 3D, datos, interfaz y arte): [docs/animaciones.md](docs/animaciones.md), con tres galerías para verlos: `fx-text`, `fx-3d` y `fx-data-ui-art` (`/?video=fx-3d&props={"theme":"dark"}`). Sonido (tempo, empalme al compás, efectos propios y mezcla): [docs/audio.md](docs/audio.md). Otros ejemplos: `hello`, `fx-in-scene` (regresión: efectos montados desde el cuadro 0 dentro de una escena, sin residuos antes de su `start` ni después de terminar), `story-demo` (historia con apertura, vueltas al listado y cierre), `qa-defects` (defectos sembrados para probar el QA). Un video roto no deja inservibles a los demás (solo falla el que tiene el problema) y los tamaños tienen que ser pares. Cada comando y sus opciones: [render/README.md](render/README.md) y [qa/README.md](qa/README.md) (con el criterio de severidad de `offscreen` y del velo en `contrast`). Pruebas y tipos: `npm test`, `npm run typecheck`.
+Catálogo de efectos listos (texto, 3D, datos, interfaz y arte): [docs/animaciones.md](docs/animaciones.md), con tres galerías para verlos: `fx-text`, `fx-3d` y `fx-data-ui-art` (`/?video=fx-3d&props={"theme":"dark"}`). Sonido (tempo, empalme al compás, efectos propios y mezcla): [docs/audio.md](docs/audio.md). Otros ejemplos: `hello`, `fx-in-scene` (regresión: efectos montados desde el cuadro 0 dentro de una escena, sin residuos antes de su `start` ni después de terminar), `story-demo` (historia con apertura, vueltas al listado y cierre), `qa-defects` (defectos sembrados para probar el QA). Un video roto no deja inservibles a los demás (solo falla el que tiene el problema) y los tamaños tienen que ser pares. Cada comando y sus opciones: [render/README.md](render/README.md) y [qa/README.md](qa/README.md) (con el criterio de severidad de `offscreen` y del velo en `contrast`). Pruebas y tipos: `npm run typecheck`, `npm test` (rápidas, 1 a 2 minutos) y `npm run test:e2e` (lentas, unos 10 minutos: `--check` por escena de varias historias; solo hace falta si se toca el toolkit).
 
 ## Mapa de carpetas
 
@@ -62,6 +62,15 @@ Abrí el repo con Claude Code y pedí lo que necesitás: "haceme un video de pre
 Cada etapa exige lo anterior aprobado: sobre todo, el guion (con su presupuesto de cuadros) antes que cualquier escena.
 
 Las reglas de producción y sus motivos: [docs/reglas.md](docs/reglas.md) (con "Qué hacer cuando --check falla"). Cómo se escribe una escena: [docs/guia-escenas.md](docs/guia-escenas.md). Qué efecto usar: [docs/animaciones.md](docs/animaciones.md). Convenciones para agentes en este repo: [CLAUDE.md](CLAUDE.md).
+
+## Trabajar con material privado
+
+Este repo es público: no puede llevar nombres de empresas, clientes o personas reales, credenciales, capturas ni marcas que no sean de quien las sube. Un video con material privado se produce así:
+
+- **En una carpeta fuera del repo**: `VE_VIDEOS_DIR=/ruta/absoluta/mis-videos bash templates/nuevo.sh escena <slug> <nombre>` crea ahí el video (con `tsconfig.json` y `env.d.ts` para el editor, a partir de `templates/externo/`) y los comandos `render`, `qa`, `sheet`, `privacy` y `npm run dev` lo descubren si la variable está definida (junto con los ejemplos). Sus fuentes, logos y audio van en `<carpeta>/assets` o `<carpeta>/<slug>/assets` (se sirven solos) y se referencian con `asset()` o con `import ... ?url`. Los tipos se revisan con `npm run typecheck:videos` (o con `npm run typecheck`, que también los mira si la variable está definida).
+- **O en `videos/`**, que está en `.gitignore` y no se sube nunca.
+- **La cache y las salidas también quedan afuera**: con `VE_VIDEOS_DIR` definida, el bundle compilado (con fuentes, logos y código de las escenas), los segmentos, los cuadros, los mp4 y las hojas se escriben en `<VE_VIDEOS_DIR>/.ve-cache/` y `<VE_VIDEOS_DIR>/out/`, nunca dentro del clon (se pueden mover con `VE_CACHE_DIR` y `VE_OUT_DIR`). `npm run clean` borra esas carpetas y las del clon. Así el clon público se puede comprimir o compartir sin arrastrar nada privado.
+- Nada privado va en `examples/`, `public/`, `docs/` ni en ningún otro archivo versionado. Lo que no puede aparecer en pantalla va en `prohibidos.txt` y se verifica con `ve-privacy`.
 
 ## Licencias
 

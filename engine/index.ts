@@ -16,6 +16,8 @@ export { Sequence, Series } from './Sequence';
 export { Fill } from './Fill';
 export { holdRender, releaseRender, pendingHolds, waitForHolds } from './holds';
 export { asset } from './asset';
+export { reportFontFailure, fontFailures, clearFontFailures, collectFontFailures, checkFontFailures, describeFontFailures } from './fontCheck';
+export type { FontFailure } from './fontCheck';
 export { Audio, collectAudio, clearAudio } from './Audio';
 export type { AudioTrack } from './Audio';
 export { createStage, scanAudio } from './stage';

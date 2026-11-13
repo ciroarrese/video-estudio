@@ -21,7 +21,7 @@ async function main(): Promise<number> {
   const log = (m: string) => console.log(m);
   const base = {
     videoId: o.videoId, out: o.out, props: o.props, frames: o.frames, concurrency: o.concurrency, scale: o.scale,
-    crf: o.crf, segment: o.segment, audio: o.audio, cache: o.cache, keepFrames: o.keepFrames, frameFormat: o.frameFormat, jpegQuality: o.jpegQuality, assets: o.assets, checkMaxDelta: o.checkMaxDelta, checkMaxRatio: o.checkMaxRatio, checkStrict: o.checkStrict, format: o.format, scene: o.scene, log,
+    crf: o.crf, segment: o.segment, audio: o.audio, cache: o.cache, keepFrames: o.keepFrames, frameFormat: o.frameFormat, jpegQuality: o.jpegQuality, assets: o.assets, allowMissingFonts: o.allowMissingFonts || undefined, checkCount: o.checkCount, checkPerScene: o.checkPerScene, checkAll: o.checkAll, checkMaxDelta: o.checkMaxDelta, checkMaxRatio: o.checkMaxRatio, checkStrict: o.checkStrict, format: o.format, scene: o.scene, log,
   };
   try {
     if (o.list) {
@@ -40,7 +40,7 @@ async function main(): Promise<number> {
     }
     if (o.check || o.checkStrict) {
       const r = await checkVideo(base);
-      console.log(r.ok ? 'check: OK (determinista)' : 'check: FALLO (no determinista)');
+      console.log(r.ok ? `check: OK (determinista; ${r.frames.length} cuadros verificados)` : `check: FALLO (no determinista; ${r.frames.length} cuadros verificados)`);
       return r.ok ? 0 : 1;
     }
     await renderVideo(base);

@@ -1,15 +1,29 @@
-import type { Theme } from "./types";
+import type { CloudBlob, DataCheck, ResolvedTheme, Surface, Theme } from "./types";
 import { neutral } from "./neutral";
 import { isValidColor, shiftColor } from "./color";
-import { checkTheme, contrastRatio } from "./contrast";
+import { checkTheme, contrastRatio, pairColors } from "./contrast";
 import { deepClone } from "./util";
+import { DATA_NAME, DEFAULT_TYPE_DISPLAY, resolveTheme } from "./data";
 
 export type TokenInput = string | Record<string, unknown>;
 
 export interface TokenOptions {
   /** Solo para CSS: selector del bloque a leer (por defecto ":root"). */
   selector?: string;
+  /**
+   * Colores con nombre del video que no tienen rol en `Theme` (estados, severidades, fondos de ficha...), legibles con `useTheme().data.<nombre>`.
+   * Cada entrada es el nombre de un token (o un color, si no hay un token con ese nombre), o `{ token | color, on?, min? }`:
+   * `on` son las superficies donde se dibuja (por defecto `surface`) y `min` el contraste que se le pide (3 por defecto; 4.5 para texto).
+   * Entran en `report.data` y en los avisos de contraste de `checkTheme`.
+   */
+  data?: Record<string, DataRoleInput>;
+  /** Pares de contraste de marca que se dan por conocidos (`["accent/bg"]`); `checkTheme` los informa como `note`, mientras los colores del par sigan siendo los aprobados. */
+  acknowledge?: string[];
 }
+
+export type DataRoleInput =
+  | string
+  | { token?: string; color?: string; on?: Surface | Surface[]; min?: number };
 
 export interface TokenReport {
   /** rol del tema -> nombre del token de origen */
@@ -22,6 +36,10 @@ export interface TokenReport {
   warnings: string[];
   /** rol -> tokens que también podían mapearse a él y perdieron por prioridad */
   ambiguous: Record<string, string[]>;
+  /** colores de datos declarados: nombre -> color, de dónde salió y contra qué se revisa */
+  data: Record<string, { color: string; source: string } & DataCheck>;
+  /** pares de contraste reconocidos en `acknowledge` (no son avisos) */
+  notes: string[];
 }
 
 type Flat = Map<string, string>;
@@ -139,6 +157,7 @@ const WEIGHT_ALIASES: Record<string, string[]> = {
 };
 const GRADIENT_BRAND = ["gradient-brand", "gradient-primary", "brand-gradient", "gradient-accent", "gradient"];
 const TYPE_KEYS = ["hero", "h1", "h2", "body", "caption", "eyebrow", "stat"] as const;
+const UI_KEYS = ["xs", "sm", "md"] as const;
 const RADIUS_KEYS = ["sm", "md", "panel", "lg", "pill"] as const;
 const SHADOW_KEYS = ["sm", "md", "lg"] as const;
 
@@ -156,13 +175,13 @@ export function themeFromTokensWithReport(
   input: TokenInput,
   base: Theme = neutral,
   options: TokenOptions = {},
-): { theme: Theme; report: TokenReport } {
+): { theme: ResolvedTheme; report: TokenReport } {
   const flat: Flat = typeof input === "string" ? parseCss(input, options.selector) : new Map();
   if (typeof input !== "string") flattenObject(input, [], flat);
   resolveRefs(flat);
 
   const theme: Theme = deepClone(base);
-  const report: TokenReport = { mapped: {}, fallback: [], derived: [], warnings: [], ambiguous: {} };
+  const report: TokenReport = { mapped: {}, fallback: [], derived: [], warnings: [], ambiguous: {}, data: {}, notes: [] };
   const used = new Set<string>();
 
   /** Tokens que coinciden con alguno de los nombres, en orden de prioridad (nombre exacto antes que sufijo -default/-500). */
@@ -262,10 +281,51 @@ export function themeFromTokensWithReport(
     theme.gradient.brand = `linear-gradient(90deg, ${theme.color.accent} 0%, ${theme.color.accent2} 100%)`;
     report.derived.push("gradient.brand");
   }
-  if (mappedAccent || mappedAccent2) {
+
+  // Nubes: colores (lista), cantidad, semilla, opacidad y manchas explícitas
+  const cloudColors: string[] = [];
+  const listed = matches(["cloud-colors", "cloud-palette"], false)[0];
+  if (listed) {
+    const parts = listed[1].split(/,(?![^(]*\))/).map((x) => x.trim()).filter(Boolean);
+    const okParts = parts.filter(isValidColor);
+    for (const bad of parts.filter((x) => !isValidColor(x))) report.warnings.push(`Color inválido ignorado en "${listed[0]}": ${bad}`);
+    if (okParts.length) {
+      cloudColors.push(...okParts);
+      note("cloud.colors", listed[0]);
+    }
+  }
+  for (let i = 1; i <= 12 && !listed; i++) {
+    const v = pick(`cloud.colors[${cloudColors.length}]`, [`cloud-color-${i}`, `cloud-colors-${i}`], isValidColor, "Color", false);
+    if (v) cloudColors.push(v);
+  }
+  if (cloudColors.length) theme.cloud.colors = cloudColors;
+  else if (mappedAccent || mappedAccent2) {
     theme.cloud.colors = [theme.color.accent, theme.color.accent2, shiftColor(theme.color.accent, -40, 0)];
     report.derived.push("cloud.colors");
   }
+  const cnt = pick("cloud.count", ["cloud-count", "clouds-count"], (x) => Number.isInteger(+x) && +x >= 1 && +x <= 24, "Cantidad de nubes", false);
+  if (cnt) theme.cloud.count = +cnt;
+  const sd = noUnresolved("cloud.seed", ["cloud-seed"], "Semilla de nubes");
+  if (sd) theme.cloud.seed = sd;
+  const op = pick("cloud.opacity", ["cloud-opacity"], (x) => {
+    const n = x.trim().endsWith("%") ? parseFloat(x) / 100 : Number(x);
+    return Number.isFinite(n) && n >= 0 && n <= 1;
+  }, "Opacidad de nubes", false);
+  if (op) theme.cloud.opacity = op.trim().endsWith("%") ? parseFloat(op) / 100 : Number(op);
+  const blobs: CloudBlob[] = [];
+  // el valor puede venir entre comillas ("x y tamaño") o sin ellas
+  const sinComillas = (x: string) => x.trim().replace(/^(["'])([\s\S]*)\1$/, "$2").trim();
+  for (let i = 1; i <= 24; i++) {
+    const v = pick(`cloud.blobs[${blobs.length}]`, [`cloud-blob-${i}`], (x) => {
+      const p = sinComillas(x).split(/[\s,]+/).map(Number);
+      return p.length >= 2 && p.length <= 3 && p.every(Number.isFinite) && p[0]! >= 0 && p[0]! <= 1 && p[1]! >= 0 && p[1]! <= 1 && (p[2] === undefined || p[2] > 0);
+    }, "Mancha de nube (\"x y tamaño\", x e y entre 0 y 1)", false);
+    if (v) {
+      const p = sinComillas(v).split(/[\s,]+/).map(Number);
+      blobs.push({ x: p[0]!, y: p[1]!, ...(p[2] ? { size: p[2] } : {}) });
+    }
+  }
+  if (blobs.length) theme.cloud.blobs = blobs;
 
   // Tipografía
   const fam = noUnresolved("font.family", FONT_FAMILY, "Familia tipográfica", (x) => !/^\d/.test(x.trim()));
@@ -283,6 +343,75 @@ export function themeFromTokensWithReport(
       (x) => (toPx(x) ?? 0) > 0, "Tamaño", false);
     if (v) theme.type[t] = toPx(v)!;
   }
+  for (const u of UI_KEYS) {
+    const v = pick(`type.ui.${u}`, [`type-ui-${u}`, `font-size-ui-${u}`, `text-ui-${u}`, `video-ui-${u}`], (x) => (toPx(x) ?? 0) > 0, "Tamaño", false);
+    if (v) theme.type.ui = { ...(theme.type.ui ?? { xs: 15, sm: 20, md: 24 }), [u]: toPx(v)! };
+  }
+  for (const d of ["sm", "md", "lg"] as const) {
+    const v = pick(`type.display.${d}`, [`type-display-${d}`, `font-size-display-${d}`, `text-display-${d}`, `video-display-${d}`], (x) => (toPx(x) ?? 0) > 0, "Tamaño", false);
+    if (v) theme.type.display = { ...(theme.type.display ?? DEFAULT_TYPE_DISPLAY), [d]: toPx(v)! };
+  }
+
+  // Colores de datos declarados por el video
+  const lookup = (name: string): [string, string] | undefined => {
+    const n = norm(name);
+    for (const key of [n, `color-${n}`]) if (flat.has(key)) return [key, flat.get(key)!];
+    return undefined;
+  };
+  theme.data = { ...(theme.data ?? {}) };
+  theme.dataChecks = { ...(theme.dataChecks ?? {}) };
+  for (const [role, raw] of Object.entries(options.data ?? {})) {
+    if (!DATA_NAME.test(role)) {
+      report.warnings.push(`Color de datos "${role}" ignorado: el nombre tiene que ser un identificador simple (letras y números, empezando con letra)`);
+      continue;
+    }
+    const spec = typeof raw === "string" ? { token: raw } : raw;
+    let color: string | undefined;
+    let source = "";
+    if (spec.color !== undefined) {
+      color = spec.color.trim();
+      source = "valor";
+    } else {
+      const name = spec.token ?? `data-${role}`;
+      const hit = lookup(name);
+      if (hit) {
+        color = hit[1].trim();
+        source = hit[0];
+      } else if (typeof raw === "string" && isValidColor(raw)) {
+        color = raw.trim();
+        source = "valor";
+      } else {
+        report.warnings.push(`Color de datos "${role}": no hay un token "${name}"; el nombre no queda declarado`);
+        continue;
+      }
+    }
+    if (!isValidColor(color)) {
+      report.warnings.push(`Color de datos "${role}" inválido ignorado${source === "valor" ? "" : ` en "${source}"`}: ${color}`);
+      continue;
+    }
+    const check: DataCheck = {
+      on: spec.on === undefined ? ["surface"] : Array.isArray(spec.on) ? spec.on : [spec.on],
+      min: spec.min ?? 3,
+    };
+    theme.data[role] = color;
+    theme.dataChecks[role] = check;
+    report.data[role] = { color, source, ...check };
+    report.mapped[`data.${role}`] = source;
+    if (source !== "valor") used.add(source);
+  }
+  // Los reconocimientos van atados a los colores con que se aprobaron: los que vienen de `base` con los colores de `base`,
+  // los nuevos con los de este tema. Así un tema derivado con otro color en ese par no hereda un "aprobado" que no le corresponde.
+  const pins: Record<string, [string, string]> = { ...(base.acknowledgePins ?? {}) };
+  for (const n of base.acknowledge ?? []) {
+    const c = pins[n] ?? pairColors(base, n);
+    if (c) pins[n] = c;
+  }
+  for (const n of options.acknowledge ?? []) {
+    const c = pairColors(theme, n);
+    if (c) pins[n] = c;
+  }
+  if (options.acknowledge?.length) theme.acknowledge = [...new Set([...(theme.acknowledge ?? []), ...options.acknowledge])];
+  if (Object.keys(pins).length) theme.acknowledgePins = pins;
 
   // Radios y sombras
   for (const r of RADIUS_KEYS) {
@@ -310,10 +439,13 @@ export function themeFromTokensWithReport(
   ];
   report.fallback = roles.filter((r) => !(r in report.mapped) && !report.derived.includes(r));
 
-  for (const w of checkTheme(theme)) report.warnings.push(`Contraste: ${w.message}`);
-  return { theme, report };
+  for (const w of checkTheme(theme)) {
+    if (w.severity === "note") report.notes.push(`Contraste: ${w.message}`);
+    else report.warnings.push(`Contraste: ${w.message}`);
+  }
+  return { theme: resolveTheme(theme), report };
 }
 
-export function themeFromTokens(input: TokenInput, base: Theme = neutral, options: TokenOptions = {}): Theme {
+export function themeFromTokens(input: TokenInput, base: Theme = neutral, options: TokenOptions = {}): ResolvedTheme {
   return themeFromTokensWithReport(input, base, options).theme;
 }

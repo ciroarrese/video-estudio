@@ -3,6 +3,7 @@
 (function qaCollect(opts) {
   var stage = document.getElementById('stage') || document.body;
   var W = opts.width, H = opts.height;
+  var onlyKeys = opts.onlyKeys ? new Set(opts.onlyKeys) : null;
   var ids = new Map();
   function idOf(el) { if (!ids.has(el)) ids.set(el, ids.size); return ids.get(el); }
   function rectOf(r) { return { x: r.left, y: r.top, w: r.width, h: r.height }; }
@@ -38,6 +39,15 @@
     }
     return out;
   }
+  // data-qa-decor en el elemento o un ancestro: texto de adorno de una interfaz recreada. "main" marca el adorno que ES el contenido principal del cuadro.
+  function decorOf(el) {
+    var decor = false, main = false;
+    for (var e = el; e; e = e.parentElement) {
+      var v = e.getAttribute && e.getAttribute('data-qa-decor');
+      if (v !== null && v !== undefined) { decor = true; if (v.split(/[\s,]+/).indexOf('main') >= 0) main = true; }
+    }
+    return { decor: decor, main: main };
+  }
   function pathOf(el) {
     var p = [];
     for (var e = el; e && e !== stage; e = e.parentElement) p.push(Array.prototype.indexOf.call(e.parentElement.children, e));
@@ -68,6 +78,26 @@
     return el && el !== stage && keyOf(el) === key ? el : null;
   }
 
+  // Color con el que se PINTA un texto. En HTML es `-webkit-text-fill-color` (que por defecto sigue a `color`); en SVG (`<text>`, `<tspan>`)
+  // `color` no pinta nada: manda `fill` (con `fill-opacity`) y, si el relleno es `none`, el trazo (`stroke`, texto "hueco" o solo contorno).
+  // Un degradado o patron (`url(#...)`) no se puede evaluar: se trata como relleno transparente (como el texto con degradado en HTML).
+  function paintOf(v, o) {
+    if (!v || v === 'none') return null;
+    if (/^url\(/.test(v)) return { grad: true };
+    var c = parseRgba(v);
+    c.a = c.a * (isNaN(o) ? 1 : o);
+    return c;
+  }
+  function textFill(el, cs) {
+    if (el.namespaceURI === 'http://www.w3.org/2000/svg') {
+      var f = paintOf(cs.fill, parseFloat(cs.fillOpacity));
+      if (f && !f.grad) return f;
+      var st = paintOf(cs.stroke, parseFloat(cs.strokeOpacity));
+      if (f === null && st && !st.grad) return st;
+      return { r: 0, g: 0, b: 0, a: 0 };
+    }
+    return parseRgba(cs.webkitTextFillColor || cs.color);
+  }
   function clipText0(cs) { return (cs.backgroundClip || cs.webkitBackgroundClip) === 'text' || cs.webkitBackgroundClip === 'text'; }
   // elementsFromPoint skips pointer-events:none; make everything hit-testable while we measure.
   var probe = document.createElement('style');
@@ -86,6 +116,8 @@
     if (tag === 'SCRIPT' || tag === 'STYLE' || tag === 'NOSCRIPT') continue;
     var cs = getComputedStyle(el);
     if (cs.visibility !== 'visible' || cs.display === 'none') continue;
+    // modo liviano (`opts.onlyKeys`): solo mide el tamaño en pantalla y la opacidad de los textos pedidos (qa/zoom.ts)
+    if (onlyKeys && !onlyKeys.has(keyOf(el) + '#' + Array.prototype.indexOf.call(el.childNodes, node))) continue;
     range.selectNodeContents(node);
     var rects = [];
     var list = range.getClientRects();
@@ -131,16 +163,17 @@
     var scale = Math.hypot(m.c, m.d);
     if (!(scale > 0)) scale = 0;
     var fontPx = parseFloat(cs.fontSize);
-    var fill = parseRgba(cs.webkitTextFillColor || cs.color);
+    var fill = textFill(el, cs);
     var weight = parseInt(cs.fontWeight, 10) || 400;
 
+    var runKey = keyOf(el) + '#' + Array.prototype.indexOf.call(el.childNodes, node);
     var run = {
-      id: runs.length, key: keyOf(el) + '#' + Array.prototype.indexOf.call(el.childNodes, node), elId: idOf(el), chain: chain, tag: tag.toLowerCase(), testid: testidOf(el),
+      id: runs.length, key: runKey, elId: idOf(el), chain: chain, tag: tag.toLowerCase(), testid: testidOf(el),
       text: excerpt(node.data),
       rect: { x: x0, y: y0, w: x1 - x0, h: y1 - y0 }, lines: rects,
       opacity: opacityUp(el), fontPx: fontPx, scale: scale, transformed: transformed, screenPx: fontPx * scale, bold: weight >= 700,
       color: 'rgba(' + fill.r + ',' + fill.g + ',' + fill.b + ',' + fill.a + ')', transparentFill: fill.a < 0.05,
-      fadingBg: fadingSurface(el), ignore: ignoreOf(el), clips: clips,
+      fadingBg: fadingSurface(el), ignore: ignoreOf(el), decor: decorOf(el).decor, decorMain: decorOf(el).main, clips: clips,
       own: {
         sw: el.scrollWidth, cw: el.clientWidth, sh: el.scrollHeight, ch: el.clientHeight,
         ox: cs.overflowX, oy: cs.overflowY, ellipsis: cs.textOverflow === 'ellipsis',
@@ -148,6 +181,8 @@
       cover: null,
       veil: null,
     };
+
+    if (onlyKeys) { runs.push(run); continue; }
 
     // covered: se muestrean hasta 5 puntos por linea (10/30/50/70/90 % del ancho, al medio de la altura) y se mira con elementsFromPoint
     // si hay encima un elemento solido que no es ancestro ni descendiente. Gana el que tapa mas puntos; `frac` = puntos tapados / muestreados.
@@ -176,7 +211,9 @@
             // (un degradado recortado al texto, background-clip:text, solo pinta las letras: no tapa nada)
             var clipText = clipText0(ccs);
             var solidImage = ccs.backgroundImage !== 'none' && op >= 0.9 && !clipText;
-            var solid = solidColor || solidImage || c.tagName === 'IMG' || c.tagName === 'VIDEO' || c.tagName === 'CANVAS';
+            // img, video y canvas tapan si se ven: con opacidad (propia o heredada) casi 0 no tapan nada (visibility ya se descartó arriba)
+            var solidMedia = (c.tagName === 'IMG' || c.tagName === 'VIDEO' || c.tagName === 'CANVAS') && op >= 0.9;
+            var solid = solidColor || solidImage || solidMedia;
             if (!solid) continue;
             if (!counts.has(c)) { counts.set(c, 0); order.push(c); }
             counts.set(c, counts.get(c) + 1);

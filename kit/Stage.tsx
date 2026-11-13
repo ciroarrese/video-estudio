@@ -1,6 +1,7 @@
 import React from "react";
 import { useTheme } from "../themes";
 import { CloudBackground } from "./CloudBackground";
+import type { CloudOptions } from "./CloudBackground";
 import { firstFamily, fontFaceCss } from "./fonts";
 import { useThemeFonts } from "./ThemeScope";
 
@@ -10,11 +11,14 @@ export { firstFamily };
 export function Stage({
   clouds = true,
   cloudOpacity,
+  cloud,
   frame,
   children,
 }: {
   clouds?: boolean;
   cloudOpacity?: number;
+  /** Colores, cantidad, semilla, manchas explícitas y opacidad de las nubes de esta escena; lo que falte sale de `theme.cloud`. */
+  cloud?: CloudOptions;
   frame?: number;
   children?: React.ReactNode;
 }) {
@@ -34,7 +38,7 @@ export function Stage({
       }}
     >
       {fontCss && <style>{fontCss}</style>}
-      {clouds && <CloudBackground frame={frame} opacity={cloudOpacity} />}
+      {clouds && <CloudBackground frame={frame} {...cloud} opacity={cloudOpacity ?? cloud?.opacity} />}
       {children}
     </div>
   );

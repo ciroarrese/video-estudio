@@ -27,6 +27,9 @@ export function World({
 }) {
   const flat = Math.abs(camera.rx) < 1e-6 && Math.abs(camera.ry) < 1e-6;
   const tilt = flat ? "" : ` perspective(${perspective}px) rotateX(${r3(camera.rx)}deg) rotateY(${r3(camera.ry)}deg)`;
+  // La escala solo se emite si no es 1 (en reposo no queda `scale(1)`); el `transform` es una sola propiedad, así que el orden del atributo no cambia.
+  const k = r3(camera.scale);
+  const zoom = k === 1 ? "" : ` scale(${k})`;
   // El desenfoque solo se emite mientras hay (React agrega al final las propiedades que reaparecen; con `key` el orden no depende del historial).
   const st: React.CSSProperties = {
     position: "absolute",
@@ -35,7 +38,7 @@ export function World({
     width: 1,
     height: 1,
     transformOrigin: "0 0",
-    transform: `translate(${width / 2}px, ${height / 2}px)${tilt} scale(${r3(camera.scale)}) translate(${r3(-camera.x)}px, ${r3(-camera.y)}px)`,
+    transform: `translate(${width / 2}px, ${height / 2}px)${tilt}${zoom} translate(${r3(-camera.x)}px, ${r3(-camera.y)}px)`,
     filter: camera.blur > 0.3 ? `blur(${camera.blur.toFixed(1)}px)` : undefined,
   };
   return (

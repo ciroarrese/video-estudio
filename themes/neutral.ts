@@ -1,7 +1,8 @@
-import type { Theme } from "./types";
+import type { ResolvedTheme, Theme } from "./types";
 import { deepFreeze } from "./util";
+import { resolveTheme } from "./data";
 
-export const neutral: Theme = deepFreeze<Theme>({
+const base: Theme = {
   name: "neutral",
   color: {
     bg: "#f6f7fb",
@@ -30,7 +31,7 @@ export const neutral: Theme = deepFreeze<Theme>({
     md: "0 4px 12px rgba(23,26,43,.10)",
     lg: "0 12px 32px rgba(23,26,43,.14)",
   },
-  type: { hero: 120, h1: 96, h2: 72, body: 44, caption: 32, eyebrow: 26, stat: 180 },
+  type: { hero: 120, h1: 96, h2: 72, body: 44, caption: 32, eyebrow: 26, stat: 180, ui: { xs: 15, sm: 20, md: 24 } },
   safe: { x: 140, y: 110 },
   motion: {
     easing: {
@@ -41,4 +42,7 @@ export const neutral: Theme = deepFreeze<Theme>({
     duration: { fast: 8, base: 16, slow: 30 },
   },
   cloud: { colors: ["#3b5bdb", "#7048e8", "#0c8599"], opacity: 0.18 },
-});
+  data: {},
+};
+
+export const neutral: ResolvedTheme = deepFreeze(resolveTheme(base));

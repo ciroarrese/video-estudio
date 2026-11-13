@@ -91,3 +91,73 @@ export function evenFrames(total: number, count: number): number[] {
   for (let i = 0; i < count; i++) set.add(Math.round((i * (total - 1)) / (count - 1)));
   return [...set].sort((a, b) => a - b);
 }
+
+/** Cuadros de una escena que `--check` mira siempre: unos pocos cerca del comienzo (ahí ocurren las entradas) y el resto repartido hasta el final. */
+export const SCENE_ENTRY_OFFSETS = [2, 10, 24] as const;
+
+/**
+ * Hasta `n` cuadros de una escena (`from`, `duration`): los primeros son los de `SCENE_ENTRY_OFFSETS` (relativos al inicio de la
+ * escena, los que caben) y el resto se reparte parejo hasta el último cuadro. Sin repetidos, ordenados.
+ */
+export function sceneCheckFrames(from: number, duration: number, n: number): number[] {
+  if (duration <= 0 || n <= 0) return [];
+  if (n >= duration) return Array.from({ length: duration }, (_, i) => from + i);
+  const near = SCENE_ENTRY_OFFSETS.filter((o) => o < duration).slice(0, n);
+  const set = new Set<number>(near);
+  const rest = n - near.length;
+  const lo = near.length ? near[near.length - 1]! : 0;
+  for (let j = 1; j <= rest; j++) set.add(Math.min(duration - 1, Math.round(lo + ((duration - 1 - lo) * j) / rest)));
+  return [...set].sort((a, b) => a - b).map((o) => from + o);
+}
+
+export type CheckPlanInput = {
+  /** Rango inclusivo que se cubre: todo el video, una escena (`--scene`) o lo pedido con `--frames a-b`. */
+  first: number;
+  last: number;
+  /** Con `--frames`: se muestrea solo dentro del rango (no se agregan cuadros por escena). */
+  explicitRange?: boolean;
+  /** Escenas con nombre del video (las que no tocan el rango se ignoran). */
+  scenes?: { id: string; from: number; durationInFrames: number }[];
+  /** Cuadros repartidos parejos en el rango (por defecto 12). */
+  count?: number;
+  /** Cuadros por escena (por defecto 6). */
+  perScene?: number;
+  /** Todos los cuadros del rango (lento). */
+  all?: boolean;
+};
+export type CheckPlan = { frames: number[]; /** Resumen para imprimir: cuántos cuadros y de qué tipo. */ summary: string };
+
+export const DEFAULT_CHECK_COUNT = 12;
+export const DEFAULT_CHECK_PER_SCENE = 6;
+
+/**
+ * Qué cuadros verifica `--check`. Con `--check-all`, todos. Con `--frames a-b`, `count` repartidos dentro del rango (o todos si el
+ * rango es corto). Sin eso: `count` repartidos en el rango más, por cada escena con nombre, `perScene` cuadros (varios cerca del inicio).
+ */
+export function planCheckFrames(i: CheckPlanInput): CheckPlan {
+  const total = i.last - i.first + 1;
+  const count = i.count ?? DEFAULT_CHECK_COUNT;
+  const perScene = i.perScene ?? DEFAULT_CHECK_PER_SCENE;
+  if (total <= 0) throw new RangeError(`planCheckFrames: rango vacío ${i.first}-${i.last}`);
+  const even = evenFrames(total, count).map((n) => n + i.first);
+  if (i.all) return { frames: Array.from({ length: total }, (_, k) => i.first + k), summary: `${total} cuadros (--check-all: todos los del rango ${i.first}-${i.last})` };
+  if (i.explicitRange) {
+    const frames = total <= count ? Array.from({ length: total }, (_, k) => i.first + k) : even;
+    return { frames, summary: `${frames.length} cuadros dentro del rango pedido ${i.first}-${i.last} (--frames)` };
+  }
+  const set = new Set(even);
+  let scenesUsed = 0;
+  for (const s of i.scenes ?? []) {
+    const from = Math.max(s.from, i.first);
+    const to = Math.min(s.from + s.durationInFrames - 1, i.last);
+    if (to < from) continue;
+    scenesUsed++;
+    // `from` es relativo al video, el recorte al rango puede mover el inicio: los desplazamientos de entrada se miden desde el inicio real
+    for (const f of sceneCheckFrames(s.from, s.durationInFrames, perScene)) if (f >= from && f <= to) set.add(f);
+  }
+  const frames = [...set].sort((a, b) => a - b);
+  const summary = scenesUsed
+    ? `${frames.length} cuadros (${even.length} repartidos + hasta ${perScene} por escena en ${scenesUsed} ${scenesUsed === 1 ? 'escena' : 'escenas'}, varios cerca del inicio de cada una)`
+    : `${frames.length} cuadros repartidos parejos (el video no declara escenas con nombre)`;
+  return { frames, summary };
+}

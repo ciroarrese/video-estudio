@@ -4,7 +4,7 @@ import { existsSync, mkdtempSync, readdirSync, rmSync, writeFileSync } from 'nod
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { codificar, decodificar, escribirAtomico, escribirWav16, hayFfmpeg } from './ffmpeg';
+import { avisoMp3SinEtiqueta, codificar, decodificar, escribirAtomico, escribirWav16, hayFfmpeg, sondear } from './ffmpeg';
 import { pistaDeClics } from './pistas-de-prueba';
 
 const HAY_FFMPEG = hayFfmpeg();
@@ -28,6 +28,30 @@ describe('escribirAtomico', () => {
       ).rejects.toThrow('falló');
       // La salida anterior sigue intacta y no queda el temporal.
       expect(readdirSync(join(dir, 'sub'))).toEqual(['a.wav']);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+});
+
+const HAY_LAME = HAY_FFMPEG && spawnSync('ffmpeg', ['-hide_banner', '-encoders'], { encoding: 'utf8' }).stdout.includes('libmp3lame');
+
+describe.skipIf(!HAY_LAME)('mp3 sin etiqueta Xing/LAME', () => {
+  it('avisa si falta la etiqueta, no avisa si está y sondea los canales', () => {
+    const dir = mkdtempSync(join(tmpdir(), 've-audio-'));
+    try {
+      const sr = 44100;
+      escribirWav16(join(dir, 'a.wav'), pistaDeClics({ bpm: 120, seconds: 2, sr }), sr, 1);
+      const conEtiqueta = join(dir, 'con.mp3');
+      const sinEtiqueta = join(dir, 'sin.mp3');
+      const lame = (args: string[]) => spawnSync('ffmpeg', ['-v', 'error', '-y', '-i', join(dir, 'a.wav'), '-c:a', 'libmp3lame', ...args], { encoding: 'utf8' });
+      expect(lame([conEtiqueta]).status).toBe(0);
+      expect(lame(['-write_xing', '0', sinEtiqueta]).status).toBe(0);
+      expect(avisoMp3SinEtiqueta(sinEtiqueta)).toMatch(/sin etiqueta Xing\/LAME[\s\S]*wav/);
+      expect(avisoMp3SinEtiqueta(conEtiqueta)).toBeUndefined();
+      expect(avisoMp3SinEtiqueta(join(dir, 'a.wav'))).toBeUndefined();
+      expect(sondear(conEtiqueta)?.canales).toBe(1);
+      expect(sondear(join(dir, 'no-existe.mp3'))).toBeNull();
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }

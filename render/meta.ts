@@ -36,9 +36,12 @@ export function metaForFormat(meta: VideoMeta, format?: FormatName): VideoMeta &
   return { ...meta, width: size.width, height: size.height, format };
 }
 
+/** URL de la página runtime que solo registra los videos (lista, carpeta de origen, errores de carga) sin dibujar ninguno. */
+export const NOSTAGE_QUERY = '?nostage=1';
+
 /** Parámetros de la URL de la página runtime. */
-export function pageQuery(videoId: string, props: Record<string, unknown>, format?: FormatName): string {
-  return `?video=${encodeURIComponent(videoId)}${Object.keys(props).length ? `&props=${encodeURIComponent(JSON.stringify(props))}` : ''}${format ? `&format=${format}` : ''}`;
+export function pageQuery(videoId: string, props: Record<string, unknown>, format?: FormatName, opts: { allowMissingFonts?: boolean } = {}): string {
+  return `?video=${encodeURIComponent(videoId)}${Object.keys(props).length ? `&props=${encodeURIComponent(JSON.stringify(props))}` : ''}${format ? `&format=${format}` : ''}${opts.allowMissingFonts ? '&fonts=warn' : ''}`;
 }
 
 /**
@@ -77,3 +80,7 @@ export function formatVideoList(metas: VideoMeta[]): string {
 export function formatLoadErrors(errors: { folder: string; message: string }[]): string {
   return `Atención: ${errors.length === 1 ? 'una carpeta no cargó' : `${errors.length} carpetas no cargaron`} (los demás videos siguen disponibles):\n${errors.map((e) => `  - ${e.message.split('\n').join('\n    ')}`).join('\n')}`;
 }
+
+/** Mensaje de un error de la página sin el rastro de pila del navegador (`    at f (http://127.0.0.1:1234/assets/index-xyz.js:3:678)`), que solo estorba. */
+export const cleanPageError = (message: string): string =>
+  message.split('\n').filter((l) => !/^\s+at .*(https?:|<anonymous>|\(.*:\d+:\d+\))/.test(l)).join('\n').replace(/^page\.evaluate: Error: /, '').trim();

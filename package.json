@@ -9,13 +9,16 @@
   },
   "scripts": {
     "test": "vitest run",
-    "typecheck": "tsc --noEmit",
+    "test:e2e": "vitest run --config vitest.e2e.config.ts",
+    "typecheck": "tsc --noEmit && tsx render/typecheck-externo.ts --opcional",
+    "typecheck:videos": "tsx render/typecheck-externo.ts",
     "dev": "vite",
     "build": "vite build",
     "render": "tsx render/cli.ts",
     "qa": "tsx qa/cli.ts qa",
     "sheet": "tsx qa/cli.ts sheet",
     "privacy": "tsx qa/cli.ts privacy",
+    "clean": "tsx render/clean.ts",
     "audio": "tsx audio/cli.ts"
   },
   "dependencies": {

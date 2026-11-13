@@ -1,0 +1,25 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "jsx": "react-jsx",
+    "strict": true,
+    "noEmit": true,
+    "skipLibCheck": true,
+    "isolatedModules": true,
+    "esModuleInterop": true,
+    "types": [],
+    "paths": {
+      "video-estudio/*": ["__REPO__/*"],
+      "react": ["__REPO__/node_modules/@types/react"],
+      "react/jsx-runtime": ["__REPO__/node_modules/@types/react/jsx-runtime"],
+      "react/jsx-dev-runtime": ["__REPO__/node_modules/@types/react/jsx-dev-runtime"],
+      "react-dom": ["__REPO__/node_modules/@types/react-dom"],
+      "react-dom/client": ["__REPO__/node_modules/@types/react-dom/client"]
+    }
+  },
+  "include": ["**/*.ts", "**/*.tsx"],
+  "exclude": ["node_modules", "assets"]
+}

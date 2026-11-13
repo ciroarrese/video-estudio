@@ -1,15 +1,16 @@
 import { useFrame } from "../../engine";
-import { ThemeProvider, dark, neutral, useTheme } from "../../themes";
+import { ThemeProvider, useTheme } from "../../themes";
 import type { Theme } from "../../themes";
 import { CountUp, Cursor, DockedHeadline, Stage, ThemeScope, kf } from "../../kit";
 import { DonutRing, Typewriter } from "../../fx";
 import { ParticleSphere } from "../../fx/three";
+import { ESTADOS } from "./estados";
 
 type Named = "neutral" | "dark" | Theme;
 /** `theme`: tema del video. `scoped`: tema de la herramienta recreada (por defecto el contrario). Aceptan un objeto Theme (para pruebas). */
 export type ThemeScopeDemoProps = { theme?: Named; scoped?: Named; inner?: Named };
 
-const resolve = (t: Named): Theme => (typeof t === "object" ? t : t === "dark" ? dark : neutral);
+const resolve = (t: Named): Theme => (typeof t === "object" ? t : t === "dark" ? ESTADOS.dark : ESTADOS.neutral);
 
 /** Tarjeta de estadística: sale entera de `useTheme()`, así que toma el tema del ámbito donde se la ponga. */
 function Stat({ label, value, to, left }: { label: string; value: string; to: number; left: number }) {
@@ -35,6 +36,14 @@ function Tool({ inner }: { inner: Theme }) {
       <div style={{ position: "absolute", left: 36, top: 76, fontSize: theme.type.caption, color: theme.color.textMuted }}>
         <Typewriter frame={frame} start={8} duration={40} text="Tablero con su propio tema" fontSize={theme.type.caption} />
       </div>
+      {/* Colores de datos del tema del ámbito (`theme.data`): solo si el tema los declara. */}
+      {"estadoOk" in theme.data && (
+        <div style={{ position: "absolute", left: 600, top: 36, display: "flex", gap: 8 }}>
+          {([["Ok", theme.data.estadoOk], ["Alerta", theme.data.estadoAlerta], ["Fallo", theme.data.estadoFallo]] as const).map(([t, c]) => (
+            <span key={t} style={{ padding: "2px 12px", borderRadius: theme.radius.pill, background: theme.data.fichaFondo, border: `2px solid ${c}`, color: c, fontSize: theme.type.ui.sm, fontWeight: theme.font.weights.semibold }}>{t}</span>
+          ))}
+        </div>
+      )}
       <Stat label="Nuevos" value=" %" to={128} left={36} />
       <Stat label="Cerrados" value=" %" to={87} left={290} />
       <div style={{ position: "absolute", left: 560, top: 70, width: 260, height: 260 }}>
@@ -82,7 +91,7 @@ function Scene({ scoped, inner }: { scoped: Theme; inner: Theme }) {
 /** Cambio de tema por escena y por subárbol con `ThemeScope`: una herramienta oscura recreada dentro de un video claro, con un ámbito anidado. */
 export function ThemeScopeDemo({ theme = "neutral", scoped, inner }: ThemeScopeDemoProps) {
   const outer = resolve(theme);
-  const mid = scoped ? resolve(scoped) : outer === dark ? neutral : dark;
+  const mid = scoped ? resolve(scoped) : outer.name === "dark" ? resolve("neutral") : resolve("dark");
   const inn = inner ? resolve(inner) : outer;
   return (
     <ThemeProvider theme={outer}>

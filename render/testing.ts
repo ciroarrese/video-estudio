@@ -33,6 +33,15 @@ export async function withTempVideos<T>(fn: (dir: string) => Promise<T> | T): Pr
   }
 }
 
+/** Escribe archivos (ruta relativa -> contenido) bajo `dir`, creando las carpetas. Para armar videos temporales dentro de `withTempVideos`. */
+export function writeVideoFiles(dir: string, files: Record<string, string | Uint8Array>): void {
+  for (const [rel, content] of Object.entries(files)) {
+    const f = join(dir, rel);
+    mkdirSync(dirname(f), { recursive: true });
+    writeFileSync(f, content);
+  }
+}
+
 const alive = (pid: number) => {
   try {
     process.kill(pid, 0);

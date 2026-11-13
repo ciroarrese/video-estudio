@@ -43,6 +43,9 @@ export type TextRun = {
   color: string;
   transparentFill: boolean;
   ignore: string[];
+  /** El texto está bajo `data-qa-decor` (adorno de una interfaz recreada) y, si el valor es `main`, es el contenido principal del cuadro. */
+  decor?: boolean;
+  decorMain?: boolean;
   clips: ClipBox[];
   own: { sw: number; cw: number; sh: number; ch: number; ox: string; oy: string; ellipsis: boolean };
   /**
@@ -61,6 +64,18 @@ export type TextRun = {
 
 export type PageData = { frame: number; width: number; height: number; runs: TextRun[]; elems: Record<string, Rect>; /** Coverage alpha of the elements in `elems` (same keys). */ opac?: Record<string, number> };
 
+/**
+ * Resumen de lo que `min-size` reclasificó como "detalle que se lee al acercar" (info): textos por debajo del mínimo en el cuadro
+ * muestreado que, dentro de la misma escena, se ven por encima del mínimo en otro cuadro.
+ */
+export type DetailSummary = { texts: number; frames: number };
+
+/** Hallazgos que callaron `data-qa-ignore` y `data-qa-decor`, por regla (solo las reglas donde callaron algo). */
+export type SilencedSummary = Record<string, { ignore: number; decor: number }>;
+
+/** Textos de adorno (`data-qa-decor`) que quedaron fuera de `min-size` y `contrast`: cuántos textos distintos y en cuántos cuadros. */
+export type DecorSummary = { texts: number; frames: number };
+
 export type Finding = {
   rule: RuleId;
   severity: Severity;
@@ -77,7 +92,7 @@ export type Thresholds = {
   offscreen: { tolerancePx: number; minOpacity: number; maxFrames: number; slipPct: number; /** Rebaba (px) que, con la cámara en movimiento, se informa como info. */ sliverPx: number; /** Desplazamiento mínimo (px) entre cuadros para decir que la cámara se mueve. */ cameraPx: number };
   'safe-area': { margin: number; minOpacity: number };
   overlap: { ratio: number; minOpacity: number; inkHeight: number; maxFrames: number };
-  'min-size': { minPx1080: number; minOpacity: number; tolerancePx: number };
+  'min-size': { minPx1080: number; minOpacity: number; tolerancePx: number; /** Cuadros que se miran dentro de la escena para saber si un texto chico se lee al acercar la cámara (0 = no mirar: todo texto chico es error). */ probeFrames: number };
   contrast: { error: number; warn: number; largePx1080: number; minOpacity: number };
   covered: { minOpacity: number; maxCoverFraction: number; hiddenFully: number };
   /** `px`: movimiento que baja a info los recortes del cuadro y el tamaño; `crossPx` (menor): movimiento con el que dos elementos que se cruzan (superposición, tapado, contraste) son una transición. */

@@ -10,7 +10,7 @@ Un video es una función del número de cuadro. Una escena:
 - devuelve React puro: sin estado que acumule, sin temporizadores, sin azar suelto (`random(seed)`), sin animaciones CSS;
 - calcula cada valor animado con `kf` (cuadros clave) o `interpolate`, nunca guardándolo.
 
-Formato por defecto: 1920×1080, 30 fps. Un tema (`useTheme()`) trae `color`, `font`, `radius`, `shadow`, `type` (tamaños en px), `safe` (área segura), `motion` y `cloud`.
+Formato por defecto: 1920×1080, 30 fps. Un tema (`useTheme()`) trae `color`, `font`, `radius`, `shadow`, `type` (tamaños en px, con `type.display` para textos grandes intermedios y la subescala `type.ui` para interfaces recreadas), `safe` (área segura), `motion`, `cloud` y `data` (colores con nombre propios del video: `useTheme().data.estado`, sin `#hex` en la escena; se declaran con `themeFromTokens(tokens, base, { data })`, ver `themes/README.md`).
 
 `theme.type` (valores de `neutral` y de `dark`; un tema armado desde tokens parte de ellos): son tamaños de letra en píxeles del cuadro, iguales en todos los formatos.
 
@@ -23,6 +23,7 @@ Formato por defecto: 1920×1080, 30 fps. Un tema (`useTheme()`) trae `color`, `f
 | `caption` | 32 | filas, botones, titular fijo; es el escalón "grande" de una interfaz recreada |
 | `eyebrow` | 26 | rótulos chicos, encabezados de columna; el piso para algo que no se acerca |
 | `stat` | 180 | cifra de un indicador (se usa multiplicada: `type.stat * 0.6` en una tarjeta) |
+| `ui.md` / `ui.sm` / `ui.xs` | 24 / 20 / 15 | **solo** texto de una interfaz recreada que se lee con la cámara acercada (tablas densas, fichas, menús); en pantalla completa usá los escalones de arriba |
 
 `theme.safe` es `{ x: 140, y: 110 }`: el margen seguro es la mitad por lado (70 px a los costados y 55 arriba y abajo); `DockedHeadline` se apoya justo en ese margen.
 
@@ -64,9 +65,11 @@ const cam = cameraAt(f, KEYS);            // { x, y, scale, rx, ry, blur }
 | Marcar algo a mano | `DoodleCircle`, `DoodleArrow`, `DoodleUnderline` (con `id` único, `start`, `end`) |
 | Una tarjeta que viaja de un lugar a otro | `FlyingCard` con `range`, `from`, `to`, `arc` |
 | Número que cuenta | `CountUp` (`start`, `duration`, `format?`) |
-| Texto con el degradado del tema | `GradientText` |
-| Titular que se aparta | `DockedHeadline` con `title` (o `TopicHeadline`, que dentro de una historia lee el tema y fuera de ella necesita `title`) |
-| Oscurecer los bordes al acercar | `Vignette amount={0..1}` |
+| Texto con el degradado del tema | `GradientText` (`loop={90}` lo hace ir y volver y termina exacto en el primer cuadro del ciclo; `pan` es una velocidad sin ciclo exacto) |
+| Titular que se aparta | `DockedHeadline` con `title` (o `TopicHeadline`, que dentro de una historia lee el tema y fuera de ella necesita `title`); `layout="inline"` pone título y subtítulo en un renglón ("04 Nombre · línea"), `"stacked"` (por defecto) los apila |
+| Oscurecer los bordes al acercar | `Vignette amount={0..1}` (`color`: un rol del tema o `data.<nombre>`; `color="bg"` y un `strength` bajo si la escena es oscura y no querés teñirla de acento) |
+| Un panel que llega volando en profundidad | `style={{ ...flyInZ(progreso, { from: 800 }) }}` en el propio elemento (nunca `preserve-3d` ni perspectiva en un ancestro) |
+| Nubes propias de la escena | `Stage cloud={{ colors, count, blobs, opacity }}` (pisa solo en esa escena lo que declara `theme.cloud`; el tema las define con tokens `--cloud-*`, ver `themes/README.md`, "Nubes"). Una historia entera: `spec.design.clouds` |
 | Salida de escena | `zoomThrough` + `Wash` |
 | Mezclar escenas con tiempos | `Sequence`, `Series` (motor) |
 | Audio | `Audio` (motor) o `defineStory({ audio })` |
@@ -173,6 +176,32 @@ export function BarChart({ values, progress, w, h }: { values: number[]; progres
 
 Cómo usarlas dentro de `<World>`: `<Window x={260} y={200} w={1400} h={700} title="Panel de ejemplo"><Table columns={["Nombre", "Estado"]} rows={[["Elemento alfa", "Activo"]]} appear={(i) => kf(f, [30 + i * 5, 48 + i * 5], [0, 1])} /></Window>`.
 
+### Colores con nombre y letra chica de la interfaz
+
+Una interfaz recreada necesita colores sin rol en `theme.color` (estados, severidades, fondos de ficha) y letra más chica que `eyebrow`. Ninguno de los dos va escrito a mano en la escena:
+
+- **Colores: `theme.data`.** Se declaran una vez en `videos/<slug>/theme.ts` (con tokens o con un valor propio) y la escena los lee con `useTheme().data.<nombre>`. Un nombre que no existe lanza un error que lista los declarados; `checkTheme` revisa cada par color/superficie con el contraste que declaraste.
+
+  ```ts
+  // videos/<slug>/theme.ts
+  const r = themeFromTokensWithReport(tokens, neutral, {
+    data: {
+      estadoOk: "data-estado-ok",                                              // un token
+      estadoBajo: { token: "severity-1", on: ["bg", "surface"], min: 4.5 },     // se usa como texto: 4.5
+      ficha: { color: "#22252b", on: ["surface"], min: 1.1 },                   // valor propio (solo en el tema, nunca en la escena)
+    },
+    acknowledge: ["accent/bg"],                                                 // ver más abajo
+  });
+  export const theme = r.theme;
+  // en la escena
+  const t = useTheme();
+  <span style={{ color: t.data.estadoOk }}>Aprobado</span>
+  ```
+
+- **Letra grande intermedia: `type.display`** (`sm` 48, `md` 56, `lg` 64 px), entre `body` y `h2`, para cifras de ficha, rótulos y títulos de panel. Si ningún escalón da el tamaño, se deriva de uno con un factor (`type.stat * 0.8`): válido; un literal (`58`) no. `h1` (96) y `hero` (120) cubren lo más grande.
+- **Letra: `type.ui`** (`xs` 15, `sm` 20, `md` 24 px): para tablas densas, fichas y menús que se leen con la cámara acercada. El control de calidad la trata aparte: un texto chico que, en otro cuadro de la misma escena, se ve a tamaño legible es `info` (no error), con una línea resumen por cuadro. Por eso cada escena con `type.ui` tiene que tener un acercamiento donde ese texto se lea; si en ningún cuadro llega al mínimo, `min-size` sigue siendo error. En pantalla completa usá `caption`, `body`, etc.
+- **Pares de la marca que no llegan a 4.5:1.** Si la marca aprobó una combinación (`accent` sobre `bg`, por ejemplo), la persona lo confirma y se reconoce en el tema con `acknowledge: ["accent/bg"]`: `checkTheme` la informa como `note` en vez de aviso y `report.notes` la lista aparte. No cambia lo que mide `qa`, que juzga el texto real en pantalla: si el texto es chico, el arreglo sigue siendo usar el tono sugerido (`suggestion`) solo para ese texto.
+
 Criterios:
 
 - **Estructura real**: las mismas columnas, pestañas, botones y rótulos que la herramienta, con datos ficticios. Si no los conocés, preguntá o pedí el nombre de las secciones; no los inventes parecidos.
@@ -192,7 +221,7 @@ Criterios:
 | Letra de 14 px en una escena que no se acerca | ilegible en pantalla | `qa`: `min-size` |
 | Texto gris sobre fondo claro o color de acento sobre acento | poco contraste | `qa`: `contrast` (y `checkTheme` para el tema) |
 | Un panel o una pastilla opaca sobre un texto | texto invisible | `qa`: `covered` |
-| Color o fuente escritos a mano | desentona al cambiar el tema | revisión: buscar `#` y `font-family` en la carpeta de la escena |
+| Color o fuente escritos a mano (también en una tabla de colores aparte dentro de la escena) | desentona al cambiar el tema | revisión: buscar `#` y `font-family` en la carpeta de la escena; los colores propios de la interfaz van en `theme.data` (sección 6) |
 | Dos garabatos con el mismo `id` | se pisan el trazo y el degradado | revisión |
 | Datos reales, correos o dominios en pantalla | privacidad | `ve-privacy` con `prohibidos.txt` |
 | Claves de cámara no crecientes | error con los cuadros nombrados | `cameraAt` lanza al renderizar |
@@ -225,6 +254,8 @@ Durante una transición (tarjeta volando sobre otra, cámara en movimiento, fund
 - Una rebaba chica (hasta 6 px) bajo una cámara que se mueve: `info`.
 - Texto bajo un `Wash` a medio fundido: `info` (con el velo quieto sigue siendo error).
 
+**Adorno de interfaz recreada.** El texto que es marco de la interfaz (menús, pestañas, barras que no se leen) va bajo `data-qa-decor`: queda fuera de `min-size` y `contrast` (con una línea `info` con la cuenta), y `clip`, el `overlap` contra texto normal y el `offscreen` de lo marcado `data-qa-decor="main"` siguen aplicando. El texto que dice algo no es adorno. Un color usado solo como código redundante (un número pintado por estado junto a su rótulo) se acepta con `data-qa-ignore="contrast"` y un comentario; `qa` imprime cuántos hallazgos callaron las marcas por regla (ver `qa/README.md`).
+
 **Qué sigue pidiendo tu decisión**: un encuadre quieto que deja cortado un elemento (`offscreen` en aviso: `data-qa-ignore` con la condición del zoom, solo si la cámara está quieta), un velo que se queda a medias (error de `contrast`: es lo que ve la persona), un texto que se escribe mientras su contenedor se funde (ver arriba) y cualquier texto quieto tapado.
 
 ### Para que no parezca un borrador
@@ -245,6 +276,11 @@ Con 2 a 6 temas usá `defineStory` (ver `stories/README.md` y `templates/story/`
 - puede usar `useTopic()` y `<TopicHeadline start hide />` para el titular con el nombre del tema. Para que la escena se renderice también sola (lo recomendado) hay dos caminos: pasarle el titular por prop y usar `DockedHeadline`, como `templates/scene/Scene.tsx`, o dejar `TopicHeadline` con `title` y `number` (`<TopicHeadline title="Panel de ventas" number={1} />`; dentro de la historia pisan al tema, y sin `title` ni historia no dibuja nada y avisa una vez en la consola) y `useTopic({ name: "Panel de ventas" })` con valor de reserva (`useTopicOrNull()` devuelve `null` fuera de la historia). El contenido no debe depender de `StoryStage` ni de `composeStory`;
 - termina con `Wash` o atravesando algo;
 - **dale una `thumbnail` a cada tema**: es la miniatura de su panel en el muro del cierre; sin ella el cierre muestra una tarjeta derivada del número y el nombre del tema (varía según el tema, pero es genérica). Va en la lista de escenas de `defineStory`: `{ id: "ventas", component: Ventas, durationInFrames: 150, thumbnail: MiniVentas }`. `MiniVentas` es un componente sin props que dibuja en un lienzo de **560×340** (coordenadas propias, `position: absolute` desde `(0, 0)`), con piezas del tema, no recibe props y, si lee `useFrame()`, obtiene el cuadro del cierre y no el de tu escena: dibujala quieta (sin `kf`): el recorte de la interfaz recreada en su momento más claro (un panel con 2 o 3 filas, una cifra y un gráfico chico). La letra de la miniatura es chica a propósito (el cierre la marca para `qa`); en 560 px de ancho entran unas 4 filas a `type.eyebrow * 0.8`. Reusá las mismas piezas de la escena (copiá el `Window`/`Table` de la sección 6) para que se reconozca.
+
+- **Historia parcial**: `scenes` va parejo a `spec.topics`; un tema sin escena se indica con `null` (sale en la lista y en el cierre, sin vuelta al listado) y una lista vacía deja solo apertura y cierre.
+- **`spec.design`** (opcional): `titleCard: "glass"`, `list: "inline"`, `handoff: "dock"` (la apertura entrega la píldora del titular ya puesta, así que la escena del primer tema arranca con `<TopicHeadline />` completo), `wall: { columns, rows, blur }` y `clouds`. Tabla en `stories/README.md`, "Opciones de diseño".
+- La firma del cierre acepta negrita (`signoff.text`, `signoff.tagline`: `"Gracias por **mirar**"`) o una marca propia (`signoff.slot`). Si `composeStory` no alcanza, las piezas (`Opening`, `Interlude`, `Closing`, `TopicProvider`, `StoryStage`) se arman a mano dentro de `Sequence`.
+- **Verificá por bloque**: `--check` de la historia entera toma cuadros parejos más 6 por escena; un fallo del cartel de la apertura se vio con `--scene opening` y no con el muestreo parejo. Corré también `--check --scene opening`, `--scene interlude-1` y `--scene closing` en cada formato (`--check-per-scene N`, `--check-count N` y `--check-all` cambian el muestreo).
 
 Probá cada escena sola (su propio `defineVideo`, como en `templates/scene/index.ts`) y recién después en la historia. `defineStory` publica por defecto solo el formato base: los formatos extra se piden con `formats: ["vertical"]` y cada escena de tema tiene que tener su disposición. El presupuesto de cuadros de la historia entera se ve con `npm run qa -- <id> --list-scenes`.
 
