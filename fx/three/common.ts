@@ -245,6 +245,10 @@ export interface Pen {
   w: number;
   /** `false`: sin atenuación ni afinado por distancia (`style.depth.fog`). */
   fog: boolean;
+  /** `true` con `accentUse: "sparse"`: el acento solo en lo principal. */
+  sparse: boolean;
+  /** Corrimiento de umbrales de acento por `accentUse` (sparse +0,25; balanced 0; rich -0,2). */
+  bias: number;
   /** Halo de los trazos (`style.line.glow`, 0 a 1), para quien traza un camino continuo por su cuenta. */
   glow: number;
   /** Acento para lo secundario: con `accentUse: "sparse"` pasa a tinta; si no, `accent`. Lo principal usa `pal.accent` directo. */
@@ -342,6 +346,8 @@ export function penFor(theme: Theme, pal: Palette, k: number): Pen {
     w,
     fog: D.fog,
     glow: L.glow,
+    sparse: L.accentUse === "sparse",
+    bias: L.accentUse === "sparse" ? 0.25 : L.accentUse === "rich" ? -0.2 : 0,
     soft: L.accentUse === "sparse" ? pal.ink : pal.accent,
     quiet: (c) => (L.accentUse === "rich" ? mix(c, pal.accent, 0.5) : c),
     share: (f) => (L.accentUse === "sparse" ? f * 0.35 : L.accentUse === "rich" ? Math.min(1, f * 2.4) : f),

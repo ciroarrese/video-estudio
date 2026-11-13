@@ -1,6 +1,6 @@
 import { Easing, FrameCanvas, clamp, mix, sub } from "../core";
-import { camera, lineByDepth, sortBackToFront } from "./math";
-import { dot, useThreeFx } from "./common";
+import { camera, sortBackToFront } from "./math";
+import { useThreeFx } from "./common";
 import type { ThreeProps } from "./common";
 
 export type WaveDotsProps = ThreeProps & {
@@ -12,7 +12,7 @@ export type WaveDotsProps = ThreeProps & {
 
 /** Campo de puntos sobre un plano con olas que viajan (suma de una onda plana y una radial). */
 export function WaveDots(p: WaveDotsProps) {
-  const { t, width, height, pal, k } = useThreeFx(p, { width: 1100, height: 700, duration: 75 });
+  const { t, width, height, pal, k, pen } = useThreeFx(p, { width: 1100, height: 700, duration: 75 });
   const g = p.grid ?? 36;
   const amp = p.amplitude ?? 0.45;
   return (
@@ -37,8 +37,8 @@ export function WaveDots(p: WaveDotsProps) {
         }
         const near = 2.6, far = 5.8;
         for (const q of sortBackToFront(items, (z) => z.depth)) {
-          const st = lineByDepth(q.depth, near, far, { minAlpha: 0.2, maxAlpha: 1, minWidth: 1.4 * k, maxWidth: 4.2 * k });
-          dot(ctx, q.x, q.y, st.width, mix(pal.line, pal.accent, clamp((q.k - 0.45) * 2)), st.alpha);
+          const st = pen.byDepth(q.depth, near, far, { minAlpha: 0.2, maxAlpha: 1, minWidth: 1.4 * k, maxWidth: 4.2 * k });
+          pen.dot(ctx, q.x, q.y, st.width, mix(pen.quiet(pal.line), pal.accent, clamp((q.k - 0.45 - pen.bias) * 2)), st.alpha);
         }
       }}
     />

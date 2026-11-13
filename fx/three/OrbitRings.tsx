@@ -1,7 +1,7 @@
 import { Easing, FrameCanvas, lerp, mix, progress, sub } from "../core";
-import { camera, lineByDepth, rotateXYZ } from "./math";
+import { camera, rotateXYZ } from "./math";
 import type { Vec3 } from "./math";
-import { dot, flush, seg, useThreeFx } from "./common";
+import { flush, useThreeFx } from "./common";
 import type { Prim, ThreeProps } from "./common";
 
 export type OrbitRingsProps = ThreeProps & {
@@ -11,7 +11,7 @@ export type OrbitRingsProps = ThreeProps & {
 
 /** Esfera central con anillos inclinados y satélites que los recorren; los anillos pasan por detrás y por delante. */
 export function OrbitRings(p: OrbitRingsProps) {
-  const { local, t, width, height, pal, k: sw } = useThreeFx(p, { width: 900, height: 900, duration: 75 });
+  const { local, t, width, height, pal, k: sw, pen } = useThreeFx(p, { width: 900, height: 900, duration: 75 });
   const n = Math.max(1, Math.min(5, p.rings ?? 3));
   return (
     <FrameCanvas
@@ -24,7 +24,7 @@ export function OrbitRings(p: OrbitRingsProps) {
         const D = 7;
         const cam = camera({ distance: D, tilt: 0.45, yaw: lerp(-0.5, 0.35, Easing.out(t)), unit });
         ctx.translate(width / 2, height / 2);
-        ctx.lineCap = "round";
+        pen.caps(ctx, { cap: true });
         const near = D - 2.6, far = D + 2.6;
         const prims: Prim[] = [];
         const grow = Easing.lands(progress(local, 0, 24));
@@ -34,13 +34,7 @@ export function OrbitRings(p: OrbitRingsProps) {
           depth: c0.depth,
           draw: (c) => {
             const r = 0.8 * unit * grow;
-            const g = c.createRadialGradient(-r * 0.35, -r * 0.4, r * 0.1, 0, 0, r);
-            g.addColorStop(0, mix(pal.accent, pal.lightest, 0.35));
-            g.addColorStop(1, mix(pal.accent, pal.darkest, 0.55));
-            c.fillStyle = g;
-            c.beginPath();
-            c.arc(0, 0, r, 0, Math.PI * 2);
-            c.fill();
+            pen.disc(c, 0, 0, r, pal.accent, 1, { light: mix(pal.accent, pal.lightest, 0.35), dark: mix(pal.accent, pal.darkest, 0.55) });
           },
         });
         for (let k = 0; k < n; k++) {
@@ -54,14 +48,14 @@ export function OrbitRings(p: OrbitRingsProps) {
             if ((i / N) * Math.PI * 2 > sweep) break;
             const A = cam.project(pointAt((i / N) * Math.PI * 2)), B = cam.project(pointAt(((i + 1) / N) * Math.PI * 2));
             const d = (A.depth + B.depth) / 2;
-            const s = lineByDepth(d, near, far, { minAlpha: 0.12, maxAlpha: 0.9, minWidth: 1 * sw, maxWidth: 3 * sw });
-            prims.push({ depth: d, draw: (c) => seg(c, A.x, A.y, B.x, B.y, pal.line, s.alpha, s.width) });
+            const s = pen.byDepth(d, near, far, { minAlpha: 0.12, maxAlpha: 0.9, minWidth: 1 * sw, maxWidth: 3 * sw });
+            prims.push({ depth: d, draw: (c) => pen.seg(c, A.x, A.y, B.x, B.y, pen.quiet(pal.line), s.alpha, s.width, { i }) });
           }
           // Satélite.
           const ang = k * 2.1 + t * Math.PI * 2 * (1 + k * 0.5);
           const S = cam.project(pointAt(ang));
-          const ss = lineByDepth(S.depth, near, far, { minAlpha: 0.5, maxAlpha: 1, minWidth: 5 * sw, maxWidth: 11 * sw });
-          prims.push({ depth: S.depth, draw: (c) => dot(c, S.x, S.y, ss.width * on, k % 2 ? pal.ink : pal.accent2, 1) });
+          const ss = pen.byDepth(S.depth, near, far, { minAlpha: 0.5, maxAlpha: 1, minWidth: 5 * sw, maxWidth: 11 * sw });
+          prims.push({ depth: S.depth, draw: (c) => pen.dot(c, S.x, S.y, ss.width * on, k % 2 ? pen.quiet(pal.ink) : pal.accent2, 1) });
         }
         flush(ctx, prims);
       }}
