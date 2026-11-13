@@ -119,3 +119,9 @@ export const fade = (o: number): number | undefined => (o >= 0.9995 ? undefined 
  */
 export const styleKey = (o: object): string =>
   Object.entries(o).filter(([, v]) => v !== undefined && v !== false && v !== null).map(([k]) => k).join(",");
+
+/** `transform` SVG de una escala alrededor de (cx, cy); `undefined` si la escala es 1 (sin residuo en reposo). */
+export function svgScale(cx: number, cy: number, s: number): string | undefined {
+  const k = +s.toFixed(4);
+  return k === 1 ? undefined : `translate(${+cx.toFixed(2)} ${+cy.toFixed(2)}) scale(${k}) translate(${+(-cx).toFixed(2)} ${+(-cy).toFixed(2)})`;
+}

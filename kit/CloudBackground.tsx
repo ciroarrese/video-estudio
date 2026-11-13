@@ -1,15 +1,19 @@
-import { random } from "../engine";
+import { random, useVideoConfig } from "../engine";
 import { useTheme } from "../themes";
 import { useFrameOr } from "./util";
 
-/** Manchas difuminadas a la deriva con los colores de `theme.cloud`; posición y deriva salen de `random(seed)` y del cuadro. */
+/**
+ * Manchas difuminadas a la deriva con los colores de `theme.cloud`; posición y deriva salen de `random(seed)` y del cuadro.
+ * `width`/`height` (el área donde se reparten las manchas) son por defecto el tamaño del cuadro del video (`useVideoConfig()`):
+ * en vertical o cuadrado las nubes se acomodan al cuadro en vez de quedar recortadas como si fuera 1920 x 1080.
+ */
 export function CloudBackground({
   frame,
   opacity,
   count = 6,
   seed = "clouds",
-  width = 1920,
-  height = 1080,
+  width,
+  height,
 }: {
   frame?: number;
   opacity?: number;
@@ -19,6 +23,8 @@ export function CloudBackground({
   height?: number;
 }) {
   const theme = useTheme();
+  const cfg = useVideoConfig();
+  const W = width ?? cfg.width, H = height ?? cfg.height;
   const f = useFrameOr(frame);
   const colors = theme.cloud.colors;
   return (
@@ -26,8 +32,8 @@ export function CloudBackground({
       {Array.from({ length: count }, (_, i) => {
         const r = (k: string) => random(`${seed}-${i}-${k}`);
         const size = 500 + r("s") * 500;
-        const x = r("x") * width + Math.sin(f / (90 + r("px") * 80) + r("ph") * 6.28) * 120;
-        const y = r("y") * height + Math.cos(f / (110 + r("py") * 80) + r("pv") * 6.28) * 90;
+        const x = r("x") * W + Math.sin(f / (90 + r("px") * 80) + r("ph") * 6.28) * 120;
+        const y = r("y") * H + Math.cos(f / (110 + r("py") * 80) + r("pv") * 6.28) * 90;
         return (
           <div
             key={i}

@@ -5,7 +5,7 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { withVideosDir } from './testing';
+import { engineDir, withTempVideos } from './testing';
 
 const raiz = resolve(__dirname, '..');
 const has = (cmd: string, args: string[]) => {
@@ -27,7 +27,7 @@ const hasPlaywright = (() => {
 const ready = hasPlaywright && has('ffmpeg', ['-version']);
 
 const videoMinimo = (id: string) => `import React from "react";
-import { defineVideo, useFrame } from "../../engine";
+import { defineVideo, useFrame } from ${JSON.stringify(engineDir)};
 const V = () => React.createElement("div", { style: { fontSize: 40 } }, "cuadro " + useFrame());
 export default defineVideo({ id: "${id}", component: V, fps: 30, width: 320, height: 180, durationInFrames: 6, formats: ["vertical"] });
 `;
@@ -42,10 +42,10 @@ describe('registro automático de videos (sin tocar engine/runtime/videos.ts)', 
     expect(src).toContain('videos/*/index');
   });
 
-  it.skipIf(!ready)('lista, renderiza y y el hash de bundle incluye videos/tmp-test-registro, y no deja nada', async () => {
+  it.skipIf(!ready)('lista, renderiza y el hash de bundle incluye el video (en una carpeta temporal, sin tocar videos/)', async () => {
     const { listVideos, renderVideo, ensureBundle, newRunId } = await import('./index');
-    await withVideosDir(raiz, async () => {
-      const carpeta = join(raiz, 'videos', 'tmp-test-registro');
+    await withTempVideos(async (dir) => {
+      const carpeta = join(dir, 'tmp-test-registro');
       const out = mkdtempSync(join(tmpdir(), 've-registro-'));
       try {
         mkdirSync(carpeta, { recursive: true });
@@ -73,6 +73,6 @@ describe('registro automático de videos (sin tocar engine/runtime/videos.ts)', 
         rmSync(out, { recursive: true, force: true });
       }
     });
-    expect(existsSync(join(raiz, 'videos', 'tmp-test-registro'))).toBe(false);
+    expect(existsSync(join(raiz, 'videos', 'tmp-test-registro'))).toBe(false); // nunca se escribe en el videos/ real
   }, 400_000);
 });

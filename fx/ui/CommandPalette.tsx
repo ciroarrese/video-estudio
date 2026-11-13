@@ -1,7 +1,8 @@
 import { withAlpha } from "../../themes";
 import { Easing } from "../../engine";
 import { kf, typed } from "../../kit";
-import { fxBox, progress, useFx } from "../core";
+import { fade, fxBox, progress, styleKey, useFx, xform } from "../core";
+import type React from "react";
 import type { FxProps } from "../core";
 
 export type PaletteItem = { label: string; hint?: string };
@@ -43,11 +44,14 @@ export function CommandPalette(p: CommandPaletteProps) {
   const fs = theme.type.caption * 0.85;
   const caret = !doneTyping && Math.floor(local / 8) % 2 === 0;
   const rowH = 70;
+  // Traslado, escala y opacidad solo mientras la paleta se abre o la fila se presiona (en reposo no queda ninguno).
+  const openStyle: React.CSSProperties = { position: "absolute", left: 0, right: 0, top: 20, boxSizing: "border-box", transform: xform({ y: (1 - open) * -24, round: true }), opacity: fade(open) };
+  const frameStyle: React.CSSProperties = { position: "absolute", inset: 0, boxSizing: "border-box", transform: xform({ scale: 0.95 + 0.05 * open }), background: theme.color.surface, border: `1px solid ${theme.color.border}`, borderRadius: theme.radius.lg, boxShadow: theme.shadow.lg };
   return (
     <div style={{ position: "relative", width: w, height: h, fontFamily: theme.font.family, ...p.style }}>
-      <div style={{ position: "absolute", left: 0, right: 0, top: 20, boxSizing: "border-box", transform: `translateY(${Math.round((1 - open) * -24)}px)`, opacity: open }}>
+      <div key={styleKey(openStyle)} style={openStyle}>
       {/* El marco crece con scale; el contenido (texto) no se escala. */}
-      <div style={{ position: "absolute", inset: 0, boxSizing: "border-box", transform: `scale(${(0.95 + 0.05 * open).toFixed(4)})`, background: theme.color.surface, border: `1px solid ${theme.color.border}`, borderRadius: theme.radius.lg, boxShadow: theme.shadow.lg }} />
+      <div key={styleKey(frameStyle)} style={frameStyle} />
       <div style={{ position: "relative", borderRadius: theme.radius.lg, overflow: "hidden" }}>
         <div style={{ display: "flex", alignItems: "center", gap: 18, padding: "0 28px", height: 92, borderBottom: `1px solid ${theme.color.border}` }}>
           <svg width={32} height={32} viewBox="0 0 32 32"><circle cx={14} cy={14} r={9} fill="none" stroke={theme.color.textMuted} strokeWidth={3} /><line x1={21} y1={21} x2={28} y2={28} stroke={theme.color.textMuted} strokeWidth={3} strokeLinecap="round" /></svg>
@@ -60,9 +64,10 @@ export function CommandPalette(p: CommandPaletteProps) {
             const sc = isHi ? 1 - 0.025 * press : 1;
             const bg = isHi ? (pressed ? theme.color.accent : withAlpha(theme.color.accent, 0.14 * hi)) : "transparent";
             const fg = isHi && pressed ? theme.color.onAccent : theme.color.text;
+            const rowBg: React.CSSProperties = { position: "absolute", inset: 0, background: bg, borderRadius: theme.radius.md, transform: xform({ scale: sc }) };
             return (
               <div key={it.label} style={{ position: "relative", height: rowH, boxSizing: "border-box", display: "flex", alignItems: "center", justifyContent: "space-between", padding: "0 20px", marginBottom: 4, color: fg, fontSize: fs, fontWeight: isHi ? theme.font.weights.semibold : theme.font.weights.regular }}>
-                <div style={{ position: "absolute", inset: 0, background: bg, borderRadius: theme.radius.md, transform: `scale(${sc.toFixed(4)})` }} />
+                <div key={styleKey(rowBg)} style={rowBg} />
                 <span style={{ position: "relative" }}>{it.label}</span>
                 {it.hint && <span style={{ position: "relative", fontSize: fs * 0.8, color: isHi && pressed ? theme.color.onAccent : theme.color.textMuted, border: `1px solid ${isHi && pressed ? theme.color.onAccent : theme.color.border}`, borderRadius: theme.radius.sm, padding: "2px 12px" }}>{it.hint}</span>}
               </div>

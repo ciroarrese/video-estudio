@@ -1,6 +1,6 @@
 import type React from "react";
 import { kf } from "../../kit";
-import { chartColor, fxBox, useFx } from "../core";
+import { chartColor, fade, fxBox, styleKey, useFx, xform } from "../core";
 import type { FxProps } from "../core";
 import { PhoneFrame, phoneScreen } from "./PhoneFrame";
 
@@ -38,17 +38,19 @@ export function PhoneScroll(p: PhoneScrollProps) {
   const rowH = 96;
   const contentH = p.children ? p.contentHeight ?? scr.height * 1.8 : 96 * rows + headEnd;
   const s = scrollState(Math.min(1, Math.max(0, local / dur)), contentH, scr.height);
+  // El desplazamiento solo se emite si hay (en reposo arriba no queda `translateY(0px)`).
+  const scrollSt: React.CSSProperties = { position: "absolute", left: 0, top: 0, width: scr.width, height: contentH, transform: xform({ y: -s.offset }) };
   return (
     <PhoneFrame {...p} width={w} height={h}>
-      <div data-qa-ignore="offscreen covered" style={{ position: "absolute", left: 0, top: 0, width: scr.width, height: contentH, transform: `translateY(${(-s.offset).toFixed(2)}px)` }}>
+      <div key={styleKey(scrollSt)} data-qa-ignore="offscreen covered" style={scrollSt}>
         {p.children ?? (
           <div>
-            <div style={{ padding: `${headTop}px 26px 14px`, opacity: edgeFade(headTop - s.offset, headTop + headH - s.offset, scr.height), fontSize: fs * 1.4, fontWeight: theme.font.weights.stat, color: theme.color.text }}>Actividad</div>
+            <div style={{ padding: `${headTop}px 26px 14px`, opacity: fade(edgeFade(headTop - s.offset, headTop + headH - s.offset, scr.height)), fontSize: fs * 1.4, fontWeight: theme.font.weights.stat, color: theme.color.text }}>Actividad</div>
             {Array.from({ length: rows }, (_, i) => {
               // Alto de la línea de texto dentro de la fila (fila de 96 px, bloque centrado).
               const top = headEnd + i * rowH + 16 - s.offset;
               return (
-              <div key={i} style={{ height: rowH, opacity: edgeFade(top, top + rowH - 32, scr.height), boxSizing: "border-box", display: "flex", alignItems: "center", gap: 18, padding: "0 26px" }}>
+              <div key={i} style={{ height: rowH, opacity: fade(edgeFade(top, top + rowH - 32, scr.height)), boxSizing: "border-box", display: "flex", alignItems: "center", gap: 18, padding: "0 26px" }}>
                 <div style={{ width: 52, height: 52, flex: "none", borderRadius: theme.radius.pill, background: chartColor(theme, i) }} />
                 <div style={{ flex: 1 }}>
                   <div style={{ fontSize: fs, fontWeight: theme.font.weights.semibold, color: theme.color.text }}>Elemento {i + 1}</div>

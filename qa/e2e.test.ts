@@ -57,6 +57,15 @@ describe.skipIf(!chromium)('qa on the qa-defects video (e2e)', () => {
     expect(errs(F.hiddenStatic).map((f) => [f.rule, f.other?.testid])).toEqual([['covered', 'hiding-card']]);
   }, 180_000);
 
+  it('light text under a full-frame veil: a veil that crosses (opacity changing between frames) is info; the same veil held still is an error', async () => {
+    const { findings } = await runQa({ videoId: 'qa-defects', frames: '19-24', rules: ['contrast'] });
+    const at = (f: number) => findings.filter((x) => x.frame === f && x.rule === 'contrast');
+    for (const f of [F.veilCrossA, F.veilCrossB, F.veilCrossC]) expect(at(f).map((x) => [x.element.testid, x.severity]), `frame ${f}`).toEqual([['veil-text', 'info']]);
+    expect(at(F.veilCrossB)[0]!.message).toMatch(/velo de cuadro completo que cruza/);
+    expect(at(F.veilStaticB).map((x) => [x.element.testid, x.severity])).toEqual([['veil-text', 'error']]);
+    expect(at(F.veilStaticB)[0]!.message).toMatch(/QUIETO/);
+  }, 180_000);
+
   it('privacy: a term and an e-mail built from one span per letter / per part are still caught', async () => {
     const r = await runPrivacy({ videoId: 'qa-defects', frames: `${F.split}`, deny: 'Acme Corp\n' });
     expect(r.findings.map((f) => `${f.kind}:${f.value}`).sort()).toEqual(['deny:acme corp', 'deny:acmecorp', 'email:persona@dominio-ficticio.com']);

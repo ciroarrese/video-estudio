@@ -1,6 +1,6 @@
 import { withAlpha } from "../../themes";
 import { Easing, random } from "../../engine";
-import { fxBox, progress, useFx } from "../core";
+import { fade, fxBox, progress, useFx } from "../core";
 import type { FxProps } from "../core";
 import { staggerT, toPath } from "../data/geom";
 import type { Pt } from "../data/geom";
@@ -43,6 +43,7 @@ export function PaperCollage(p: PaperCollageProps) {
     { fill: theme.color.accent2, ink: theme.color.onAccent },
   ];
   const tape = Easing.lands(progress(local, dur * 0.8, dur * 0.2));
+  const tapeScale = +(1.6 - 0.6 * Math.min(1.05, tape)).toFixed(4);
   const last = strips[n - 1]!;
   const fs = theme.type.h2 * 0.8;
   return (
@@ -61,7 +62,7 @@ export function PaperCollage(p: PaperCollageProps) {
         const col = paper[i % paper.length]!;
         const cx = s.x + s.w / 2, cy = s.y + s.h / 2;
         return (
-          <g key={i} opacity={Math.min(1, e * 2.5)} transform={`translate(${(cx + dx).toFixed(2)} ${(cy + dy).toFixed(2)}) rotate(${rot.toFixed(3)}) translate(${-s.w / 2} ${-s.h / 2})`}>
+          <g key={`${i}${fade(Math.min(1, e * 2.5)) === undefined ? "" : "o"}`} opacity={fade(Math.min(1, e * 2.5))} transform={`translate(${(cx + dx).toFixed(2)} ${(cy + dy).toFixed(2)}) rotate(${rot.toFixed(3)}) translate(${-s.w / 2} ${-s.h / 2})`}>
             <path d={poly} transform="translate(5 7)" fill={withAlpha(theme.color.text, 0.16)} />
             <path d={poly} fill={col.fill} stroke={theme.color.border} strokeWidth={1.5} />
             <text x={s.w / 2} y={s.h / 2 + fs * 0.33} textAnchor="middle" fontSize={fs} fontWeight={theme.font.weights.semibold} fill={col.ink} style={{ color: col.ink }}>{s.text}</text>
@@ -69,7 +70,7 @@ export function PaperCollage(p: PaperCollageProps) {
         );
       })}
       {tape > 0 && (
-        <g transform={`translate(${last.x + last.w * 0.12} ${last.y + 8}) rotate(-12) scale(${(1.6 - 0.6 * Math.min(1.05, tape)).toFixed(4)})`} opacity={Math.min(1, tape * 1.5)}>
+        <g key={`${tapeScale === 1 ? "" : "s"}${fade(Math.min(1, tape * 1.5)) === undefined ? "" : "o"}`} transform={`translate(${last.x + last.w * 0.12} ${last.y + 8}) rotate(-12)${tapeScale === 1 ? "" : ` scale(${tapeScale})`}`} opacity={fade(Math.min(1, tape * 1.5))}>
           <rect x={-60} y={-18} width={120} height={36} fill={withAlpha(theme.color.warning, 0.65)} stroke={withAlpha(theme.color.warning, 0.9)} strokeWidth={1.5} />
         </g>
       )}

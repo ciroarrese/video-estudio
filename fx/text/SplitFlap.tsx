@@ -1,5 +1,6 @@
+import React from "react";
 import { random } from "../../engine";
-import { progress, roleColor, stagger, useFx } from "../core";
+import { progress, roleColor, stagger, styleKey, useFx, xform } from "../core";
 import type { ColorRole } from "../core";
 import type { TextFxProps } from "./shared";
 import { baseText } from "./shared";
@@ -31,22 +32,22 @@ export function flapPlan(ch: string, i: number, n: number, seed: string | number
 export const splitFlapDuration = (n: number) => (n - 1) * 2 + 5 * 4;
 
 function Half({ ch, half, w, h, fs, color, bg, scaleY, origin }: { ch: string; half: "top" | "bottom"; w: number; h: number; fs: number; color: string; bg: string; scaleY: number; origin: string }) {
+  const transform = xform({ scaleY });
+  const st: React.CSSProperties = {
+    position: "absolute",
+    left: 0,
+    top: half === "top" ? 0 : h / 2,
+    width: w,
+    height: h / 2,
+    overflow: "hidden",
+    background: bg,
+    // La escala (y su origen) solo se emiten mientras la mitad gira.
+    transform,
+    transformOrigin: transform ? origin : undefined,
+    borderRadius: half === "top" ? `${h * 0.08}px ${h * 0.08}px 0 0` : `0 0 ${h * 0.08}px ${h * 0.08}px`,
+  };
   return (
-    <div
-      data-qa-ignore="clip overlap covered"
-      style={{
-        position: "absolute",
-        left: 0,
-        top: half === "top" ? 0 : h / 2,
-        width: w,
-        height: h / 2,
-        overflow: "hidden",
-        background: bg,
-        transform: `scaleY(${scaleY.toFixed(4)})`,
-        transformOrigin: origin,
-        borderRadius: half === "top" ? `${h * 0.08}px ${h * 0.08}px 0 0` : `0 0 ${h * 0.08}px ${h * 0.08}px`,
-      }}
-    >
+    <div key={styleKey(st)} data-qa-ignore="clip overlap covered" style={st}>
       <div style={{ position: "absolute", left: 0, top: half === "top" ? 0 : -h / 2, width: w, height: h, display: "flex", alignItems: "center", justifyContent: "center", color, fontSize: fs, lineHeight: 1 }}>
         {ch === " " ? " " : ch}
       </div>

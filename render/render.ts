@@ -99,6 +99,9 @@ export function assetsDigest(dirs: string[]): string {
   return digestFiles(entries);
 }
 
+// eslint-disable-next-line no-control-regex
+const stripAnsi = (t: string) => t.replace(/\u001b\[[0-9;]*m/g, '');
+
 /** Carpeta que hace de `videos/` (VE_VIDEOS_DIR, para pruebas); `null` = el `videos/` real del proyecto. */
 export const videosDirFromEnv = (): string | null => (process.env.VE_VIDEOS_DIR ? resolve(process.env.VE_VIDEOS_DIR) : null);
 
@@ -156,15 +159,24 @@ export async function ensureBundle(root: string, cacheDir: string, runId: string
           await vite.build({ configFile: join(root, 'vite.config.ts'), logLevel: 'silent', plugins: [stub], build: { outDir: tmp, emptyOutDir: true } });
           return;
         } catch (e) {
-          const err = e as Error & { id?: string; loc?: { file?: string }; file?: string };
-          const bad = err.id ?? err.loc?.file ?? err.file;
-          const abs = bad ? resolve(bad.split('?')[0]!) : null;
-          const inVideo = abs !== null && (abs.startsWith(resolve(root, 'videos') + '/') || abs.startsWith(resolve(root, 'examples') + '/') || (videosDir !== null && abs.startsWith(videosDir + '/')));
-          if (!inVideo || stubbed.has(abs!) || attempt >= 8 || !existsSync(abs!)) throw e;
-          const where = videosDir && abs!.startsWith(videosDir + '/') ? `videos/${relative(videosDir, abs!)}` : relative(root, abs!);
-          const first = String(err.message).split('\n').filter(Boolean).slice(0, 3).join(' | ');
-          log(`bundle: "${where}" no compila (${first}); se compila el resto sin ese archivo`);
-          stubbed.set(abs!, `${where} no compila: ${first}`);
+          // rolldown agrupa los errores en `errors`; cada uno trae el archivo (`id`) donde se produjo
+          type BuildErr = { id?: string; loc?: { file?: string }; file?: string; message?: string };
+          const top = e as BuildErr & { errors?: BuildErr[] };
+          const list = top.errors?.length ? top.errors : [top];
+          const inVideo = (abs: string) => abs.startsWith(resolve(root, 'videos') + '/') || abs.startsWith(resolve(root, 'examples') + '/') || (videosDir !== null && abs.startsWith(videosDir + '/'));
+          const mine = list
+            // los errores de transformación (sintaxis) no traen `id`: el archivo va en el texto, como `[ ruta:linea:col ]`
+            .map((x) => ({ x, bad: x.id ?? x.loc?.file ?? x.file ?? /\[\s*(\S+?\.[cm]?[jt]sx?)(?::\d+){0,2}\s*\]/.exec(stripAnsi(String(x.message)))?.[1] }))
+            .filter((r): r is { x: BuildErr; bad: string } => !!r.bad)
+            .map((r) => ({ ...r, abs: resolve(root, r.bad.split('?')[0]!) }))
+            .filter((r) => inVideo(r.abs) && !stubbed.has(r.abs) && existsSync(r.abs));
+          if (!mine.length || mine.length < list.length || attempt >= 8) throw e; // algo que no es de un video: es un error de verdad
+          for (const { x, abs } of mine) {
+            const where = videosDir && abs.startsWith(videosDir + '/') ? `videos/${relative(videosDir, abs)}` : relative(root, abs);
+            const first = stripAnsi(String(x.message)).split('\n').filter(Boolean).slice(0, 2).join(' | ');
+            log(`bundle: "${where}" no compila (${first}); se compila el resto sin ese archivo`);
+            stubbed.set(abs, `${where} no compila: ${first}`);
+          }
         }
       }
     } finally {
@@ -537,6 +549,57 @@ export async function renderVideo(options: RenderOptions): Promise<RenderResult>
 
 // ---------- check ----------
 
+/** Pista que se imprime en toda falla de `--check` (título de la sección de docs/reglas.md). */
+export const CHECK_HINT = 'pista: seguí la receta "Qué hacer cuando --check falla" en docs/reglas.md (bisecar piezas, causas habituales y arreglos).';
+
+/** Puntos a consultar en un bbox (centro y esquinas), en px del escenario (el bbox viene en px de la captura: se divide por la escala). */
+export function bboxPoints(bbox: [number, number, number, number], scale: number, width: number, height: number): [string, number, number][] {
+  const [x0, y0, x1, y1] = bbox.map((v) => v / scale) as [number, number, number, number];
+  const clamp = (v: number, max: number) => Math.min(Math.max(Math.round(v), 0), max - 1);
+  const cx = clamp((x0 + x1 + 1) / 2, width), cy = clamp((y0 + y1 + 1) / 2, height);
+  const [lx, rx, ty, by] = [clamp(x0, width), clamp(x1, width), clamp(y0, height), clamp(y1, height)];
+  return [['centro', cx, cy], ['arriba-izq', lx, ty], ['arriba-der', rx, ty], ['abajo-izq', lx, by], ['abajo-der', rx, by]];
+}
+
+/** Agrupa lo que devolvió `describeAt` por elemento: `{ elemento: [puntos donde aparece] }`, en orden de aparición. */
+export function groupElements(points: [string, number, number][], found: string[][]): [string, string[]][] {
+  const m = new Map<string, string[]>();
+  points.forEach(([name], i) => {
+    for (const d of found[i] ?? []) m.set(d, [...(m.get(d) ?? []), name]);
+  });
+  return [...m];
+}
+
+/**
+ * Qué hay en el rectángulo donde difieren dos capturas del cuadro `frame`: elementos (etiqueta, texto corto, ruta DOM,
+ * data-* / name) en el centro y las esquinas del bbox, y las escenas con nombre activas en ese cuadro.
+ */
+async function describeBBox(s: Awaited<ReturnType<typeof setup>>, frame: number, bbox: [number, number, number, number]): Promise<string[]> {
+  const { width, height } = s.env.meta;
+  const pts = bboxPoints(bbox, s.env.scale, width, height);
+  const lines: string[] = [];
+  const shared: Shared = { error: null };
+  const { page, context } = await openPage(s.env.browser, { width, height, scale: 1 }, s.env.pageUrl, shared);
+  try {
+    await callReady(page);
+    const found = (await page.evaluate(([n, p]: [number, [number, number][]]) => (window as any).__ve.describeAt(n, p), [frame, pts.map(([, x, y]) => [x, y] as [number, number])])) as string[][];
+    const groups = groupElements(pts, found);
+    if (!groups.length) lines.push('no se encontraron elementos en esos puntos (¿el bbox cae fuera del escenario o sobre un canvas?)');
+    for (const [el, where] of groups.slice(0, 8)) lines.push(`${el}  (en ${where.join(', ')})`);
+  } catch (e) {
+    lines.push(`no se pudo consultar la página: ${(e as Error).message}`);
+  } finally {
+    await context.close().catch(() => {});
+  }
+  try {
+    const active = (await s.scenes()).filter((sc) => frame >= sc.from && frame < sc.from + sc.durationInFrames).map((sc) => sc.id);
+    if (active.length) lines.push(`escenas con nombre activas en el cuadro ${frame}: ${active.join(', ')}`);
+  } catch {
+    /* el video no tiene escenas con nombre */
+  }
+  return lines;
+}
+
 /** Determinism check: __ve.checkDeterminism plus two PNG renders in different shard layouts. */
 export async function checkVideo(options: RenderOptions): Promise<CheckResult> {
   const s = await setup({ ...options, frameFormat: 'png' }, false);
@@ -552,11 +615,17 @@ export async function checkVideo(options: RenderOptions): Promise<CheckResult> {
     }
     const frames = evenFrames(total, 12).map((n) => n + offset);
     log(`check: cuadros ${frames.join(', ')}`);
-    const det = (await s.page.evaluate((f: number[]) => (window as any).__ve.checkDeterminism(f), frames)) as { frame: number; ok: boolean; error?: string }[];
+    const det = (await s.page.evaluate((f: number[]) => (window as any).__ve.checkDeterminism(f), frames)) as { frame: number; ok: boolean; error?: string; diffs?: string[] }[];
     for (const d of det) if (d.error) log(`check: cuadro ${d.frame}: ${d.error}`);
     const bad = det.filter((d) => !d.ok).map((d) => d.frame);
-    if (bad.length) log(`check: checkDeterminism FALLA en cuadros ${bad.join(', ')}`);
-    else log('check: checkDeterminism ok');
+    if (bad.length) {
+      log(`check: checkDeterminism FALLA en cuadros ${bad.join(', ')} (el DOM del mismo cuadro sale distinto según qué se dibujó antes)`);
+      for (const d of det.filter((x) => !x.ok && x.diffs?.length)) {
+        log(`check:   cuadro ${d.frame}, elementos que cambian entre los dos renders:`);
+        for (const line of d.diffs!) log(`check:     ${line}`);
+      }
+      log(`check: ${CHECK_HINT}`);
+    } else log('check: checkDeterminism ok');
 
     const layoutA = new Map<number, Buffer>();
     const layoutB = new Map<number, Buffer>();
@@ -574,10 +643,19 @@ export async function checkVideo(options: RenderOptions): Promise<CheckResult> {
       const ok = withinTolerance(stats, tol) && !(tol.strict && !layoutA.get(n)!.equals(layoutB.get(n)!));
       diffs[n] = formatDiff(stats);
       log(`check: cuadro ${n} ${ok ? 'ruido tolerado' : 'DIFERENTE'}: ${diffs[n]}`);
-      if (!ok) mismatches.push(n);
+      if (!ok) {
+        mismatches.push(n);
+        if (stats.bbox) {
+          log(`check:   elementos en el bbox del cuadro ${n}:`);
+          for (const line of await describeBBox(s, n, stats.bbox)) log(`check:     ${line}`);
+        }
+      }
     }
     const mode = tol.strict ? 'estricto (byte a byte)' : `tolerante (ningun pixel con delta > ${tol.maxDelta}, <= ${(tol.maxRatio * 100).toFixed(3)}% con delta 2..${tol.maxDelta}, <= ${(DEFAULT_TOLERANCE.maxNoiseRatio * 100).toFixed(0)}% con delta 1)`;
-    if (mismatches.length) log(`check: PNG distintos entre layouts en cuadros ${mismatches.join(', ')} [${mode}]`);
+    if (mismatches.length) {
+      log(`check: PNG distintos entre layouts en cuadros ${mismatches.join(', ')} [${mode}]`);
+      log(`check: ${CHECK_HINT}`);
+    }
     else log(`check: PNG equivalentes en ambos layouts [${mode}]${noisy ? `, ${noisy} cuadros con ruido tolerado` : ', todos identicos'}`);
     return { ok: bad.length === 0 && mismatches.length === 0, frames, determinism: det, mismatches, diffs };
   } finally {
@@ -599,8 +677,10 @@ export async function listScenes(options: RenderOptions): Promise<{ meta: VideoM
   }
 }
 
-/** Videos que el runtime descubrió (`examples/*` y `videos/*`), con tamaños y formatos. */
-export async function listVideos(options: { root?: string; cacheDir?: string; log?: (m: string) => void } = {}): Promise<VideoMeta[]> {
+export type LoadErrorInfo = { folder: string; folders: string[]; ids: string[]; message: string };
+
+/** Videos que el runtime descubrió (`examples/*` y `videos/*`) y los errores por carpeta (rota, `id` repetido) de las que no cargaron. */
+export async function discoverVideos(options: { root?: string; cacheDir?: string; log?: (m: string) => void } = {}): Promise<{ videos: VideoMeta[]; errors: LoadErrorInfo[] }> {
   const root = options.root ?? defaultRoot;
   const cacheDir = resolve(options.cacheDir ?? join(root, '.ve-cache'));
   mkdirSync(cacheDir, { recursive: true });
@@ -612,10 +692,11 @@ export async function listVideos(options: { root?: string; cacheDir?: string; lo
     const shared: Shared = { error: null };
     const { page, context } = await openPage(browser, { width: 320, height: 180, scale: 1 }, `${server.url}/`, shared);
     try {
+      // `ready` puede rechazar si el primer video es uno de los rotos: acá solo importa la lista y los errores.
       await page.evaluate(() => (window as any).__ve.ready as Promise<unknown>).catch(() => undefined);
-      const err = (await page.evaluate(() => (window as any).__ve.loadError)) as string | null;
-      if (err) throw new Error(err);
-      return (await page.evaluate(() => (window as any).__ve.videos)) as VideoMeta[];
+      const videos = (await page.evaluate(() => (window as any).__ve.videos)) as VideoMeta[];
+      const errors = (await page.evaluate(() => (window as any).__ve.loadErrors)) as LoadErrorInfo[];
+      return { videos, errors };
     } finally {
       await context.close().catch(() => {});
     }
@@ -623,4 +704,9 @@ export async function listVideos(options: { root?: string; cacheDir?: string; lo
     await browser?.close().catch(() => {});
     await server.close();
   }
+}
+
+/** Solo la lista de videos (ver `discoverVideos` para los errores por carpeta). */
+export async function listVideos(options: { root?: string; cacheDir?: string; log?: (m: string) => void } = {}): Promise<VideoMeta[]> {
+  return (await discoverVideos(options)).videos;
 }

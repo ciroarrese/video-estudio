@@ -72,3 +72,8 @@ export function formatVideoList(metas: VideoMeta[]): string {
     .map((m) => `${m.id.padEnd(w)}  ${m.width}x${m.height}@${m.fps}  ${m.durationInFrames} cuadros  formatos: ${Object.keys(m.formats ?? {}).join(', ') || m.format || '-'}${m.source ? `  (${m.source})` : ''}`)
     .join('\n');
 }
+
+/** Errores por carpeta de `__ve.loadErrors`, para imprimir después de la lista de videos. */
+export function formatLoadErrors(errors: { folder: string; message: string }[]): string {
+  return `Atención: ${errors.length === 1 ? 'una carpeta no cargó' : `${errors.length} carpetas no cargaron`} (los demás videos siguen disponibles):\n${errors.map((e) => `  - ${e.message.split('\n').join('\n    ')}`).join('\n')}`;
+}

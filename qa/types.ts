@@ -48,11 +48,16 @@ export type TextRun = {
    * of the sampled points it covers (1 = all, 0.4 = two of five). Solid = opaque background colour, background image/gradient, img, video, canvas.
    */
   cover: (ElementInfo & { ignore: string[]; id: number; key: string; motion?: number; frac?: number; /** Opacidad efectiva del elemento que tapa (con la de sus ancestros). */ opacity?: number }) | null;
+  /**
+   * Translucent full-frame element above the text (opacity x background alpha in [0.02, 0.9): a scene wash mid-fade, or a static veil).
+   * `fade` (set by applyMotion) is the largest change of that opacity between this frame and its neighbours (an absent veil counts as 0).
+   */
+  veil?: { key: string; opacity: number; testid: string | null; fade?: number } | null;
   /** Background under the text box (text hidden), filled by the runner when the contrast rule is on. */
   bg?: { r: number; g: number; b: number; samples: number } | null;
 };
 
-export type PageData = { frame: number; width: number; height: number; runs: TextRun[]; elems: Record<string, Rect> };
+export type PageData = { frame: number; width: number; height: number; runs: TextRun[]; elems: Record<string, Rect>; /** Coverage alpha of the elements in `elems` (same keys). */ opac?: Record<string, number> };
 
 export type Finding = {
   rule: RuleId;

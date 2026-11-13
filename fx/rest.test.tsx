@@ -57,7 +57,10 @@ beforeAll(() => {
   (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = false;
 });
 beforeEach(() => {
-  const ctx = new Proxy({} as Record<string, unknown>, { get: () => () => ({ addColorStop() {} }), set: () => true });
+  const ctx = new Proxy({} as Record<string, unknown>, {
+    get: (_t, k) => (k === "createImageData" ? (w: number, h: number) => ({ data: new Uint8ClampedArray(w * h * 4) }) : () => ({ addColorStop() {} })),
+    set: () => true,
+  });
   vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockImplementation((() => ctx) as never);
 });
 afterEach(() => vi.restoreAllMocks());
@@ -98,7 +101,7 @@ describe("efectos en uso: reposo e historial", () => {
           ...(markup.match(/opacity:\s*0\.9\d+/g) ?? []),
           ...(markup.match(/opacity="0\.9\d+"/g) ?? []),
         ];
-        expect(leftovers, `${name} cuadro ${f}`).toEqual([]);
+        expect(leftovers.slice(0, 6), `${name} cuadro ${f}`).toEqual([]);
       }
     });
   }

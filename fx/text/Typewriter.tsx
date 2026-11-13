@@ -1,6 +1,6 @@
 import React from "react";
 import { Easing } from "../../engine";
-import { progress, roleColor, useFx } from "../core";
+import { progress, roleColor, styleKey, useFx, xform } from "../core";
 import type { ColorRole } from "../core";
 import { baseText } from "./shared";
 import type { TextFxProps } from "./shared";
@@ -25,6 +25,8 @@ export function Typewriter(props: TypewriterProps) {
   const blink = Math.floor(local / 8) % 2 === 0;
   const caretOn = !done && (typedP < 1 ? (count > 0 && count < n ? true : blink) : false);
   const afterP = progress(local, duration + 2, 14, Easing.lands);
+  // El extra solo lleva opacidad y traslado mientras aparece.
+  const afterStyle: React.CSSProperties = { display: "inline-block", opacity: afterP > 0 ? undefined : 0, transform: xform({ y: (1 - afterP) * fs * 0.5, round: true }) };
   return (
     <div style={{ ...baseText(theme, { ...props, fontSize: fs }), whiteSpace: "pre-wrap", display: "flex", alignItems: "center", gap: "0.5em", width: props.width, ...style }}>
       <span>
@@ -44,7 +46,7 @@ export function Typewriter(props: TypewriterProps) {
         <span style={{ visibility: "hidden" }}>{chars.slice(count).join("")}</span>
       </span>
       {after !== undefined && (
-        <span style={{ display: "inline-block", opacity: afterP > 0 ? 1 : 0, transform: `translateY(${Math.round((1 - afterP) * fs * 0.5)}px)` }}>
+        <span key={styleKey(afterStyle)} style={afterStyle}>
           {after}
         </span>
       )}

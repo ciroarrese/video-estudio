@@ -1,5 +1,5 @@
 // Public surface of render/ (shared with qa/).
-export { renderVideo, checkVideo, listScenes, listVideos, suffixOf, ensureBundle, hashDir, newRunId, defaultRoot, defaultConcurrency } from './render';
+export { renderVideo, checkVideo, listScenes, listVideos, discoverVideos, suffixOf, ensureBundle, hashDir, newRunId, defaultRoot, defaultConcurrency } from './render';
 export type { RenderOptions, RenderResult, CheckResult } from './render';
 export { serveStatic } from './server';
 export { launchChromium } from './browser';

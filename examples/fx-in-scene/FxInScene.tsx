@@ -40,7 +40,7 @@ const KEYS: CameraKey[] = [
   { f: 299, x: center(2, 2).x, y: center(2, 2).y, scale: 1 },
 ];
 
-const TARGET = { x: center(2, 2).x, y: center(2, 2).y };
+const TARGET = { x: cell(2, 2).x + 270 + 180, y: cell(2, 2).y + 100 + 180 }; // centro del DonutRing
 const camera = (f: number) => cameraAt(f, KEYS, { map: (fr, c) => zoomThrough(fr, THROUGH, c, TARGET, 40), noBlurFrom: THROUGH[0] });
 
 const Slot = ({ c, r, x = 0, y = 0, children }: { c: number; r: number; x?: number; y?: number; children: React.ReactNode }) => (
@@ -68,7 +68,7 @@ function Scene() {
             <MaskedRise text="Palabra por palabra" by="word" start={52} fontSize={theme.type.h2} />
           </Slot>
 
-          <Slot c={1} r={0}><DonutRing value={4} max={4} start={58} width={420} height={420} label="Tareas" /></Slot>
+          <Slot c={1} r={0}><DonutRing value={4} max={4} start={58} width={420} height={420} label="Tareas" unit=" de 4" /></Slot>
           <Slot c={1} r={0} x={440} y={40}><CubeFold start={64} width={440} height={440} /></Slot>
 
           <Slot c={2} r={0}><BarsGrow start={86} width={900} height={520} /></Slot>
@@ -91,12 +91,13 @@ function Scene() {
           <Slot c={0} r={2} y={330} x={460}><MarkerDraw text="Resaltado" start={198} width={420} height={120} /></Slot>
 
           <Slot c={1} r={2}><FlowSteps start={206} width={900} height={500} /></Slot>
-          <Slot c={1} r={2} y={0}><div /></Slot>
 
-          <Slot c={2} r={2}><TileGrid start={214} width={460} height={300} /></Slot>
-          <Slot c={2} r={2} x={480}><LogoLand start={216} width={300} height={300} /></Slot>
-          <Slot c={2} r={2} y={310}><CardFlip start={222} width={420} height={250} /></Slot>
-          <Slot c={2} r={2} x={440} y={310}><TypeRing text="Anillo" start={224} width={440} height={250} /></Slot>
+          {/* El punto de atravesado (TARGET) es el centro del anillo: durante el zoom final el anillo se agranda hasta ocupar todo. */}
+          <Slot c={2} r={2} x={270} y={100}><DonutRing start={214} width={360} height={360} value={4} max={4} unit=" de 4" label="tareas" duration={30} /></Slot>
+          <Slot c={2} r={2}><TileGrid start={214} width={250} height={190} /></Slot>
+          <Slot c={2} r={2} y={360}><LogoLand start={216} width={200} height={200} /></Slot>
+          <Slot c={2} r={2} x={650} y={360}><CardFlip start={222} width={250} height={200} /></Slot>
+          <Slot c={2} r={2} x={650}><TypeRing text="Anillo" start={224} width={250} height={190} /></Slot>
         </World>
       </div>
       <DockedHeadline index={1} title="Efectos en escena" subtitle="Cámara en movimiento" frame={frame} start={0} hide={hideFromScale(cam.scale)} />

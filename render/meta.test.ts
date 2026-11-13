@@ -42,6 +42,12 @@ describe('formatos y escenas en el CLI', () => {
   });
   it('nombre de salida con formato y escena', () => {
     expect(suffixOf({})).toBe('');
-    expect(suffixOf({ format: 'vertical', scene: 'Tema B' })).toBe('-vertical-Tema_B');
+    expect(suffixOf({ format: 'vertical', scene: 'Tema B' }, 3)).toBe('-vertical-Tema_B-3'); // se cambió el nombre: lleva el índice
+    expect(suffixOf({ scene: 'intro' }, 0)).toBe('-intro'); // sin cambios, queda tal cual
+  });
+  it('`a b` y `a/b` no caen en el mismo archivo', () => {
+    expect(suffixOf({ scene: 'a b' }, 1)).not.toBe(suffixOf({ scene: 'a/b' }, 2));
+    expect(suffixOf({ scene: 'a b' })).not.toBe(suffixOf({ scene: 'a/b' })); // sin índice: hash corto del nombre
+    expect(suffixOf({ scene: 'a_b' })).not.toBe(suffixOf({ scene: 'a b' }));
   });
 });

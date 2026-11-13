@@ -45,7 +45,8 @@ export function FlyingCard({
     top: p.y - height / 2,
     width,
     height,
-    transform: `scale(${scale})`,
+    // la escala solo se emite si no es 1 (en reposo no queda `scale(1)`)
+    transform: +scale.toFixed(4) === 1 ? undefined : `scale(${+scale.toFixed(4)})`,
   });
   return (
     <>
@@ -59,7 +60,7 @@ export function FlyingCard({
             </div>
           );
         })}
-      <div style={{ ...place(cur, 1 + Math.sin(Math.PI * cur.t) * 0.06), zIndex: 30 }}>{children}</div>
+      <div key={+(1 + Math.sin(Math.PI * cur.t) * 0.06).toFixed(4) === 1 ? "rest" : "fly"} style={{ ...place(cur, 1 + Math.sin(Math.PI * cur.t) * 0.06), zIndex: 30 }}>{children}</div>
     </>
   );
 }

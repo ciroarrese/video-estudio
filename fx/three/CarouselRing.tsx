@@ -1,5 +1,5 @@
 import React from "react";
-import { Easing, lerp, progress } from "../core";
+import { Easing, fade, lerp, progress, styleKey, xform } from "../core";
 import { camera, sortBackToFront } from "./math";
 import { useThreeFx } from "./common";
 import type { ThreeProps } from "./common";
@@ -36,28 +36,30 @@ export function CarouselRing(p: CarouselRingProps) {
       {sortBackToFront(cards, (c) => c.pr.depth).map((c, z) => {
         const e = enter(c.i);
         const s = c.pr.scale * lerp(0.6, 1, e);
+        const st: React.CSSProperties = {
+          position: "absolute",
+          left: Math.round(width / 2 + c.pr.x - cw / 2),
+          top: Math.round(height / 2 + c.pr.y - ch / 2),
+          width: cw,
+          height: ch,
+          boxSizing: "border-box",
+          // Escala y opacidad solo cuando no son identidad (en reposo no queda `scale(1)` ni `opacity: 0.99`).
+          transform: xform({ scale: s }),
+          transformOrigin: "50% 50%",
+          opacity: fade(lerp(0.35, 1, Math.pow(c.front, 0.8)) * Math.min(1, e * 2)),
+          zIndex: z,
+          background: c.front > 0.85 ? theme.color.surface : theme.color.surfaceAlt,
+          border: `2px solid ${c.front > 0.92 ? pal.accent : theme.color.border}`,
+          borderRadius: theme.radius.lg,
+          overflow: "hidden",
+          fontFamily: theme.font.family,
+        };
         return (
           <div
-            key={c.i}
+            key={`${c.i}:${styleKey(st)}:${c.front < 0.85 ? "o" : ""}`}
             // Oclusión intencional: las tarjetas de atrás quedan tapadas por la de adelante
             data-qa-ignore={c.front < 0.85 ? "covered" : undefined}
-            style={{
-              position: "absolute",
-              left: Math.round(width / 2 + c.pr.x - cw / 2),
-              top: Math.round(height / 2 + c.pr.y - ch / 2),
-              width: cw,
-              height: ch,
-              boxSizing: "border-box",
-              transform: `scale(${s})`,
-              transformOrigin: "50% 50%",
-              opacity: lerp(0.35, 1, Math.pow(c.front, 0.8)) * Math.min(1, e * 2),
-              zIndex: z,
-              background: c.front > 0.85 ? theme.color.surface : theme.color.surfaceAlt,
-              border: `2px solid ${c.front > 0.92 ? pal.accent : theme.color.border}`,
-              borderRadius: theme.radius.lg,
-              overflow: "hidden",
-              fontFamily: theme.font.family,
-            }}
+            style={st}
           >
             {kids.length ? kids[c.i] : (
               <div style={{ padding: 24, display: "flex", flexDirection: "column", gap: 12, height: "100%", boxSizing: "border-box", justifyContent: "flex-end" }}>

@@ -37,6 +37,13 @@
     var t = el.closest ? el.closest('[data-testid]') : null;
     return pathOf(el) + '|' + el.tagName.toLowerCase() + '|' + (t ? t.getAttribute('data-testid') : '') + '|' + excerpt(el.textContent || '');
   }
+  // Cuanto tapa un elemento por si solo: su opacidad efectiva por el alfa de su color de fondo (1 si el fondo es imagen o degradado).
+  function veilAlpha(c) {
+    var ccs = getComputedStyle(c);
+    var bg = parseRgba(ccs.backgroundColor);
+    var a = ccs.backgroundColor !== 'rgba(0, 0, 0, 0)' ? bg.a : (ccs.backgroundImage !== 'none' ? 1 : 0);
+    return a * opacityUp(c);
+  }
   function infoOf(el) {
     return { tag: el.tagName.toLowerCase(), testid: testidOf(el), text: excerpt(el.textContent || ''), rect: rectOf(el.getBoundingClientRect()) };
   }
@@ -128,6 +135,7 @@
         ox: cs.overflowX, oy: cs.overflowY, ellipsis: cs.textOverflow === 'ellipsis',
       },
       cover: null,
+      veil: null,
     };
 
     // covered: se muestrean hasta 5 puntos por linea (10/30/50/70/90 % del ancho, al medio de la altura) y se mira con elementsFromPoint
@@ -177,10 +185,33 @@
         run.cover = info;
       }
     }
+    // veil: un velo de cuadro completo TRANSLUCIDO (no llega a ser `cover`, que pide >= 0.9) por encima del texto, p. ej. un `Wash` a medio fundido.
+    // Se mide al medio de la primera linea; `qa/motion.ts` le agrega `fade` (cambio de su opacidad entre cuadros vecinos) para distinguir un
+    // velo que cruza (transicion) de uno quieto (defecto).
+    if (!run.cover && run.opacity >= 0.05) {
+      var ln0 = rects[0];
+      var vx = ln0.x + ln0.w / 2, vy = ln0.y + ln0.h / 2;
+      if (vx >= 0 && vy >= 0 && vx < W && vy < H) {
+        var vstack = document.elementsFromPoint(vx, vy);
+        var vat = vstack.indexOf(el);
+        for (var vj = 0; vj < vat; vj++) {
+          var vc = vstack[vj];
+          if (el.contains(vc) || vc.contains(el)) continue;
+          if (getComputedStyle(vc).visibility !== 'visible') continue;
+          var vr = vc.getBoundingClientRect();
+          if (vr.width * vr.height < 0.9 * W * H) continue;
+          var va = veilAlpha(vc);
+          if (va < 0.02 || va >= 0.9) continue;
+          run.veil = { key: keyOf(vc), opacity: va, testid: testidOf(vc) };
+          break;
+        }
+      }
+    }
     runs.push(run);
   }
   var elems = {};
-  (opts.elemKeys || []).forEach(function (k) { var e = resolveKey(k); if (e) elems[k] = rectOf(e.getBoundingClientRect()); });
+  var opac = {};
+  (opts.elemKeys || []).forEach(function (k) { var e = resolveKey(k); if (e) { elems[k] = rectOf(e.getBoundingClientRect()); opac[k] = veilAlpha(e); } });
   probe.remove();
-  return { width: W, height: H, runs: runs, elems: elems };
+  return { width: W, height: H, runs: runs, elems: elems, opac: opac };
 })

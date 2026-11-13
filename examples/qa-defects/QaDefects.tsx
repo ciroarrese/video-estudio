@@ -11,9 +11,12 @@ import { Fill, useFrame } from '../../engine';
  * Frames 15-17 are defects that the first version of the rules missed: static text at 50% opacity that looks washed out
  * once composited (15), a gradient strip over the LEFT 40% of a line with its centre free (16), and static text fully
  * hidden under a static card (17). All three are errors.
+ * Frames 19-21 are a NON-defect: light text on an accent block under a scene wash (a full-frame veil) whose opacity changes frame to
+ * frame (0.45, 0.55, 0.65): the contrast the rule measures is a transition, so it is `info`. Frames 22-24 hold the SAME veil still
+ * at 0.55 over the same text: that contrast is what the viewer sees, so frame 23 (both neighbours identical) is a `contrast` error.
  * Frame 18 builds a term and an e-mail out of one span per letter / per part: only the privacy check cares (block-level scan).
  */
-export const QA_DEFECT_FRAMES = { clean: 0, clip: 1, offscreen: 2, overlap: 3, tiny: 4, contrast: 5, covered: 6, privacy: 7, wash: 8, flyingA: 9, flyingB: 10, faint: 11, leavingA: 12, leavingB: 13, leavingC: 14, stillFaint: 15, sideCover: 16, hiddenStatic: 17, split: 18 } as const;
+export const QA_DEFECT_FRAMES = { clean: 0, clip: 1, offscreen: 2, overlap: 3, tiny: 4, contrast: 5, covered: 6, privacy: 7, wash: 8, flyingA: 9, flyingB: 10, faint: 11, leavingA: 12, leavingB: 13, leavingC: 14, stillFaint: 15, sideCover: 16, hiddenStatic: 17, split: 18, veilCrossA: 19, veilCrossB: 20, veilCrossC: 21, veilStaticA: 22, veilStaticB: 23, veilStaticC: 24 } as const;
 
 const font: CSSProperties = { fontFamily: 'Arial, Helvetica, sans-serif', color: '#1b1f2a' };
 const abs = (left: number, top: number, extra: CSSProperties = {}): CSSProperties => ({ position: 'absolute', left, top, margin: 0, whiteSpace: 'nowrap', ...font, ...extra });
@@ -137,6 +140,23 @@ export function QaDefects() {
         </Card>
       );
       break;
+    case 19:
+    case 20:
+    case 21:
+    case 22:
+    case 23:
+    case 24: {
+      const veil = f <= 21 ? 0.45 + (f - 19) * 0.1 : 0.55;
+      body = (
+        <>
+          <div style={{ position: 'absolute', left: 96, top: 200, width: 640, height: 200, background: '#2b4a8c', borderRadius: 16 }}>
+            <p data-testid="veil-text" style={abs(32, 70, { fontSize: 36, fontWeight: 700, color: '#ffffff' })}>Texto claro sobre acento</p>
+          </div>
+          <div data-testid="veil" style={{ position: 'absolute', left: 0, top: 0, width: '100%', height: '100%', background: '#ffffff', opacity: veil }} />
+        </>
+      );
+      break;
+    }
     default:
       body = (
         <Card>

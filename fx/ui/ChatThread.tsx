@@ -1,6 +1,6 @@
 import type React from "react";
 import { Easing } from "../../engine";
-import { fxBox, progress, useFx } from "../core";
+import { fade, fxBox, progress, styleKey, useFx, xform } from "../core";
 import type { FxProps } from "../core";
 
 export type ChatMessage = { from: "me" | "them"; text: string };
@@ -33,12 +33,19 @@ export function ChatThread(p: ChatThreadProps) {
   const sched = chatSchedule(messages, dur);
   const fs = theme.type.caption * 0.85;
   // El "pop" escala solo el fondo de la burbuja; el texto no se escala (se desvanece), así el trazado de las letras no depende del historial.
-  const bubble = (key: string, mine: boolean, scale: number, children: React.ReactNode) => (
-    <div key={key} style={{ position: "relative", alignSelf: mine ? "flex-end" : "flex-start", maxWidth: "76%", boxSizing: "border-box", padding: "16px 24px", color: mine ? theme.color.onAccent : theme.color.text, fontSize: fs, lineHeight: 1.3, opacity: Math.min(1, scale * 1.4) }}>
-      <div style={{ position: "absolute", inset: 0, background: mine ? theme.color.accent : theme.color.surfaceAlt, border: mine ? "none" : `1px solid ${theme.color.border}`, borderRadius: theme.radius.lg, boxSizing: "border-box", transform: `scale(${scale.toFixed(4)})`, transformOrigin: mine ? "100% 100%" : "0% 100%" }} />
-      <div style={{ position: "relative", opacity: Math.min(1, Math.max(0, (scale - 0.55) * 2.2)) }}>{children}</div>
-    </div>
-  );
+  // Opacidad y escala solo mientras la burbuja aparece: en reposo no queda `scale(1)` ni `opacity: 0.99`.
+  const bubble = (key: string, mine: boolean, scale: number, children: React.ReactNode) => {
+    const outer: React.CSSProperties = { position: "relative", alignSelf: mine ? "flex-end" : "flex-start", maxWidth: "76%", boxSizing: "border-box", padding: "16px 24px", color: mine ? theme.color.onAccent : theme.color.text, fontSize: fs, lineHeight: 1.3, opacity: fade(Math.min(1, scale * 1.4)) };
+    const tf = xform({ scale });
+    const back: React.CSSProperties = { position: "absolute", inset: 0, background: mine ? theme.color.accent : theme.color.surfaceAlt, border: mine ? "none" : `1px solid ${theme.color.border}`, borderRadius: theme.radius.lg, boxSizing: "border-box", transform: tf, transformOrigin: tf ? (mine ? "100% 100%" : "0% 100%") : undefined };
+    const txt: React.CSSProperties = { position: "relative", opacity: fade(Math.min(1, Math.max(0, (scale - 0.55) / 0.45))) };
+    return (
+      <div key={`${key}:${styleKey(outer)}`} style={outer}>
+        <div key={styleKey(back)} style={back} />
+        <div key={styleKey(txt)} style={txt}>{children}</div>
+      </div>
+    );
+  };
   const out: React.ReactNode[] = [];
   messages.forEach((m, i) => {
     const s = sched[i]!;
@@ -48,7 +55,7 @@ export function ChatThread(p: ChatThreadProps) {
     if (typing) {
       out.push(bubble(`t${i}`, false, Easing.out(progress(local, s.typingAt!, 6)), (
         <span style={{ display: "inline-flex", gap: 8, alignItems: "center", height: fs * 0.9 }}>
-          {[0, 1, 2].map((d) => <span key={d} style={{ width: 12, height: 12, borderRadius: theme.radius.pill, background: theme.color.textMuted, transform: `translateY(${Math.round(Math.sin(local * 0.55 - d * 0.9) * -5)}px)`, display: "inline-block" }} />)}
+          {[0, 1, 2].map((d) => <span key={d} style={{ width: 12, height: 12, borderRadius: theme.radius.pill, background: theme.color.textMuted, transform: xform({ y: Math.sin(local * 0.55 - d * 0.9) * -5, round: true }), display: "inline-block" }} />)}
         </span>
       )));
     }

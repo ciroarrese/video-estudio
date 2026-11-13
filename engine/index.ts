@@ -26,3 +26,4 @@ export { defineVideo, getVideos, getVideo, setVideoSource, clearVideos, VideoReg
 export type { VideoDefinition, RegisteredVideo } from './defineVideo';
 export { FrameCanvas } from './FrameCanvas';
 export type { FrameCanvasProps } from './FrameCanvas';
+export { diffHtml, describeAtPoint } from './htmlDiff';

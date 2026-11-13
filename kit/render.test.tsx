@@ -165,7 +165,7 @@ describe("degenerate inputs", () => {
     expect(html(<CountUp to={50} start={5} duration={0} />, neutral, 4)).toContain(">0<");
     expect(html(<CountUp to={50} start={5} duration={0} />, neutral, 5)).toContain(">50<");
     expect(html(<Wash range={[5, 5]} />, neutral, 4)).toBe("");
-    expect(html(<Wash range={[5, 5]} />, neutral, 5)).toContain("opacity:1");
+    expect(html(<Wash range={[5, 5]} />, neutral, 5)).toContain("data-qa-veil=\"1.000\"");
   });
   it("flight / zoomThrough with start == end step", () => {
     expect(flight(4, [5, 5], { x: 0, y: 0 }, { x: 9, y: 9 }).t).toBe(0);

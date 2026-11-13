@@ -1,7 +1,7 @@
 import { parseCliArgs, USAGE } from './args';
 import { installSignalHandlers, isInterrupted } from './cleanup';
-import { checkVideo, listScenes, listVideos, renderVideo } from './render';
-import { formatSceneList, formatVideoList } from './meta';
+import { checkVideo, discoverVideos, listScenes, renderVideo } from './render';
+import { formatLoadErrors, formatSceneList, formatVideoList } from './meta';
 
 installSignalHandlers();
 
@@ -24,7 +24,9 @@ async function main(): Promise<number> {
   };
   try {
     if (o.list) {
-      console.log(formatVideoList(await listVideos({ log })));
+      const { videos, errors } = await discoverVideos({ log });
+      console.log(formatVideoList(videos));
+      if (errors.length) console.log(`\n${formatLoadErrors(errors)}`);
       return 0;
     }
     if (o.listScenes) {

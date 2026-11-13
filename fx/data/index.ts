@@ -1,6 +1,6 @@
 export { LineDraw, lineLayout, lineLength } from "./LineDraw";
 export type { LineDrawProps } from "./LineDraw";
-export { DonutRing, donutArc } from "./DonutRing";
+export { DonutRing, donutArc, donutGeometry, DONUT_SIZE } from "./DonutRing";
 export type { DonutRingProps } from "./DonutRing";
 export { RadarMorph, radarValues, radarPoints } from "./RadarMorph";
 export type { RadarMorphProps } from "./RadarMorph";

@@ -1,4 +1,4 @@
-import { checkDeterminism, createStage, scanAudio, getVideo, getVideos, waitForHolds, collectAudio, resolveScenes, isFormatName, FORMAT_NAMES, formatOf } from '../index';
+import { checkDeterminism, describeAtPoint, createStage, scanAudio, getVideo, getVideos, waitForHolds, collectAudio, resolveScenes, isFormatName, FORMAT_NAMES, formatOf } from '../index';
 import type { DeterminismResult, FormatName, FormatSize, SceneInfo, Stage } from '../index';
 import { videosReady } from './videos';
 import type { LoadError } from './discover';
@@ -23,6 +23,8 @@ declare global {
       /** Escenas del video (declaradas o juntadas de `<Sequence name>`). */
       scenes(): Promise<SceneInfo[]>;
       checkDeterminism(frames: number[]): Promise<DeterminismResult[]>;
+      /** Muestra el cuadro `n` y devuelve, para cada punto `[x, y]` (px del escenario), los elementos que hay ahí (de arriba hacia abajo; ver `describeAtPoint`). Para diagnosticar `--check`. */
+      describeAt(n: number, points: [number, number][]): Promise<string[][]>;
     };
   }
 }
@@ -128,6 +130,15 @@ window.__ve = {
   audio: () => wire(collectAudio()),
   scanAudio: async () => (await init, wire(scanAudio(need()))),
   scenes: async () => (await init, resolveScenes(need())),
+  describeAt: async (n: number, points: [number, number][]) => {
+    await init;
+    const s = need();
+    checkFrame(s, n);
+    s.render(n);
+    await settle();
+    const host = document.getElementById('stage')!;
+    return points.map(([x, y]) => describeAtPoint(host, x, y));
+  },
   checkDeterminism: async (frames: number[]) => (await init, checkDeterminism(need(), frames, settle)),
 };
 // Avoid an unhandled rejection if nobody awaits ready.
