@@ -61,7 +61,7 @@ export function InterludeCompact({ spec, done, skip = [], next: nextProp }: { sp
           })}
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: Math.round(cs * 0.4), maxWidth: maxW, opacity: fade(appear), transform: xform({ y: Math.round((1 - appear) * 18) }) }}>
-          {check > 0 && <div style={{ flexShrink: 0 }}><CheckMark p={check} size={cs} id={`c${done}`} /></div>}
+          <div style={{ flexShrink: 0, width: cs, height: cs }}>{check > 0 && <CheckMark p={check} size={cs} id={`c${done}`} />}</div>
           <div style={{ fontSize: nameFit.size, fontWeight: theme.font.weights.semibold, color: theme.color.text, letterSpacing: "-0.02em", whiteSpace: "nowrap" }}>{nameFit.text}</div>
         </div>
         <div style={{ textAlign: "center", opacity: fade(nextIn), transform: xform({ y: Math.round((1 - nextIn) * 14) }), color: theme.color.textMuted, fontSize: theme.type.body }}>
