@@ -37,7 +37,8 @@ const LAYOUTS: Record<"horizontal" | "vertical" | "cuadrado", Layout> = {
   vertical: { P: { x: 60, y: 330, w: 960, h: 1260 }, CARD: { w: 860, h: 190 }, cardPos: (i) => ({ x: 110, y: 420 + i * 220 }), rowsTop: 700, cursorHome: { x: 900, y: 1500 } },
   cuadrado: { P: { x: 60, y: 190, w: 960, h: 760 }, CARD: { w: 270, h: 200 }, cardPos: (i) => ({ x: 110 + i * 300, y: 280 }), rowsTop: 340, cursorHome: { x: 900, y: 880 } },
 };
-const DUR = 150;const THROUGH: [number, number] = [112, 149];
+const DUR = 150;
+const THROUGH: [number, number] = [112, 149];
 
 function DemoScene({ variant }: { variant: number }) {
   const theme = useTheme();
