@@ -1,7 +1,7 @@
 import React from "react";
 import { useFrame } from "../../engine";
-import { useTheme } from "../../themes";
-import type { Theme, ThemeColors } from "../../themes";
+import { resolveStyle, useTheme } from "../../themes";
+import type { Theme, ThemeColors, ThemeStyle } from "../../themes";
 
 /** Roles de color del tema (sin la serie `chart`). Los efectos aceptan sobrescrituras con estos nombres. */
 export type ColorRole = Exclude<keyof ThemeColors, "chart">;
@@ -36,12 +36,12 @@ export function fxBox(p: Pick<FxProps, "width" | "height" | "size">, def: FxBox)
   return { width: p.width ?? p.size ?? def.width, height: p.height ?? p.size ?? def.height };
 }
 
-/** Cuadro absoluto, cuadro local (desde `start`) y tema para un efecto. */
-export function useFx(p: Pick<FxProps, "frame" | "start">): { frame: number; local: number; theme: Theme } {
+/** Cuadro absoluto, cuadro local (desde `start`), tema y estilo resuelto del tema (`resolveStyle(theme)`, completo) para un efecto. */
+export function useFx(p: Pick<FxProps, "frame" | "start">): { frame: number; local: number; theme: Theme; style: ThemeStyle } {
   const ctx = useFrame();
   const theme = useTheme();
   const frame = p.frame ?? ctx;
-  return { frame, local: frame - (p.start ?? 0), theme };
+  return { frame, local: frame - (p.start ?? 0), theme, style: resolveStyle(theme) };
 }
 
 /** Color del tema por rol. */

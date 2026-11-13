@@ -1,10 +1,10 @@
-import { doodleStyle, staggerScale, withAlpha } from "../../themes";
+import { doodleStyle, staggerScale, withAlpha, textStyle } from "../../themes";
 import { Easing, random } from "../../engine";
 import { fade, fxBox, progress, useFx } from "../core";
 import type { FxProps } from "../core";
 import { staggerT, toPath } from "../data/geom";
 import type { Pt } from "../data/geom";
-import { parseSurface } from "../data/styleKit";
+import { svgSurface } from "../data/styleKit";
 
 export type Strip = { text: string; x: number; y: number; w: number; h: number; rot: number; from: "left" | "right" | "top" | "bottom" };
 export type PaperCollageProps = FxProps & { strips?: Strip[] };
@@ -39,7 +39,7 @@ export function PaperCollage(p: PaperCollageProps) {
   const t = progress(local, 0, dur * 0.82);
   // Estilo del diseño: superficie de la tira (relleno, borde, sombra: suave = la desplazada de siempre, filo duro = tinta, plana = ninguna) y rasgado
   // (`decor.doodleStroke`: a mano = irregular; geométrico = corte casi limpio).
-  const surf = parseSurface(theme, "card");
+  const surf = svgSurface(theme, "card");
   const amp = doodleStyle(theme).jitter ? 7 : 2.5;
   const paper = [
     { fill: surf.fill, ink: theme.color.text },
@@ -71,7 +71,7 @@ export function PaperCollage(p: PaperCollageProps) {
             {surf.shadow.shadow === "hard" ? <path d={poly} transform={`translate(${surf.shadow.dx + 2} ${surf.shadow.dy + 2})`} fill={surf.shadow.color} /> : surf.shadow.shadow === "soft" && <path d={poly} transform="translate(5 7)" fill={withAlpha(theme.color.text, 0.16)} />}
             {surf.shadow.shadow === "glow" && <path d={poly} fill="none" stroke={surf.shadow.color} strokeWidth={14} strokeLinejoin="round" opacity={0.35} />}
             <path d={poly} fill={col.fill} stroke={surf.border > 0 ? surf.edge : "none"} strokeWidth={1.5 * surf.border} />
-            <text x={s.w / 2} y={s.h / 2 + fs * 0.33} textAnchor="middle" fontSize={fs} fontWeight={theme.font.weights.semibold} fill={col.ink} style={{ color: col.ink }}>{s.text}</text>
+            <text x={s.w / 2} y={s.h / 2 + fs * 0.33} textAnchor="middle" fontSize={fs} fontWeight={textStyle(theme, "label", { strong: true }).fontWeight} fill={col.ink} style={{ color: col.ink }}>{s.text}</text>
           </g>
         );
       })}

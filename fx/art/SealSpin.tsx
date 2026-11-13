@@ -1,4 +1,4 @@
-import { withAlpha } from "../../themes";
+import { withAlpha, textStyle } from "../../themes";
 import { Easing } from "../../engine";
 import { fade, fxBox, progress, svgScale, useFx } from "../core";
 import type { FxProps } from "../core";
@@ -41,7 +41,7 @@ export function SealSpin(p: SealSpinProps) {
         <circle cx={cx} cy={cy} r={R} fill={theme.color.surface} stroke={theme.color.accent} strokeWidth={6} />
         <circle cx={cx} cy={cy} r={R - 14} fill="none" stroke={theme.color.accent} strokeWidth={2} />
         <g transform={`rotate(${ang.toFixed(3)} ${cx} ${cy})`}>
-          <text fontSize={fs} fontWeight={theme.font.weights.semibold} fill={theme.color.text} letterSpacing={2}>
+          <text fontSize={fs} fontWeight={textStyle(theme, "label", { strong: true }).fontWeight} fill={theme.color.text} letterSpacing={2}>
             <textPath href={`#sp-${uid}`} startOffset={0} textLength={circ * 0.985} lengthAdjust="spacing">{text}</textPath>
           </text>
           {Array.from({ length: ticks }, (_, i) => {

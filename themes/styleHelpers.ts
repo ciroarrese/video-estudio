@@ -20,10 +20,12 @@ const num = (n: number, d: number) => String(+n.toFixed(d));
 // ---------- forma ----------
 
 /**
- * Radio (px) de un rol según `style.shape.corners`.
- * `pill` (por defecto): chip y barra = `radius.pill`, tarjeta y panel = `radius.lg`, cartel = `radius.lg * 2`, control = `radius.md`.
- * `rounded`: chip = `radius.md`, tarjeta y panel = `radius.lg`, cartel = `radius.lg * 1.5`, control y barra = `radius.sm`.
+ * Radio (px) de un rol según `style.shape.corners`; cada rol sale de un escalón de `theme.radius`:
+ * `pill` (por defecto): chip y barra = `radius.pill`, tarjeta y ventana = `radius.lg`, panel = `radius.panel`, cartel = `radius.lg * 2`, control = `radius.md`.
+ * `rounded`: chip = `radius.md`, tarjeta y ventana = `radius.lg`, panel = `radius.panel`, cartel = `radius.lg * 1.5`, control y barra = `radius.sm`.
  * `sharp`: 0 en todo.
+ * `panel` es el contenedor de tamaño medio (un panel dentro de una interfaz, un paso de un diagrama); `window` es el grande (la paleta de
+ * comandos, el plano, el panel que ocupa la escena) y `card` la tarjeta suelta.
  */
 export function cornerRadius(theme: Theme, role: CornerRole): number {
   const r = theme.radius;
@@ -31,27 +33,32 @@ export function cornerRadius(theme: Theme, role: CornerRole): number {
     case "sharp":
       return 0;
     case "rounded":
-      return { chip: r.md, card: r.lg, panel: r.lg, hero: r.lg * 1.5, control: r.sm, bar: r.sm }[role];
+      return { chip: r.md, card: r.lg, panel: r.panel, window: r.lg, hero: r.lg * 1.5, control: r.sm, bar: r.sm }[role];
     default:
-      return { chip: r.pill, card: r.lg, panel: r.lg, hero: r.lg * 2, control: r.md, bar: r.pill }[role];
+      return { chip: r.pill, card: r.lg, panel: r.panel, window: r.lg, hero: r.lg * 2, control: r.md, bar: r.pill }[role];
   }
 }
 
 /**
  * Grosor (px) del borde de una superficie: `shape.border` más lo propio de la pieza (chip +1, píldora +2, como hoy: 2 y 3 px con el
  * valor por defecto). 0 si `shape.outlined` es `false` (salvo `surface.kind: "outline"`, que es un borde) y para el cartel sólido.
+ * - `bold`: un píxel más (la ficha que tiene que leerse como objeto: las tarjetas de `fx/three`, la tarjeta de un recorrido; con el valor por
+ *   defecto, 2 px en vez de 1). Quien lo necesita lo pide acá y no suma a mano.
+ * - `titleCard`: variante del cartel (`solid` o `glass`) del video; por defecto la que declara el tema (`story.titleCard`).
+ * Con `surface.kind: "outline"` el cartel también lleva borde (es el propio contorno del cartel, sin el cual se confunde con el fondo).
  */
-export function borderWidth(theme: Theme, role: SurfaceRole): number {
+export function borderWidth(theme: Theme, role: SurfaceRole, o: Pick<SurfaceOptions, "bold" | "titleCard"> = {}): number {
   const st = resolveStyle(theme);
   const base = st.shape.border;
-  if (st.surface.kind === "outline" && role !== "title") return Math.max(base, 1) + (role === "chip" ? 1 : role === "pill" ? 2 : 0);
+  const bold = o.bold ? 1 : 0;
+  if (st.surface.kind === "outline") return Math.max(base, 1) + (role === "chip" ? 1 : role === "pill" ? 2 : 0) + bold;
   if (!st.shape.outlined || base <= 0) return 0;
-  if (role === "title") return st.story.titleCard === "glass" || st.surface.kind === "glass" ? base : 0;
-  return base + (role === "chip" ? 1 : role === "pill" ? 2 : 0);
+  if (role === "title") return (o.titleCard ?? st.story.titleCard) === "glass" || st.surface.kind === "glass" ? base + bold : 0;
+  return base + (role === "chip" ? 1 : role === "pill" ? 2 : 0) + bold;
 }
 
-const ROLE_RADIUS: Record<SurfaceRole, CornerRole> = { card: "card", panel: "panel", headline: "chip", chip: "chip", pill: "chip", title: "hero" };
-const ROLE_LEVEL: Record<SurfaceRole, "md" | "lg"> = { card: "md", panel: "lg", headline: "md", chip: "md", pill: "lg", title: "lg" };
+const ROLE_RADIUS: Record<SurfaceRole, CornerRole> = { card: "card", panel: "panel", window: "window", headline: "chip", chip: "chip", pill: "chip", title: "hero" };
+const ROLE_LEVEL: Record<SurfaceRole, "md" | "lg"> = { card: "md", panel: "lg", window: "lg", headline: "md", chip: "md", pill: "lg", title: "lg" };
 
 export interface SurfaceOptions {
   /** Superficie destacada: borde de acento (chip encendido). Por defecto `true` solo en la píldora. */
@@ -62,80 +69,130 @@ export interface SurfaceOptions {
   glow?: number;
   /** Escalón de sombra (`sm`, `md`, `lg`) en vez del que corresponde al rol. */
   level?: "sm" | "md" | "lg";
+  /** Borde un píxel más grueso (ver `borderWidth`). */
+  bold?: boolean;
+  /** Rol de esquinas distinto del que corresponde a la superficie (una tarjeta con las esquinas de `panel`). */
+  corner?: CornerRole;
+  /** Solo con el rol `title`: variante del cartel que decidió el video; por defecto la del tema (`story.titleCard`). */
+  titleCard?: "solid" | "glass";
+}
+
+/** Partes de una superficie, sin CSS: lo que necesita un SVG (`<rect>`, sombras dibujadas a mano) y lo que arma `surfaceStyle`. */
+export interface SurfaceParts {
+  /** Relleno. */
+  fill: string;
+  /** Borde (color y grosor en px), o `null` si la superficie no lleva. */
+  stroke: { color: string; width: number } | null;
+  /** Radio de las esquinas (px). */
+  radius: number;
+  /**
+   * Elevación: `soft` (la sombra del tema, `theme.shadow.*`: no se descompone, ver `boxShadow`), `hard` (filo duro desplazado `x`, `y` en tinta),
+   * `glow` (halo de acento de `blur` px) o `none`.
+   */
+  shadow: { kind: "none" | "soft" | "hard" | "glow"; x: number; y: number; blur: number; color: string };
+  /** Destello de acento extra (el "pop" de un chip, el brillo de la píldora), o `null`. Es otra capa, sobre la elevación. */
+  glow: { blur: number; color: string } | null;
+  /** Las sombras juntas como valor CSS de `box-shadow` (`undefined` si no hay). */
+  boxShadow: string | undefined;
 }
 
 /**
- * Fondo, borde, sombra y radio de una superficie según `style.shape` y `style.surface`; con el estilo por defecto da exactamente lo que
- * dibujaban `DockedHeadline`, `Chip`, `Pill`, `NotificationStack` y el cartel de la apertura.
- *
- * - `surface.kind`: `solid` = `color.surface`; `glass` = `surface` con `surface.opacity` (la emulación del vidrio: sin `backdrop-filter`);
- *   `outline` = relleno del fondo (opaco) y borde de tinta (`color.text`); `tinted` = `surface` teñida 10 % de acento.
- * - `surface.elevation`: `shadow` = la sombra del tema; `flat` = ninguna; `border` = filo duro desplazado en tinta; `glow` = halo de acento y borde de acento.
- * - El rol `title` (cartel de la apertura) usa vidrio si `story.titleCard` es `glass`, y agrega su sombra larga en `shadow`.
- * El estilo que devuelve no lleva `padding`, `transform` ni `opacity`: eso lo decide la pieza.
+ * Fondo, borde, sombra y radio de una superficie como datos (`SurfaceParts`) según `style.shape` y `style.surface`; `surfaceStyle` es lo mismo
+ * escrito como CSS. Las piezas SVG usan esta variante: no hay que leer cadenas de CSS.
  */
-export function surfaceStyle(theme: Theme, role: SurfaceRole, o: SurfaceOptions = {}): React.CSSProperties {
+export function surfaceParts(theme: Theme, role: SurfaceRole, o: SurfaceOptions = {}): SurfaceParts {
   const st = resolveStyle(theme);
   const c = theme.color;
-  const kind = role === "title" && st.story.titleCard === "glass" ? "glass" : st.surface.kind;
+  const card = role === "title" ? (o.titleCard ?? st.story.titleCard) : undefined;
+  const kind = card === "glass" ? "glass" : st.surface.kind;
   const on = o.on ?? role === "pill";
-  const w = borderWidth(theme, role);
-  const out: React.CSSProperties = { borderRadius: cornerRadius(theme, ROLE_RADIUS[role]) };
+  const w = borderWidth(theme, role, o);
 
-  out.background = kind === "glass" ? withAlpha(c.surface, st.surface.opacity) : kind === "outline" ? c.bg : kind === "tinted" ? mixColors(c.surface, c.accent, 0.1) : c.surface;
+  const fill = kind === "glass" ? withAlpha(c.surface, st.surface.opacity) : kind === "outline" ? c.bg : kind === "tinted" ? mixColors(c.surface, c.accent, 0.1) : c.surface;
 
+  let stroke: SurfaceParts["stroke"] = null;
   if (w > 0) {
     let col = kind === "outline" ? c.text : c.border;
     if (kind === "glass") col = withAlpha(c.surface, 0.9);
     if (st.surface.elevation === "border") col = c.text;
     if (st.surface.elevation === "glow") col = withAlpha(c.accent, 0.45);
     if (on) col = withAlpha(c.accent, role === "pill" ? 0.66 : o.faint ? 0.3 : 0.55);
-    out.border = `${num(w, 2)}px solid ${col}`;
+    stroke = { color: col, width: w };
   }
 
   const level = o.level ?? ROLE_LEVEL[role];
-  const glow = clamp01(o.glow ?? 0);
-  const parts: string[] = [];
+  const g = clamp01(o.glow ?? 0);
+  const big = role === "panel" || role === "window" || role === "title";
+  const layers: string[] = [];
+  let shadow: SurfaceParts["shadow"] = { kind: "none", x: 0, y: 0, blur: 0, color: c.text };
+  let glow: SurfaceParts["glow"] = null;
   switch (st.surface.elevation) {
     case "shadow":
     case "glow": {
       if (st.surface.elevation === "shadow") {
-        if (role === "title") parts.push(`0 40px 90px -30px ${withAlpha(c.text, 0.35)}`);
-        parts.push(theme.shadow[level]);
+        if (role === "title") layers.push(`0 40px 90px -30px ${withAlpha(c.text, 0.35)}`);
+        layers.push(theme.shadow[level]);
+        shadow = { kind: "soft", x: 0, y: 0, blur: 0, color: c.text };
       } else {
-        const r = role === "panel" || role === "title" ? 44 : 24;
-        parts.push(`0 0 ${r}px ${withAlpha(c.accent, 0.3)}`);
+        const r = big ? 44 : 24;
+        const col = withAlpha(c.accent, 0.3);
+        layers.push(`0 0 ${r}px ${col}`);
+        shadow = { kind: "glow", x: 0, y: 0, blur: r, color: col };
       }
-      if (role === "pill") parts.push(`0 0 ${num(18 + glow * 34, 2)}px ${withAlpha(c.accent, 0.25 + glow * 0.4)}`);
-      else if (glow > 0.01) parts.push(`0 0 ${num(10 + glow * 34, 2)}px ${withAlpha(c.accent, 0.45 * glow)}`);
+      if (role === "pill") glow = { blur: +(18 + g * 34).toFixed(2), color: withAlpha(c.accent, 0.25 + g * 0.4) };
+      else if (g > 0.01) glow = { blur: +(10 + g * 34).toFixed(2), color: withAlpha(c.accent, 0.45 * g) };
+      if (glow) layers.push(`0 0 ${num(glow.blur, 2)}px ${glow.color}`);
       break;
     }
     case "border": {
-      const d = role === "panel" || role === "title" || role === "card" ? 4 : 3;
-      parts.push(`${d}px ${d}px 0 0 ${c.text}`);
+      const d = big || role === "card" ? 4 : 3;
+      layers.push(`${d}px ${d}px 0 0 ${c.text}`);
+      shadow = { kind: "hard", x: d, y: d, blur: 0, color: c.text };
       break;
     }
     default:
       break;
   }
-  if (parts.length) out.boxShadow = parts.join(", ");
+  return { fill, stroke, radius: cornerRadius(theme, o.corner ?? ROLE_RADIUS[role]), shadow, glow, boxShadow: layers.length ? layers.join(", ") : undefined };
+}
+
+/**
+ * Fondo, borde, sombra y radio de una superficie como CSS (`surfaceParts` escrito para un elemento HTML); con el estilo por defecto da
+ * exactamente lo que dibujaban `DockedHeadline`, `Chip`, `Pill`, `NotificationStack` y el cartel de la apertura.
+ *
+ * - `surface.kind`: `solid` = `color.surface`; `glass` = `surface` con `surface.opacity` (la emulación del vidrio: sin `backdrop-filter`);
+ *   `outline` = relleno del fondo (opaco) y borde de tinta (`color.text`); `tinted` = `surface` teñida 10 % de acento.
+ * - `surface.elevation`: `shadow` = la sombra del tema; `flat` = ninguna; `border` = filo duro desplazado en tinta; `glow` = halo de acento y borde de acento.
+ * - El rol `title` (cartel de la apertura) usa vidrio si `story.titleCard` es `glass` (o `titleCard` en las opciones, la variante que eligió
+ *   el video), y agrega su sombra larga en `shadow`.
+ * El estilo que devuelve no lleva `padding`, `transform` ni `opacity`: eso lo decide la pieza.
+ */
+export function surfaceStyle(theme: Theme, role: SurfaceRole, o: SurfaceOptions = {}): React.CSSProperties {
+  const p = surfaceParts(theme, role, o);
+  const out: React.CSSProperties = { borderRadius: p.radius, background: p.fill };
+  if (p.stroke) out.border = `${num(p.stroke.width, 2)}px solid ${p.stroke.color}`;
+  if (p.boxShadow) out.boxShadow = p.boxShadow;
   return out;
 }
 
 // ---------- texto ----------
 
+const STRONGER = { regular: "medium", medium: "semibold", semibold: "stat", stat: "stat" } as const;
+
 /**
  * Peso e interletrado de un rol de texto. `title`: `titleWeight` y `titleTracking`; `label`: `labelWeight`; `eyebrow`: caja alta y
  * `eyebrowTracking` (el peso lo deja a la pieza). `tracking` es lo que la pieza ya lleva (por ejemplo -0,02 em en los nombres de la lista):
  * el del estilo se suma. Omite `letterSpacing` y `textTransform` cuando no cambian nada.
+ * `strong` (solo en `label`): el rótulo que va un escalón más fuerte que el común (los nombres de una tarjeta, la etiqueta de una ficha):
+ * `labelWeight` subido un escalón (`regular` a `medium`, `medium` a `semibold`, `semibold` a `stat`). Con el estilo por defecto, `semibold`.
  */
-export function textStyle(theme: Theme, role: "title" | "label" | "eyebrow", o: { tracking?: number } = {}): React.CSSProperties {
+export function textStyle(theme: Theme, role: "title" | "label" | "eyebrow", o: { tracking?: number; strong?: boolean } = {}): React.CSSProperties {
   const st = resolveStyle(theme).type;
   const out: React.CSSProperties = {};
   const extra = role === "title" ? st.titleTracking : role === "eyebrow" ? st.eyebrowTracking : 0;
   const ls = +((o.tracking ?? 0) + extra).toFixed(3);
   if (role === "title") out.fontWeight = theme.font.weights[st.titleWeight];
-  if (role === "label") out.fontWeight = theme.font.weights[st.labelWeight];
+  if (role === "label") out.fontWeight = theme.font.weights[o.strong ? STRONGER[st.labelWeight] : st.labelWeight];
   if (role === "eyebrow" && st.eyebrowCase === "upper") out.textTransform = "uppercase";
   if (ls !== 0) out.letterSpacing = `${ls}em`;
   return out;
@@ -247,41 +304,68 @@ export interface EntranceOptions {
   alternate?: boolean;
   /** Traslados a px enteros (por defecto `true`: el texto con traslados fraccionarios se rasteriza según el historial). */
   round?: boolean;
+  /**
+   * Curva propia de la pieza (por ejemplo `Easing.lands`): reemplaza al asentado de `motion.overshoot` mientras la entrada es la propia
+   * (`motion.entrance: "auto"`) y puede pasarse de 1 (rebote). Con otra entrada manda el tema. `progress` llega a la curva sin curvar.
+   */
+  curve?: (p: number) => number;
+  /** Traslado extra (px) de la pieza, sumado al de la entrada en un solo `transform` (la tarjeta empujada por otra). Sin redondear si `round` es `false`. */
+  offset?: { x?: number; y?: number };
 }
 
 /**
  * Entrada de un elemento genérico según `style.motion.entrance` (con `auto`, la `native` de la pieza) y `overshoot`. `progress` (0 a 1) ya viene con la demora de
  * `staggerFrames` y la curva de la pieza; `index` solo decide el lado en `slide` con `alternate`.
- * En reposo (`progress` >= 1) devuelve `{}`: sin `opacity`, `transform` ni `clipPath`. Con `progress` <= 0 devuelve `opacity: 0`.
+ * En reposo (`progress` >= 1) devuelve `{}`: sin `opacity`, `transform` ni `clipPath` (con `offset`, solo el traslado). Con `progress` <= 0 devuelve `opacity: 0`.
+ * `curve` deja que la pieza use una curva propia que se pasa de 1 (rebote) y `offset` suma un traslado extra al de la entrada.
  */
 export function entrance(theme: Theme, progress: number, index = 0, o: EntranceOptions = {}): React.CSSProperties {
   const st = resolveStyle(theme).motion;
   const p = clamp01(progress);
-  if (p >= 1) return {};
-  const q = settle(p, st.overshoot);
+  const ox = o.offset?.x ?? 0, oy = o.offset?.y ?? 0;
   const tr = (v: number) => (o.round === false ? +v.toFixed(2) : Math.round(v));
+  // traslado extra: delante de lo que haga la entrada, como una sola función de `translate`
+  const shift = (): string[] => {
+    const x = tr(ox), y = tr(oy);
+    return x !== 0 && y !== 0 ? [`translate(${num(x, 2)}px, ${num(y, 2)}px)`] : x !== 0 ? [`translateX(${num(x, 2)}px)`] : y !== 0 ? [`translateY(${num(y, 2)}px)`] : [];
+  };
+  if (p >= 1) {
+    const rest = shift();
+    return rest.length ? { transform: rest.join(" ") } : {};
+  }
+  const native = st.entrance === "auto";
+  const q = native && o.curve ? o.curve(p) : settle(p, st.overshoot);
   const op = p <= 0 ? 0 : +p.toFixed(4) >= 0.9995 ? undefined : +p.toFixed(4);
   const out: React.CSSProperties = {};
   const parts: string[] = [];
-  switch (st.entrance === "auto" ? o.native ?? "rise" : st.entrance) {
-    case "wipe":
-      return p <= 0 ? { opacity: 0 } : { clipPath: `inset(0 ${num((1 - p) * 100, 2)}% 0 0)` };
+  switch (native ? o.native ?? "rise" : st.entrance) {
+    case "wipe": {
+      const t = shift();
+      return p <= 0 ? { opacity: 0, ...(t.length ? { transform: t.join(" ") } : {}) } : { clipPath: `inset(0 ${num((1 - p) * 100, 2)}% 0 0)`, ...(t.length ? { transform: t.join(" ") } : {}) };
+    }
     case "fade":
+      parts.push(...shift());
       break;
     case "scale": {
       const sc = +((o.from ?? 0.85) + (1 - (o.from ?? 0.85)) * q).toFixed(4);
+      parts.push(...shift());
       if (sc !== 1) parts.push(`scale(${num(sc, 4)})`);
       break;
     }
     case "slide": {
       const dir = (o.side ?? "left") === "left" ? -1 : 1;
       const x = tr((1 - q) * (o.distance ?? 48) * (o.alternate && index % 2 === 1 ? -dir : dir));
-      if (x !== 0) parts.push(`translateX(${x}px)`);
+      parts.push(...shift());
+      if (x !== 0) parts.push(`translateX(${num(x, 2)}px)`);
       break;
     }
     default: {
-      const y = tr((1 - q) * (o.distance ?? 24));
-      if (y !== 0) parts.push(`translateY(${y}px)`);
+      // la distancia propia y el traslado extra se suman antes de redondear: así un solo número, igual al de siempre sin traslado extra
+      const y = tr((1 - q) * (o.distance ?? 24) + oy);
+      const x = tr(ox);
+      if (x !== 0 && y !== 0) parts.push(`translate(${num(x, 2)}px, ${num(y, 2)}px)`);
+      else if (x !== 0) parts.push(`translateX(${num(x, 2)}px)`);
+      else if (y !== 0) parts.push(`translateY(${num(y, 2)}px)`);
     }
   }
   if (op !== undefined) out.opacity = op;

@@ -1,11 +1,11 @@
 import type React from "react";
-import { cornerRadius, numeralStyle, staggerScale, withAlpha } from "../../themes";
+import { numeralStyle, staggerScale, withAlpha, textStyle } from "../../themes";
 import { Easing } from "../../engine";
 import { fade, fxBox, progress, styleKey, svgScale, useFx } from "../core";
 import type { FxProps } from "../core";
 import { pointAt, roundedPolyline, toPath, trimPolyline } from "./geom";
 import type { Pt } from "./geom";
-import { SvgShadow, parseSurface } from "./styleKit";
+import { SvgShadow, svgSurface } from "./styleKit";
 
 export type StepState = "done" | "active" | "pending";
 export type FlowStep = { title: string; caption?: string; state?: StepState };
@@ -48,9 +48,9 @@ export function FlowSteps(p: FlowStepsProps) {
   const tr = trimPolyline(full, draw);
   const tip = full.length ? pointAt(full, draw) : { x: 0, y: 0 };
   const fs = theme.type.eyebrow;
-  // Estilo del diseño: esquinas del panel (con las de siempre, `radius.panel`), superficie (relleno y sombra), número de paso y paso entre tarjetas.
-  const rx = (theme.radius.panel * cornerRadius(theme, "panel")) / theme.radius.lg;
-  const surf = parseSurface(theme, "panel");
+  // Estilo del diseño: esquinas del panel (`radius.panel` con el estilo por defecto), superficie (relleno y sombra), número de paso y paso entre tarjetas.
+  const surf = svgSurface(theme, "panel");
+  const rx = surf.radius;
   const num = numeralStyle(theme, { on: theme.color.surface });
   const numFill = "background" in num ? null : "WebkitTextStroke" in num ? "outline" : String(num.color);
   const stag = Math.min(0.95, 0.8 * staggerScale(theme));
@@ -81,8 +81,8 @@ export function FlowSteps(p: FlowStepsProps) {
             <SvgShadow shadow={surf.shadow} x={c.x} y={c.y} width={cw} height={ch} rx={rx} />
             <rect x={c.x} y={c.y} width={cw} height={ch} rx={rx} fill={surf.fill} stroke={state === "pending" ? theme.color.border : col} strokeWidth={state === "active" ? 4 : 2.5} strokeDasharray={state === "pending" ? "10 8" : undefined} />
             <circle cx={c.x + 44} cy={cy} r={22} fill={state === "pending" ? "none" : state === "done" ? col : withAlpha(col, 0.15)} stroke={col} strokeWidth={3} />
-            {state === "done" ? <path d={`M${c.x + 34} ${cy} l7 8 l13 -16`} fill="none" stroke={theme.color.onAccent} strokeWidth={4} strokeLinecap="round" strokeLinejoin="round" /> : <text x={c.x + 44} y={cy + fs * 0.35} textAnchor="middle" fontSize={fs} fontWeight={theme.font.weights.semibold} {...numAttrs(state, col)}>{i + 1}</text>}
-            <text x={c.x + 84} y={cy - 4} fontSize={fs * 1.1} fontWeight={theme.font.weights.semibold} fill={state === "pending" ? theme.color.textMuted : theme.color.text}>{s.title}</text>
+            {state === "done" ? <path d={`M${c.x + 34} ${cy} l7 8 l13 -16`} fill="none" stroke={theme.color.onAccent} strokeWidth={4} strokeLinecap="round" strokeLinejoin="round" /> : <text x={c.x + 44} y={cy + fs * 0.35} textAnchor="middle" fontSize={fs} fontWeight={textStyle(theme, "label", { strong: true }).fontWeight} {...numAttrs(state, col)}>{i + 1}</text>}
+            <text x={c.x + 84} y={cy - 4} fontSize={fs * 1.1} fontWeight={textStyle(theme, "label", { strong: true }).fontWeight} fill={state === "pending" ? theme.color.textMuted : theme.color.text}>{s.title}</text>
             {s.caption && <text x={c.x + 84} y={cy + fs * 0.95} fontSize={fs * 0.8} fill={theme.color.textMuted}>{s.caption}</text>}
           </g>
         );

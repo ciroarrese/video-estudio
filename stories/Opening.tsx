@@ -1,8 +1,7 @@
 import type React from "react";
 import { Easing, useFrame, useVideoConfig } from "../engine";
 import { Wash, World, kf, useCameraAt, zoomThrough } from "../kit";
-import { borderWidth, entrance, resolveStyle, staggerFrames, surfaceStyle, textStyle, useTheme } from "../themes";
-import type { Theme } from "../themes";
+import { entrance, staggerFrames, surfaceStyle, textStyle, useTheme } from "../themes";
 import { fade, styleKey, xform } from "../fx/core/math";
 import { fitText, listLayout, openingWall, rigTransform } from "./layout";
 import { Chip, HeadlineRow, HighlightedTitle, StoryStage, rowEntrance, scaler, useEase, useStorySpec } from "./shared";
@@ -18,15 +17,6 @@ const WALL_P = 1400;
 
 /** Cuadros que dura el acople final del titular (`design.handoff: "dock"`) antes de terminar la apertura. */
 const DOCK_FRAMES = 26;
-
-/** Tema con el cartel del título `kind` (el del video, `design.titleCard`) en vez del que declara el design system. */
-const titleThemes = new WeakMap<Theme, Record<string, Theme>>();
-function titleTheme(theme: Theme, kind: "solid" | "glass"): Theme {
-  if (resolveStyle(theme).story.titleCard === kind) return theme;
-  const byKind = titleThemes.get(theme) ?? {};
-  titleThemes.set(theme, byKind);
-  return (byKind[kind] ??= { ...theme, style: { ...resolveStyle(theme), story: { ...resolveStyle(theme).story, titleCard: kind } } });
-}
 
 /**
  * Apertura: el título se lee desde el primer cuadro sobre un muro de etiquetas en profundidad (cada pieza con su
@@ -112,7 +102,7 @@ export function Opening({ spec: specIn, first = 0, dock, through }: { spec: Stor
         // el cartel solo lleva `transform` / `opacity` mientras se anima: en reposo un `translateY(0px) scale(1)` residual lo compone en
         // capa propia y su texto se rasteriza distinto según el historial de cuadros
         // superficie, borde, sombra y radio del cartel según el design system (`surfaceStyle`); `design.titleCard` del video pisa al del tema
-        const surf = surfaceStyle(titleTheme(theme, design.titleCard === "glass" ? "glass" : "solid"), "title");
+        const surf = surfaceStyle(theme, "title", { titleCard: design.titleCard === "glass" ? "glass" : "solid" });
         // la entrada del cartel (`motion.entrance`) es solo un asentado de movimiento: el título se lee desde el primer cuadro, así que
         // el progreso arranca en 0,8 (con la entrada por defecto: escala de 0,95 a 1) y no lleva fundido
         const enter = entrance(theme, 0.8 + 0.2 * titleIn, 0, { native: "scale", from: 0.75 });
@@ -124,8 +114,6 @@ export function Opening({ spec: specIn, first = 0, dock, through }: { spec: Stor
           boxSizing: "border-box",
           padding: `${Math.round(tf.size * 0.3)}px ${Math.round(tf.size * 0.55)}px`,
           ...surf,
-          // TEMA: con `surface.kind: "outline"` el cartel no trae borde (`borderWidth(title)` da 0) y plano se confunde con el fondo: se lo dibuja
-          ...(!surf.border && resolveStyle(theme).surface.kind === "outline" ? { border: `${Math.max(1, borderWidth(theme, "chip") - 1)}px solid ${theme.color.text}` } : {}),
           opacity: fade(1 - titleOut),
           transform,
           textAlign: "center",

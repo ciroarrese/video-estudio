@@ -1,8 +1,8 @@
-import { cornerRadius, withAlpha } from "../../themes";
+import { cornerRadius, withAlpha, textStyle } from "../../themes";
 import { Easing } from "../../engine";
 import { fxBox, progress, svgScale, useFx } from "../core";
 import type { FxProps } from "../core";
-import { SvgShadow, parseSurface } from "../data/styleKit";
+import { SvgShadow, svgSurface } from "../data/styleKit";
 
 export type TileDoneProps = FxProps & {
   label?: string;
@@ -24,7 +24,7 @@ export function TileDone(p: TileDoneProps) {
   const fs = theme.type.caption * 0.85;
   const cx = 70, cy = h / 2;
   // Estilo del diseño: superficie (relleno, filo duro o halo) y esquinas de la baldosa; el borde de "hecha" sigue en verde.
-  const surf = parseSurface(theme, "card");
+  const surf = svgSurface(theme, "card");
   const rx = cornerRadius(theme, "card");
   const colBorder = done ? theme.color.success : surf.border > 0 ? surf.edge : "none";
   return (
@@ -36,7 +36,7 @@ export function TileDone(p: TileDoneProps) {
         {t > 0 && t < 1 && <circle cx={cx} cy={cy} r={ripple * w * 0.5} fill="none" stroke={withAlpha(theme.color.success, 0.5 * (1 - ripple))} strokeWidth={6 * (1 - ripple) + 1} />}
         <circle key={done ? "d" : "p"} cx={cx} cy={cy} r={32 * (done ? 0.85 + 0.15 * Math.min(1.1, flip) : 1)} fill={done ? theme.color.success : "none"} stroke={done ? theme.color.success : theme.color.textMuted} strokeWidth={3.5} strokeDasharray={done ? undefined : "8 6"} />
         {done && <path d={`M${cx - 13} ${cy + 1} l10 11 l18 -22`} fill="none" stroke={theme.color.onAccent} strokeWidth={6} strokeLinecap="round" strokeLinejoin="round" pathLength={1} strokeDasharray={1} strokeDashoffset={1 - check} />}
-        <text x={126} y={cy - 4} fontSize={fs * 1.15} fontWeight={theme.font.weights.semibold} fill={theme.color.text}>{p.label ?? "Revisar informe"}</text>
+        <text x={126} y={cy - 4} fontSize={fs * 1.15} fontWeight={textStyle(theme, "label", { strong: true }).fontWeight} fill={theme.color.text}>{p.label ?? "Revisar informe"}</text>
         <text x={126} y={cy + fs * 1.1} fontSize={fs * 0.85} fill={done ? theme.color.success : theme.color.textMuted}>{done ? p.doneText ?? "Hecho" : p.pendingText ?? "Pendiente"}</text>
       </g>
     </svg>

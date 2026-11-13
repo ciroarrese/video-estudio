@@ -1,4 +1,4 @@
-import { doodleStyle, textStyle, withAlpha, resolveStyle } from "../../themes";
+import { doodleStyle, textStyle, withAlpha } from "../../themes";
 import { Easing, random } from "../../engine";
 import { fxBox, progress, roleColor, useFx } from "../core";
 import type { ColorRole, FxProps } from "../core";
@@ -41,13 +41,13 @@ export function markerPoints(kind: MarkerKind, w: number, h: number, seed: strin
 
 /** Trazos gruesos de marcador (resaltar, subrayar, encerrar) con temblor sembrado, sobre un texto. */
 export function MarkerDraw(p: MarkerDrawProps) {
-  const { local, theme } = useFx(p);
+  const { local, theme, style } = useFx(p);
   const { width: w, height: h } = fxBox(p, { width: 560, height: 160 });
   // Estilo del diseño: trazo a mano (con temblor) o geométrico (limpio) y, para el resalte, lo que dice `type.highlight`: con `underline` el
   // resalte se dibuja como filete bajo la palabra; con el resto, el marcador translúcido de siempre.
   const jitter = doodleStyle(theme).jitter;
   const tw = textStyle(theme, "title");
-  const asUnderline = resolveStyle(theme).type.highlight === "underline";
+  const asUnderline = style.type.highlight === "underline";
   const kind = (p.kind ?? "highlight") === "highlight" && asUnderline ? "underline" : p.kind ?? "highlight";
   const dur = p.duration ?? 40;
   const color = roleColor(theme, p.color ?? ((p.kind ?? "highlight") === "highlight" && !asUnderline ? "warning" : "accent"));

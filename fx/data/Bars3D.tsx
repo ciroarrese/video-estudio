@@ -1,4 +1,4 @@
-import { withAlpha } from "../../themes";
+import { withAlpha, textStyle } from "../../themes";
 import { Easing } from "../../engine";
 import { chartColor, fxBox, progress, useFx } from "../core";
 import type { FxProps } from "../core";
@@ -69,7 +69,7 @@ export function Bars3D(p: Bars3DProps) {
                 <path d={poly(f.top)} fill={withAlpha(theme.color.surface, 0.38)} />
               </>
             )}
-            <text x={top.x} y={top.y - 16} textAnchor="middle" fontSize={fs * 1.1} fontWeight={theme.font.weights.semibold} fill={theme.color.text} opacity={Math.min(1, t)} style={{ fontVariantNumeric: "tabular-nums" }}>{fmt(v * Math.min(1, t))}</text>
+            <text x={top.x} y={top.y - 16} textAnchor="middle" fontSize={fs * 1.1} fontWeight={textStyle(theme, "label", { strong: true }).fontWeight} fill={theme.color.text} opacity={Math.min(1, t)} style={{ fontVariantNumeric: "tabular-nums" }}>{fmt(v * Math.min(1, t))}</text>
             <text x={lab.x} y={lab.y} textAnchor="middle" fontSize={fs} fill={theme.color.textMuted} opacity={g}>{labels[i]}</text>
           </g>
         );

@@ -2,7 +2,7 @@ import type React from "react";
 import { Easing } from "../../engine";
 import { kf } from "../../kit";
 import { cornerRadius, textStyle } from "../../themes";
-import { bareShadow, parseSurface } from "../data/styleKit";
+import { bareShadow, svgSurface } from "../data/styleKit";
 import { fxBox, progress, useFx } from "../core";
 import type { FxProps } from "../core";
 
@@ -69,16 +69,16 @@ export function BeforeAfter(p: BeforeAfterProps) {
   const pos = wipePosition(progress(local, 0, dur), p.rest ?? 0.5);
   const hx = pos * w;
   const fs = theme.type.eyebrow * 0.85;
-  // Estilo del diseño: marco (borde doble del nominal, esquinas) y rótulos (relleno, borde, esquinas) según `surfaceStyle`.
-  const frame = parseSurface(theme, "card");
-  const tag = parseSurface(theme, "chip");
-  const tagBorder = Math.max(0, tag.border - 1);
+  // Estilo del diseño: marco (borde grueso, esquinas) y rótulos (relleno, borde, esquinas) según `surfaceStyle`.
+  const frame = svgSurface(theme, "card", { bold: true });
+  const tag = svgSurface(theme, "headline");
+  const tagBorder = tag.border;
   const knob = cornerRadius(theme, "chip");
   const chip = (txt: string, left: boolean) => (
-    <div style={{ position: "absolute", top: 18, [left ? "left" : "right"]: 18, padding: "6px 18px", fontSize: fs, fontWeight: theme.font.weights.semibold, background: tag.fill, color: theme.color.text, border: tagBorder > 0 ? `${tagBorder}px solid ${tag.edge}` : "none", borderRadius: cornerRadius(theme, "chip"), boxShadow: bareShadow(tag), ...textStyle(theme, "eyebrow") }}>{txt}</div>
+    <div style={{ position: "absolute", top: 18, [left ? "left" : "right"]: 18, padding: "6px 18px", fontSize: fs, fontWeight: textStyle(theme, "label", { strong: true }).fontWeight, background: tag.fill, color: theme.color.text, border: tagBorder > 0 ? `${tagBorder}px solid ${tag.edge}` : "none", borderRadius: tag.radius, boxShadow: bareShadow(tag), ...textStyle(theme, "eyebrow") }}>{txt}</div>
   );
   return (
-    <div style={{ position: "relative", width: w, height: h, overflow: "hidden", fontFamily: theme.font.family, border: frame.border > 0 ? `${frame.border * 2}px solid ${frame.edge}` : "none", borderRadius: cornerRadius(theme, "card"), boxShadow: bareShadow(frame), boxSizing: "border-box", ...p.style }}>
+    <div style={{ position: "relative", width: w, height: h, overflow: "hidden", fontFamily: theme.font.family, border: frame.border > 0 ? `${frame.border}px solid ${frame.edge}` : "none", borderRadius: frame.radius, boxShadow: bareShadow(frame), boxSizing: "border-box", ...p.style }}>
       <div style={{ position: "absolute", inset: 0 }}>{p.before ?? <Wireframe w={w} h={h} />}</div>
       <div style={{ position: "absolute", inset: 0, clipPath: `inset(0 ${wipeInset(pos)}% 0 0)` }}>{p.after ?? <Design w={w} h={h} />}</div>
       <div style={{ position: "absolute", left: hx - 2, top: 0, width: 4, height: h, background: theme.color.accent }} />

@@ -1,5 +1,5 @@
 import { Easing } from "../../engine";
-import { chartFill, chartStyle, settle, staggerScale, resolveStyle } from "../../themes";
+import { chartFill, chartStyle, settle, staggerScale, textStyle } from "../../themes";
 import { chartColor, fxBox, progress, useFx } from "../core";
 import type { FxProps } from "../core";
 import { fmtInt, niceTicks, staggerT } from "./geom";
@@ -15,7 +15,7 @@ export type BarsGrowProps = FxProps & {
 
 /** Grafico de barras que crece con escalonado y rotulos de valor (el caso comun). */
 export function BarsGrow(p: BarsGrowProps) {
-  const { local, theme } = useFx(p);
+  const { local, theme, style } = useFx(p);
   const { width: w, height: h } = fxBox(p, { width: 900, height: 520 });
   const data = p.data ?? [42, 68, 55, 90, 76];
   const labels = p.labels ?? data.map((_, i) => `Ítem ${i + 1}`);
@@ -25,7 +25,7 @@ export function BarsGrow(p: BarsGrowProps) {
   const { max, ticks } = niceTicks(Math.max(...data, 1), 4);
   // Estilo del diseño: radio de barra, rayado/degradado, guías y carácter del movimiento (sobrepaso y paso entre barras).
   const cs = chartStyle(theme);
-  const over = resolveStyle(theme).motion.overshoot;
+  const over = style.motion.overshoot;
   const spread = Math.min(0.95, 0.5 * staggerScale(theme));
   const top = 70, bot = 64, left = 30;
   const area = h - top - bot;
@@ -50,7 +50,7 @@ export function BarsGrow(p: BarsGrowProps) {
         return (
           <g key={i}>
             {d && <path d={d} fill={fills[i]!.fill} {...fillEdge(fills[i]!, color)} />}
-            <text x={x + bw / 2} y={y - 14} textAnchor="middle" fontSize={fs * 1.15} fontWeight={theme.font.weights.semibold} fill={theme.color.text} opacity={Math.min(1, t * 1.5)} style={{ fontVariantNumeric: "tabular-nums" }}>{fmt(v * Math.min(1, t))}</text>
+            <text x={x + bw / 2} y={y - 14} textAnchor="middle" fontSize={fs * 1.15} fontWeight={textStyle(theme, "label", { strong: true }).fontWeight} fill={theme.color.text} opacity={Math.min(1, t * 1.5)} style={{ fontVariantNumeric: "tabular-nums" }}>{fmt(v * Math.min(1, t))}</text>
             <text x={x + bw / 2} y={h - bot + fs + 14} textAnchor="middle" fontSize={fs} fill={theme.color.textMuted} opacity={g}>{labels[i]}</text>
           </g>
         );

@@ -47,8 +47,8 @@ export function CommandPalette(p: CommandPaletteProps) {
   // Traslado, escala y opacidad solo mientras la paleta se abre o la fila se presiona (en reposo no queda ninguno).
   // Estilo del diseño: la entrada (baja 24 px y se asienta) la decide `motion.entrance`; el marco, `surfaceStyle`; las esquinas, `shape.corners`.
   const openStyle: React.CSSProperties = { position: "absolute", left: 0, right: 0, top: 20, boxSizing: "border-box", ...entrance(theme, open, 0, { native: "rise", distance: -24 }) };
-  const frameStyle: React.CSSProperties = { position: "absolute", inset: 0, boxSizing: "border-box", transform: xform({ scale: 0.95 + 0.05 * open }), ...surfaceStyle(theme, "panel") };
-  const radius = cornerRadius(theme, "panel");
+  const frameStyle: React.CSSProperties = { position: "absolute", inset: 0, boxSizing: "border-box", transform: xform({ scale: 0.95 + 0.05 * open }), ...surfaceStyle(theme, "window") };
+  const radius = cornerRadius(theme, "window");
   const rowRadius = cornerRadius(theme, "control");
   const keyRadius = Math.min(theme.radius.sm, rowRadius);
   return (
@@ -70,7 +70,7 @@ export function CommandPalette(p: CommandPaletteProps) {
             const fg = isHi && pressed ? theme.color.onAccent : theme.color.text;
             const rowBg: React.CSSProperties = { position: "absolute", inset: 0, background: bg, borderRadius: rowRadius, transform: xform({ scale: sc }) };
             return (
-              <div key={it.label} style={{ position: "relative", height: rowH, boxSizing: "border-box", display: "flex", alignItems: "center", justifyContent: "space-between", padding: "0 20px", marginBottom: 4, color: fg, fontSize: fs, fontWeight: isHi ? theme.font.weights.semibold : theme.font.weights.regular }}>
+              <div key={it.label} style={{ position: "relative", height: rowH, boxSizing: "border-box", display: "flex", alignItems: "center", justifyContent: "space-between", padding: "0 20px", marginBottom: 4, color: fg, fontSize: fs, fontWeight: isHi ? textStyle(theme, "label", { strong: true }).fontWeight : theme.font.weights.regular }}>
                 <div key={styleKey(rowBg)} style={rowBg} />
                 <span style={{ position: "relative" }}>{it.label}</span>
                 {it.hint && <span style={{ position: "relative", fontSize: fs * 0.8, color: isHi && pressed ? theme.color.onAccent : theme.color.textMuted, border: `1px solid ${isHi && pressed ? theme.color.onAccent : theme.color.border}`, borderRadius: keyRadius, padding: "2px 12px", ...textStyle(theme, "eyebrow") }}>{it.hint}</span>}

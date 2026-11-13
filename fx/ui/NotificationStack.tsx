@@ -1,10 +1,9 @@
-import { cornerRadius, staggerScale, surfaceStyle, textStyle, withAlpha } from "../../themes";
+import { cornerRadius, entrance, staggerScale, surfaceStyle, textStyle, withAlpha } from "../../themes";
 import { Easing } from "../../engine";
 import { chartColor, fade, fxBox, progress, styleKey, useFx } from "../core";
 import type React from "react";
 import type { FxProps } from "../core";
 import { staggerT } from "../data/geom";
-import { entranceWithOffset } from "../data/styleKit";
 
 export type Notice = { title: string; body?: string; time?: string };
 export type NotificationStackProps = FxProps & { items?: Notice[] };
@@ -57,7 +56,7 @@ export function NotificationStack(p: NotificationStackProps) {
         const cardSt: React.CSSProperties = {
           position: "absolute", left: 0, top: 0, width: w, height: ch, boxSizing: "border-box", ...surfaceStyle(theme, "card"),
           display: "flex", alignItems: "center", gap: 20, padding: "0 26px", zIndex: i,
-          ...entranceWithOffset(theme, raw[i]!, i, { native: "rise", distance: -50, curve: Easing.lands }, offs[i]!),
+          ...entrance(theme, raw[i]!, i, { native: "rise", distance: -50, curve: Easing.lands, round: false, offset: { y: offs[i]! } }),
           opacity: fade(Math.min(1, a * 1.8)),
         };
         return (

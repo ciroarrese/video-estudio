@@ -1,11 +1,10 @@
 import type React from "react";
-import { entrance, settle, surfaceStyle, resolveStyle } from "../../themes";
-import type { ChartFill, EntranceOptions, SurfaceOptions, SurfaceRole, Theme } from "../../themes";
-import { xform } from "../core";
+import { surfaceParts, surfaceStyle } from "../../themes";
+import type { ChartFill, SurfaceOptions, SurfaceRole, Theme } from "../../themes";
 
 /*
  * Ayudas locales de `fx/data`, `fx/ui` y `fx/art` para leer `theme.style` desde piezas SVG o con rellenos propios.
- * Todas son puras. Las ayudas de `themes/` devuelven CSS (`surfaceStyle`) o descripciones (`chartFill`); acá se traducen
+ * Todas son puras. Las ayudas de `themes/` devuelven CSS (`surfaceStyle`), partes (`surfaceParts`) o descripciones (`chartFill`); acá se traducen
  * a lo que un SVG necesita. Con el estilo por defecto cada traducción da lo que dibujaba la pieza antes.
  */
 
@@ -35,7 +34,7 @@ export const fillEdge = (fill: ChartFill, color: string, width = 2.5): { stroke?
 
 export type Edge = { shadow: "none" | "soft" | "hard" | "glow"; dx: number; dy: number; color: string; blur: number };
 
-export interface ParsedSurface {
+export interface SvgSurface {
   /** Relleno (`fill`). */
   fill: string;
   /** Grosor del borde nominal (0 = sin borde). Con el estilo por defecto es 1. */
@@ -44,27 +43,21 @@ export interface ParsedSurface {
   edge: string;
   /** Sombra: `soft` es la del tema (los efectos SVG nunca la dibujaron: se ignora), `hard` filo desplazado, `glow` halo de acento. */
   shadow: Edge;
-  /** El borde de `surfaceStyle` tal como viene (para elementos HTML). */
+  /** Radio de las esquinas (px). */
+  radius: number;
+  /** El estilo de `surfaceStyle` tal como viene (para elementos HTML). */
   css: React.CSSProperties;
 }
 
 /**
- * Traduce `surfaceStyle(theme, role)` a las partes que usa un SVG. Compara contra los valores del propio tema (la sombra suave
- * `theme.shadow.*`), nunca contra cadenas del estilo.
+ * Superficie de `surfaceParts(theme, role)` en la forma que usan los efectos SVG (`<rect>` con `fill`, `stroke` y `SvgShadow`). No lee CSS:
+ * toma las partes que da el tema.
  */
-export function parseSurface(theme: Theme, role: SurfaceRole, o: SurfaceOptions = {}): ParsedSurface {
-  const css = surfaceStyle(theme, role, o);
-  const m = /^([\d.]+)px solid (.+)$/.exec(String(css.border ?? ""));
-  const bs = css.boxShadow ? String(css.boxShadow) : "";
-  let shadow: Edge = { shadow: "none", dx: 0, dy: 0, color: theme.color.text, blur: 0 };
-  if (bs) {
-    const hard = /^(\d+)px (\d+)px 0 0 (.+)$/.exec(bs);
-    const glow = /^0 0 (\d+)px (rgba?\([^)]*\)|#[0-9a-fA-F]+)/.exec(bs);
-    if (hard) shadow = { shadow: "hard", dx: +hard[1]!, dy: +hard[2]!, color: hard[3]!, blur: 0 };
-    else if (glow) shadow = { shadow: "glow", dx: 0, dy: 0, color: glow[2]!, blur: +glow[1]! };
-    else shadow = { ...shadow, shadow: "soft" };
-  }
-  return { fill: String(css.background), border: m ? parseFloat(m[1]!) : 0, edge: m ? m[2]! : theme.color.border, shadow, css };
+export function svgSurface(theme: Theme, role: SurfaceRole, o: SurfaceOptions = {}): SvgSurface {
+  const p = surfaceParts(theme, role, o);
+  const sh = p.shadow;
+  const shadow: Edge = { shadow: sh.kind, dx: sh.x, dy: sh.y, color: sh.color, blur: sh.blur };
+  return { fill: p.fill, border: p.stroke?.width ?? 0, edge: p.stroke?.color ?? theme.color.border, shadow, radius: p.radius, css: surfaceStyle(theme, role, o) };
 }
 
 /** Sombra de una tarjeta SVG (se dibuja antes que ella): filo duro desplazado o halo de acento en capas. `soft` y `none` no dibujan nada. */
@@ -86,31 +79,6 @@ export function SvgShadow(p: { shadow: Edge; x: number; y: number; width: number
  * Sombra de un elemento HTML que hoy no lleva ninguna (burbujas, filas): se conserva solo la que el estilo cambia (filo duro o halo)
  * y se descarta la suave del tema, así el estilo por defecto no agrega nada.
  */
-export function bareShadow(p: ParsedSurface): string | undefined {
+export function bareShadow(p: SvgSurface): string | undefined {
   return p.shadow.shadow === "hard" || p.shadow.shadow === "glow" ? String(p.css.boxShadow) : undefined;
-}
-
-/**
- * Entrada del tema (`motion.entrance`, con `native` de la pieza como valor de `auto`) combinada con un traslado propio `offY` (px) de la
- * pieza, en un solo `transform`. Si la entrada es vertical (la de siempre) las dos distancias se suman SIN redondear por separado, así con
- * el estilo por defecto el marcado es el de antes. Devuelve solo `transform` y `clipPath`: la opacidad la sigue decidiendo la pieza.
- */
-export function entranceWithOffset(theme: Theme, p: number, index: number, o: EntranceOptions & { curve?: (p: number) => number }, offY = 0): React.CSSProperties {
-  const st = resolveStyle(theme).motion;
-  const clamped = Math.min(1, Math.max(0, p));
-  const e = entrance(theme, clamped, index, { ...o, round: false });
-  const vertical = e.transform === undefined || /^translateY\(/.test(String(e.transform));
-  const out: React.CSSProperties = {};
-  if (vertical) {
-    // Con la entrada propia (`auto`) rige la curva de la pieza (`curve`, que puede pasarse de 1); con otra, el asentado con rebote del diseño.
-    const q = st.entrance === "auto" && o.curve ? o.curve(p) : settle(clamped, st.overshoot);
-    const dy = e.transform === undefined ? 0 : (1 - q) * (o.distance ?? 24);
-    const t = xform({ y: offY + dy });
-    if (t) out.transform = t;
-  } else {
-    const t = [xform({ y: offY }), e.transform].filter(Boolean).join(" ");
-    if (t) out.transform = t;
-  }
-  if (e.clipPath) out.clipPath = e.clipPath;
-  return out;
 }

@@ -1,8 +1,8 @@
 import type React from "react";
 import { Easing } from "../../engine";
-import { cornerRadius, entrance, resolveStyle } from "../../themes";
+import { cornerRadius, entrance } from "../../themes";
 import { fade, fxBox, progress, styleKey, useFx, xform } from "../core";
-import { bareShadow, parseSurface } from "../data/styleKit";
+import { bareShadow, svgSurface } from "../data/styleKit";
 import type { FxProps } from "../core";
 
 export type ChatMessage = { from: "me" | "them"; text: string };
@@ -28,7 +28,7 @@ export function chatSchedule(messages: ChatMessage[], duration: number): { typin
 
 /** Burbujas de chat que aparecen una a una, con indicador de "escribiendo" antes de cada respuesta. */
 export function ChatThread(p: ChatThreadProps) {
-  const { local, theme } = useFx(p);
+  const { local, theme, style } = useFx(p);
   const { width: w, height: h } = fxBox(p, { width: 760, height: 560 });
   const messages = p.messages ?? DEFAULT;
   const dur = p.duration ?? 80;
@@ -37,11 +37,11 @@ export function ChatThread(p: ChatThreadProps) {
   // El "pop" escala solo el fondo de la burbuja; el texto no se escala (se desvanece), así el trazado de las letras no depende del historial.
   // Opacidad y escala solo mientras la burbuja aparece: en reposo no queda `scale(1)` ni `opacity: 0.99`.
   // Estilo del diseño: superficie (relleno, borde, filo duro o halo) y esquinas de las burbujas.
-  const surf = parseSurface(theme, "card");
+  const surf = svgSurface(theme, "card");
   const radius = cornerRadius(theme, "card");
   const edged = (color: string) => (surf.border > 0 ? `${surf.border}px solid ${color}` : "none");
   // Con la entrada propia (`motion.entrance: "auto"`) el fondo "salta" con `scale`; con otra, la burbuja entera entra como dice el diseño.
-  const auto = resolveStyle(theme).motion.entrance === "auto";
+  const auto = style.motion.entrance === "auto";
   const bubble = (key: string, mine: boolean, scale: number, idx: number, children: React.ReactNode) => {
     const ent = auto ? {} : entrance(theme, Math.min(1, scale), idx, { native: "rise", distance: 18, side: mine ? "right" : "left" });
     const outer: React.CSSProperties = { position: "relative", alignSelf: mine ? "flex-end" : "flex-start", maxWidth: "76%", boxSizing: "border-box", padding: "16px 24px", color: mine ? theme.color.onAccent : theme.color.text, fontSize: fs, lineHeight: 1.3, opacity: auto ? fade(Math.min(1, scale * 1.4)) : undefined, ...ent };

@@ -1,6 +1,6 @@
 import type React from "react";
 import { kf } from "../../kit";
-import { cornerRadius } from "../../themes";
+import { cornerRadius, textStyle } from "../../themes";
 import { chartColor, fade, fxBox, styleKey, useFx, xform } from "../core";
 import type { FxProps } from "../core";
 import { PhoneFrame, phoneScreen } from "./PhoneFrame";
@@ -54,7 +54,7 @@ export function PhoneScroll(p: PhoneScrollProps) {
               <div key={i} style={{ height: rowH, opacity: fade(edgeFade(top, top + rowH - 32, scr.height)), boxSizing: "border-box", display: "flex", alignItems: "center", gap: 18, padding: "0 26px" }}>
                 <div style={{ width: 52, height: 52, flex: "none", borderRadius: cornerRadius(theme, "chip"), background: chartColor(theme, i) }} />
                 <div style={{ flex: 1 }}>
-                  <div style={{ fontSize: fs, fontWeight: theme.font.weights.semibold, color: theme.color.text }}>Elemento {i + 1}</div>
+                  <div style={{ fontSize: fs, fontWeight: textStyle(theme, "label", { strong: true }).fontWeight, color: theme.color.text }}>Elemento {i + 1}</div>
                   <div style={{ marginTop: 6, height: 12, width: `${60 + ((i * 17) % 30)}%`, background: theme.color.border, borderRadius: Math.min(theme.radius.sm, cornerRadius(theme, "control")) }} />
                 </div>
               </div>

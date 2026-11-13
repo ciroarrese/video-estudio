@@ -49,11 +49,11 @@ function Tool({ inner }: { inner: Theme }) {
       <div style={{ position: "absolute", left: 560, top: 70, width: 260, height: 260 }}>
         <DonutRing frame={frame} start={10} duration={60} width={260} height={260} value={72} label="Avance" />
       </div>
-      <div style={{ position: "absolute", left: 36, top: 300, width: 330, height: 330, borderRadius: Math.min(theme.radius.panel, cornerRadius(theme, "panel")), overflow: "hidden", background: theme.color.surfaceAlt, border: `1px solid ${theme.color.border}` }}>
+      <div style={{ position: "absolute", left: 36, top: 300, width: 330, height: 330, borderRadius: cornerRadius(theme, "panel"), overflow: "hidden", background: theme.color.surfaceAlt, border: `1px solid ${theme.color.border}` }}>
         <ParticleSphere frame={frame} start={0} duration={75} width={330} height={330} />
       </div>
       {/* Subárbol anidado: vuelve al otro tema, dentro de la herramienta. */}
-      <ThemeScope theme={inner} paint style={{ position: "absolute", left: 400, top: 340, width: 420, height: 280, borderRadius: Math.min(inner.radius.panel, cornerRadius(inner, "panel")), border: `1px solid ${inner.color.border}`, padding: 28, boxSizing: "border-box" }}>
+      <ThemeScope theme={inner} paint style={{ position: "absolute", left: 400, top: 340, width: 420, height: 280, borderRadius: cornerRadius(inner, "panel"), border: `1px solid ${inner.color.border}`, padding: 28, boxSizing: "border-box" }}>
         <InnerNote />
       </ThemeScope>
       <Cursor frame={frame} show={[30, 120]} keys={[[30, 700, 560], [80, 330, 160], [120, 340, 170]]} clicks={[82]} />
@@ -79,7 +79,7 @@ function Scene({ scoped, inner }: { scoped: Theme; inner: Theme }) {
     <Stage clouds={false}>
       <DockedHeadline index={1} title="Un tema por escena" subtitle="La herramienta oscura dentro de un video claro" frame={frame} start={0} />
       <div style={{ position: "absolute", left: 500, top: 190, opacity: kf(frame, [0, 20], [0, 1]) }}>
-        <ThemeScope theme={scoped} paint style={{ width: 860, height: 660, borderRadius: cornerRadius(scoped, "panel"), border: `1px solid ${scoped.color.border}`, boxShadow: scoped.shadow.lg, overflow: "hidden" }}>
+        <ThemeScope theme={scoped} paint style={{ width: 860, height: 660, borderRadius: cornerRadius(scoped, "window"), border: `1px solid ${scoped.color.border}`, boxShadow: scoped.shadow.lg, overflow: "hidden" }}>
           <Tool inner={inner} />
         </ThemeScope>
       </div>

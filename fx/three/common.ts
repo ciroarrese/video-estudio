@@ -196,8 +196,8 @@ export function roundedRect(x0: number, y0: number, x1: number, y1: number, r: n
 }
 
 /**
- * Superficie de una tarjeta plana (`CardFlip`, `CarouselRing`) según `style.shape` y `style.surface`: radio, relleno, borde y sombra de
- * `surfaceStyle(theme, "card")`. Con el estilo por defecto reproduce lo de siempre: borde de 2 px (`shape.border` + 1) y SIN sombra (la
+ * Superficie de una tarjeta plana (`CardFlip`, `CarouselRing`) según `style.shape` y `style.surface`: radio, relleno, borde grueso (`bold`) y sombra de
+ * `surfaceStyle(theme, "card")`. Con el estilo por defecto reproduce lo de siempre: borde de 2 px (`borderWidth(theme, "card", { bold: true })`) y SIN sombra (la
  * elevación `shadow` no se dibuja: estas tarjetas ya se sombrean al girar); `flat` la deja así, `border` y `glow` sí agregan su filo o halo.
  * - `alt`: cara apagada (reverso, tarjetas del fondo): `surfaceAlt` si el relleno es el sólido del tema; vidrio, contorno y teñido se respetan.
  * - `accent`: color de acento (CSS) para el borde en vez del de la superficie (cara que mira al frente); sin borde en el estilo no lo agrega.
@@ -205,13 +205,13 @@ export function roundedRect(x0: number, y0: number, x1: number, y1: number, r: n
  * El grosor del borde sigue a `style.line.weight` y, con `style.line.glow`, el borde de acento suma un halo.
  */
 export function cardSurface(theme: Theme, o: { alt?: boolean; accent?: string; guide?: boolean } = {}): React.CSSProperties {
-  const s = surfaceStyle(theme, "card");
+  const s = surfaceStyle(theme, "card", { bold: true });
   const out: React.CSSProperties = {};
   out.background = o.alt && s.background === theme.color.surface ? theme.color.surfaceAlt : s.background;
-  const w = borderWidth(theme, "card");
+  const w = borderWidth(theme, "card", { bold: true });
   if (w > 0 && s.border) {
     const L = lineLook(theme);
-    const bw = L.widthK === 1 ? w + 1 : Math.max(1, Math.round((w + 1) * L.widthK * 2) / 2);
+    const bw = L.widthK === 1 ? w : Math.max(1, Math.round(w * L.widthK * 2) / 2);
     const kind = o.guide && L.dash !== "solid" ? L.dash : "solid";
     out.border = o.accent ? `${bw}px ${kind} ${o.accent}` : String(s.border).replace(/^[\d.]+px/, `${bw}px`).replace(" solid ", ` ${kind} `);
   }

@@ -4,7 +4,7 @@ import { cornerRadius, entrance, staggerScale, textStyle } from "../../themes";
 import { chartColor, fxBox, progress, styleKey, useFx, xform } from "../core";
 import type { FxProps } from "../core";
 import { staggerT } from "../data/geom";
-import { parseSurface } from "../data/styleKit";
+import { svgSurface } from "../data/styleKit";
 
 export type FanCard = { title: string; text?: string };
 export type CardFanProps = FxProps & {
@@ -43,7 +43,7 @@ export function CardFan(p: CardFanProps) {
   const gT = progress(local, 0, dur * 0.2, Easing.out);
   const fs = theme.type.eyebrow;
   // Estilo del diseño: superficie y esquinas de la tarjeta, paso entre tarjetas (`motion.stagger`) y entrada (`motion.entrance`).
-  const surf = parseSurface(theme, "card");
+  const surf = svgSurface(theme, "card");
   const radius = cornerRadius(theme, "card");
   const stag = Math.min(0.95, 0.45 * staggerScale(theme));
   // Sin sombra: bajo rotate() una sombra (con o sin desenfoque) no rasteriza igual según el historial; el borde inferior grueso da el relieve.
@@ -69,7 +69,7 @@ export function CardFan(p: CardFanProps) {
             {kids ? kids[i] : (
               <>
                 <div style={{ width: 44, height: 44, borderRadius: cornerRadius(theme, "chip"), background: chartColor(theme, i) }} />
-                <div style={{ marginTop: 22, fontSize: fs * 1.3, fontWeight: theme.font.weights.semibold, color: theme.color.text }}>{items[i]!.title}</div>
+                <div style={{ marginTop: 22, fontSize: fs * 1.3, fontWeight: textStyle(theme, "label", { strong: true }).fontWeight, color: theme.color.text }}>{items[i]!.title}</div>
                 {items[i]!.text && <div style={{ marginTop: 8, fontSize: fs * 0.85, color: theme.color.textMuted, ...textStyle(theme, "eyebrow") }}>{items[i]!.text}</div>}
               </>
             )}

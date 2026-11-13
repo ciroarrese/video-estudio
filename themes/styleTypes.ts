@@ -217,5 +217,5 @@ type DeepPartial<T> = { [K in keyof T]?: T[K] extends object ? DeepPartial<T[K]>
 export type ThemeStyleInput = DeepPartial<ThemeStyle>;
 
 /** Roles de superficie que entienden `cornerRadius` y `surfaceStyle`. */
-export type CornerRole = "chip" | "card" | "panel" | "hero" | "control" | "bar";
-export type SurfaceRole = "card" | "panel" | "headline" | "chip" | "pill" | "title";
+export type CornerRole = "chip" | "card" | "panel" | "window" | "hero" | "control" | "bar";
+export type SurfaceRole = "card" | "panel" | "window" | "headline" | "chip" | "pill" | "title";

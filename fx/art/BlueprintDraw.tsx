@@ -1,12 +1,12 @@
 import { useMemo } from "react";
-import { cornerRadius, staggerScale, withAlpha } from "../../themes";
+import { staggerScale, withAlpha } from "../../themes";
 import { Easing } from "../../engine";
 import { fxBox, progress, useFx } from "../core";
 import type { FxProps } from "../core";
 import { parsePath, pointAt, toPath, trimPolyline } from "../data/geom";
 import type { Pt } from "../data/geom";
 import { staggerT } from "../data/geom";
-import { SvgShadow, parseSurface } from "../data/styleKit";
+import { SvgShadow, svgSurface } from "../data/styleKit";
 
 export type BpShape =
   | { type: "rect"; x: number; y: number; w: number; h: number }
@@ -49,8 +49,8 @@ export function BlueprintDraw(p: BlueprintDrawProps) {
   const pen = penIdx >= 0 ? pointAt(polys[penIdx]!, ts[penIdx]!) : null;
   const penOn = pen && draw < 1 ? 1 : 0;
   const fs = theme.type.eyebrow * 0.8;
-  // Estilo del diseño: el papel del plano es un panel (esquinas, relleno, filo duro o halo); la grilla y las cotas son su contenido y no cambian.
-  const surf = parseSurface(theme, "panel");
+  // Estilo del diseño: el papel del plano es una ventana (esquinas, relleno, filo duro o halo); la grilla y las cotas son su contenido y no cambian.
+  const surf = svgSurface(theme, "window", { bold: true });
   const paper = surf.fill === theme.color.surface ? theme.color.surfaceAlt : surf.fill;
   const rim = surf.edge !== theme.color.border && surf.border > 0;
   const minor: string[] = [], major: string[] = [];
@@ -66,8 +66,8 @@ export function BlueprintDraw(p: BlueprintDrawProps) {
   );
   return (
     <svg width={w} height={h} viewBox={`0 0 ${w} ${h}`} style={{ display: "block", fontFamily: theme.font.family, ...p.style }}>
-      <SvgShadow shadow={surf.shadow} x={0} y={0} width={w} height={h} rx={cornerRadius(theme, "panel")} />
-      <rect width={w} height={h} fill={paper} rx={cornerRadius(theme, "panel")} {...(rim ? { stroke: surf.edge, strokeWidth: surf.border * 2 } : {})} />
+      <SvgShadow shadow={surf.shadow} x={0} y={0} width={w} height={h} rx={surf.radius} />
+      <rect width={w} height={h} fill={paper} rx={surf.radius} {...(rim ? { stroke: surf.edge, strokeWidth: surf.border } : {})} />
       <path d={minor.join(" ")} stroke={theme.color.border} strokeWidth={1} opacity={0.55 * gridIn} fill="none" />
       <path d={major.join(" ")} stroke={theme.color.border} strokeWidth={1.8} opacity={gridIn} fill="none" />
       {shapes.map((_s, i) => {

@@ -15,13 +15,6 @@ export const KIT_DEMO_THEMES = Object.keys(TEMAS);
 /** `theme`: "neutral" | "dark" | "editorial" | "neon" | "papel" (por defecto neutral); también acepta un objeto Theme (para pruebas). */
 export type KitDemoProps = { theme?: "neutral" | "dark" | "editorial" | "neon" | "papel" | Theme };
 
-/** Engrosa o quita el borde de una superficie (`"1px solid c"`) sumando `extra` px: las tarjetas de la demo llevan 1 px más que el borde base. */
-const thicken = (border: unknown, extra: number): string | undefined => {
-  if (typeof border !== "string") return undefined;
-  const m = /^([\d.]+)px (.*)$/.exec(border);
-  return m ? `${+(+m[1]! + extra).toFixed(2)}px ${m[2]}` : border;
-};
-
 // Invented layout (world coordinates = pixels at scale 1).
 const A = { x: 120, y: 190, w: 1100, h: 740 };
 const B = { x: 1300, y: 190, w: 520, h: 740 };
@@ -56,7 +49,7 @@ const CAMERA_OPTS = { map: (fr: number, c: { x: number; y: number; scale: number
 function Panel({ x, y, w, h, title, opacity = 1, children }: { x: number; y: number; w: number; h: number; title: string; opacity?: number; children?: React.ReactNode }) {
   const theme = useTheme();
   // Superficie del design system (esquinas, relleno, borde, sombra). Con el relleno sólido el panel va un escalón más claro (`surfaceAlt`) que las tarjetas.
-  const s = surfaceStyle(theme, "panel", { level: "lg" });
+  const s = surfaceStyle(theme, "window", { level: "lg" });
   const fill = s.background === theme.color.surface ? theme.color.surfaceAlt : s.background;
   return (
     <div key={opacity === 1 ? "rest" : "anim"} data-qa-ignore={opacity === 1 ? undefined : "contrast"} /* el panel se atenúa a propósito mientras vuela la tarjeta: es un foco, no texto para leer; `opacity` se emite siempre, como antes, para que el aspecto por defecto sea idéntico al píxel */ style={{ position: "absolute", left: x, top: y, width: w, height: h, background: fill, border: s.border, borderRadius: s.borderRadius, boxShadow: s.boxShadow, opacity }}>
@@ -70,11 +63,12 @@ function StatCard({ i, frame, selected }: { i: number; frame: number; selected?:
   const theme = useTheme();
   const s = STATS[i]!;
   const col = theme.color.chart[i % theme.color.chart.length]!;
-  const surf = surfaceStyle(theme, "card", { level: selected ? "lg" : "sm" });
-  const w = borderWidth(theme, "card");
-  const border = selected && w > 0 ? `${w + 1}px solid ${theme.color.accent}` : thicken(surf.border, 1);
+  // tarjeta de ficha: borde grueso (`bold`) y las esquinas de un panel
+  const surf = surfaceStyle(theme, "card", { level: selected ? "lg" : "sm", bold: true, corner: "panel" });
+  const w = borderWidth(theme, "card", { bold: true });
+  const border = selected && w > 0 ? `${w}px solid ${theme.color.accent}` : surf.border;
   return (
-    <div style={{ width: CARD.w, height: CARD.h, boxSizing: "border-box", padding: "22px 28px", background: surf.background, borderRadius: Math.min(theme.radius.panel, cornerRadius(theme, "card")), border, boxShadow: surf.boxShadow }}>
+    <div style={{ width: CARD.w, height: CARD.h, boxSizing: "border-box", padding: "22px 28px", background: surf.background, borderRadius: surf.borderRadius, border, boxShadow: surf.boxShadow }}>
       <Eyebrow style={{ display: "block" }}>{s.label}</Eyebrow>
       <div style={{ fontSize: 84, lineHeight: 1.1, fontWeight: theme.font.weights.stat, color: theme.color.text }}>{s.value}</div>
       <div style={{ marginTop: 6, height: 10, borderRadius: cornerRadius(theme, "bar"), background: theme.color.surfaceAlt }}>
@@ -110,7 +104,7 @@ function Scene({ frame }: { frame: number }) {
             return (
               <div key={i} style={{ position: "absolute", left: p.x - A.x, top: p.y - A.y, ...flyInZ(a, { from: 800, x: (i - 1) * 140, y: 60 }) }}>
                 {hidden ? (
-                  <div style={{ width: CARD.w, height: CARD.h, boxSizing: "border-box", borderRadius: theme.radius.panel, border: `2px dashed ${theme.color.border}` }} />
+                  <div style={{ width: CARD.w, height: CARD.h, boxSizing: "border-box", borderRadius: cornerRadius(theme, "panel"), border: `2px dashed ${theme.color.border}` }} />
                 ) : (
                   <StatCard i={i} frame={frame} selected={i === PICK && picked} />
                 )}

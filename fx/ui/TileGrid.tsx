@@ -2,7 +2,7 @@ import { cornerRadius, staggerScale, withAlpha } from "../../themes";
 import { Easing, random } from "../../engine";
 import { chartColor, fxBox, progress, useFx } from "../core";
 import type { FxProps } from "../core";
-import { SvgShadow, parseSurface } from "../data/styleKit";
+import { SvgShadow, svgSurface } from "../data/styleKit";
 
 export type TileGridProps = FxProps & {
   cols?: number;
@@ -26,7 +26,7 @@ export function TileGrid(p: TileGridProps) {
   const gap = 12;
   const tw = (w - gap * (cols - 1)) / cols, th = (h - gap * (rows - 1)) / rows;
   // Estilo del diseño: superficie y esquinas de la baldosa, y paso entre baldosas (`motion.stagger`).
-  const surf = parseSurface(theme, "card");
+  const surf = svgSurface(theme, "card");
   const rx = cornerRadius(theme, "control");
   const spread = Math.min(0.95, 0.6 * staggerScale(theme));
   const t = progress(local, 0, dur);

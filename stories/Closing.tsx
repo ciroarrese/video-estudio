@@ -184,7 +184,7 @@ export function Closing({ spec: specIn, scenes = [] }: { spec: StorySpec; scenes
   const blur = !wallOptions(spec.design).blurClosing ? 0 : Math.round((1 - focus) * 90) / 10;
 
   // el panel flota: con sombra, la larga de siempre; con otra elevación (plana, filo duro, halo) la del design system (`surfaceStyle`)
-  const panelSurf = surfaceStyle(theme, "panel");
+  const panelSurf = surfaceStyle(theme, "window");
   const panelSurface: React.CSSProperties = resolveStyle(theme).surface.elevation === "shadow"
     ? { borderRadius: panelSurf.borderRadius, boxShadow: `0 44px 80px -28px ${withAlpha(theme.color.text, 0.42)}` }
     : { borderRadius: panelSurf.borderRadius, boxShadow: panelSurf.boxShadow };
