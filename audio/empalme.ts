@@ -81,10 +81,14 @@ export function planEmpalme(o: PlanOpts): Plan {
     let out = 0;
     while (out < targetSec - 1e-9) {
       const len = Math.min(L, targetSec - out);
-      // Un resto muy corto se absorbe en el tramo anterior (lee más allá del fin del bucle).
+      // Un resto muy corto se absorbe en el tramo anterior (lee más allá del fin del bucle), pero
+      // solo si la pista alcanza a darlo (con el margen del cruce); si no, queda como tramo propio.
       if (segments.length > 0 && len < 0.25) {
-        segments[segments.length - 1].lenSec += len;
-        break;
+        const ant = segments[segments.length - 1];
+        if (ant.srcStart + ant.lenSec + len + cfEfectivo / 2 <= trackDurSec + 1e-9) {
+          ant.lenSec = r6(ant.lenSec + len);
+          break;
+        }
       }
       if (segments.length > 0) splices.push({ outSec: r6(out), crossfadeSec: cfEfectivo });
       segments.push({ srcStart: t0, outStart: r6(out), lenSec: r6(len) });
@@ -102,6 +106,17 @@ export function planEmpalme(o: PlanOpts): Plan {
   return { startSec: t0, startBeatIndex: s, beatsPerBar: B, targetSec, loopEndSec, segments, splices, fadeOut, outBeatsSec };
 }
 
+/** Posiciones enteras (en muestras) de cada tramo. Una sola fuente de verdad para renderizar y probar:
+ *  el final de un tramo es siempre el inicio del siguiente, así el cruce cae justo sobre el empalme
+ *  aunque los pulsos no estén redondeados. */
+export function muestrasDelPlan(plan: Plan, sr: number, totalSamples: number): { o0: number; o1: number; s0: number }[] {
+  return plan.segments.map((sg, idx) => ({
+    o0: Math.round(sg.outStart * sr),
+    o1: idx === plan.segments.length - 1 ? totalSamples : Math.round(plan.segments[idx + 1].outStart * sr),
+    s0: Math.round(sg.srcStart * sr),
+  }));
+}
+
 /** Mezcla el plan sobre PCM estéreo entrelazado. Cruces de potencia constante centrados en cada
  *  empalme (el tramo que termina lee un poco más allá del pulso; el que empieza, un poco antes). */
 export function renderizarPlan(src: Float32Array, plan: Plan, sr: number, totalSamples: number): Float32Array {
@@ -109,10 +124,7 @@ export function renderizarPlan(src: Float32Array, plan: Plan, sr: number, totalS
   const nSrc = Math.floor(src.length / 2);
   const cfPor = new Map<number, number>();
   for (const sp of plan.splices) cfPor.set(Math.round(sp.outSec * sr), Math.round(sp.crossfadeSec * sr));
-  plan.segments.forEach((sg, idx) => {
-    const o0 = Math.round(sg.outStart * sr);
-    const s0 = Math.round(sg.srcStart * sr);
-    const o1 = idx === plan.segments.length - 1 ? totalSamples : Math.round((sg.outStart + sg.lenSec) * sr);
+  muestrasDelPlan(plan, sr, totalSamples).forEach(({ o0, o1, s0 }) => {
     const cfIni = cfPor.get(o0) ?? 0;
     const cfFin = cfPor.get(o1) ?? 0;
     for (let n = o0 - cfIni / 2; n < o1 + cfFin / 2; n++) {

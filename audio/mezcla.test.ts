@@ -3,7 +3,7 @@ import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { decodificar, escribirWav16 } from './ffmpeg';
+import { decodificar, escribirWav16, hayFfmpeg } from './ffmpeg';
 import { EFECTOS, generarEfectos } from './efectos';
 import { mezclar, planMezcla, rutaDeEfecto } from './mezcla';
 
@@ -49,7 +49,10 @@ describe('planMezcla', () => {
   });
 });
 
-describe('efectos y mezcla (e2e con ffmpeg)', () => {
+const HAY_FFMPEG = hayFfmpeg();
+if (!HAY_FFMPEG) console.warn('[audio] ffmpeg no está en el PATH: se omiten las pruebas de punta a punta de mezcla.');
+
+describe.skipIf(!HAY_FFMPEG)('efectos y mezcla (e2e con ffmpeg)', () => {
   it('los efectos son deterministas, no vacíos y sin saturar', () => {
     for (const [nombre, e] of Object.entries(EFECTOS)) {
       const a = e.generar(48000);

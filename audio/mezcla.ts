@@ -1,9 +1,7 @@
 // Mezcla: lista de señales (cue) + música opcional con ducking -> una pista de audio lista para el video.
 // `planMezcla` es una función pura que arma las entradas y el filtergraph de ffmpeg.
-import { extname, isAbsolute, join } from 'node:path';
-import { mkdirSync } from 'node:fs';
-import { dirname } from 'node:path';
-import { runFfmpeg } from './ffmpeg';
+import { extname, isAbsolute, join, resolve } from 'node:path';
+import { escribirAtomico, runFfmpeg } from './ffmpeg';
 
 export interface Cue {
   frame: number;
@@ -138,13 +136,15 @@ export function planMezcla(o: MezclaOpts): PlanMezcla {
 /** Renderiza la mezcla a `salida` (el formato lo da la extensión). */
 export async function mezclar(o: MezclaOpts & { salida: string }): Promise<PlanMezcla> {
   const plan = planMezcla(o);
-  mkdirSync(dirname(o.salida), { recursive: true });
-  const args = ['-y'];
-  for (const i of plan.inputs) args.push('-i', i);
-  args.push('-filter_complex', plan.filterComplex, '-map', `[${plan.outLabel}]`, '-ar', String(plan.sr), '-ac', '2');
-  if (extname(o.salida).toLowerCase() === '.wav') args.push('-c:a', 'pcm_s16le');
-  args.push(o.salida);
-  await runFfmpeg(args);
+  await escribirAtomico(o.salida, async (tmp) => {
+    const args = ['-y'];
+    // Rutas absolutas: una que empiece con "-" ffmpeg la leería como opción.
+    for (const i of plan.inputs) args.push('-i', resolve(i));
+    args.push('-filter_complex', plan.filterComplex, '-map', `[${plan.outLabel}]`, '-ar', String(plan.sr), '-ac', '2');
+    if (extname(o.salida).toLowerCase() === '.wav') args.push('-c:a', 'pcm_s16le');
+    args.push(tmp);
+    await runFfmpeg(args);
+  });
   return plan;
 }
 

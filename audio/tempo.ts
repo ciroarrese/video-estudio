@@ -213,3 +213,22 @@ export function tempoReport(x: Float32Array, fps: number, opts: TempoOpts & { bp
     percussionBeat,
   };
 }
+
+/** Por debajo de esta confianza se avisa; en 0 (sin pulso detectable) se rechaza. */
+export const CONFIANZA_AVISO = 0.3;
+
+/**
+ * Decide qué hacer con una estimación de tempo antes de empalmar. Confianza 0 sin tempo forzado
+ * significa que la señal no tiene pulso (silencio, ruido, ambiente): la grilla sería inventada,
+ * así que se rechaza. Entre 0 y `CONFIANZA_AVISO` se avisa pero se sigue. Con `manual` no se juzga.
+ */
+export function chequearConfianza(t: Pick<TempoReport, 'confidence' | 'manual' | 'bpm'>): { error?: string; aviso?: string } {
+  if (t.manual) return {};
+  if (t.confidence <= 0) {
+    return { error: 'No se detectó un pulso en la pista (silencio o sin ritmo marcado): la grilla sería inventada. Pasá el tempo a mano con --bpm y --offset (segundo del primer pulso).' };
+  }
+  if (t.confidence < CONFIANZA_AVISO) {
+    return { aviso: `confianza baja (${t.confidence}, ${t.bpm} bpm); revisá el BPM o forzalo con --bpm y --offset` };
+  }
+  return {};
+}

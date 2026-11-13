@@ -1,8 +1,8 @@
 // Utilidades mínimas para hablar con ffmpeg: decodificar a PCM float, codificar PCM float
 // y escribir WAV de 16 bits. Sin dependencias fuera de Node.
 import { spawn, spawnSync } from 'node:child_process';
-import { mkdirSync, writeFileSync } from 'node:fs';
-import { dirname } from 'node:path';
+import { mkdirSync, renameSync, rmSync, writeFileSync } from 'node:fs';
+import { basename, dirname, extname, join, resolve } from 'node:path';
 
 /** Corre ffmpeg y devuelve stdout. Rechaza con el final de stderr si falla. */
 export function runFfmpeg(args: string[], stdin?: Buffer): Promise<Buffer> {
@@ -34,7 +34,8 @@ export async function decodificar(
   archivo: string,
   opts: { sr: number; canales: 1 | 2 },
 ): Promise<Float32Array> {
-  const buf = await runFfmpeg(['-i', archivo, '-vn', '-ac', String(opts.canales), '-ar', String(opts.sr), '-f', 'f32le', 'pipe:1']);
+  // Ruta absoluta: una que empiece con "-" ffmpeg la leería como opción.
+  const buf = await runFfmpeg(['-i', resolve(archivo), '-vn', '-ac', String(opts.canales), '-ar', String(opts.sr), '-f', 'f32le', 'pipe:1']);
   const copia = new Uint8Array(buf.byteLength - (buf.byteLength % 4));
   copia.set(buf.subarray(0, copia.length));
   return new Float32Array(copia.buffer);
@@ -45,9 +46,30 @@ export async function codificar(
   muestras: Float32Array,
   opts: { sr: number; canales: 1 | 2; salida: string },
 ): Promise<void> {
-  mkdirSync(dirname(opts.salida), { recursive: true });
   const buf = Buffer.from(muestras.buffer, muestras.byteOffset, muestras.byteLength);
-  await runFfmpeg(['-y', '-f', 'f32le', '-ar', String(opts.sr), '-ac', String(opts.canales), '-i', 'pipe:0', opts.salida], buf);
+  await escribirAtomico(opts.salida, (tmp) =>
+    runFfmpeg(['-y', '-f', 'f32le', '-ar', String(opts.sr), '-ac', String(opts.canales), '-i', 'pipe:0', tmp], buf).then(() => undefined),
+  );
+}
+
+/**
+ * Escribe `salida` de forma atómica: `escribir` recibe una ruta temporal absoluta (al lado de la
+ * salida y con su misma extensión, para que ffmpeg elija el formato) y, si termina bien, se renombra
+ * a `salida`. Si falla se borra lo parcial y la salida anterior, si existía, queda intacta.
+ */
+export async function escribirAtomico(salida: string, escribir: (tmp: string) => Promise<void>): Promise<string> {
+  const destino = resolve(salida);
+  mkdirSync(dirname(destino), { recursive: true });
+  const ext = extname(destino);
+  const tmp = join(dirname(destino), `.${basename(destino, ext)}.parcial-${process.pid}${ext}`);
+  try {
+    await escribir(tmp);
+    renameSync(tmp, destino);
+  } catch (e) {
+    rmSync(tmp, { force: true });
+    throw e;
+  }
+  return destino;
 }
 
 /** Escribe un WAV mono o estéreo de 16 bits (sin ffmpeg). */
