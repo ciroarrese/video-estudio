@@ -57,8 +57,8 @@ export function CarouselRing(p: CarouselRingProps) {
         return (
           <div
             key={`${c.i}:${styleKey(st)}:${c.front < 0.85 ? "o" : ""}`}
-            // Oclusión intencional: las tarjetas de atrás quedan tapadas por la de adelante
-            data-qa-ignore={c.front < 0.85 ? "covered" : undefined}
+            // Oclusión y atenuación intencionales: las tarjetas de atrás quedan tapadas por la de adelante y a baja opacidad (profundidad)
+            data-qa-ignore={c.front < 0.85 ? "covered contrast" : undefined}
             style={st}
           >
             {kids.length ? kids[c.i] : (

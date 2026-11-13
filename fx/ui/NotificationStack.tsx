@@ -64,7 +64,7 @@ export function NotificationStack(p: NotificationStackProps) {
             <div style={{ width: 56, height: 56, flex: "none", borderRadius: cornerRadius(theme, "chip"), background: withAlpha(chartColor(theme, i), 0.18), color: theme.color.text, display: "flex", alignItems: "center", justifyContent: "center", fontSize: fs * 1.2, fontWeight: theme.font.weights.stat }}>{it.title.charAt(0)}</div>
             <div style={{ flex: 1, minWidth: 0 }}>
               <div style={{ display: "flex", justifyContent: "space-between", gap: 12 }}>
-                <span style={{ fontSize: fs * 1.15, fontWeight: theme.font.weights.semibold, color: theme.color.text, ...textStyle(theme, "title") }}>{it.title}</span>
+                <span style={{ fontSize: fs * 1.15, color: theme.color.text, ...textStyle(theme, "title") }}>{it.title}</span>
                 <span style={{ fontSize: fs * 0.8, color: theme.color.textMuted, ...textStyle(theme, "eyebrow") }}>{it.time}</span>
               </div>
               {it.body && <div style={{ marginTop: 6, fontSize: fs * 0.9, color: theme.color.textMuted, maxHeight: fs * 1.3, overflow: "hidden" }}>{it.body}</div>}

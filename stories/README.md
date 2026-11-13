@@ -25,7 +25,7 @@ La estética de la historia (esquinas, superficies, tratamiento del texto, fondo
 | `chart.barRadius`, `lineWidth`, `grid`, `fill` | Miniatura por defecto del cierre: esquinas de las barras (un escalón menos que el gráfico grande), línea (1 px más), guías y relleno (liso, degradado o rayado). |
 | `story.titleCard`, `listLayout`, `listUnderline`, `handoff`, `headlineSize`, `closingBg`, `signoffBar`, `wall*` | Los valores por defecto de `spec.design` (tabla de abajo). En formato vertical las columnas y filas del muro del tema no rigen (el muro alto lo decide el formato); las que el video pide en `spec.design.wall` sí. |
 
-Lo que NO depende del estilo: los tamaños de letra, el área segura, la medida de la lista, del muro y de las miniaturas, y el contenido (con `doodles: false` o `transition: "cut"` no se quita información). Un tema con `surface.kind: "outline"` pide al cartel de la apertura un borde de tinta que `borderWidth(theme, "title")` no da (la historia lo dibuja ella).
+Lo que NO depende del estilo: los tamaños de letra, el área segura, la medida de la lista, del muro y de las miniaturas, y el contenido (con `doodles: false` o `transition: "cut"` no se quita información). Con `surface.kind: "outline"` el cartel de la apertura lleva su borde de tinta (`borderWidth(theme, "title")` lo da) y la variante del video (`design.titleCard`) se la pasa a `surfaceStyle(theme, "title", { titleCard })`.
 
 ## Configuración (`StorySpec`)
 

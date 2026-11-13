@@ -45,7 +45,7 @@ export const papel: ResolvedTheme = deepFreeze(resolveTheme({
     shape: { corners: "rounded", border: 2, outlined: true },
     surface: { kind: "tinted", elevation: "shadow", opacity: 0.9 },
     type: { titleWeight: "stat", labelWeight: "semibold", titleTracking: 0, eyebrowCase: "as-is", eyebrowTracking: 0.04, numerals: "solid", highlight: "marker" },
-    background: { kind: "noise", intensity: 0.8 },
+    background: { kind: "noise", intensity: 1 },
     motion: { entrance: "rise", overshoot: 0.06, stagger: 4, cameraBlur: true, cameraTilt: 1, transition: "wash" },
     decor: { doodles: true, doodleStroke: "hand", vignette: 0.4, accent: "dot", gradientLoop: 0 },
     story: {

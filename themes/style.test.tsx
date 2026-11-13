@@ -4,7 +4,7 @@ import {
   DEFAULT_STYLE, STYLE_FIELDS, ThemeProvider, accentMark, backgroundLayer, cameraOptions, chartFill, chartStyle, checkTheme, cornerRadius, dark,
   doodleStyle, editorial, entrance, highlightStyle, neon, neutral, numeralStyle, papel, resolveStyle, resolveStyleInput, settle, staggerFrames, staggerScale, storyDefaults,
   styleIssues, styleTokenName, surfaceStyle, textStyle, themeFromTokens, themeFromTokensWithReport, transitionVeil, useTheme, vignetteStrength,
-  withAlpha, withStoryDefaults, borderWidth,
+  withAlpha, withStoryDefaults, borderWidth, surfaceParts,
 } from "./index";
 
 const c = neutral.color;
@@ -20,7 +20,8 @@ describe("valores por defecto = lo que las piezas dibujan hoy", () => {
   it("radios: chip y píldora = pill; tarjeta y panel = lg; cartel = lg * 2; control = md; barra = pill", () => {
     expect(cornerRadius(neutral, "chip")).toBe(neutral.radius.pill); // Chip, Pill, DockedHeadline
     expect(cornerRadius(neutral, "card")).toBe(20); // NotificationStack: theme.radius.lg
-    expect(cornerRadius(neutral, "panel")).toBe(20); // panel del cierre: theme.radius.lg
+    expect(cornerRadius(neutral, "panel")).toBe(14); // panel de un diagrama o de una interfaz: theme.radius.panel
+    expect(cornerRadius(neutral, "window")).toBe(20); // panel del cierre, paleta de comandos, plano: theme.radius.lg
     expect(cornerRadius(neutral, "hero")).toBe(40); // cartel de la apertura: theme.radius.lg * 2
     expect(cornerRadius(neutral, "control")).toBe(10); // BarsGrow: theme.radius.md
     expect(cornerRadius(neutral, "bar")).toBe(999); // barra de la lista y de la firma: theme.radius.pill
@@ -30,8 +31,9 @@ describe("valores por defecto = lo que las piezas dibujan hoy", () => {
     expect(surfaceStyle(neutral, "card")).toEqual({ borderRadius: 20, background: c.surface, border: `1px solid ${c.border}`, boxShadow: neutral.shadow.md });
   });
 
-  it("panel del cierre: 1px border, shadow.lg", () => {
-    expect(surfaceStyle(neutral, "panel")).toEqual({ borderRadius: 20, background: c.surface, border: `1px solid ${c.border}`, boxShadow: neutral.shadow.lg });
+  it("panel del cierre (ventana): 1px border, shadow.lg, radius.lg; el panel mediano usa radius.panel", () => {
+    expect(surfaceStyle(neutral, "panel").borderRadius).toBe(14);
+    expect(surfaceStyle(neutral, "window")).toEqual({ borderRadius: 20, background: c.surface, border: `1px solid ${c.border}`, boxShadow: neutral.shadow.lg });
   });
 
   it("píldora del titular (DockedHeadline): pill, 1px, shadow.md", () => {
@@ -162,7 +164,7 @@ describe("campos, validación y errores", () => {
     expect(w[0]!.message).toMatch(/Subí surface\.opacity a/);
     // con el fondo liso y opacidad alta pasa
     const ok = themeFromTokens({}, base, { style: { surface: { kind: "glass", opacity: 0.95 }, background: { kind: "plain" } } });
-    expect(checkTheme(ok).filter((x) => x.pair.startsWith("style."))).toEqual([]);
+    expect(checkTheme(ok).filter((x) => x.pair.startsWith("style.surface"))).toEqual([]);
   });
 
   it("checkTheme: marcador, números atenuados, patrón cargado y tarjetas sin borde ni sombra", () => {
@@ -411,7 +413,7 @@ describe("tres design systems de ejemplo", () => {
     expect(String(surfaceStyle(neon, "card").boxShadow)).toContain("0 0 24px");
     expect(surfaceStyle(papel, "card").background).toMatch(/^#/);
     expect(borderWidth(papel, "chip")).toBe(3);
-    expect(borderWidth(editorial, "title")).toBe(0);
+    expect(borderWidth(editorial, "title")).toBe(1); // con `outline` el cartel lleva su contorno: sin él se confunde con el fondo
   });
 
   it("el design system llega a las piezas por el proveedor", () => {
@@ -426,5 +428,93 @@ describe("tres design systems de ejemplo", () => {
     renderToString(<ThemeProvider theme={{ ...neutral, style: { surface: { kind: "tinted" } } }}><Probe /></ThemeProvider>);
     expect(seen).toBe("tinted/wash");
     expect(() => renderToString(<ThemeProvider theme={{ ...neutral, style: { surface: { kind: "x" as never } } }}><Probe /></ThemeProvider>)).toThrow(/style no es válido/);
+  });
+});
+
+describe("cierre del sistema de diseño: ayudas sin trabajos a mano", () => {
+  it("borde grueso (`bold`): un píxel más, sin que nadie sume a mano", () => {
+    expect(borderWidth(neutral, "card")).toBe(1);
+    expect(borderWidth(neutral, "card", { bold: true })).toBe(2);
+    expect(surfaceStyle(neutral, "card", { bold: true }).border).toBe(`2px solid ${c.border}`);
+    expect(borderWidth(editorial, "card", { bold: true })).toBe(2); // `outline`: el borde es la superficie
+    const sinBorde = themeFromTokens({}, neutral, { style: { shape: { outlined: false } } });
+    expect(borderWidth(sinBorde, "card", { bold: true })).toBe(0);
+  });
+
+  it("esquinas: `corner` pide otro rol y `panel` sigue a radius.panel", () => {
+    expect(surfaceStyle(neutral, "card", { corner: "panel" }).borderRadius).toBe(neutral.radius.panel);
+    expect(surfaceStyle(neutral, "window").borderRadius).toBe(neutral.radius.lg);
+    expect(cornerRadius(papel, "panel")).toBe(papel.radius.panel);
+    expect(cornerRadius(editorial, "panel")).toBe(0);
+  });
+
+  it("cartel con `outline` lleva borde; la variante del video (`titleCard`) manda sobre la del tema", () => {
+    expect(surfaceStyle(editorial, "title").border).toBe(`1px solid ${editorial.color.text}`);
+    expect(surfaceStyle(neutral, "title").border).toBeUndefined();
+    const vidrio = surfaceStyle(neutral, "title", { titleCard: "glass" });
+    expect(vidrio.background).toBe(withAlpha(c.surface, neutral.style!.surface?.opacity ?? 0.74));
+    expect(vidrio.border).toBe(`1px solid ${withAlpha(c.surface, 0.9)}`);
+  });
+
+  it("`surfaceParts` es lo mismo que `surfaceStyle`, en datos", () => {
+    for (const t of [neutral, dark, editorial, neon, papel]) {
+      for (const role of ["card", "panel", "window", "headline", "chip", "pill", "title"] as const) {
+        const p = surfaceParts(t, role, { glow: 0.5 });
+        const css = surfaceStyle(t, role, { glow: 0.5 });
+        expect(css.background).toBe(p.fill);
+        expect(css.borderRadius).toBe(p.radius);
+        expect(css.boxShadow).toBe(p.boxShadow);
+        expect(css.border).toBe(p.stroke ? `${+p.stroke.width.toFixed(2)}px solid ${p.stroke.color}` : undefined);
+      }
+    }
+    expect(surfaceParts(neutral, "card").shadow.kind).toBe("soft");
+    expect(surfaceParts(editorial, "card").shadow.kind).toBe("none");
+    expect(surfaceParts(neon, "card").shadow).toMatchObject({ kind: "glow", blur: 24 });
+    const duro = themeFromTokens({}, neutral, { style: { surface: { elevation: "border" } } });
+    expect(surfaceParts(duro, "card").shadow).toMatchObject({ kind: "hard", x: 4, y: 4, color: c.text });
+    expect(surfaceParts(neutral, "chip", { glow: 1 }).glow).toMatchObject({ blur: 44 });
+  });
+
+  it("`entrance` con curva propia (rebote) y traslado extra", () => {
+    const lands = (p: number) => 1 + 0.2 * Math.sin(p * Math.PI); // se pasa de 1
+    const e = entrance(neutral, 0.5, 0, { native: "rise", distance: -50, curve: lands, round: false });
+    expect(e.transform).toBe(`translateY(${+((1 - lands(0.5)) * -50).toFixed(2)}px)`);
+    const o = entrance(neutral, 0.5, 0, { native: "rise", distance: -50, curve: lands, round: false, offset: { y: 30 } });
+    expect(o.transform).toBe(`translateY(${+((1 - lands(0.5)) * -50 + 30).toFixed(2)}px)`);
+    // en reposo solo queda el traslado extra; sin él, nada
+    expect(entrance(neutral, 1, 0, { offset: { y: 30 } })).toEqual({ transform: "translateY(30px)" });
+    expect(entrance(neutral, 1, 0, { offset: { y: 0 } })).toEqual({});
+    // con otra entrada del tema manda el tema (no la curva) y el traslado va delante
+    const f = entrance(themeFromTokens({}, neutral, { style: { motion: { entrance: "scale" } } }), 0.5, 0, { curve: lands, offset: { y: 12 } });
+    expect(String(f.transform)).toMatch(/^translateY\(12px\) scale\(/);
+    // sin opciones nuevas, igual que antes
+    expect(entrance(neutral, 0.5, 0, { distance: 24 })).toEqual({ opacity: 0.5, transform: "translateY(12px)" });
+  });
+
+  it("rótulo fuerte: un escalón sobre `labelWeight`", () => {
+    expect(textStyle(neutral, "label").fontWeight).toBe(neutral.font.weights.medium);
+    expect(textStyle(neutral, "label", { strong: true }).fontWeight).toBe(neutral.font.weights.semibold);
+    expect(textStyle(neon, "label", { strong: true }).fontWeight).toBe(neon.font.weights.semibold);
+    expect(textStyle(papel, "label", { strong: true }).fontWeight).toBe(papel.font.weights.stat);
+  });
+
+  it("checkTheme revisa line, solid y text", () => {
+    const con = (style: object, color: Partial<typeof neutral.color> = {}) => checkTheme(themeFromTokens({}, { ...neutral, color: { ...neutral.color, ...color } }, { style: style as never }));
+    expect(con({}).filter((w) => w.pair.startsWith("style."))).toEqual([]);
+    expect(con({ line: { weight: "hairline" } }, { border: "#eeeeee" }).some((w) => w.pair === "style.line.hairline/border" && w.severity === "error")).toBe(true);
+    expect(con({ solid: { fill: "outline", edge: "none" } }).some((w) => w.pair === "style.solid.edge/none")).toBe(true);
+    expect(con({ solid: { fill: "translucent", edge: "accent" } }, { accent: "#f4f4f4" }).some((w) => w.pair === "style.solid.edge/accent")).toBe(true);
+    expect(con({ text: { caret: "block" } }, { onAccent: "#dddddd" }).some((w) => w.pair === "style.text.caret/onAccent")).toBe(true);
+    expect(con({ text: { tile: "outline" } }, { text: "#cccccc" }).some((w) => w.pair === "style.text.tile.outline/ink")).toBe(true);
+    // un par reconocido baja a nota
+    const ack = themeFromTokens({}, { ...neutral, color: { ...neutral.color, border: "#eeeeee" } }, { style: { line: { weight: "hairline" } } as never, acknowledge: ["style.line.hairline/border"] });
+    expect(checkTheme(ack).find((w) => w.pair === "style.line.hairline/border")?.severity).toBe("note");
+  });
+
+  it("papel: el grano se nota y el texto atenuado sigue pasando", () => {
+    const l = backgroundLayer(papel);
+    const alpha = Number(/opacity%3D%22([\d.]+)%22/.exec(String(l.style?.backgroundImage))?.[1]);
+    expect(alpha).toBeGreaterThanOrEqual(0.12);
+    expect(checkTheme(papel)).toEqual([]);
   });
 });

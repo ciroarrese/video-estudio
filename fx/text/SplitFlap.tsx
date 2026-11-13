@@ -2,7 +2,7 @@ import React from "react";
 import { random } from "../../engine";
 import { progress, roleColor, stagger, styleKey, useFx, xform } from "../core";
 import type { ColorRole } from "../core";
-import { staggerFrames, textLook } from "../../themes";
+import { contrastRatio, readableOn, staggerFrames, textLook } from "../../themes";
 import { mix } from "../core";
 import type { TextFxProps } from "./shared";
 import { baseText } from "./shared";
@@ -77,7 +77,10 @@ export function SplitFlap(props: SplitFlapProps) {
   const outline = look.tile === "outline";
   // `card`: loseta llena con bisagra (como siempre); `flat`: sin redondeo ni bisagra; `outline`: solo contorno, glifo del color de la loseta.
   const bg = outline ? roleColor(theme, "bg") : roleColor(theme, tileColor);
-  const color = outline ? roleColor(theme, tileColor) : roleColor(theme, props.color ?? "bg");
+  // Tinta: la que pide quien llama; si no, `bg` sobre la loseta (`card`, `flat`) o el color de la loseta sobre el fondo (`outline`). Si el par
+  // no llega a 4,5:1 (una `tileColor` clara con `bg` claro), se elige entre `bg`, `text` y `onAccent` la que más contrasta con la loseta.
+  const ink = outline ? roleColor(theme, tileColor) : roleColor(theme, props.color ?? "bg");
+  const color = props.color || contrastRatio(ink, bg) >= 4.5 ? ink : readableOn(theme, bg, { candidates: [ink, theme.color.text, theme.color.onAccent, theme.color.bg] });
   const ring = outline ? roleColor(theme, tileColor) : undefined;
   const round = look.tile === "card" ? 0.08 : 0;
   const hinge = roleColor(theme, "bg");

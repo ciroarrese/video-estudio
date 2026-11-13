@@ -10,8 +10,8 @@ export const DOTS_SIZE = 48;
 /** Opacidad máxima de las líneas de la grilla y de los puntos (con `intensity` 1). */
 export const GRID_ALPHA = 0.55;
 export const DOTS_ALPHA = 0.9;
-/** Opacidad de las motas del ruido (con `intensity` 1). */
-export const NOISE_ALPHA = 0.07;
+/** Opacidad de las motas del ruido (con `intensity` 1): la mayor con la que el texto atenuado de `papel` sigue pasando 4,5:1 sobre el peor punto. */
+export const NOISE_ALPHA = 0.16;
 
 const clamp01 = (n: number) => Math.min(1, Math.max(0, n));
 

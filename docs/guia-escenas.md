@@ -525,3 +525,37 @@ export const SceneVideo: React.FC<{ title?: string; subtitle?: string }> = ({ ti
 ```
 
 Qué copiar de este ejemplo: las constantes arriba (la caja, las filas y los tiempos, para que el guion y el código se lean juntos); la cámara con la primera clave sostenida; `data-qa-ignore` condicionado al zoom; el resultado derivado del cuadro (`hecho = f >= T.result`), nunca guardado; el garabato que empieza después del resultado.
+
+## 14. El design system decide la estética: qué usar en lugar de escribirlo
+
+El design system va primero (ver la etapa 2 de la skill): el tema trae un bloque `style` con las decisiones de forma, superficie, texto, fondo, movimiento y gráficos. **Una escena no decide estética que el design system puede decidir** (`docs/reglas.md`): no escribe un radio, una sombra, un peso de letra ni una curva; pide el resultado a una ayuda o a una pieza del kit.
+
+| Si necesitás... | Usá | No escribas |
+|---|---|---|
+| una tarjeta, panel o ventana | `surfaceStyle(theme, "card" \| "panel" \| "window", { level, bold, corner })` | `background`, `border`, `borderRadius`, `boxShadow` |
+| un radio suelto (una barra, un chip, una fila) | `cornerRadius(theme, "bar" \| "chip" \| "control" \| ...)` | `borderRadius: 12`, `Math.min(theme.radius.panel, ...)` |
+| el grosor de un borde | `borderWidth(theme, rol, { bold })` | `1 + 1`, `${w + 1}px` |
+| un rótulo, un título o un texto pequeño | `Eyebrow`, `textStyle(theme, "title" \| "label" \| "eyebrow", { strong })` | `fontWeight: 600`, `letterSpacing`, `textTransform` |
+| una palabra resaltada | `Highlight` | un degradado o un subrayado propios |
+| un número de paso o de lista | `Numeral` (las métricas que cuentan no lo usan: `CountUp`) | un degradado de texto a mano |
+| que algo entre | `entrance(theme, progreso, índice, { native, distance, curve, offset })` y `staggerFrames(theme, i, { base })` | `translateY((1 - p) * 30)` y `i * 4` |
+| la cámara | `useCameraAt(frame, claves, opciones)` | `cameraAt` directo (no lleva el desenfoque ni la inclinación del tema) |
+| un gráfico | `chartStyle(theme)` (radio de barra, grosor de línea, guías, relleno), `chartFill` | `rx={6}`, `strokeWidth={5}` |
+| un SVG con superficie | `surfaceParts(theme, rol)` (fill, stroke, radius, shadow) | leer `surfaceStyle` con expresiones regulares |
+| un efecto de `fx/` | el efecto, que ya sigue `theme.style` (`useFx` da `style`) | rehacerlo con otro estilo |
+
+Reglas para que funcione:
+
+- Los roles son los de `docs/estilo.md`: `card` (tarjeta suelta), `panel` (contenedor mediano), `window` (contenedor grande), `chip`, `control`, `bar`. Si ninguno sirve, se pide uno en `themes/`; no se corrige a mano.
+- Lo que el estilo no decide (tamaños de letra, área segura, medidas de lo que se mide) sigue saliendo de `theme.type`, `theme.safe` y de las constantes de la escena.
+- El borde del aparato de `PhoneFrame` y las cifras de métricas están exentos (ver las exenciones en `docs/estilo.md`).
+
+**Probar el video con otros design systems.** El video se hace con el tema aprobado; antes de entregarlo, comprobá que no quedó nada decidido a mano mirándolo con otros. `--props '{"theme":"editorial"}'` (también `neon`, `papel`, `dark`) cambia el tema en `render`, `qa` y `sheet`; la plantilla de escena y la de historia lo aceptan (en una escena propia, copiá el mapa de nombres de `templates/scene/Scene.tsx`):
+
+```bash
+npm run sheet -- <id> --count 12 --props '{"theme":"editorial"}'
+npm run qa -- <id> --count 30 --props '{"theme":"neon"}'
+npm run render -- <id> --check --props '{"theme":"papel"}'
+```
+
+Lo que tiene que pasar: el video se ve distinto con cada uno (esquinas, superficies, números, fondo, movimiento) y `qa` da 0 errores. Si una escena se ve igual en los tres, hay decisiones escritas a mano; si da errores de contraste solo con un tema, lo que dibuja usa un color que no sale de un rol.

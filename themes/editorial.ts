@@ -16,7 +16,7 @@ export const editorial: ResolvedTheme = deepFreeze(resolveTheme({
     surfaceAlt: "#e8e2d4",
     text: "#1d1b17",
     textMuted: "#57524a",
-    border: "#c9c1ae",
+    border: "#b0a78f",
     accent: "#8f1d2c",
     accent2: "#1d5a66",
     onAccent: "#fbf9f3",

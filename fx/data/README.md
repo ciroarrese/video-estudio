@@ -23,4 +23,4 @@ Ayudas puras exportadas (sirven para pruebas y para otras piezas): `trimPolyline
 | `FlowSteps` | `shape.corners` (por el factor de `cornerRadius("panel")` sobre `radius.panel`), `surface` (relleno, filo duro o halo), `type.numerals` (el paso pendiente queda atenuado), `motion.stagger` |
 | `Bars3D`, `DonutRing` | sin cambio (geometría y cifras de contenido) |
 
-`styleKit.tsx` traduce `surfaceStyle` y `chartFill` a lo que pide un SVG (`svgSurface`, `SvgShadow`, `FillDef`) y suma una entrada del tema a un traslado propio (`entranceWithOffset`). Con el estilo por defecto el resultado es el de antes.
+`styleKit.tsx` traduce `surfaceStyle` y `chartFill` a lo que pide un SVG (`svgSurface`, `SvgShadow`, `FillDef`) (sobre `surfaceParts`, sin leer CSS). La entrada con traslado propio es `entrance(theme, p, i, { curve, offset })` de `themes/`. Con el estilo por defecto el resultado es el de antes.
