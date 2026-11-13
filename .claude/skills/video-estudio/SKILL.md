@@ -7,7 +7,7 @@ description: "Produce videos animados (presentación, demo, explicador, recorrid
 
 Producís videos animados con el motor de este repo (cada video es una función pura del número de cuadro; Chromium captura, ffmpeg arma el MP4). **Nunca lo hacés de una sola pasada**: trabajás por etapas y, al final de cada una, te detenés y esperás la respuesta de la persona. Sin "aprobado" explícito no pasás a la siguiente.
 
-Antes de empezar leé `CLAUDE.md`, `docs/reglas.md` y `docs/guia-escenas.md`. Todo lo que escribas para la persona va en español rioplatense (voseo, sin emojis). El repo es público: nada de nombres de empresas, clientes o personas reales en lo que quede versionado.
+Antes de empezar leé `CLAUDE.md`, `docs/reglas.md`, `docs/guia-escenas.md` y mirá el catálogo de efectos `docs/animaciones.md`. Todo lo que escribas para la persona va en español rioplatense (voseo, sin emojis). El repo es público: nada de nombres de empresas, clientes o personas reales en lo que quede versionado.
 
 ## Dónde va cada cosa
 
@@ -125,7 +125,7 @@ Escribí `videos/<slug>/guion.md`: una tabla por escena (apertura y cierre inclu
 | 0:04-0:05 (112-150) | Atraviesa el panel hacia la escena siguiente | zoomThrough + velo | - | - |
 ```
 
-Aplicá las reglas de `docs/reglas.md` desde el guion (acción clave con zoom rápido, flujos con dirección, cada escena termina atravesando un elemento, entre temas vuelta al listado). Sumá los cuadros y comprobá que la duración total cuadre con lo pedido. Agregá al final una línea con las cifras emuladas elegidas.
+En la columna "Efecto" nombrá el efecto del catálogo (`docs/animaciones.md`, por ejemplo `MaskedRise`, `BarsGrow`, `DotWipe`) o el recurso del kit (`zoomThrough`, `Cursor`) de cada momento; solo si ninguno sirve, escribí "a medida". Aplicá las reglas de `docs/reglas.md` desde el guion (acción clave con zoom rápido, flujos con dirección, cada escena termina atravesando un elemento, entre temas vuelta al listado). Sumá los cuadros y comprobá que la duración total cuadre con lo pedido. Agregá al final una línea con las cifras emuladas elegidas.
 
 **Alto: sin guion aprobado no se construye ninguna escena.**
 
@@ -133,8 +133,9 @@ Aplicá las reglas de `docs/reglas.md` desde el guion (acción clave con zoom r�
 
 Para cada escena del guion, en orden:
 
-1. `bash templates/nuevo.sh escena <slug> <escena>` y agregá el import en `engine/runtime/videos.ts`. Construí la escena con piezas del kit siguiendo `docs/guia-escenas.md`: coordenadas del mundo, cámara con cuadros clave, todo del tema, interfaces recreadas con su estructura y rótulos, nunca capturas. Si va en una historia, el contenido es `SceneBody` (sin `Stage`) y el titular sale de `TopicHeadline` o `DockedHeadline`.
-2. **Antes de mostrar nada**, corré en este orden y corregí lo que salga hasta que quede limpio:
+1. **Elegí efectos del catálogo antes de escribir desde cero:** abrí `docs/animaciones.md` (sección "Cómo elegir") y usá los efectos de `fx/` que ya existen para cada momento del guion; combinalos con cámara, cursor y garabatos del kit (`docs/guia-escenas.md`, sección 9). Podés ver cualquiera con `npm run dev` y `/?video=fx-text`, `fx-3d` o `fx-data-ui-art`.
+2. `bash templates/nuevo.sh escena <slug> <escena>` y agregá el import en `engine/runtime/videos.ts`. Construí la escena con piezas del kit siguiendo `docs/guia-escenas.md`: coordenadas del mundo, cámara con cuadros clave, todo del tema, interfaces recreadas con su estructura y rótulos, nunca capturas. Si va en una historia, el contenido es `SceneBody` (sin `Stage`) y el titular sale de `TopicHeadline` o `DockedHeadline`.
+3. **Antes de mostrar nada**, corré en este orden y corregí lo que salga hasta que quede limpio:
    ```bash
    npm run typecheck
    npm run render -- <slug>-<escena> --check
@@ -142,10 +143,10 @@ Para cada escena del guion, en orden:
    npm run privacy -- <slug>-<escena> --deny videos/<slug>/prohibidos.txt --scan-source videos/<slug>
    ```
    Los avisos de `qa` que sean a propósito (transiciones) se explican; solo se silencian con `data-qa-ignore="regla"` si lo decidiste a propósito y lo decís.
-3. Hoja de cuadros: `npm run sheet -- <slug>-<escena> --count 12`. **Mirala** (abrí `out/<slug>-<escena>-sheet.png` con Read) y corregí lo que veas mal: titular tapando contenido, vacío arriba en la vista general, cosas fuera de cuadro.
-4. MP4 de esa escena sola: `npm run render -- <slug>-<escena> --scale 0.5 --crf 23`. Entregá a la persona la ruta del MP4 y de la hoja, más un resumen de lo que hace cada tramo y de lo que QA y privacidad dijeron (aunque sea "limpio").
+4. Hoja de cuadros: `npm run sheet -- <slug>-<escena> --count 12`. **Mirala** (abrí `out/<slug>-<escena>-sheet.png` con Read) y corregí lo que veas mal: titular tapando contenido, vacío arriba en la vista general, cosas fuera de cuadro.
+5. MP4 de esa escena sola: `npm run render -- <slug>-<escena> --scale 0.5 --crf 23`. Entregá a la persona la ruta del MP4 y de la hoja, más un resumen de lo que hace cada tramo y de lo que QA y privacidad dijeron (aunque sea "limpio").
 
-**Alto: esperá aprobación de la escena.** Aplicá las correcciones, repetí el punto 2 y mostrá de nuevo (solo lo que cambió). Recién con "aprobada" pasás a la escena siguiente.
+**Alto: esperá aprobación de la escena.** Aplicá las correcciones, repetí el punto 3 y mostrá de nuevo (solo lo que cambió). Recién con "aprobada" pasás a la escena siguiente.
 
 ## Etapa 5: armado
 
@@ -167,12 +168,12 @@ Para cada escena del guion, en orden:
 
 ## Cambios sobre un video existente
 
-Si piden agregar, editar o corregir una escena: leé su carpeta y el guion, proponé el cambio en una línea, hacelo, corré el punto 2 de la etapa 4, mostrá hoja y MP4 de esa escena, y actualizá `guion.md`. El render por partes reutiliza lo que no cambió.
+Si piden agregar, editar o corregir una escena: leé su carpeta y el guion, proponé el cambio en una línea, hacelo, corré el punto 3 de la etapa 4, mostrá hoja y MP4 de esa escena, y actualizá `guion.md`. El render por partes reutiliza lo que no cambió.
 
 ## Si algo falla
 
 - `setFrame(n) fallo: ... holds pendientes` (timeout de 30 s): una fuente o imagen no carga. Revisá que el archivo exista en `public/` y que `theme.font.files`/`asset()` apunten bien.
-- `--check` falla o `checkDeterminism` da `ok: false`: la escena depende del historial. Buscá `useState`/`useRef` que acumulan, `Date.now()`, `Math.random()` (usá `random(seed)`), animaciones CSS, `setTimeout`. En `ve-render`, diferencias chicas por efectos (desenfoque, sombras grandes, 3D) se toleran; un bloque con diferencia real no.
+- `--check` falla o `checkDeterminism` da `ok: false`: la escena depende del historial. Buscá `useState`/`useRef` que acumulan, `Date.now()`, `Math.random()` (usá `random(seed)`), animaciones CSS, `setTimeout`. `--check` es tolerante con diferencias chicas (desenfoque, sombras); un bloque con diferencia real no (`--check-strict` compara byte a byte). Revisá también `useId`, `scale()` sobre texto, `perspective`/`preserve-3d` en un ancestro y posiciones fraccionarias: la lista completa está en `docs/reglas.md`.
 - `No se pudo cargar "playwright"` / `No se pudo lanzar Chromium`: `npm i -D playwright` y `npx playwright install chromium`, o `VE_CHROMIUM=/ruta/a/chrome`.
 - ffmpeg o ffprobe no encontrado: instalalo y comprobá con `ffmpeg -version`.
 - `Audio file ... not found`: poné el archivo en `public/` o pasá `--assets <dir>`.

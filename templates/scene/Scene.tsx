@@ -5,6 +5,7 @@
 //  - Todo sale del cuadro (`useFrame`) y del tema (`useTheme`): nada de estado, azar ni temporizadores.
 //  - Coordenadas del MUNDO dentro de <World>; la cámara se mueve con cuadros clave.
 //  - El titular se aparta solo cuando la cámara se acerca (`hideFromScale`).
+//  - Un efecto del catálogo `fx/` (MaskedRise) para empezar desde piezas hechas; ver docs/animaciones.md.
 //  - Un acercamiento rápido en la acción clave, un clic, un garabato y un atravesado final.
 //  - Termina atravesando un elemento y con un velo (`Wash`) hacia la escena siguiente.
 import React from "react";
@@ -14,6 +15,7 @@ import {
   cameraAt, hideFromScale, kf, typed, zoomThrough,
 } from "../../kit";
 import type { CameraKey } from "../../kit";
+import { MaskedRise } from "../../fx";
 import { ThemeProvider, useTheme } from "../../themes";
 import { theme as videoTheme } from "../theme";
 
@@ -80,8 +82,9 @@ export function SceneBody({ title, subtitle }: SceneProps) {
             borderRadius: t.radius.lg, boxShadow: t.shadow.lg, opacity: kf(f, [0, 18], [0, 1]),
           }}
         >
-          <div style={{ padding: "26px 50px", fontSize: t.type.body, fontWeight: t.font.weights.semibold, color: t.color.text }}>
-            Panel de ejemplo
+          {/* Efecto del catálogo (docs/animaciones.md): el rótulo sube desde una máscara. Probá también BarsGrow o DigitRoll. */}
+          <div style={{ padding: "22px 50px" }}>
+            <MaskedRise text="Panel de ejemplo" start={6} fontSize={t.type.body} by="word" />
           </div>
         </div>
 

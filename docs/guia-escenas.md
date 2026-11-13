@@ -1,6 +1,6 @@
 # Guía de escenas
 
-Cómo se escribe una escena de este toolkit. Antes leé `docs/reglas.md` (las reglas y sus motivos), `kit/README.md` (las piezas) y `engine/README.md` (la regla de determinismo). Para arrancar copiá la plantilla: `bash templates/nuevo.sh escena <slug> <nombre>`.
+Cómo se escribe una escena de este toolkit. Antes leé `docs/reglas.md` (las reglas y sus motivos), `kit/README.md` (las piezas) y `engine/README.md` (la regla de determinismo). Antes de escribir una animación a medida, mirá el catálogo de efectos listos en `docs/animaciones.md`. Para arrancar copiá la plantilla: `bash templates/nuevo.sh escena <slug> <nombre>`.
 
 ## 1. Lo básico
 
@@ -56,6 +56,7 @@ const cam = cameraAt(f, KEYS);            // { x, y, scale, rx, ry, blur }
 | Salida de escena | `zoomThrough` + `Wash` |
 | Mezclar escenas con tiempos | `Sequence`, `Series` (motor) |
 | Audio | `Audio` (motor) o `defineStory({ audio })` |
+| Título, número, gráfico, teléfono, transición ya hechos | un efecto de `fx/` (ver `docs/animaciones.md`) |
 
 ## 4. Tiempos a 30 fps
 
@@ -196,3 +197,48 @@ Con 2 a 6 temas usá `defineStory` (ver `stories/README.md` y `templates/story/`
 - puede pasar un `thumbnail` (lienzo de 560×340) para el cierre.
 
 Probá cada escena sola (su propio `defineVideo`, como en `templates/scene/index.ts`) y recién después en la historia.
+
+## 9. Combinar el kit con efectos de `fx/`
+
+Los efectos de `fx/` son componentes comunes: se ponen dentro de `World` (se mueven con la cámara) o fuera (fijos en pantalla), y los garabatos y el cursor del kit se dibujan encima. Reglas prácticas:
+
+- Un efecto sin `frame` lee el cuadro del motor: usá `start` y `duration` para ubicarlo en la línea de tiempo de la escena. Su último cuadro es una imagen fija, así que se queda en pantalla después de terminar.
+- Posicionalo con un contenedor `position: absolute` con `left`/`top` en píxeles enteros y dale `width`/`height` al efecto.
+- Los garabatos y el cursor van en las coordenadas del mundo del efecto sobre el que apuntan; empezá el garabato cuando el efecto ya terminó (`start + duration`).
+- Para una transición entre escenas, `DotWipe` (cuadro completo) o `Wash` del kit; no los apiles.
+
+```tsx
+import { useFrame, useVideoConfig } from "../../../engine";
+import { Cursor, DoodleCircle, Stage, Wash, World, cameraAt } from "../../../kit";
+import type { CameraKey } from "../../../kit";
+import { BarsGrow, MaskedRise } from "../../../fx";
+
+const KEYS: CameraKey[] = [
+  { f: 0, x: 960, y: 540, scale: 1 },
+  { f: 50, x: 1200, y: 620, scale: 1.6 },
+  { f: 120, x: 1200, y: 620, scale: 1.6 },
+];
+
+export function EscenaCombinada() {
+  const f = useFrame();
+  const { width, height } = useVideoConfig();
+  const cam = cameraAt(f, KEYS);
+  return (
+    <Stage clouds={false}>
+      <World camera={cam} width={width} height={height}>
+        <div style={{ position: "absolute", left: 160, top: 120 }}>
+          <MaskedRise text="Ventas por región" start={4} dot />
+        </div>
+        <div style={{ position: "absolute", left: 760, top: 320 }}>
+          <BarsGrow start={20} duration={50} width={900} height={520} data={[40, 65, 52, 90]} labels={["N", "S", "E", "O"]} />
+        </div>
+        <DoodleCircle id="ej-circulo" start={80} end={105} cx={1330} cy={500} rx={110} ry={90} />
+        <Cursor show={[50, 118]} keys={[[50, 1500, 900], [76, 1360, 560]]} clicks={[78]} />
+      </World>
+      <Wash range={[104, 119]} />
+    </Stage>
+  );
+}
+```
+
+El titular y las barras entran solos con su propio escalonado; la cámara se acerca a las barras, el cursor hace clic y el círculo marca la barra más alta. Probalo con `npm run dev` y `/?video=fx-text`, `fx-3d` o `fx-data-ui-art` para ver cada efecto por separado.

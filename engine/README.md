@@ -6,7 +6,7 @@ Motor de video propio, escrito desde cero (TypeScript + React 18); ver `docs/ORI
 
 **Toda escena debe ser una funcion pura del numero de cuadro (y de sus props).** El runtime reutiliza UNA sola raiz de React y salta entre cuadros en cualquier orden (y en paralelo por partes), asi que el estado que persiste entre renders cambia el resultado segun el historial.
 
-- Prohibido: `useState`/`useRef` que acumulen valores entre cuadros, `setTimeout`/`setInterval`/`requestAnimationFrame`, `Date.now()`, `Math.random()` (usar `random(seed)`), animaciones/transiciones CSS.
+- Lista completa de lo prohibido y permitido (con motivo y arreglo de cada punto): `docs/reglas.md`, sección "Lista única de determinismo". Resumen: nada de estado que acumule, temporizadores, `Date`, `Math.random()` (usar `random(seed)`), CSS animado ni `useId`.
 - Los efectos solo se permiten para `holdRender`/`releaseRender` (esperar fuentes e imagenes) y para el dibujo de `FrameCanvas` (un `useLayoutEffect` que en cada render limpia el lienzo y lo redibuja entero desde el cuadro y las props; no guarda nada entre cuadros).
 - Verificacion: `__ve.checkDeterminism([frames])` renderiza cada cuadro dos veces (tras el cuadro 0 y tras otro cuadro) y compara `innerHTML`; `ok: false` significa que la escena depende del historial. Correrlo en QA sobre cuadros representativos.
 

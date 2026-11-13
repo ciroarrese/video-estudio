@@ -4,12 +4,34 @@ Lista de control para cada escena y cada video. Cada regla lleva su motivo, para
 
 ## Técnicas (el render tiene que dar siempre lo mismo)
 
-- [ ] **La escena es una función pura del cuadro.** Todo sale de `useFrame()` (o de una prop `frame`), de las props y del tema. Sin `useState`/`useRef` que acumulen, `setTimeout`, `requestAnimationFrame`, `Date.now()`, `Math.random()` (se usa `random(seed)`) ni animaciones CSS.
-  *Por qué:* el motor salta entre cuadros en cualquier orden y en paralelo; si algo depende del historial, el mismo cuadro sale distinto según cómo se renderice. *Se revisa con:* `npm run render -- <id> --check`.
+- [ ] **La escena es una función pura del cuadro.** Todo sale de `useFrame()` (o de una prop `frame`), de las props y del tema.
+  *Por qué:* el motor salta entre cuadros en cualquier orden y en paralelo; si algo depende del historial, el mismo cuadro sale distinto según cómo se renderice.
+  *Cómo:* calculá cada valor desde el cuadro con `kf`/`interpolate`; no lo guardes. *Se revisa con:* `npm run render -- <id> --check`.
+
+### Lista única de determinismo
+
+Esta es la lista de referencia; `CLAUDE.md`, `engine/README.md`, `kit/README.md` y `docs/animaciones.md` remiten acá.
+
+- [ ] **Sin estado, referencias ni temporizadores:** nada de `useState`/`useRef` que acumulen entre cuadros, `setTimeout`/`setInterval`/`requestAnimationFrame`, `Date`/`Date.now()` ni `Math.random()`.
+  *Por qué:* el resultado pasaría a depender de cuántas veces y en qué orden se renderizó. *Qué hacer:* derivá todo del cuadro; para azar usá `random(seed)` del motor (sembrado y determinista).
+- [ ] **Sin animaciones ni transiciones CSS** (`transition`, `animation`, `@keyframes`).
+  *Por qué:* corren con el reloj del navegador, no con el cuadro. *Qué hacer:* animá con `kf`/`interpolate` sobre el cuadro.
+- [ ] **Sin `useId`.**
+  *Por qué:* los ids que genera cambian con el historial de render y rompen referencias SVG (degradados, máscaras, recortes). *Qué hacer:* derivá los ids de las props (por ejemplo `id` del garabato o un prefijo + índice).
+- [ ] **Canvas solo con `FrameCanvas`**, que redibuja todo en cada cuadro.
+  *Por qué:* un `<canvas>` que conserva lo dibujado antes depende del historial. *Qué hacer:* `draw(ctx, frame, size)` pura, limpiando y dibujando la escena completa cada vez.
+- [ ] **CSS 3D permitido solo como `perspective()` propio de cada elemento**, dentro de su `transform`, con las posiciones de layout en enteros: todo el movimiento va dentro de `transform` y `left`/`top` son píxeles enteros. **Prohibido** `transform-style: preserve-3d` y `perspective` en un ancestro.
+  *Por qué:* con la perspectiva en un ancestro, Chromium rasteriza las capas de forma distinta según el historial de cuadros; con `perspective()` en el propio `transform` y layout entero, el resultado es estable (es lo que hace `stories/`). *Qué hacer:* `transform: perspective(P) rotateX(..) rotateY(..) translate3d(..)` en cada pieza, orden de profundidad con `zIndex`, nada de planos que se crucen. Ver `stories/README.md`.
+- [ ] **Sin `scale()` sobre texto.**
+  *Por qué:* el texto escalado se rasteriza distinto según el historial. *Qué hacer:* animá `font-size`, o usá un traslado entero.
+- [ ] **Traslados de texto en píxeles enteros** (`Math.round`).
+  *Por qué:* una posición fraccionaria suaviza los bordes de forma inestable.
+- [ ] **Desenfoques y sombras están bien**, dentro de la tolerancia de `--check`.
+- [ ] **Siempre correr `npm run render -- <id> --check`.** Por defecto es tolerante (diferencia máxima por canal 2 y hasta 0,1 % de píxeles distintos); `--check-strict` compara byte a byte.
+  *Por qué:* es la única forma de enterarse de que una escena depende del historial antes de que lo note la persona.
+
 - [ ] **Todo sale del tema.** Colores, tipografías, radios, sombras, curvas y tamaños de letra vienen de `useTheme()`. Ningún `#hex` ni `font-family` suelto en una escena.
   *Por qué:* el mismo video tiene que poder rehacerse con otro design system cambiando solo el tema. Con un color fijo, esa escena queda desentonando.
-- [ ] **Sin efectos 3D de CSS.** Sin `backdrop-filter`, sombras grandes sobre piezas escaladas, giros ni sesgos de CSS; la profundidad se proyecta a mano con traslado y escala.
-  *Por qué:* Chromium no rasteriza esos efectos igual según el historial de cuadros (ver `stories/README.md`).
 - [ ] **Los recursos externos se esperan.** Fuentes e imágenes se cargan con `asset()` y `holdRender`/`releaseRender` (las piezas del kit ya lo hacen).
   *Por qué:* un cuadro capturado antes de que cargue la imagen sale vacío, y no lo ves hasta el final.
 - [ ] **Cada garabato tiene un `id` único.** *Por qué:* el `id` es también la semilla del temblor y el nombre del degradado SVG; dos iguales se pisan.

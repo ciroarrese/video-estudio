@@ -27,7 +27,7 @@ if [[ "$modo" == "escena" ]]; then
   dest="$base/$nombre"
   [[ ! -e "$dest" ]] || { echo "Ya existe $dest" >&2; exit 1; }
   cp -r templates/scene "$dest"
-  sed -i -E 's#"\.\./\.\./(engine|kit|themes|stories)#"../../../\1#g' "$dest"/*.ts "$dest"/*.tsx
+  sed -i -E 's#"\.\./\.\./(engine|kit|themes|stories|fx)#"../../../\1#g' "$dest"/*.ts "$dest"/*.tsx
   sed -i "s#\"plantilla-escena\"#\"$slug-$nombre\"#" "$dest/index.ts"
   echo "creado $dest (id de video: $slug-$nombre)"
   echo "falta: import \"../../videos/$slug/$nombre\"; en engine/runtime/videos.ts"
