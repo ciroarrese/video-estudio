@@ -2,6 +2,8 @@ export type { StorySpec, StoryTopic, StoryTiming, TopicScene } from "./types";
 export { validateSpec, MIN_TOPICS, MAX_TOPICS } from "./types";
 export { Opening, OPENING_FRAMES, openingFrames } from "./Opening";
 export { Interlude, INTERLUDE_FRAMES, interludeFrames } from "./Interlude";
+export { InterludeCompact, INTERLUDE_COMPACT_FRAMES, interludeCompactFrames } from "./InterludeCompact";
+export { MIN_COMPACT_FRAMES } from "./durations";
 export { Closing, CLOSING_FRAMES, closingFrames, DefaultThumbnail } from "./Closing";
 export { composeStory } from "./compose";
 export type { ComposeOptions, TimelineEntry } from "./compose";

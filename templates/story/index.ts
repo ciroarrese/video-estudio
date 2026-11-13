@@ -17,8 +17,9 @@ const escena2: React.FC = () => React.createElement(SceneBody, { title: spec.top
 
 // Una escena por tema, en el mismo orden que `spec.topics`.
 const scenes: TopicScene[] = [
-  { id: "tema-uno", component: escena1, durationInFrames: DURACION },
-  { id: "tema-dos", component: escena2, durationInFrames: DURACION },
+  // `thumbnail` (componente sin props de 560x340): sin ella el cierre muestra una tarjeta genérica. Ver docs/guia-escenas.md, sección 8.
+  { id: "tema-uno", component: escena1, durationInFrames: DURACION /*, thumbnail: MiniTemaUno */ },
+  { id: "tema-dos", component: escena2, durationInFrames: DURACION /*, thumbnail: MiniTemaDos */ },
 ];
 
 export default defineStory({

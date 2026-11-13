@@ -213,6 +213,26 @@ describe("FlyingCard trail", () => {
   });
 });
 
+describe("FlyingCard hideBefore / hideAfter", () => {
+  const fc = (fr: number, extra: { hideBefore?: boolean; hideAfter?: boolean } = {}) =>
+    html(<FlyingCard range={[10, 30]} from={{ x: 0, y: 0 }} to={{ x: 200, y: 0 }} width={50} height={50} {...extra}>c</FlyingCard>, neutral, fr);
+  it("por defecto no dibuja antes de range[0] y queda en `to` después de range[1]", () => {
+    expect(fc(9)).toBe("");
+    expect(fc(0)).toBe("");
+    expect(fc(10)).toContain("c</div>");
+    expect(fc(31)).toContain("left:175px");
+    expect(fc(500)).toContain("left:175px");
+  });
+  it("hideBefore={false} la deja en `from` y hideAfter la oculta al terminar", () => {
+    expect(fc(0, { hideBefore: false })).toContain("left:-25px");
+    expect(fc(30, { hideAfter: true })).toContain("c</div>");
+    expect(fc(31, { hideAfter: true })).toBe("");
+  });
+  it("es determinista: mismo cuadro, misma salida", () => {
+    expect(fc(20)).toBe(fc(20));
+  });
+});
+
 describe("World", () => {
   const cam = (rx: number, ry: number) => ({ x: 0, y: 0, scale: 1, rx, ry, blur: 0 });
   it("uses a plain 2D transform when there is no tilt, own perspective() otherwise", () => {

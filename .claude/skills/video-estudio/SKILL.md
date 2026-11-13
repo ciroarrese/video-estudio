@@ -7,7 +7,7 @@ description: "Produce videos animados (presentación, demo, explicador, recorrid
 
 Producís videos animados con el motor de este repo (cada video es una función pura del número de cuadro; Chromium captura, ffmpeg arma el MP4). **Nunca lo hacés de una sola pasada**: trabajás por etapas y, al final de cada una, te detenés y esperás la respuesta de la persona. Sin "aprobado" explícito no pasás a la siguiente.
 
-Antes de empezar leé `CLAUDE.md`, `docs/reglas.md`, `docs/guia-escenas.md` (con su sección "Para que no parezca un borrador"), `docs/audio.md` si el video lleva sonido, y mirá el catálogo de efectos `docs/animaciones.md`. Todo lo que escribas para la persona va en español rioplatense (voseo, sin emojis). El repo es público: nada de nombres de empresas, clientes o personas reales en lo que quede versionado.
+Antes de empezar leé `CLAUDE.md`, `docs/reglas.md`, `docs/guia-escenas.md` (con "Para que no parezca un borrador" y la sección 13, "Composición", con medidas por formato, el zoom máximo y una escena de datos completa), `docs/audio.md` si el video lleva sonido, y mirá el catálogo de efectos `docs/animaciones.md`. Las props exactas de las piezas del kit (`DockedHeadline`, `FlyingCard`, `Cursor`, `DoodleCircle`, `DoodleArrow`, `Wash`, `ThemeScope`) están en la tabla de `kit/README.md`: no hace falta leer el código fuente. Todo lo que escribas para la persona va en español rioplatense (voseo, sin emojis). El repo es público: nada de nombres de empresas, clientes o personas reales en lo que quede versionado.
 
 ## Orden de las etapas (no se saltea)
 
@@ -26,7 +26,7 @@ Cada etapa empieza con una lista de lo que **tiene que existir** antes de arranc
 ```
 videos/<slug>/
   fichas/<tema>.md      etapa 1
-  theme.ts              etapa 2 (exporta `theme` y `report`)
+  theme.ts              etapa 2 (exporta `theme`; `report` solo si salió de tokens)
   guion.md              etapa 3
   prohibidos.txt        lista de términos que no pueden aparecer (etapa 0)
   <escena>/Scene.tsx    etapa 4, una carpeta por escena (index.ts la registra como video propio)
@@ -36,13 +36,13 @@ public/                 imágenes, logos, fuentes y música con licencia (se ref
 out/                    MP4, hojas de cuadros e informes (no se versiona)
 ```
 
-`<slug>`: minúsculas, números y guiones. `videos/` **no existe en un clon nuevo**: la crea el script de plantillas (`templates/nuevo.sh`) o la etapa 0 con `mkdir -p`. Si la persona pide cosas que no puede mostrar un repo público (datos reales, marcas, capturas), `videos/` no se sube: avisale y no hagas commit de esa carpeta.
+`<slug>`: minúsculas, números y guiones. `videos/` **puede existir o no**: en un clon nuevo no está, y la crea el script de plantillas (`templates/nuevo.sh`) o la etapa 0 con `mkdir -p`; no asumas que está ni que está vacía (`ls videos` antes de elegir el `<slug>`). Si la persona pide cosas que no puede mostrar un repo público (datos reales, marcas, capturas), `videos/` no se sube: avisale y no hagas commit de esa carpeta.
 
 **Registrar un video**: no hay que registrar nada. El runtime descubre solo toda carpeta `videos/<slug>/index.ts(x)` y `videos/<slug>/<carpeta>/index.ts(x)` (y `examples/*`); el render, la hoja de cuadros y el QA buscan el video por `id`. `npm run render -- --list` muestra lo que ve (con tamaños, formatos y carpeta). No se edita `engine/runtime/videos.ts`. Un `id` repetido entre dos carpetas falla con un error que nombra las dos: cambiá uno. Un video roto (no compila, lanza al cargarse) no deja inservibles a los demás: solo falla el que tiene el problema, `--list` lo muestra al final y al renderizar otro sale un `aviso:` con la primera línea del error.
 
 Plantillas: `bash templates/nuevo.sh escena <slug> <nombre>` y `bash templates/nuevo.sh historia <slug> <escena>` crean los archivos con los imports ya corregidos (y `videos/<slug>/theme.ts` si falta); ya quedan descubiertos.
 
-**Formatos y escenas sueltas**: el formato base (16:9) siempre existe; cada formato extra que pida la persona se habilita a propósito con `formats: ["vertical"]` (o `"cuadrado"`) en el `defineVideo` o en el `defineStory` (sin `formats`, los dos publican solo el formato base; las plantillas ya traen `formats: ["vertical"]`: sacalo si el video es solo horizontal) y **hay que diseñar la disposición de cada escena para ese formato** con `useFormat()` (`pick({ horizontal, vertical, cuadrado })`, ver `docs/guia-escenas.md` sección 11 y `templates/scene/Scene.tsx`). Se mira con `--format vertical|cuadrado` en `render`, `qa` y `sheet` (la hoja de un formato distinto del base se llama `out/<id>-vertical-sheet.png`), y `--check` y `qa` se corren en cada formato. Para revisar o renderizar una escena sola: `--list-scenes` y `--scene <id|índice>` (en una historia, cada tema es una escena). Los tamaños tienen que ser pares (H.264): `defineVideo` rechaza uno impar; con `--scale` que da impar, el render avisa y agrega una fila o columna negra.
+**Formatos y escenas sueltas**: el formato base (16:9) siempre existe; cada formato extra que pida la persona se habilita a propósito con `formats: ["vertical"]` (o `"cuadrado"`) en el `defineVideo` o en el `defineStory` (sin `formats`, los dos publican solo el formato base; las plantillas ya traen `formats: ["vertical"]`: sacalo si el video es solo horizontal) y **hay que diseñar la disposición de cada escena para ese formato** con `useFormat()` (`pick({ horizontal, vertical, cuadrado })`, ver `docs/guia-escenas.md` sección 11 y `templates/scene/Scene.tsx`). Se mira con `--format vertical|cuadrado` en `render`, `qa` y `sheet` (la hoja de un formato distinto del base se llama `out/<id>-vertical-sheet.png`; ver "Salidas" más abajo), y `--check` y `qa` se corren en cada formato. Para revisar o renderizar una escena sola: `--list-scenes` y `--scene <id|índice>` (en una historia, cada tema es una escena). Los tamaños tienen que ser pares (H.264): `defineVideo` rechaza uno impar; con `--scale` que da impar, el render avisa y agrega una fila o columna negra.
 
 ## Comandos
 
@@ -55,7 +55,7 @@ Todos corren desde la raíz del repo. Los `<id>` son ids de video registrados.
 | Determinismo | `npm run render -- <id> --check` |
 | Control de calidad | `npm run qa -- <id> --count 40` (`--frames 0,60,120`, `--every N`, `--fail-on warn`, `--json out/qa.json`) |
 | Privacidad | `npm run privacy -- <id> --deny videos/<slug>/prohibidos.txt --scan-source videos/<slug>` (`--allow permitidos.txt`) |
-| Hoja de cuadros | `npm run sheet -- <id> --count 12` (genera `out/<id>-sheet.png`; con `--format vertical`, `out/<id>-vertical-sheet.png`; `--frames`, `--cols`, `--scale`) |
+| Hoja de cuadros | `npm run sheet -- <id> --count 12` (sin `--format`: `out/<id>-sheet.png`; con `--format vertical`: `out/<id>-vertical-sheet.png`; `--frames`, `--cols`, `--scale`, `--out`) |
 | Tempo de una pista | `npm run audio -- tempo <pista> --fps 30 --out videos/<slug>/tempo.json` |
 | Pista al compás | `npm run audio -- empalme <pista> --frames N --fps 30 --inicio percusion --tempo videos/<slug>/tempo.json --out videos/<slug>/audio/musica.wav` |
 | Efectos de sonido | `npm run audio -- efectos --out videos/<slug>/audio/sfx` |
@@ -66,6 +66,10 @@ Todos corren desde la raíz del repo. Los `<id>` son ids de video registrados.
 | Videos y escenas | `npm run render -- --list` (videos descubiertos y, al final, las carpetas que no cargaron), `npm run qa -- <id> --list-scenes` (escenas y, en una historia, el presupuesto de cuadros por bloque; también `sheet`; `render -- <id> --list-scenes` lista las escenas pero no el presupuesto) |
 | Otros ajustes | `--frames a-b`, `--props '<json>'`, `--no-audio`, `--assets videos/<slug>/audio` (audio y estáticos fuera de `public/`; obligatorio si la mezcla vive ahí), `--no-cache`, `--concurrency N`, `--keep-frames` (deja los cuadros en `out/<id>[-formato][-escena]-frames/`) |
 | Vista en navegador | `npm run dev` y abrir `/?video=<id>` |
+
+**Salidas.** Cada comando escribe en `out/` (que no se versiona) con un nombre armado con el id, el formato y la escena: el MP4 es `out/<id>[-formato][-escena].mp4` y la hoja `out/<id>[-formato][-escena]-sheet.png`. Sin `--format` no hay sufijo de formato (`out/<id>-sheet.png`); con `--format vertical` sale `out/<id>-vertical-sheet.png`; con `--format horizontal` explícito también agrega el sufijo (`-horizontal-`), así que no lo mezcles con el otro. Para mandar el resultado a otra carpeta o nombre: `--out <ruta>` en `render` (MP4), en `sheet` (PNG) y en `audio` (los WAV y JSON); `qa` y `privacy` usan `--json <ruta>` para el informe. Con `--out` el nombre es el que escribís (no se agrega el sufijo de formato): si hacés dos formatos, ponele el sufijo vos.
+
+**Comandos largos.** Un render completo tarda unos 2 minutos por formato y `npm test` también es largo (casi todo es Chromium y ffmpeg). Lanzalos en segundo plano (`run_in_background`) o con un timeout de 10 minutos, y no los des por colgados antes: mientras tanto seguí con otra cosa (la hoja, el guion). El `--check`, el `qa` y la hoja de una escena sola, en cambio, tardan segundos. Con el render a mitad de tamaño (`--scale 0.5 --crf 23`) alcanza para los borradores.
 
 Requisitos: Node 22, ffmpeg y ffprobe en el PATH, Playwright con Chromium (`npx playwright install chromium`; otro ejecutable con `VE_CHROMIUM=/ruta`). Si falta algo, decile a la persona qué instalar; no inventes alternativas.
 
@@ -113,7 +117,7 @@ Si la información de un tema no alcanza para una ficha, preguntá en vez de inv
 
 Antes de empezar: fichas aprobadas.
 
-1. Con los tokens de la persona (archivo CSS con variables o JSON), escribí `videos/<slug>/theme.ts` con `themeFromTokensWithReport` (ver `themes/README.md`). Debe exportar `theme` y `report`:
+1. Con los tokens de la persona (archivo CSS con variables o JSON), escribí `videos/<slug>/theme.ts` con `themeFromTokensWithReport` (ver `themes/README.md`). Debe exportar `theme` y, cuando sale de tokens, `report`:
 
    ```ts
    import { themeFromTokensWithReport } from "../../themes";
@@ -124,7 +128,7 @@ Antes de empezar: fichas aprobadas.
    export const report = r.report;
    ```
 
-   Si no hay tokens, usá `neutral` (o `dark` si la herramienta que se recrea es oscura) y decilo. No inventes marcas ni colores corporativos.
+   `report` existe solo con `themeFromTokensWithReport`. Si no hay tokens, usá `neutral` (o `dark` si la herramienta que se recrea es oscura), exportá solo `theme` (`export const theme = dark;`, con `import { dark } from "../../themes"`) y decilo: `templates/tema-informe.ts` lo tolera y muestra solo el contraste. No inventes marcas ni colores corporativos.
 2. Corré `npx tsx templates/tema-informe.ts <slug>` y mostrá: roles tomados de los tokens, roles que quedaron con el valor base (`fallback`), avisos y fallas de contraste. Para cada falla proponé el arreglo (oscurecer el color de texto, cambiar el acento) y no lo apliques sin que la persona lo apruebe.
 3. Fuentes: si la persona trae archivos, van en `public/` y se declaran en `theme.font.files`; confirmá su licencia para el lugar de exhibición (etapa 0, punto 8).
 
@@ -134,9 +138,11 @@ Antes de empezar: fichas aprobadas.
 
 Antes de empezar: tema aprobado. **El guion se escribe y se aprueba antes de construir cualquier escena**; si ya hay escenas sin guion, parás y lo escribís primero.
 
+**Nombres de tema cortos.** El nombre de cada tema (`topics[].name`) va en una píldora sobre el panel del cierre y en la lista: se achica y se corta con "…". **Presupuesto de caracteres: hasta 18 por nombre** (ideal 12 a 16): es lo que entra sin cortarse en cualquier cantidad de temas (2 a 6) y en los tres formatos; con 24 todavía entra en 2 a 4 temas horizontales o verticales, y desde ahí la letra se achica y se corta con "…" (a tamaño completo entran unos 11 con el cuadrado y 5 o 6 temas, 16 con el vertical y 4 o más, 20 con el horizontal y 5 o 6). En la lista vertical el tope es de unos 22. Pensá cada nombre con ese tope ("Panel de ventas" sí, "Panel integral de ventas por región" no) y poné el detalle en `line` (2 renglones en la lista).
+
 Escribí `videos/<slug>/guion.md`: una tabla por escena (apertura y cierre incluidos si usa historia). Cuadros a 30 fps; la columna de tiempo lleva segundos y cuadros, y hay una columna de duración en cuadros por escena.
 
-**Presupuesto de cuadros.** Una historia con `n` temas dura `apertura + Σ temas + n × vuelta al listado + cierre`. **Por defecto: apertura 300 + vuelta al listado 120 × n + cierre 480 = 780 + 120n cuadros antes de sumar una sola escena** (con 3 temas, 1140 cuadros, 38 s). Para un video más corto bajá los bloques con `timing: { opening, interlude, closing }` en el `spec` (mínimo 60 cuadros cada uno) o sacá las vueltas con `interludes: false` (ver `stories/README.md`). Ejemplo de 25 s (750 cuadros) con 3 temas: apertura 75 + 3 × (tema 135 + vuelta 60) + cierre 90 = 750. Despejá los temas de la fórmula y poné la cuenta en la primera línea del guion. Con el código a mano: `storyBudget(spec, scenes)` y `formatStoryBudget(...)` de `stories/` devuelven el total y el mínimo posible; con la historia ya armada, `npm run qa -- <id> --list-scenes` imprime el presupuesto por bloque (`budgetFromScenes`). La apertura tiene que durar al menos unos 4 s (120 cuadros) para que el título se lea: si el total no alcanza, sacá un tema o agrandá el video; no comprimas la apertura.
+**Presupuesto de cuadros.** Una historia con `n` temas dura `apertura + Σ temas + n × vuelta al listado + cierre`. **Por defecto: apertura 300 + vuelta al listado 120 × n + cierre 480 = 780 + 120n cuadros antes de sumar una sola escena** (con 3 temas, 1140 cuadros, 38 s). Para un video más corto bajá los bloques con `timing: { opening, interlude, closing }` en el `spec` (mínimo 60 cuadros cada uno) o sacá las vueltas con `interludes: false` (ver `stories/README.md`), o dejalas como una tira corta con `interludes: "compact"` en el `defineStory` (40 cuadros cada una, mínimo 24, `timing.interludeCompact`: con 3 temas, apertura 300 + cierre 480 + 3 × 40 = 900 antes de los temas). Ejemplo de 25 s (750 cuadros) con 3 temas: apertura 75 + 3 × (tema 135 + vuelta 60) + cierre 90 = 750. Despejá los temas de la fórmula y poné la cuenta en la primera línea del guion. Con el código a mano: `storyBudget(spec, scenes)` y `formatStoryBudget(...)` de `stories/` devuelven el total y el mínimo posible; con la historia ya armada, `npm run qa -- <id> --list-scenes` imprime el presupuesto por bloque (`budgetFromScenes`). La apertura tiene que durar al menos unos 4 s (120 cuadros) para que el título se lea: si el total no alcanza, sacá un tema o agrandá el video; no comprimas la apertura.
 
 ```md
 # <Video>: guion (<N> cuadros a 30 fps; <formatos>)
@@ -154,7 +160,7 @@ Total de la escena: 150 cuadros (5 s).
 
 En la columna "Efecto" nombrá el efecto del catálogo (`docs/animaciones.md`, por ejemplo `MaskedRise`, `BarsGrow`, `DotWipe`) o el recurso del kit (`zoomThrough`, `Cursor`) de cada momento; solo si ninguno sirve, escribí "a medida". Aplicá las reglas de `docs/reglas.md` desde el guion (acción clave con zoom rápido, flujos con dirección, cada escena termina atravesando un elemento, entre temas vuelta al listado). Sumá los cuadros y comprobá que la duración total cuadre con lo pedido. Agregá al final una línea con las cifras emuladas elegidas.
 
-Si usa sonido, sumá una tabla de momentos (cuadro, efecto: `clic`, `tilde`, `aviso`, `barrido`, `campanita`, `golpe`) que después se vuelve `cues.json`. Si hay varios formatos, anotá qué cambia de disposición en cada uno.
+Si usa sonido, sumá una tabla de momentos (cuadro, efecto: `clic`, `tilde`, `aviso`, `barrido`, `campanita`, `golpe`) que después se vuelve `cues.json`. **Sin música el sonido queda flaco**, así que proponé un plan de cues en vez de dejarlo a medias: un sonido por cada acción clave (`clic` en cada clic del cursor, `tilde` cuando algo queda hecho, `aviso` cuando aparece un resultado o alerta), un `barrido` en cada transición (el atravesado y el velo, en el primer cuadro del `zoomThrough`) y un `golpe` suave (`gain` 0,5 a 0,7) en el título de la apertura y en el cierre. Dejá espacio: no más de un efecto cada 8 a 10 cuadros salvo que sea un redoble pensado. La música es opcional y es decisión de la persona: ofrecela, pero la pista y su licencia las pone ella (nunca la elegís ni la bajás vos). Si hay varios formatos, anotá qué cambia de disposición en cada uno.
 
 **Alto: sin guion aprobado no se construye ninguna escena.**
 
@@ -165,7 +171,7 @@ Antes de empezar: `guion.md` aprobado (con presupuesto de cuadros) y el tema apr
 Para cada escena del guion, en orden:
 
 1. **Elegí efectos del catálogo antes de escribir desde cero:** abrí `docs/animaciones.md` (sección "Cómo elegir") y usá los efectos de `fx/` que ya existen para cada momento del guion; combinalos con cámara, cursor y garabatos del kit (`docs/guia-escenas.md`, sección 9). Podés ver cualquiera con `npm run dev` y `/?video=fx-text`, `fx-3d` o `fx-data-ui-art`.
-2. `bash templates/nuevo.sh escena <slug> <escena>` (no hay que registrarla). Construí la escena con piezas del kit siguiendo `docs/guia-escenas.md`: coordenadas del mundo, cámara con cuadros clave, todo del tema, interfaces recreadas con su estructura y rótulos, nunca capturas. La plantilla ya trae una disposición horizontal y otra vertical con `useFormat().pick`; para cada formato extra del guion, diseñá la disposición (no achiques la horizontal). Si va en una historia, el contenido es `SceneBody` (sin `Stage`) y el titular va con `DockedHeadline` y una prop `title` (como en la plantilla), que funciona tanto sola como dentro de la historia. La alternativa es `<TopicHeadline title="..." number={1} />`: con `title` dibuja el titular también fuera de la historia (dentro, `title` y `number` pisan al tema); sin `title` y sin historia no dibuja nada y avisa una vez en la consola. `useTopic({ name: "..." })` (con valor de reserva) y `useTopicOrNull()` sirven para leer el tema sin que la escena sola falle. La escena exporta su `DURACION` y se prueba sola antes de entrar a la historia.
+2. `bash templates/nuevo.sh escena <slug> <escena>` (no hay que registrarla). Antes de acomodar nada a ojo, usá las medidas de la sección 13 de `docs/guia-escenas.md` (caja de la ventana por formato, franja del titular, zoom máximo que muestra una fila entera) y copiá de ahí la escena de datos completa si la escena es de ese tipo. Construí la escena con piezas del kit siguiendo `docs/guia-escenas.md`: coordenadas del mundo, cámara con cuadros clave, todo del tema, interfaces recreadas con su estructura y rótulos, nunca capturas. La plantilla ya trae una disposición horizontal y otra vertical con `useFormat().pick`; para cada formato extra del guion, diseñá la disposición (no achiques la horizontal). Si va en una historia, el contenido es `SceneBody` (sin `Stage`) y el titular va con `DockedHeadline` y una prop `title` (como en la plantilla), que funciona tanto sola como dentro de la historia. La alternativa es `<TopicHeadline title="..." number={1} />`: con `title` dibuja el titular también fuera de la historia (dentro, `title` y `number` pisan al tema); sin `title` y sin historia no dibuja nada y avisa una vez en la consola. `useTopic({ name: "..." })` (con valor de reserva) y `useTopicOrNull()` sirven para leer el tema sin que la escena sola falle. La escena exporta su `DURACION` y se prueba sola antes de entrar a la historia.
 3. **Antes de mostrar nada**, corré en este orden y corregí lo que salga hasta que quede limpio:
    ```bash
    npm run typecheck
@@ -173,7 +179,7 @@ Para cada escena del guion, en orden:
    npm run qa -- <slug>-<escena> --count 40
    npm run privacy -- <slug>-<escena> --deny videos/<slug>/prohibidos.txt --scan-source videos/<slug>
    ```
-   Los avisos de `qa` que sean a propósito (transiciones) se explican; solo se silencian con `data-qa-ignore="regla"` si lo decidiste a propósito y lo decís.
+   Los avisos de `qa` que sean a propósito (transiciones) se explican; solo se silencian con `data-qa-ignore="regla"` si lo decidiste a propósito y lo decís. Para silenciar una regla solo mientras dura la transición (`data-qa-ignore={cond ? "contrast" : undefined}`) y qué transiciones ya no hace falta silenciar: `docs/guia-escenas.md`, sección 7, "Recetas de `qa`".
 4. Hoja de cuadros: `npm run sheet -- <slug>-<escena> --count 12` (una por formato: `--format vertical` escribe `out/<slug>-<escena>-vertical-sheet.png`). **Mirala como un espectador** (abrí la imagen con Read) y corregí lo que veas mal: titular tapando contenido, vacío arriba en la vista general, cosas fuera de cuadro, interfaces vacías o cargando, el sujeto chico en el cuadro vertical. Repasá `docs/guia-escenas.md`, sección "Para que no parezca un borrador".
 5. MP4 de esa escena sola: `npm run render -- <slug>-<escena> --scale 0.5 --crf 23`. Entregá a la persona la ruta del MP4 y de la hoja, más un resumen de lo que hace cada tramo y de lo que QA y privacidad dijeron (aunque sea "limpio").
 
@@ -183,7 +189,7 @@ Para cada escena del guion, en orden:
 
 Antes de empezar: todas las escenas aprobadas, cada una con `--check`, `qa` y `privacy` en limpio.
 
-1. Si hay varios temas: completá `bash templates/nuevo.sh historia <slug> <escena>`, reemplazá las escenas de ejemplo por las reales (en el mismo orden que `spec.topics`) y completá `spec.ts` con lo de las fichas (de 2 a 6 temas). `defineStory` agrega apertura, vueltas al listado y cierre. Con un solo tema o escena suelta, el video final es esa escena.
+1. Si hay varios temas: completá `bash templates/nuevo.sh historia <slug> <escena>`, reemplazá las escenas de ejemplo por las reales (en el mismo orden que `spec.topics`) y completá `spec.ts` con lo de las fichas (de 2 a 6 temas). **Dale una `thumbnail` a cada tema o el cierre se ve genérico** (una tarjeta con el nombre y barras de ejemplo): es un componente sin props de 560×340, ver `docs/guia-escenas.md`, sección 8. `defineStory` agrega apertura, vueltas al listado y cierre. La firma del cierre puede llevar una marca propia: `signoff.slot` (un nodo React: ícono, sello) reemplaza al logo; `theme` acepta el objeto de `videos/<slug>/theme.ts`. Con un solo tema o escena suelta, el video final es esa escena.
 2. Sonido (solo si se pidió; detalle en `docs/audio.md`), con el video mudo ya aprobado:
    - **Efectos**: `npm run audio -- efectos --out videos/<slug>/audio/sfx`.
    - **Cues**: `videos/<slug>/cues.json` con `[{"frame": 45, "sfx": "clic"}, ...]`; cada cuadro sale del guion (clic = cuadro del clic, tilde cuando se tilda, barrido en el atravesado). Los cuadros se miden en el tiempo del video, sumando el desplazamiento de cada escena en la historia (`timeline` de `composeStory`).

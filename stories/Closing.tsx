@@ -1,7 +1,9 @@
+import React from "react";
 import { Easing, random, useFrame, useVideoConfig } from "../engine";
 import { GradientText, kf } from "../kit";
 import { useTheme, withAlpha } from "../themes";
-import { PILL_OFF, closingWall, fitText, panelEntryLift, panelLayout, pillBudget, pillFit, rigProject, rigTransform } from "./layout";
+import type { Theme } from "../themes";
+import { PILL_OFF, closingWall, fitText, panelEntryLift, panelLayout, closingCamStart, pillBudget, pillFit, rigProject, rigTransform } from "./layout";
 import { Chip, Logo, Pill, StoryStage, scaler, useEase } from "./shared";
 import type { StorySpec, TopicScene } from "./types";
 
@@ -13,26 +15,87 @@ const PANEL = { w: 560, h: 340 };
 const WALL_P = 1600;
 const CARD_P = 2200;
 
-/** Tarjeta por defecto del cierre cuando una escena no trae `thumbnail`: nombre del tema y barras de ejemplo. */
+/** Número de 0 a 1 estable a partir de un texto (para variar la tarjeta por defecto sin azar entre cuadros). */
+const seedOf = (text: string, k: number) => random(`thumb-${text}-${k}`);
+
+/**
+ * Tarjeta por defecto del cierre cuando una escena no trae `thumbnail`. Para que no parezcan todas iguales se deriva de lo que hay:
+ * el rol de color (`theme.color.chart[index]`), el número del tema en grande y una composición que cambia con el índice (barras,
+ * línea, anillo, filas) con datos que salen del nombre. Con una captura recreada de la escena propia (`thumbnail`) queda mucho mejor:
+ * se recomienda siempre que haya tiempo.
+ */
 export function DefaultThumbnail({ index, name }: { index: number; name: string }) {
   const theme = useTheme();
-  const t = fitText(name, PANEL.w - 80, 28, { min: 22 });
+  const t = fitText(name, PANEL.w - 150, 28, { min: 22 });
+  const chart = theme.color.chart;
+  const col = (k: number) => chart[(index + k) % chart.length]!;
+  const variant = index % 4;
+  const vals = [0, 1, 2, 3, 4].map((k) => 0.3 + seedOf(name, k) * 0.7);
+  const area = { left: 28, top: 84, w: PANEL.w - 56, h: PANEL.h - 84 - 30 };
+  let body: React.ReactNode;
+  if (variant === 0) {
+    body = (
+      <div style={{ position: "absolute", left: area.left, top: area.top, width: area.w, height: area.h, display: "flex", alignItems: "flex-end", gap: 18 }}>
+        {vals.map((v, k) => <div key={k} style={{ flex: 1, height: `${v * 100}%`, borderRadius: theme.radius.sm, background: col(k), opacity: 0.85 }} />)}
+      </div>
+    );
+  } else if (variant === 1) {
+    const pts = vals.map((v, k) => `${(k / 4) * area.w},${area.h - v * area.h}`).join(" ");
+    body = (
+      <svg style={{ position: "absolute", left: area.left, top: area.top }} width={area.w} height={area.h} viewBox={`0 0 ${area.w} ${area.h}`} overflow="visible">
+        <polygon points={`0,${area.h} ${pts} ${area.w},${area.h}`} fill={col(0)} opacity={0.18} />
+        <polyline points={pts} fill="none" stroke={col(0)} strokeWidth={6} strokeLinejoin="round" strokeLinecap="round" />
+        {vals.map((v, k) => <circle key={k} cx={(k / 4) * area.w} cy={area.h - v * area.h} r={8} fill={theme.color.surface} stroke={col(1)} strokeWidth={4} />)}
+      </svg>
+    );
+  } else if (variant === 2) {
+    const r = 62, c = 2 * Math.PI * r;
+    const parts = [vals[0]!, vals[1]!, vals[2]!];
+    const sum = parts.reduce((a, b) => a + b, 0);
+    let off = 0;
+    body = (
+      <svg style={{ position: "absolute", left: area.left, top: area.top }} width={area.w} height={area.h} viewBox={`0 0 ${area.w} ${area.h}`}>
+        <g transform={`translate(${area.w * 0.28} ${area.h / 2}) rotate(-90)`}>
+          {parts.map((p, k) => {
+            const len = (p / sum) * c;
+            const el = <circle key={k} r={r} fill="none" stroke={col(k)} strokeWidth={28} strokeDasharray={`${Math.max(0, len - 4)} ${c}`} strokeDashoffset={-off} />;
+            off += len;
+            return el;
+          })}
+        </g>
+        {parts.map((p, k) => <rect key={k} x={area.w * 0.58} y={40 + k * 48} width={Math.round(60 + (p / sum) * 220)} height={16} rx={8} fill={col(k)} opacity={0.85} />)}
+      </svg>
+    );
+  } else {
+    body = (
+      <div style={{ position: "absolute", left: area.left, top: area.top, width: area.w, height: area.h, display: "flex", flexDirection: "column", justifyContent: "space-between" }}>
+        {vals.slice(0, 4).map((v, k) => (
+          <div key={k} style={{ display: "flex", alignItems: "center", gap: 14, height: 36 }}>
+            <span style={{ width: 22, height: 22, borderRadius: theme.radius.pill, background: col(k), flexShrink: 0 }} />
+            <span style={{ flex: 1, height: 12, borderRadius: theme.radius.pill, background: theme.color.border }}><span style={{ display: "block", width: `${v * 100}%`, height: "100%", borderRadius: theme.radius.pill, background: col(k), opacity: 0.8 }} /></span>
+          </div>
+        ))}
+      </div>
+    );
+  }
   return (
     <div style={{ width: PANEL.w, height: PANEL.h, borderRadius: theme.radius.lg, background: theme.color.surface, border: `1px solid ${theme.color.border}`, boxShadow: theme.shadow.lg, overflow: "hidden", position: "relative" }}>
       <div style={{ height: 52, display: "flex", alignItems: "center", gap: 12, padding: "0 24px", borderBottom: `1px solid ${theme.color.border}`, background: theme.color.surfaceAlt }}>
-        <span style={{ width: 14, height: 14, borderRadius: theme.radius.pill, background: theme.color.accent }} />
+        <span style={{ width: 14, height: 14, borderRadius: theme.radius.pill, background: col(0), flexShrink: 0 }} />
         <span style={{ fontSize: t.size, fontWeight: theme.font.weights.semibold, color: theme.color.text, whiteSpace: "nowrap" }}>{t.text}</span>
+        <span style={{ marginLeft: "auto", fontSize: 26, fontWeight: theme.font.weights.stat, color: col(0) }}>{String(index + 1).padStart(2, "0")}</span>
       </div>
-      <div style={{ position: "absolute", left: 28, right: 28, bottom: 30, top: 84, display: "flex", alignItems: "flex-end", gap: 18 }}>
-        {[0, 1, 2, 3, 4].map((k) => (
-          <div key={k} style={{ flex: 1, height: `${30 + random(`thumb-${index}-${k}`) * 70}%`, borderRadius: theme.radius.sm, background: theme.color.chart[(index + k) % theme.color.chart.length]!, opacity: 0.85 }} />
-        ))}
-      </div>
+      {body}
     </div>
   );
 }
 
 const WALL_PILL = 1.5;
+/** Ancho total máximo (px, sin escalar) de la píldora del muro: ya agrandada por `WALL_PILL` ocupa como mucho el 80 % del cuadro (en vertical un nombre largo se salía). */
+const wallPillMaxW = (theme: Theme, name: string, width: number): number | undefined => {
+  const cap = Math.floor((width * 0.8) / WALL_PILL);
+  return pillFit(theme, name).w <= cap ? undefined : cap; // si ya entra, queda como siempre (horizontal no cambia)
+};
 
 /** Valor que sigue entre dos puntos. */
 const mix = (a: number, b: number, p: number) => a + (b - a) * p;
@@ -56,11 +119,12 @@ export function Closing({ spec, scenes }: { spec: StorySpec; scenes: TopicScene[
   const panels = panelLayout(n, width, height);
   const stagger = Math.min(6, 30 / n);
   // cuánto se acerca cada panel a la cámara al entrar (menos en los formatos donde los paneles llenan el cuadro)
-  const lifts = panels.map((c, i) => panelEntryLift(c, theme, spec.topics[i]!.name, pillBudget(panels, i, width), width, height));
+  const camStart = closingCamStart(panels, theme, spec.topics.map((t) => t.name), width, height);
+  const lifts = panels.map((c, i) => panelEntryLift(c, theme, spec.topics[i]!.name, pillBudget(panels, i, width), width, height, camStart));
   const T = { wall: u(130), fold: [u(170), u(200)] as [number, number], fly: [u(200), u(254)] as [number, number], light: u(262), pull: u(372), wash: [u(368), u(398)] as [number, number], logo: u(394), sign: u(418) };
 
   const cam = {
-    s: kf(f, [0, u(150), u(260)], [1.1, 0.99, 0.95], Easing.inOut),
+    s: kf(f, [0, u(150), u(260)], [camStart, Math.min(camStart, 0.99), Math.min(camStart, 0.95)], Easing.inOut),
     ry: kf(f, [0, u(260)], [-12, 7]),
     rx: kf(f, [0, u(260)], [8, 2]),
   };
@@ -98,7 +162,9 @@ export function Closing({ spec, scenes }: { spec: StorySpec; scenes: TopicScene[
 
   const signLines = spec.signoff;
   const signW = Math.min(1560, width - 2 * theme.safe.x);
-  const sf = fitText(signLines.text, signW, theme.type.h2, { min: theme.type.body, lines: 2, avg: 0.55 });
+  const hasMark = !!(signLines.logo || signLines.slot);
+  // sin marca propia la despedida es lo más grande del cierre (h1); con marca baja a h2 para que la marca mande
+  const sf = fitText(signLines.text, signW, hasMark ? theme.type.h2 : theme.type.h1, { min: theme.type.body, lines: 2, avg: 0.55 });
   const tagline = signLines.tagline ? fitText(signLines.tagline, Math.min(1500, signW), theme.type.body, { min: theme.type.caption, avg: 0.5, lines: 2 }) : null;
 
   return (
@@ -113,7 +179,7 @@ export function Closing({ spec, scenes }: { spec: StorySpec; scenes: TopicScene[
             const g = kf(f, [flyStart(i) + u(40), flyStart(i) + u(48), flyStart(i) + u(90)], [0, 1, 0.3]);
             return (
               <div key={`p${i}`} style={{ position: "absolute", left: 0, top: 0, transformOrigin: "0 0", transform: rigTransform(s.x, s.y, 0, wallCam, WALL_P, cx, cy, ` scale(${WALL_PILL}) translate(-50%, -50%)`), zIndex: 10 }}>
-                <Pill index={i} name={spec.topics[i]!.name} glow={g} />
+                <Pill index={i} name={spec.topics[i]!.name} glow={g} maxW={wallPillMaxW(theme, spec.topics[i]!.name, width)} />
               </div>
             );
           })}
@@ -161,7 +227,9 @@ export function Closing({ spec, scenes }: { spec: StorySpec; scenes: TopicScene[
         const pc = rigProject((c.x - cx) * cam.s, (c.y - cy + bobOf(i) - H / 2 + PILL_OFF) * cam.s, c.z * cam.s, { dz: 0, rx: cam.rx, ry: cam.ry }, CARD_P)!;
         // la píldora en vuelo es la del muro (tamaño completo); arranca achicada al ancho de la del panel para que no haya salto
         const name = spec.topics[i]!.name;
-        const ratio = pillFit(theme, name, pillBudget(panels, i, width)).w / pillFit(theme, name).w;
+        const pp = pillFit(theme, name, pillBudget(panels, i, width)), pw = pillFit(theme, name, wallPillMaxW(theme, name, width));
+        // por ancho (sin salto de tamaño) pero nunca con letra menor a la del panel: con nombres largos el texto del muro es más largo y la letra salía de ~14 px
+        const ratio = Math.max(pp.w / pw.w, pp.size / pw.size);
         const from = { x: cx + pc.x, y: cy + pc.y, s: pc.s * cam.s * ratio, rx: cam.rx, ry: cam.ry };
         const w = rigProject(slots[i]!.x, slots[i]!.y, 0, wallCam, WALL_P)!;
         const to = { x: cx + w.x, y: cy + w.y, s: w.s * WALL_PILL, rx: 0, ry: wallCam.ry };
@@ -177,7 +245,7 @@ export function Closing({ spec, scenes }: { spec: StorySpec; scenes: TopicScene[
               transform: `translate(${Math.round(x)}px, ${Math.round(y)}px) perspective(2000px) rotateX(${mix(from.rx, to.rx, p).toFixed(3)}deg) rotateY(${mix(from.ry, to.ry, p).toFixed(3)}deg) scale(${sc.toFixed(4)}) translate(-50%, -50%)`,
             }}
           >
-            <Pill index={i} name={spec.topics[i]!.name} glow={arc} />
+            <Pill index={i} name={spec.topics[i]!.name} glow={arc} maxW={wallPillMaxW(theme, spec.topics[i]!.name, width)} />
           </div>
         );
       })}
@@ -185,12 +253,14 @@ export function Closing({ spec, scenes }: { spec: StorySpec; scenes: TopicScene[
       {/* firma */}
       <div style={{ position: "absolute", inset: 0, background: theme.color.bg, opacity: wash, zIndex: 500 }} />
       <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", flexDirection: "column", gap: 40, zIndex: 600 }}>
-        {signLines.logo && <Logo src={signLines.logo} style={{ maxWidth: Math.min(1000, width - 2 * theme.safe.x), maxHeight: 360, objectFit: "contain", opacity: logo, transform: `scale(${0.92 + logo * 0.08})` }} />}
-        <div style={{ maxWidth: signW, textAlign: "center", fontSize: sf.size, lineHeight: 1.12, fontWeight: theme.font.weights.semibold, color: theme.color.text, opacity: signLines.logo ? sign : logo, transform: `translateY(${Math.round((1 - (signLines.logo ? sign : logo)) * 16)}px)` }}>
-          {signLines.logo ? sf.text : <GradientText>{sf.text}</GradientText>}
+        {signLines.slot && <div style={{ opacity: logo, transform: `scale(${0.92 + logo * 0.08})`, maxWidth: signW, display: "flex", justifyContent: "center" }}>{signLines.slot}</div>}
+        {!signLines.slot && signLines.logo && <Logo src={signLines.logo} style={{ maxWidth: Math.min(1000, width - 2 * theme.safe.x), maxHeight: 360, objectFit: "contain", opacity: logo, transform: `scale(${0.92 + logo * 0.08})` }} />}
+        <div style={{ maxWidth: signW, textAlign: "center", fontSize: sf.size, lineHeight: 1.12, fontWeight: theme.font.weights.semibold, color: theme.color.text, opacity: hasMark ? sign : logo, transform: `translateY(${Math.round((1 - (hasMark ? sign : logo)) * 16)}px)` }}>
+          {hasMark ? sf.text : <GradientText>{sf.text}</GradientText>}
         </div>
+        <div style={{ width: Math.round(Math.min(signW, 420) * sign), height: 8, borderRadius: theme.radius.pill, background: theme.gradient.brand, opacity: sign }} />
         {tagline && (
-          <div style={{ maxWidth: Math.min(1500, signW), textAlign: "center", fontSize: tagline.size, color: theme.color.textMuted, opacity: sign, transform: `translateY(${Math.round((1 - sign) * 16)}px)` }}>
+          <div style={{ maxWidth: Math.min(1500, signW), textAlign: "center", fontSize: tagline.size, fontWeight: theme.font.weights.medium, color: theme.color.textMuted, opacity: sign, transform: `translateY(${Math.round((1 - sign) * 16)}px)` }}>
             {tagline.text}
           </div>
         )}

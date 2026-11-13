@@ -6,7 +6,9 @@ import { themeEasing, useFrameOr } from "./util";
 /**
  * Elemento que viaja entre dos puntos con arco y estela que se desvanece.
  * `from`/`to` son el centro del elemento; los hijos se centran en esa posición.
- * Antes de `range[0]` está en `from` y después de `range[1]` en `to`.
+ * Antes de `range[0]` no se dibuja (`hideBefore`, por defecto true: si no, quedaba una copia encima del origen mientras la tarjeta
+ * "real" todavía estaba ahí); después de `range[1]` queda en `to` (`hideAfter: true` la oculta). Con `hideBefore={false}` se
+ * dibuja en `from` desde el principio.
  */
 export function FlyingCard({
   frame,
@@ -18,6 +20,8 @@ export function FlyingCard({
   height,
   trail = 5,
   trailLag = 1.5,
+  hideBefore = true,
+  hideAfter = false,
   children,
 }: {
   frame?: number;
@@ -29,12 +33,17 @@ export function FlyingCard({
   height: number;
   trail?: number;
   trailLag?: number;
+  /** No dibujar nada antes de `range[0]` (por defecto true). */
+  hideBefore?: boolean;
+  /** No dibujar nada desde después de `range[1]` (por defecto false: queda en `to`). */
+  hideAfter?: boolean;
   children?: React.ReactNode;
 }) {
   const theme = useTheme();
   const f = useFrameOr(frame);
   const easing = themeEasing(theme.motion.easing.inOut);
   const at = (fr: number) => flight(fr, range, from, to, { arc, easing });
+  if ((hideBefore && f < range[0]) || (hideAfter && f > range[1])) return null;
   const cur = at(f);
   const moving = cur.t > 0 && cur.t < 1;
   // la estela entra y sale suavemente: sin fantasmas de un solo cuadro en los extremos

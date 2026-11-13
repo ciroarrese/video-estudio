@@ -362,15 +362,32 @@ const ENTRY_LIFT = 260;
  * perspectiva y el zoom inicial de la cámara (1,1), se salga del cuadro (64 px de holgura por la inclinación). Hasta `ENTRY_LIFT`:
  * en horizontal queda entero; en vertical, donde los paneles llenan el alto, es menor.
  */
-export function panelEntryLift(c: PanelPlace, theme: Theme, name: string, maxW: number | undefined, width: number, height: number): number {
+export function panelEntryLift(c: PanelPlace, theme: Theme, name: string, maxW: number | undefined, width: number, height: number, camStart = CLOSING_CAM_MAX): number {
   const cx = width / 2, cy = height / 2;
   const { panel, pill } = panelRects(c, theme, name, maxW);
-  const reach = Math.max(cy - pill.y, panel.y + panel.h - cy, Math.abs(c.x - cx) + Math.max(pill.w, panel.w) / 2 * 1.0);
+  const reach = Math.max(cy - pill.y, panel.y + panel.h - cy, Math.abs(c.x - cx) + Math.max(pill.w * 1.12, panel.w) / 2); // 12 % de más en la píldora: el ancho del texto es una estimación (nombres anchos, mayúsculas)
   const room = Math.min(cy, cx) - 64;
-  const factor = room / reach / CLOSING_CAM_MAX; // factor de perspectiva máximo que se tolera
+  const factor = room / reach / camStart; // factor de perspectiva máximo que se tolera
   if (factor <= 1) return 0;
   const z = CARD_PERSP * (1 - 1 / factor);
   return Math.round(Math.max(0, Math.min(ENTRY_LIFT, z - c.z)));
+}
+
+/**
+ * Zoom con el que arranca la cámara del cierre: 1,1 como máximo, y menos si con ese zoom la píldora de algún panel (con 12 % de margen
+ * por la estimación del ancho del texto) o el panel mismo se saldrían del cuadro (40 px de holgura por la inclinación). En vertical la
+ * píldora de arriba queda cerca del borde superior y con 1,1 asomaba unos px afuera.
+ */
+export function closingCamStart(panels: PanelPlace[], theme: Theme, names: string[], width: number, height: number): number {
+  const cx = width / 2, cy = height / 2, slack = 40;
+  let s = CLOSING_CAM_MAX;
+  panels.forEach((c, i) => {
+    const { panel, pill } = panelRects(c, theme, names[i] ?? "", pillBudget(panels, i, width));
+    const reachY = Math.max(cy - pill.y, panel.y + panel.h - cy);
+    const reachX = Math.abs(c.x - cx) + Math.max(pill.w * 1.12, panel.w) / 2;
+    s = Math.min(s, (cy - slack) / reachY, (cx - slack) / reachX);
+  });
+  return Math.max(0.5, Math.floor(s * 1000) / 1000);
 }
 
 /**

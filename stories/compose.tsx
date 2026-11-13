@@ -3,6 +3,7 @@ import { Audio, Fill, Sequence } from "../engine";
 import { StoryStage } from "./shared";
 import { Closing, closingFrames } from "./Closing";
 import { Interlude, interludeFrames } from "./Interlude";
+import { InterludeCompact, interludeCompactFrames } from "./InterludeCompact";
 import { Opening, openingFrames } from "./Opening";
 import { TopicContext } from "./topic";
 import { isReservedSceneId, validateSpec } from "./types";
@@ -11,8 +12,11 @@ import type { StorySpec, TopicScene } from "./types";
 export type TimelineEntry = { id: string; kind: "opening" | "topic" | "interlude" | "closing"; from: number; durationInFrames: number };
 
 export type ComposeOptions = {
-  /** Vuelta al listado entre un tema y otro (por defecto true). */
-  interludes?: boolean;
+  /**
+   * Vuelta al listado entre un tema y otro: `true` (por defecto) la lista completa con el siguiente tema atravesado (120 cuadros);
+   * `"compact"` una tira de progreso con el tema visto y el que sigue (40 cuadros, mínimo 24); `false` sin vueltas.
+   */
+  interludes?: boolean | "compact";
   /** Pista de audio que cubre todo el video. */
   audio?: { src: string; startFrom?: number; volume?: number };
 };
@@ -38,6 +42,7 @@ export function composeStory(
     }
   }
   const withInterludes = opts.interludes ?? true;
+  const compact = withInterludes === "compact";
   const timeline: TimelineEntry[] = [];
   // Índice de tema de cada entrada (y, en las vueltas al listado, cuántos temas van hechos): se arma acá, no se deduce del id.
   const topicOf: number[] = [];
@@ -50,7 +55,7 @@ export function composeStory(
   push("opening", "opening", openingFrames(spec));
   scenes.forEach((s, i) => {
     push(s.id, "topic", s.durationInFrames, i);
-    if (withInterludes) push(`interlude-${i + 1}`, "interlude", interludeFrames(spec), i + 1);
+    if (withInterludes) push(`interlude-${i + 1}`, "interlude", compact ? interludeCompactFrames(spec) : interludeFrames(spec), i + 1);
   });
   push("closing", "closing", closingFrames(spec));
 
@@ -61,7 +66,7 @@ export function composeStory(
           let body: React.ReactNode;
           if (e.kind === "opening") body = <Opening spec={spec} />;
           else if (e.kind === "closing") body = <Closing spec={spec} scenes={scenes} />;
-          else if (e.kind === "interlude") body = <Interlude spec={spec} done={topicOf[k]!} />;
+          else if (e.kind === "interlude") body = compact ? <InterludeCompact spec={spec} done={topicOf[k]!} /> : <Interlude spec={spec} done={topicOf[k]!} />;
           else {
             const topic = topicOf[k]!;
             const t = spec.topics[topic]!;

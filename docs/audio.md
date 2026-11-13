@@ -3,7 +3,7 @@
 Herramientas de línea de comandos para ponerle sonido a un video: detectar el tempo de una pista, empalmarla al compás para que dure lo mismo que el video, sintetizar efectos propios y mezclarlo todo en un solo archivo. Viven en `audio/` y usan ffmpeg (tiene que estar en el PATH) y TypeScript con `tsx`; no agregan dependencias de npm.
 
 ```bash
-npx tsx audio/cli.ts <comando> ...     # o, si está el script: npm run audio -- <comando> ...
+npm run audio -- <comando> ...         # es `tsx audio/cli.ts`; en todo el repo se usa esta forma
 ```
 
 ## Cuándo usar cada una
@@ -19,13 +19,13 @@ npx tsx audio/cli.ts <comando> ...     # o, si está el script: npm run audio --
 ## Flujo para un video
 
 1. **Elegir el tema con licencia verificada.** Que permita usarlo donde se va a mostrar el video y redistribuirlo. Anotá de dónde salió y bajo qué licencia. Nunca se sube música al repo.
-2. **`tempo`**: `npx tsx audio/cli.ts tempo tema.mp3 --fps 30 --out videos/<slug>/tempo.json`. Mirá `bpm` y `confidence`; si es baja, revisá el apartado de límites.
-3. **`empalme`**: `npx tsx audio/cli.ts empalme tema.mp3 --frames 900 --fps 30 --inicio percusion --tempo videos/<slug>/tempo.json --out videos/<slug>/musica.wav --json videos/<slug>/musica.json`. Arranca sobre el pulso donde entra la percusión, repite compases enteros si la pista es corta (cruce de potencia constante de 40 ms en cada empalme) y cierra con una caída de 2 s. Imprime `beatFrames` y `spliceFrames`.
-4. **`efectos`**: `npx tsx audio/cli.ts efectos --out videos/<slug>/audio/sfx` (o la carpeta que quieras fuera de lo versionado). Ver `--lista` para los nombres.
+2. **`tempo`**: `npm run audio -- tempo tema.mp3 --fps 30 --out videos/<slug>/tempo.json`. Mirá `bpm` y `confidence`; si es baja, revisá el apartado de límites.
+3. **`empalme`**: `npm run audio -- empalme tema.mp3 --frames 900 --fps 30 --inicio percusion --tempo videos/<slug>/tempo.json --out videos/<slug>/audio/musica.wav --json videos/<slug>/audio/musica.json`. Arranca sobre el pulso donde entra la percusión, repite compases enteros si la pista es corta (cruce de potencia constante de 40 ms en cada empalme) y cierra con una caída de 2 s. Imprime `beatFrames` y `spliceFrames`.
+4. **`efectos`**: `npm run audio -- efectos --out videos/<slug>/audio/sfx` (el valor por defecto es `public/sfx/`, ignorado por git, pero acá usamos la carpeta del video). Ver `--lista` para los nombres.
 5. **`mezcla`**: con un `cues.json` como `[{"frame": 45, "sfx": "clic"}, {"frame": 120, "sfx": "tilde", "gain": 0.7}]`:
-   `npx tsx audio/cli.ts mezcla --cues videos/<slug>/cues.json --sfx videos/<slug>/audio/sfx --fps 30 --frames 900 --musica videos/<slug>/musica.wav --musica-gain 0.5 --out videos/<slug>/audio/audio-<slug>.wav`.
+   `npm run audio -- mezcla --cues videos/<slug>/cues.json --sfx videos/<slug>/audio/sfx --fps 30 --frames 900 --musica videos/<slug>/audio/musica.wav --musica-gain 0.5 --out videos/<slug>/audio/audio-<slug>.wav`.
    La mezcla puede contener música con licencia: va a `videos/<slug>/audio/`, que está ignorada por git (`videos/` en `.gitignore`), y nunca a `public/`.
-6. **Usar el archivo en el video**: `<Audio src={asset("audio-<slug>.wav")} />` en la escena raíz y, al renderizar, la carpeta de la mezcla como directorio extra: `npm run render -- <id> --assets videos/<slug>/audio` (ver `render/README.md`; el renderizador busca el `src` primero en `--assets`, después en el bundle y en `public/`). Así el archivo no pasa por `public/`. La vista previa de desarrollo no reproduce `<Audio>` (el componente no dibuja nada; el sonido lo mezcla el renderizador), así que no hace falta copiar nada a `public/`. Además, usá los `beatFrames` de `musica.json` para sincronizar animaciones:
+6. **Usar el archivo en el video**: `<Audio src={asset("audio-<slug>.wav")} />` en la escena raíz y, al renderizar, la carpeta de la mezcla como directorio extra: `npm run render -- <id> --assets videos/<slug>/audio` (ver `render/README.md`; el renderizador busca el `src` primero en `--assets`, después en el bundle y en `public/`). Así el archivo no pasa por `public/`. La vista previa de desarrollo no reproduce `<Audio>` (el componente no dibuja nada; el sonido lo mezcla el renderizador), así que no hace falta copiar nada a `public/`. Además, usá los `beatFrames` de `audio/musica.json` para sincronizar animaciones:
 
 ```tsx
 import { pulse, nearestBeat } from '../../audio/beats';
@@ -34,7 +34,20 @@ const frame = useFrame();
 const escala = 1 + 0.06 * pulse(frame, beats, 0.25);
 ```
 
+**Una sola carpeta de salida.** Todo lo que genera `empalme` (la pista y su JSON) y `mezcla` (el WAV final) va a `videos/<slug>/audio/`, junto con `sfx/`; `tempo.json` y `cues.json` quedan en `videos/<slug>/`. Así `--assets videos/<slug>/audio` encuentra los archivos y nada pasa por `public/`.
+
 Si usás `empalme` y `mezcla` juntos, los cuadros de los cues se miden en el tiempo del video, igual que `beatFrames` de la salida de `empalme`. `beatFrames` son números fraccionarios (un pulso rara vez cae justo en un cuadro); las funciones de `beats.ts` los aceptan tal cual.
+
+## Sin música: plan de cues
+
+Con solo efectos el sonido queda flaco si cada uno suena aislado. Un plan que alcanza para un video corto (30 a 60 s):
+
+- **Una acción clave, un sonido**: `clic` en el cuadro de cada clic del cursor, `tilde` cuando algo queda hecho o aprobado, `aviso` cuando aparece un resultado o una alerta, `campanita` para un logro (una vez, no más).
+- **Una transición, un `barrido`**: en el primer cuadro del atravesado (`zoomThrough`) o del velo (`Wash`) de cada escena.
+- **Un `golpe` suave** (`"gain": 0.5` a `0.7`) en el título de la apertura y otro en el cierre.
+- Dejá aire: unos 8 a 10 cuadros entre efectos, salvo un redoble pensado, y bajá el `gain` (0,6 a 0,8) de los que se repiten.
+
+Música: es opcional y la decide la persona; la pista y su licencia las trae ella (ver "Licencias"). Con música, los efectos bajan la música solos (`--duck`).
 
 ## Comandos y opciones
 

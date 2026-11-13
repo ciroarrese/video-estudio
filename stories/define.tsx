@@ -27,5 +27,6 @@ export function defineStory({
       <Story />
     </ThemeProvider>
   );
-  return defineVideo<StoryProps>({ id, component: Video, fps, width, height, durationInFrames, formats, scenes: sceneList, defaultProps: { theme: typeof theme === "string" ? theme : "neutral" } });
+  return defineVideo<StoryProps>({ id, component: Video, fps, width, height, durationInFrames, formats, scenes: sceneList, // con un objeto `Theme` no se publica como prop (no es serializable): `t ?? theme` lo usa; `--props '{"theme":"dark"}'` lo pisa
+    defaultProps: typeof theme === "string" ? { theme } : {} });
 }

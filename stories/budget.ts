@@ -1,4 +1,4 @@
-import { CLOSING_FRAMES, INTERLUDE_FRAMES, OPENING_FRAMES } from "./durations";
+import { CLOSING_FRAMES, INTERLUDE_COMPACT_FRAMES, INTERLUDE_FRAMES, MIN_COMPACT_FRAMES, OPENING_FRAMES } from "./durations";
 import type { StorySpec } from "./types";
 
 /** Mínimo de cuadros por bloque generado (el mismo que valida `timing`). */
@@ -9,7 +9,7 @@ export type StoryBudget = {
   fps: number;
   opening: BudgetBlock;
   /** `frames` y `min` son de UNA vuelta; `count` cuántas hay (n con vueltas, 0 sin ellas). */
-  interlude: BudgetBlock & { count: number };
+  interlude: BudgetBlock & { count: number; compact: boolean };
   closing: BudgetBlock;
   /** Escenas de tema (suma). */
   scenes: { frames: number; each: number[] };
@@ -29,23 +29,25 @@ export const DEFAULT_BLOCK_FRAMES = { opening: OPENING_FRAMES, interlude: INTERL
  * defecto (apertura 300, vuelta 120, cierre 480) solo los bloques generados de una historia de 3 temas suman 1140 cuadros (38 s a 30 fps);
  * para una pieza más corta hay que bajar `timing`.
  */
-export function storyBudget(spec: StorySpec, scenes: (number | { durationInFrames: number })[] = [], opts: { interludes?: boolean; fps?: number } = {}): StoryBudget {
+export function storyBudget(spec: StorySpec, scenes: (number | { durationInFrames: number })[] = [], opts: { interludes?: boolean | "compact"; fps?: number } = {}): StoryBudget {
   const n = spec.topics.length;
   const count = (opts.interludes ?? true) ? n : 0;
+  const compact = opts.interludes === "compact";
+  const imin = compact ? MIN_COMPACT_FRAMES : MIN_BLOCK_FRAMES;
   const t = spec.timing ?? {};
-  const opening = t.opening ?? OPENING_FRAMES, interlude = t.interlude ?? INTERLUDE_FRAMES, closing = t.closing ?? CLOSING_FRAMES;
+  const opening = t.opening ?? OPENING_FRAMES, interlude = compact ? (t.interludeCompact ?? INTERLUDE_COMPACT_FRAMES) : (t.interlude ?? INTERLUDE_FRAMES), closing = t.closing ?? CLOSING_FRAMES;
   const each = scenes.map((s) => (typeof s === "number" ? s : s.durationInFrames));
   const sceneFrames = each.reduce((a, b) => a + b, 0);
   const generated = opening + interlude * count + closing;
   return {
     fps: opts.fps ?? 30,
     opening: { frames: opening, min: MIN_BLOCK_FRAMES },
-    interlude: { frames: interlude, min: MIN_BLOCK_FRAMES, count },
+    interlude: { frames: interlude, min: imin, count, compact },
     closing: { frames: closing, min: MIN_BLOCK_FRAMES },
     scenes: { frames: sceneFrames, each },
     generated,
     total: generated + sceneFrames,
-    minTotal: MIN_BLOCK_FRAMES * (2 + count) + sceneFrames,
+    minTotal: MIN_BLOCK_FRAMES * 2 + imin * count + sceneFrames,
   };
 }
 
@@ -57,12 +59,12 @@ export function formatStoryBudget(b: StoryBudget): string {
   const lines = [
     "presupuesto de la historia:",
     row("apertura", b.opening.frames, b.opening.min),
-    b.interlude.count ? row(`vueltas al listado ×${b.interlude.count}`, b.interlude.frames * b.interlude.count, b.interlude.min * b.interlude.count) : "  sin vueltas al listado",
+    b.interlude.count ? row(`vueltas ${b.interlude.compact ? "compactas" : "al listado"} ×${b.interlude.count}`, b.interlude.frames * b.interlude.count, b.interlude.min * b.interlude.count) : "  sin vueltas al listado",
     row("cierre", b.closing.frames, b.closing.min),
     ...(b.scenes.frames ? [row(`escenas de tema ×${b.scenes.each.length}`, b.scenes.frames)] : []),
     row("total", b.total),
     `  bloques generados      ${String(b.generated).padStart(5)} cuadros  ${sec(b.generated, b.fps).padStart(8)}   (con todo al mínimo: ${b.minTotal - b.scenes.frames} cuadros, ${sec(b.minTotal - b.scenes.frames, b.fps)}; las escenas se suman aparte)`,
-    "  cambiar duraciones: StorySpec.timing { opening, interlude, closing }; sin vueltas: composeStory/defineStory({ interludes: false })",
+    "  cambiar duraciones: StorySpec.timing { opening, interlude, closing }; vueltas compactas: interludes: \"compact\" (por defecto 40 cuadros, mínimo 24, timing.interludeCompact); sin vueltas: interludes: false",
   ];
   return lines.join("\n");
 }
@@ -79,12 +81,15 @@ export function budgetFromScenes(scenes: { id: string; durationInFrames: number 
   const each = topics.map((s) => s.durationInFrames);
   const generated = opening.durationInFrames + inter.reduce((a, s) => a + s.durationInFrames, 0) + closing.durationInFrames;
   const sceneFrames = each.reduce((a, b) => a + b, 0);
+  // sin la opción a mano se infiere: una vuelta de menos de 60 cuadros solo puede ser la compacta
+  const compact = inter.length > 0 && inter[0]!.durationInFrames < MIN_BLOCK_FRAMES;
+  const imin = compact ? MIN_COMPACT_FRAMES : MIN_BLOCK_FRAMES;
   return {
     fps,
     opening: { frames: opening.durationInFrames, min: MIN_BLOCK_FRAMES },
-    interlude: { frames: inter[0]?.durationInFrames ?? 0, min: MIN_BLOCK_FRAMES, count: inter.length },
+    interlude: { frames: inter[0]?.durationInFrames ?? 0, min: imin, count: inter.length, compact },
     closing: { frames: closing.durationInFrames, min: MIN_BLOCK_FRAMES },
     scenes: { frames: sceneFrames, each },
-    generated, total: generated + sceneFrames, minTotal: MIN_BLOCK_FRAMES * (2 + inter.length) + sceneFrames,
+    generated, total: generated + sceneFrames, minTotal: MIN_BLOCK_FRAMES * 2 + imin * inter.length + sceneFrames,
   };
 }

@@ -1,6 +1,6 @@
 # Guía de escenas
 
-Cómo se escribe una escena de este toolkit. Antes leé `docs/reglas.md` (las reglas y sus motivos), `kit/README.md` (las piezas) y `engine/README.md` (la regla de determinismo). Antes de escribir una animación a medida, mirá el catálogo de efectos listos en `docs/animaciones.md`. Para arrancar copiá la plantilla: `bash templates/nuevo.sh escena <slug> <nombre>`.
+Cómo se escribe una escena de este toolkit. Antes leé `docs/reglas.md` (las reglas y sus motivos), `kit/README.md` (las piezas) y `engine/README.md` (la regla de determinismo). Antes de escribir una animación a medida, mirá el catálogo de efectos listos en `docs/animaciones.md`. Para arrancar copiá la plantilla: `bash templates/nuevo.sh escena <slug> <nombre>`. Las firmas exactas de las piezas están en la tabla de `kit/README.md`; dónde poner cada cosa en el cuadro y cuánto acercar la cámara, en la sección 13.
 
 ## 1. Lo básico
 
@@ -11,6 +11,20 @@ Un video es una función del número de cuadro. Una escena:
 - calcula cada valor animado con `kf` (cuadros clave) o `interpolate`, nunca guardándolo.
 
 Formato por defecto: 1920×1080, 30 fps. Un tema (`useTheme()`) trae `color`, `font`, `radius`, `shadow`, `type` (tamaños en px), `safe` (área segura), `motion` y `cloud`.
+
+`theme.type` (valores de `neutral` y de `dark`; un tema armado desde tokens parte de ellos): son tamaños de letra en píxeles del cuadro, iguales en todos los formatos.
+
+| Clave | px | Para qué |
+|---|---|---|
+| `hero` | 120 | título de apertura, cifra o palabra que ocupa el cuadro |
+| `h1` | 96 | nombre de tema, título de sección |
+| `h2` | 72 | subtítulo grande, firma de cierre |
+| `body` | 44 | texto corrido, rótulo de panel |
+| `caption` | 32 | filas, botones, titular fijo; es el escalón "grande" de una interfaz recreada |
+| `eyebrow` | 26 | rótulos chicos, encabezados de columna; el piso para algo que no se acerca |
+| `stat` | 180 | cifra de un indicador (se usa multiplicada: `type.stat * 0.6` en una tarjeta) |
+
+`theme.safe` es `{ x: 140, y: 110 }`: el margen seguro es la mitad por lado (70 px a los costados y 55 arriba y abajo); `DockedHeadline` se apoya justo en ese margen.
 
 ## 2. Coordenadas del mundo y cámara
 
@@ -188,6 +202,31 @@ Criterios:
 
 Durante una transición (tarjeta volando sobre otra, cámara en movimiento) `overlap`, `covered` y `offscreen` pueden saltar a propósito: se juzga con la hoja de cuadros. Para silenciar uno que decidiste a propósito: `data-qa-ignore="overlap"` en el elemento (ver `qa/README.md`). Un umbral que no sirve en general se cambia con `--set regla.umbral=valor`.
 
+### Recetas de `qa`
+
+- **Silenciar una regla solo mientras dura la transición.** El atributo acepta `undefined`, así que se activa con una condición del cuadro y el resto del tiempo la regla sigue vigilando:
+
+  ```tsx
+  const zoomed = cam.scale > 1.05;      // la cámara está encuadrando una parte del diseño
+  const volando = f >= T.fly[0] && f <= T.fly[1];
+  <div data-qa-ignore={zoomed ? "offscreen" : undefined}>…filas vecinas cortadas por el borde…</div>
+  <div data-qa-ignore={volando ? "overlap covered" : undefined}>…tarjeta que cruza sobre otra…</div>
+  <div data-qa-ignore={f < 20 ? "contrast" : undefined}>…texto claro que entra sobre un bloque de acento…</div>
+  ```
+
+  Se puede poner en un ancestro (alcanza a todo lo de adentro), con varias reglas separadas por espacios o `all`. Hacelo en el elemento mínimo y con la condición más angosta posible; decí en el mensaje de entrega qué silenciaste y por qué.
+- **Falsos errores de `contrast` con texto que entra.** Un texto que se escribe (`typed`) mientras su contenedor está en fundido (entrada del titular, o `hide` al acercar) puede dar `contrast` como "quieto" con opacidad intermedia: cada cuadro tiene un texto distinto y no se empareja con el vecino. Escribilo cuando el contenedor ya terminó de entrar y de apartarse, o mostralo entero con el contenedor.
+- **Cortado por el zoom a propósito.** Las tarjetas o filas vecinas que la cámara deja cortadas por el borde dan `offscreen` (aviso si el recorte es grande y estable). Si es el encuadre que querés, la condición `zoomed` de arriba lo silencia solo durante el zoom; si no, alejá la cámara o usá el zoom máximo de la sección 13.
+
+**Qué transiciones ya no hace falta silenciar** (`qa` las baja solo a `info`, que queda oculto salvo `--verbose`; criterio en `qa/README.md`, "Reglas de `ve-qa`" y "`offscreen`: por qué error, aviso o info"):
+
+- Texto que se mueve entre cuadros vecinos (más de 12 px a 1080p): cámara en paneo o zoom, tarjeta volando sobre otra, texto que sale o entra del cuadro (`offscreen`, `overlap`, `covered`, `min-size`).
+- Un `Wash` o cualquier velo de cuadro completo cuya opacidad cambia de un cuadro al siguiente: el texto de abajo da `contrast` en `info`.
+- Un panel que entra junto con el texto de adentro (los dos en fundido): `contrast` en `info` hasta que se asienta.
+- Texto con opacidad baja (fundido, decorativo): `info`.
+
+**Qué sigue pidiendo tu decisión**: un encuadre quieto que deja cortado un elemento (`offscreen` en aviso: `data-qa-ignore` con la condición del zoom), un velo que se queda a medias (error de `contrast`: es lo que ve la persona), un texto que se escribe mientras su contenedor se funde (ver arriba) y cualquier texto quieto tapado.
+
 ### Para que no parezca un borrador
 
 Un video puede pasar todas las herramientas y seguir pareciendo un borrador. Reglas concretas, sacadas de un primer video que salió así:
@@ -205,7 +244,7 @@ Con 2 a 6 temas usá `defineStory` (ver `stories/README.md` y `templates/story/`
 - es un componente sin `Stage` (la historia ya lo pone) y de duración fija (`durationInFrames`);
 - puede usar `useTopic()` y `<TopicHeadline start hide />` para el titular con el nombre del tema. Para que la escena se renderice también sola (lo recomendado) hay dos caminos: pasarle el titular por prop y usar `DockedHeadline`, como `templates/scene/Scene.tsx`, o dejar `TopicHeadline` con `title` y `number` (`<TopicHeadline title="Panel de ventas" number={1} />`; dentro de la historia pisan al tema, y sin `title` ni historia no dibuja nada y avisa una vez en la consola) y `useTopic({ name: "Panel de ventas" })` con valor de reserva (`useTopicOrNull()` devuelve `null` fuera de la historia). El contenido no debe depender de `StoryStage` ni de `composeStory`;
 - termina con `Wash` o atravesando algo;
-- puede pasar un `thumbnail` (lienzo de 560×340) para el cierre.
+- **dale una `thumbnail` a cada tema**: es la miniatura de su panel en el muro del cierre; sin ella el cierre muestra una tarjeta genérica (el nombre del tema y unas barras de ejemplo). Va en la lista de escenas de `defineStory`: `{ id: "ventas", component: Ventas, durationInFrames: 150, thumbnail: MiniVentas }`. `MiniVentas` es un componente sin props que dibuja en un lienzo de **560×340** (coordenadas propias, `position: absolute` desde `(0, 0)`), con piezas del tema, no recibe props y, si lee `useFrame()`, obtiene el cuadro del cierre y no el de tu escena: dibujala quieta (sin `kf`): el recorte de la interfaz recreada en su momento más claro (un panel con 2 o 3 filas, una cifra y un gráfico chico). La letra de la miniatura es chica a propósito (el cierre la marca para `qa`); en 560 px de ancho entran unas 4 filas a `type.eyebrow * 0.8`. Reusá las mismas piezas de la escena (copiá el `Window`/`Table` de la sección 6) para que se reconozca.
 
 Probá cada escena sola (su propio `defineVideo`, como en `templates/scene/index.ts`) y recién después en la historia. `defineStory` publica por defecto solo el formato base: los formatos extra se piden con `formats: ["vertical"]` y cada escena de tema tiene que tener su disposición. El presupuesto de cuadros de la historia entera se ve con `npm run qa -- <id> --list-scenes`.
 
@@ -291,3 +330,162 @@ El mismo video puede salir en 16:9 (1920×1080), vertical (1080×1920) y cuadrad
 ## 12. Probar una escena sola
 
 `npm run qa -- <id> --list-scenes` (también `sheet` y `render`) lista las escenas con nombre: las `<Series.Item name="...">` / `<Sequence name="...">`, las que declara `defineVideo({ scenes })` y, en una historia, la apertura, cada tema, las vueltas al listado y el cierre; las versiones de `qa` y `sheet` agregan, en una historia, el presupuesto de cuadros por bloque (la de `render` no). Con `--scene <id|índice>` (índice desde 0) `render`, `qa` y `sheet` trabajan solo sobre el rango de cuadros de esa escena: `npm run sheet -- mi-video --scene ventas --count 8`.
+
+## 13. Composición: dónde poner cada cosa y cuánto acercar
+
+Sin coordenadas de partida, cada escena se reabre varias veces para mover cosas. Estas tres recetas ahorran esas vueltas. Todas las medidas son del mundo (1 unidad = 1 px a escala 1) con el tema `neutral`/`dark`; con otro tema recalculá con `theme.safe` y `theme.type`.
+
+### a) Receta de disposición por formato
+
+| | Horizontal | Vertical | Cuadrado |
+|---|---|---|---|
+| Lienzo (`useFormat()`) | 1920×1080 | 1080×1920 | 1080×1080 |
+| Margen seguro por lado (`theme.safe / 2`) | 70 en x, 55 en y | 70 en x, 55 en y | 70 en x, 55 en y |
+| Franja del titular (`DockedHeadline`, fijo en pantalla) | de y = 55 a unos 145; dejá libre hasta y = 170 | igual, dejá libre hasta y = 240 | hasta y = 200 |
+| Ventana o panel recomendado `{ x, y, w, h }` | `{ 260, 200, 1400, 700 }`; denso: `{ 160, 190, 1600, 780 }` | `{ 40, 260, 1000, 1400 }` | `{ 60, 200, 960, 800 }` |
+| Contenido dentro de la ventana | fila de 3 tarjetas de 400×220 (separadas 50) y filas de 58 a 90 de alto | rejilla de 2 columnas de 440×400 (separadas 40) o una columna de 920; filas de 96 | una columna de 840 o 2 columnas de 400 |
+| Letra de la interfaz | `eyebrow` (26) o `caption` (32); cifras `stat * 0.6` | `caption` (32) o `body` (44); cifras `stat * 0.8` | `caption`; cifras `stat * 0.6` |
+| Dónde queda el cursor al arrancar | abajo a la derecha de la ventana | abajo a la derecha de la ventana | abajo a la derecha |
+
+Cómo se usa:
+
+- **El titular no se mueve**: está fijo en pantalla y se aparta (`hideFromScale`) apenas la cámara se acerca. En la vista general nada va por encima de la franja del titular; con la ventana empezando donde dice la tabla no hay que pensarlo.
+- **Horizontal**: el centro del lienzo es `(960, 540)`; la ventana recomendada queda centrada en x (260 + 1400 / 2 = 960) y un poco baja, para compensar el titular.
+- **Vertical**: el sujeto llena el cuadro (1000 de 1080 de ancho y 1400 de 1920 de alto) y la letra sube un escalón del tema. No achiques la composición horizontal: apilá, o poné las tarjetas en dos columnas. Un panel de 700 px de alto en 1920 deja los dos tercios del cuadro vacíos.
+- **Cuadrado**: sin `pick` propio cae en la disposición horizontal, que se sale del cuadro: definí la suya (la tabla da una base).
+- Todo texto de la interfaz dentro del margen seguro de la ventana (mínimo 30 px de relleno interno) y a `eyebrow` o más grande si no se acerca.
+- **Vista general con contenido**: sostené la primera clave de cámara hasta el cuadro 26 y hacé que todo el contenido ya haya entrado para entonces (entradas de 4 cuadros de desfase, la última termina en el 26). La plantilla lo hace así.
+
+### b) Zoom máximo que muestra un elemento completo
+
+Para que un elemento de ancho `w` (una fila, una tarjeta) se vea entero con un margen `m` a cada lado, el zoom más alto es:
+
+```
+zmax = (ancho del cuadro - 2 * m) / w          // con la altura: (alto del cuadro - 2 * m) / h; usá el menor
+```
+
+`ancho del cuadro` es `width` de `useFormat()` y `m` el margen seguro por lado (`theme.safe.x / 2`, 70 con los temas base). La cámara va centrada en el elemento (`x = left + w / 2`, `y = top + h / 2`). Quedate un poco por debajo de `zmax` (el 90 %) para que entren el borde y el garabato.
+
+Ejemplos con el tema neutro:
+
+| Elemento | Cuenta | zmax | Usá |
+|---|---|---|---|
+| Fila de 1320 en horizontal (1920) | (1920 - 140) / 1320 | 1,35 | 1,3 |
+| Tarjeta de 400 en horizontal | (1920 - 140) / 400 | 4,45 | 1,8 a 2,2 (más sería exagerar) |
+| Tarjeta de 440 en vertical (1080) | (1080 - 140) / 440 | 2,14 | 2 |
+| Fila de 920 en vertical | (1080 - 140) / 920 | 1,02 | no hay zoom que valga |
+
+Cuando `zmax` da cerca de 1 (la fila ya ocupa todo el ancho), el zoom no aporta: acercá a la parte que importa (el botón, la cifra) aceptando que el resto quede cortado (y silenciá `offscreen` solo durante el zoom, receta de la sección 7), o rediseñá el elemento en dos renglones en vertical. Lo mismo vale al revés: si el elemento es chico (`zmax` mayor de 3), no acerques hasta `zmax`: con 1,8 a 2,2 la acción se lee y el contexto se ve.
+
+En código (el ejemplo de abajo lo usa): `const zoom = Math.min((width - 2 * m) / ROW.w, 1.5)`, con `m = theme.safe.x / 2`.
+
+### c) Una escena de datos completa
+
+La escena de `examples/kit-demo` es un recorrido de piezas; esta es una escena de datos como las que se entregan: **vista general sostenida hasta el cuadro 26 con el contenido ya adentro, acercamiento a la acción, clic del cursor, resultado, vuelta a la vista general, atravesado final**. 150 cuadros:
+
+| Cuadros | Qué pasa |
+|---|---|
+| 0 a 26 | la ventana, el indicador y las 4 filas entran escalonados; la cámara no se mueve |
+| 26 a 50 | acercamiento rápido a la fila elegida (zoom calculado con la fórmula) |
+| 24 a 64 | el cursor viaja al botón; clic en el 66 |
+| 68 | resultado: la fila pasa a "Aprobado" y el indicador suma uno |
+| 72 a 90 | garabato sobre el estado nuevo |
+| 96 a 122 | la cámara vuelve a la vista general |
+| 122 a 149 | atravesado hacia el indicador y velo |
+
+Guardalo como `videos/<slug>/datos/Scene.tsx` después de `bash templates/nuevo.sh escena <slug> datos` (que ya deja el `index.ts` y el tema; el ejemplo exporta los mismos nombres que la plantilla: `DURACION`, `SceneBody` y `SceneVideo`). Es horizontal; para vertical agregale una entrada vertical a las constantes de caja como en `templates/scene/Scene.tsx`. Pasa `typecheck`, `--check` y `qa` sin errores:
+
+```tsx
+import React from "react";
+import { useFormat, useFrame } from "../../../engine";
+import { Cursor, DockedHeadline, DoodleCircle, Stage, Wash, World, cameraAt, hideFromScale, kf, zoomThrough } from "../../../kit";
+import type { CameraKey } from "../../../kit";
+import { ThemeProvider, useTheme } from "../../../themes";
+import { theme as videoTheme } from "../theme";
+
+export const DURACION = 150;
+
+// Zoom máximo que todavía muestra un elemento de ancho w con margen seguro m a cada lado.
+const maxZoom = (frameW: number, w: number, m: number) => (frameW - 2 * m) / w;
+
+// Caja de la ventana (mundo = píxeles del lienzo de 1920x1080) y datos ficticios.
+const WIN = { x: 260, y: 200, w: 1400, h: 700 };
+const ROW = { x: WIN.x + 40, y: WIN.y + 150, w: WIN.w - 80, h: 90, gap: 14 }; // filas de la tabla
+const FILAS = [
+  ["Pedido 1041", "Equipo norte", "Pendiente"],
+  ["Pedido 1042", "Equipo sur", "Pendiente"],
+  ["Pedido 1043", "Equipo este", "Pendiente"],
+  ["Pedido 1044", "Equipo oeste", "Pendiente"],
+];
+const ELEGIDA = 2;
+const rowTop = (i: number) => ROW.y + i * (ROW.h + ROW.gap);
+
+const T = { hold: 26, zoomIn: 50, click: 66, result: 68, back: [96, 122] as [number, number], through: [122, 149] as [number, number] };
+
+export function SceneBody({ title }: { title: string }) {
+  const f = useFrame();
+  const t = useTheme();
+  const { width, height } = useFormat();
+  const m = t.safe.x / 2; // margen seguro por lado
+  const zoom = Math.min(maxZoom(width, ROW.w, m), 1.5); // 1920 -> (1920 - 140) / 1320 = 1,35
+
+  const fila = { x: ROW.x + ROW.w / 2, y: rowTop(ELEGIDA) + ROW.h / 2 };
+  const boton = { x: ROW.x + ROW.w - 120, y: fila.y };
+  const kpi = { x: WIN.x + WIN.w - 190, y: WIN.y + 80 };
+  const hecho = f >= T.result;
+
+  const keys: CameraKey[] = [
+    { f: 0, x: width / 2, y: height / 2, scale: 1 },
+    { f: T.hold, x: width / 2, y: height / 2, scale: 1 }, // vista general con todo adentro
+    { f: T.zoomIn, x: fila.x, y: fila.y, scale: zoom },   // acercamiento a la acción
+    { f: T.back[0], x: fila.x, y: fila.y, scale: zoom },  // sostener el resultado
+    { f: T.back[1], x: width / 2, y: height / 2, scale: 1 }, // vuelve a la vista general
+  ];
+  const cam = cameraAt(f, keys, { map: (fr, c) => zoomThrough(fr, T.through, c, kpi, 40), noBlurFrom: T.through[0] });
+  const zoomed = cam.scale > 1.05;
+
+  return (
+    <>
+      <World camera={cam} width={width} height={height}>
+        <div style={{ position: "absolute", left: WIN.x, top: WIN.y, width: WIN.w, height: WIN.h, background: t.color.surface, border: `1px solid ${t.color.border}`, borderRadius: t.radius.lg, boxShadow: t.shadow.lg, opacity: kf(f, [0, 10], [0, 1]) }} />
+        <div style={{ position: "absolute", left: WIN.x + 40, top: WIN.y + 34, whiteSpace: "nowrap", fontSize: t.type.body, fontWeight: t.font.weights.semibold, color: t.color.text, opacity: kf(f, [2, 12], [0, 1]) }}>Pedidos de la semana</div>
+        <div style={{ position: "absolute", left: kpi.x - 80, top: kpi.y - 40, width: 270, height: 80, boxSizing: "border-box", display: "flex", alignItems: "center", justifyContent: "space-between", padding: "0 24px", background: t.color.surfaceAlt, borderRadius: t.radius.md, fontSize: t.type.eyebrow, color: t.color.textMuted, opacity: kf(f, [4, 14], [0, 1]) }}>
+          Aprobados
+          <b style={{ fontSize: t.type.caption, color: t.color.text }}>{hecho ? 8 : 7}</b>
+        </div>
+
+        {FILAS.map(([id, equipo, estado], i) => {
+          const esta = i === ELEGIDA && hecho;
+          return (
+            <div
+              key={id}
+              data-qa-ignore={zoomed ? "offscreen" : undefined} // las filas vecinas quedan cortadas a propósito durante el zoom
+              style={{ position: "absolute", left: ROW.x, top: rowTop(i), width: ROW.w, height: ROW.h, boxSizing: "border-box", display: "flex", alignItems: "center", padding: "0 30px", gap: 40, background: t.color.bg, border: `1px solid ${esta ? t.color.accent : t.color.border}`, borderRadius: t.radius.md, fontSize: t.type.caption, color: t.color.text, opacity: kf(f, [6 + i * 4, 20 + i * 4], [0, 1]) }}
+            >
+              <span style={{ width: 280, fontWeight: t.font.weights.semibold }}>{id}</span>
+              <span style={{ flex: 1, color: t.color.textMuted }}>{equipo}</span>
+              <span style={{ width: 200, color: esta ? t.color.success : t.color.textMuted }}>{esta ? "Aprobado" : estado}</span>
+              <span style={{ width: 190, padding: "10px 0", textAlign: "center", borderRadius: t.radius.pill, background: t.color.accent, color: t.color.onAccent, fontSize: t.type.eyebrow, fontWeight: t.font.weights.semibold }}>Aprobar</span>
+            </div>
+          );
+        })}
+
+        <DoodleCircle id="datos-circulo" start={T.result + 4} end={T.back[1] - 6} cx={ROW.x + ROW.w - 360} cy={fila.y} rx={100} ry={46} />
+        <Cursor show={[T.hold - 2, T.back[0] + 6]} keys={[[T.hold - 2, 1500, 860], [T.click - 2, boton.x, boton.y]]} clicks={[T.click]} />
+      </World>
+      <DockedHeadline index={1} title={title} start={4} hide={hideFromScale(cam.scale)} />
+      <Wash range={[133, 149]} />
+    </>
+  );
+}
+
+export const SceneVideo: React.FC<{ title?: string; subtitle?: string }> = ({ title = "Aprobar pedidos" }) => (
+  <ThemeProvider theme={videoTheme}>
+    <Stage clouds={false}>
+      <SceneBody title={title} />
+    </Stage>
+  </ThemeProvider>
+);
+```
+
+Qué copiar de este ejemplo: las constantes arriba (la caja, las filas y los tiempos, para que el guion y el código se lean juntos); la cámara con la primera clave sostenida; `data-qa-ignore` condicionado al zoom; el resultado derivado del cuadro (`hecho = f >= T.result`), nunca guardado; el garabato que empieza después del resultado.
