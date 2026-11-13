@@ -121,20 +121,38 @@ describe('rules on plain data', () => {
     expect(f).toHaveLength(1);
     expect(f[0]!.data).toMatchObject({ covered: 2 });
     const wash = { ...cover, id: 10, rect: { x: 0, y: 0, w: W, h: H } };
-    expect(check([run({ cover: wash })], ['covered'])).toEqual([]);
+    expect(check([run({ cover: wash, opacity: 0.1 })], ['covered'])).toEqual([]);
     expect(check([run({ cover, opacity: 0.1 })], ['covered'])).toEqual([]);
     expect(check([run({ cover: { ...cover, motion: 60 } })], ['covered'])[0]!.severity).toBe('info');
     expect(check([run({ cover, motion: 60 })], ['covered'])[0]!.severity).toBe('info');
   });
-  it('covered: text hidden entirely by a card is info; a partial cover stays an error; text under a full-frame layer is skipped by every rule', () => {
+  it('covered: text hidden entirely by a static card is an error (only motion downgrades it); moving is info', () => {
     const t = { x: 400, y: 400, w: 300, h: 40 };
     const card = { id: 9, key: 'c', tag: 'div', testid: 'card', text: '', rect: { x: 380, y: 380, w: 400, h: 100 }, ignore: [] as string[] };
-    expect(check([run({ cover: card, rect: t })], ['covered'])[0]!.severity).toBe('info');
+    expect(check([run({ cover: card, rect: t })], ['covered'])[0]!.severity).toBe('error');
+    expect(check([run({ cover: card, rect: t, motion: 40 })], ['covered'])[0]!.severity).toBe('info');
+    expect(check([run({ cover: { ...card, motion: 40 }, rect: t })], ['covered'])[0]!.severity).toBe('info');
     expect(check([run({ cover: { ...card, rect: { x: 500, y: 380, w: 400, h: 100 } }, rect: t })], ['covered'])[0]!.severity).toBe('error');
-    const layer = { ...card, id: 10, rect: { x: 0, y: 0, w: W, h: H } };
+  });
+  it('covered: a partial cover (40% of the line, centre free) is reported with its share', () => {
+    const cover = { id: 9, key: 'c', tag: 'div', testid: 'strip', text: '', rect: { x: 400, y: 390, w: 120, h: 60 }, ignore: [] as string[], frac: 0.4 };
+    const f = check([run({ cover })], ['covered']);
+    expect(f).toHaveLength(1);
+    expect(f[0]).toMatchObject({ severity: 'error' });
+    expect(f[0]!.message).toMatch(/40%/);
+  });
+  it('covered: text under a full-frame opaque layer is reported (warn; info if moving), not silently dropped; the other rules still skip it', () => {
+    const layer = { id: 10, key: 'l', tag: 'div', testid: 'end-card', text: '', rect: { x: 0, y: 0, w: W, h: H }, ignore: [] as string[] };
     const a = run({ cover: layer, rect: { x: 100, y: 100, w: 300, h: 40 }, screenPx: 9 });
     const b = run({ cover: layer, rect: { x: 120, y: 105, w: 300, h: 40 } });
-    expect(check([a, b], ['overlap', 'min-size', 'covered'])).toEqual([]);
+    expect(check([a, b], ['overlap', 'min-size'])).toEqual([]);
+    const f = check([a, b], ['overlap', 'min-size', 'covered']);
+    expect(f).toHaveLength(1);
+    expect(f[0]).toMatchObject({ rule: 'covered', severity: 'warn' });
+    expect(f[0]!.message).toMatch(/cuadro completo/);
+    expect(check([run({ cover: { ...layer, motion: 80 } })], ['covered'])[0]!.severity).toBe('info');
+    expect(check([run({ cover: layer, opacity: 0.1 })], ['covered'])).toEqual([]); // fundido: no cuenta
+    expect(check([run({ cover: { ...layer, ignore: ['covered'] } })], ['covered'])).toEqual([]);
   });
   it('motion downgrades offscreen and overlap to info', () => {
     const o = run({ rect: { x: W - 100, y: 300, w: 300, h: 40 }, motion: 30 });
@@ -147,8 +165,18 @@ describe('rules on plain data', () => {
     const base = { color: 'rgba(210,210,210,1)', bg: { r: 242, g: 242, b: 242, samples: 9 } };
     const sev = (opacity: number) => contrastRule.check({ frame: 0, width: W, height: H, runs: [run({ ...base, opacity })], thresholds: DEFAULT_THRESHOLDS })[0]?.severity;
     expect(sev(1)).toBe('error');
-    expect(sev(0.6)).toBe('error'); // judged by its own colour: a settled frame shows it at full opacity
+    expect(sev(0.6)).toBe('error');
     expect(sev(0.2)).toBe('info');
+  });
+  it('contrast: static text is judged at its composited opacity; text mid-fade or moving by its own colour', () => {
+    // #6b6b6b sobre blanco = 5.3:1 opaco, pero al 50% se dibuja como ~#b5b5b5 (2.1:1)
+    const base = { color: 'rgba(107,107,107,1)', bg: { r: 255, g: 255, b: 255, samples: 9 }, opacity: 0.5 };
+    const sev = (extra: Partial<TextRun>) => contrastRule.check({ frame: 0, width: W, height: H, runs: [run({ ...base, ...extra })], thresholds: DEFAULT_THRESHOLDS })[0]?.severity;
+    expect(sev({ motion: 0, fade: 0 })).toBe('error');
+    expect(sev({})).toBe('error'); // sin vecinos medidos: cuenta como quieto
+    expect(sev({ fade: 0.3 })).toBeUndefined(); // a mitad de un fundido: un cuadro asentado lo mostraria opaco
+    expect(sev({ motion: 40 })).toBeUndefined();
+    expect(sev({ opacity: 1 })).toBeUndefined();
   });
 });
 

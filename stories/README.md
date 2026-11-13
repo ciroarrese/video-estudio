@@ -10,7 +10,7 @@ const spec: StorySpec = {
   topics: [{ id: "ventas", name: "Panel de ventas", line: "los números del día" }, /* 2 a 6 */],
   labels: ["Resumen diario", "Stock mínimo" /* ... */],           // palabras del muro; si faltan se repiten
   signoff: { logo: "brand/logo.png", tagline: "Hecho con ...", text: "Gracias por mirar" },
-  timing: { opening: 300, interlude: 120, closing: 480 },          // opcional (cuadros, mínimo 60)
+  timing: { opening: 300, interlude: 120, closing: 480 },          // opcional (cuadros enteros, mínimo 60; otras claves se rechazan)
 };
 ```
 
@@ -49,6 +49,8 @@ Opening (300) → [escena i → Interlude(done = i+1) (120)] × n → Closing (4
 Piezas sueltas: `<Opening spec />`, `<Interlude spec done />`, `<Closing spec scenes />` y sus duraciones `OPENING_FRAMES`, `INTERLUDE_FRAMES`, `CLOSING_FRAMES`.
 
 ## Límites
+
+- Validaciones (errores en español): ids de escena únicos y distintos de `opening`, `closing` e `interlude-N`; `durationInFrames` entero > 0; `labels`, si viene, es una lista de textos no vacíos (ausente o vacío usa los nombres de los temas).
 
 - De 2 a 6 temas (otro número lanza un error claro). La lista, el tamaño de letra, los paneles del cierre y los lugares reservados del muro se calculan según `n`.
 - Escala (1920×1080, sale de `theme.type`): la lista es lo más grande de la pantalla (nombre ~0.8 × h1, línea ~0.9 × body, filas de ~170 px hasta 4 temas; con 5 o 6 se achica parejo y el nombre no baja de ~44 px). Título de apertura a `type.hero`, etiquetas del muro ~30 px (marcadas con `data-qa-ignore`), píldoras del cierre ~34 px, firma a `type.h2`.
