@@ -45,7 +45,10 @@ export function CommandPalette(p: CommandPaletteProps) {
   const rowH = 70;
   return (
     <div style={{ position: "relative", width: w, height: h, fontFamily: theme.font.family, ...p.style }}>
-      <div style={{ position: "absolute", left: 0, right: 0, top: 20, boxSizing: "border-box", transform: `translateY(${((1 - open) * -24).toFixed(2)}px) scale(${(0.95 + 0.05 * open).toFixed(4)})`, opacity: open, background: theme.color.surface, border: `1px solid ${theme.color.border}`, borderRadius: theme.radius.lg, boxShadow: theme.shadow.lg, overflow: "hidden" }}>
+      <div style={{ position: "absolute", left: 0, right: 0, top: 20, boxSizing: "border-box", transform: `translateY(${Math.round((1 - open) * -24)}px)`, opacity: open }}>
+      {/* El marco crece con scale; el contenido (texto) no se escala. */}
+      <div style={{ position: "absolute", inset: 0, boxSizing: "border-box", transform: `scale(${(0.95 + 0.05 * open).toFixed(4)})`, background: theme.color.surface, border: `1px solid ${theme.color.border}`, borderRadius: theme.radius.lg, boxShadow: theme.shadow.lg }} />
+      <div style={{ position: "relative", borderRadius: theme.radius.lg, overflow: "hidden" }}>
         <div style={{ display: "flex", alignItems: "center", gap: 18, padding: "0 28px", height: 92, borderBottom: `1px solid ${theme.color.border}` }}>
           <svg width={32} height={32} viewBox="0 0 32 32"><circle cx={14} cy={14} r={9} fill="none" stroke={theme.color.textMuted} strokeWidth={3} /><line x1={21} y1={21} x2={28} y2={28} stroke={theme.color.textMuted} strokeWidth={3} strokeLinecap="round" /></svg>
           <span style={{ fontSize: fs * 1.1, color: shown ? theme.color.text : theme.color.textMuted }}>{shown || "Buscar comandos"}</span>
@@ -58,14 +61,16 @@ export function CommandPalette(p: CommandPaletteProps) {
             const bg = isHi ? (pressed ? theme.color.accent : withAlpha(theme.color.accent, 0.14 * hi)) : "transparent";
             const fg = isHi && pressed ? theme.color.onAccent : theme.color.text;
             return (
-              <div key={it.label} style={{ height: rowH, boxSizing: "border-box", display: "flex", alignItems: "center", justifyContent: "space-between", padding: "0 20px", marginBottom: 4, background: bg, borderRadius: theme.radius.md, transform: `scale(${sc.toFixed(4)})`, color: fg, fontSize: fs, fontWeight: isHi ? theme.font.weights.semibold : theme.font.weights.regular }}>
-                <span>{it.label}</span>
-                {it.hint && <span style={{ fontSize: fs * 0.8, color: isHi && pressed ? theme.color.onAccent : theme.color.textMuted, border: `1px solid ${isHi && pressed ? theme.color.onAccent : theme.color.border}`, borderRadius: theme.radius.sm, padding: "2px 12px" }}>{it.hint}</span>}
+              <div key={it.label} style={{ position: "relative", height: rowH, boxSizing: "border-box", display: "flex", alignItems: "center", justifyContent: "space-between", padding: "0 20px", marginBottom: 4, color: fg, fontSize: fs, fontWeight: isHi ? theme.font.weights.semibold : theme.font.weights.regular }}>
+                <div style={{ position: "absolute", inset: 0, background: bg, borderRadius: theme.radius.md, transform: `scale(${sc.toFixed(4)})` }} />
+                <span style={{ position: "relative" }}>{it.label}</span>
+                {it.hint && <span style={{ position: "relative", fontSize: fs * 0.8, color: isHi && pressed ? theme.color.onAccent : theme.color.textMuted, border: `1px solid ${isHi && pressed ? theme.color.onAccent : theme.color.border}`, borderRadius: theme.radius.sm, padding: "2px 12px" }}>{it.hint}</span>}
               </div>
             );
           })}
           {res.length === 0 && <div style={{ padding: 24, fontSize: fs, color: theme.color.textMuted }}>Sin resultados</div>}
         </div>
+      </div>
       </div>
     </div>
   );

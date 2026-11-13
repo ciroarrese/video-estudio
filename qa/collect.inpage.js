@@ -50,6 +50,7 @@
     return el && el !== stage && keyOf(el) === key ? el : null;
   }
 
+  function clipText0(cs) { return (cs.backgroundClip || cs.webkitBackgroundClip) === 'text' || cs.webkitBackgroundClip === 'text'; }
   // elementsFromPoint skips pointer-events:none; make everything hit-testable while we measure.
   var probe = document.createElement('style');
   probe.textContent = '*{pointer-events:auto !important}';
@@ -151,9 +152,11 @@
             if (ccs.visibility !== 'visible') continue;
             var bg = parseRgba(ccs.backgroundColor);
             var op = opacityUp(c);
-            var solidColor = bg.a * op >= 0.9 && ccs.backgroundColor !== 'rgba(0, 0, 0, 0)';
+            var solidColor = bg.a * op >= 0.9 && ccs.backgroundColor !== 'rgba(0, 0, 0, 0)' && !clipText0(ccs);
             // una imagen o un degradado de fondo tambien tapan (se asume opaco: con opacidad propia >= 0.9)
-            var solidImage = ccs.backgroundImage !== 'none' && op >= 0.9;
+            // (un degradado recortado al texto, background-clip:text, solo pinta las letras: no tapa nada)
+            var clipText = clipText0(ccs);
+            var solidImage = ccs.backgroundImage !== 'none' && op >= 0.9 && !clipText;
             var solid = solidColor || solidImage || c.tagName === 'IMG' || c.tagName === 'VIDEO' || c.tagName === 'CANVAS';
             if (!solid) continue;
             if (!counts.has(c)) { counts.set(c, 0); order.push(c); }
@@ -170,6 +173,7 @@
         info.key = keyOf(bestEl);
         info.ignore = ignoreOf(bestEl);
         info.frac = total ? bestN / total : 1;
+        info.opacity = opacityUp(bestEl);
         run.cover = info;
       }
     }

@@ -42,22 +42,35 @@ describe.skipIf(!chromium)('qa on the qa-defects video (e2e)', () => {
     const { findings } = await runQa({ videoId: 'qa-defects', frames: '8-14' });
     expect(findings.filter((f) => f.severity === 'error'), JSON.stringify(findings.filter((f) => f.severity === 'error'))).toEqual([]);
     expect(findings.filter((f) => f.severity === 'warn' && f.frame >= 8)).toEqual([]);
-    expect(findings.filter((f) => f.rule === 'covered').map((f) => [f.frame, f.severity])).toEqual([[9, 'info'], [10, 'info']]);
+    expect(findings.filter((f) => f.rule === 'covered').map((f) => [f.frame, f.severity])).toEqual([[8, 'info'], [9, 'info'], [10, 'info']]); // 8: el lavado a pantalla completa se informa, como info (esta a medio fundido)
     expect(findings.some((f) => f.rule === 'contrast' && f.frame === 11 && f.severity === 'info')).toBe(true);
     // the label leaving the frame is still noticed, but as info because it moves 60 px per frame
     expect(findings.filter((f) => f.rule === 'offscreen').map((f) => [f.frame, f.severity])).toEqual([[12, 'info'], [13, 'info'], [14, 'info']]);
     expect(findings.filter((f) => f.frame === 8 && f.severity !== 'info')).toEqual([]);
   }, 180_000);
 
+  it('seeded defects the first rules missed: still faint text (contrast), a cover over one side of a line, static text fully hidden', async () => {
+    const { findings } = await runQa({ videoId: 'qa-defects', frames: '15-17' });
+    const errs = (frame: number) => findings.filter((f) => f.frame === frame && f.severity === 'error');
+    expect(errs(F.stillFaint).map((f) => [f.rule, f.element.testid])).toEqual([['contrast', 'still-faint']]);
+    expect(errs(F.sideCover).map((f) => [f.rule, f.other?.testid])).toEqual([['covered', 'side-strip']]);
+    expect(errs(F.hiddenStatic).map((f) => [f.rule, f.other?.testid])).toEqual([['covered', 'hiding-card']]);
+  }, 180_000);
+
+  it('privacy: a term and an e-mail built from one span per letter / per part are still caught', async () => {
+    const r = await runPrivacy({ videoId: 'qa-defects', frames: `${F.split}`, deny: 'Acme Corp\n' });
+    expect(r.findings.map((f) => `${f.kind}:${f.value}`).sort()).toEqual(['deny:acme corp', 'deny:acmecorp', 'email:persona@dominio-ficticio.com']);
+  }, 180_000);
+
   it('privacy: e-mail and real-looking domain are caught, example.com is not; a deny term fails', async () => {
     const r = await runPrivacy({ videoId: 'qa-defects', frames: `${F.privacy}`, deny: '' });
     expect(r.ok).toBe(false);
-    expect(r.findings.map((f) => `${f.kind}:${f.value}`).sort()).toEqual(['domain:www.lumbrera-datos.com', 'email:lucia.paredes@lumbrera-datos.com']);
+    expect(r.findings.map((f) => `${f.kind}:${f.value}`).sort()).toEqual(['domain:www.dominio-ficticio.com', 'email:persona.ejemplo@dominio-ficticio.com']);
     const clean = await runPrivacy({ videoId: 'qa-defects', frames: `${F.clean}`, deny: '' });
     expect(clean.ok).toBe(true);
     const denied = await runPrivacy({ videoId: 'qa-defects', frames: `${F.clean}`, deny: 'tareas  # frase del cuadro 0\n' });
     expect(denied.findings.map((f) => f.kind)).toEqual(['deny']);
-    const allowed = await runPrivacy({ videoId: 'qa-defects', frames: `${F.privacy}`, deny: '', allow: 'lumbrera-datos.com' });
+    const allowed = await runPrivacy({ videoId: 'qa-defects', frames: `${F.privacy}`, deny: '', allow: 'dominio-ficticio.com' });
     expect(allowed.ok).toBe(true);
   }, 180_000);
 });

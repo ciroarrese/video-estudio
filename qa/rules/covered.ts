@@ -7,9 +7,11 @@ import type { Finding, Rule } from '../types';
  * only one side of a line is caught; a background image or gradient counts as opaque).
  * Skipped: text that is nearly invisible. One finding per coverer (not per text run).
  * Severity: `info` when the text or the coverer is in motion (transition). Static is an `error`, hidden entirely or not.
- * A coverer that spans >= `maxCoverFraction` of the frame (scene wash, end card) is reported too, as `warn` when static (it is
+ * A coverer that spans >= `maxCoverFraction` of the frame (scene wash, end card) is reported too, as `warn` when static and fully opaque (`info` mid-fade or moving; it is
  * usually a scene that should be unmounted, but also what a transition leaves for a frame): the other rules skip that text, this one says so.
  */
+const FULL_OPACITY = 0.99;
+
 export const coveredRule: Rule = {
   id: 'covered',
   description: 'Texto tapado por otro elemento opaco',
@@ -32,11 +34,13 @@ export const coveredRule: Rule = {
         const i = intersect(x.rect, c.rect);
         return i !== null && area(i) >= t.hiddenFully * area(x.rect);
       });
-      const severity = moving ? 'info' : fullFrame ? 'warn' : 'error';
+      // una capa de cuadro completo a medio fundido (lavado de escena) es transicion: info; opaca del todo y quieta: aviso
+      const settling = fullFrame && (c.opacity ?? 1) < FULL_OPACITY;
+      const severity = moving || settling ? 'info' : fullFrame ? 'warn' : 'error';
       const pct = c.frac !== undefined && c.frac < 1 ? ` (${Math.round(c.frac * 100)}% de los puntos medidos)` : '';
       out.push({
         rule: 'covered', severity, frame,
-        message: `${fullFrame ? 'texto bajo una capa opaca de cuadro completo' : 'texto tapado por otro elemento opaco'}${pct}${list.length > 1 ? ` (${list.length} textos bajo el mismo elemento)` : ''}${moving ? '; en movimiento' : hiddenFully ? '; el texto queda oculto por completo' : ''}`,
+        message: `${fullFrame ? 'texto bajo una capa opaca de cuadro completo' : 'texto tapado por otro elemento opaco'}${pct}${list.length > 1 ? ` (${list.length} textos bajo el mismo elemento)` : ''}${moving ? '; en movimiento' : settling ? '; la capa esta a medio fundido' : hiddenFully ? '; el texto queda oculto por completo' : ''}`,
         element: describe(r), other: { tag: c.tag, testid: c.testid, text: c.text, rect: roundRect(c.rect), path: pathOfKey(c.key) },
         data: { covered: list.length },
       });

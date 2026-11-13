@@ -47,7 +47,7 @@ export type TextRun = {
    * Opaque element over the text, found by sampling 5 points along each line (elementsFromPoint). `frac` is the share
    * of the sampled points it covers (1 = all, 0.4 = two of five). Solid = opaque background colour, background image/gradient, img, video, canvas.
    */
-  cover: (ElementInfo & { ignore: string[]; id: number; key: string; motion?: number; frac?: number }) | null;
+  cover: (ElementInfo & { ignore: string[]; id: number; key: string; motion?: number; frac?: number; /** Opacidad efectiva del elemento que tapa (con la de sus ancestros). */ opacity?: number }) | null;
   /** Background under the text box (text hidden), filled by the runner when the contrast rule is on. */
   bg?: { r: number; g: number; b: number; samples: number } | null;
 };

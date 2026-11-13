@@ -56,14 +56,20 @@ export async function collectAllText(vp: VideoPage): Promise<PageText> {
       const add=s=>{const t=norm(s||'');if(!t)return;joined.add(t);const q=t.replace(/\\s+/g,'');if(q)squashed.add(q);};
       const w=document.createTreeWalker(root,NodeFilter.SHOW_TEXT);let n;
       while((n=w.nextNode())){const t=n.data.trim();if(t)nodes.push(t);}
+      // Texto de un bloque: los elementos en linea (y en linea-bloque) se pegan sin separador, el resto separa con un espacio,
+      // para no fabricar un correo o un dominio con el final de un bloque y el inicio del siguiente.
+      const flat=e=>{let t='';for(const c of e.childNodes){
+        if(c.nodeType===3)t+=c.data;
+        else if(c.nodeType===1&&c.tagName!=='SCRIPT'&&c.tagName!=='STYLE'){const d=getComputedStyle(c).display;if(d==='none')continue;const tight=d==='inline'||d==='contents'||d==='inline-block';t+=(tight?'':' ')+flat(c)+(tight?'':' ');}}
+        return t;};
       const els=root.querySelectorAll('*');
       els.forEach(e=>{
         for(const a of ['alt','title','aria-label','placeholder','value']){const v=e.getAttribute(a);if(v&&v.trim())nodes.push(v.trim());}
         if(e.tagName==='SCRIPT'||e.tagName==='STYLE')return;
         const d=getComputedStyle(e).display;
-        if(d!=='inline'&&d!=='contents'&&d!=='none')add(e.textContent);
+        if(d!=='inline'&&d!=='contents'&&d!=='none')add(flat(e));
       });
-      add(root.textContent);add(root.innerText);
+      add(flat(root));add(root.innerText);
       return {nodes,joined:[...joined],squashed:[...squashed]};})()`,
   );
 }

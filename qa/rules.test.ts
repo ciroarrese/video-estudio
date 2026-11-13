@@ -142,7 +142,7 @@ describe('rules on plain data', () => {
     expect(f[0]!.message).toMatch(/40%/);
   });
   it('covered: text under a full-frame opaque layer is reported (warn; info if moving), not silently dropped; the other rules still skip it', () => {
-    const layer = { id: 10, key: 'l', tag: 'div', testid: 'end-card', text: '', rect: { x: 0, y: 0, w: W, h: H }, ignore: [] as string[] };
+    const layer = { id: 10, key: 'l', opacity: 1, tag: 'div', testid: 'end-card', text: '', rect: { x: 0, y: 0, w: W, h: H }, ignore: [] as string[] };
     const a = run({ cover: layer, rect: { x: 100, y: 100, w: 300, h: 40 }, screenPx: 9 });
     const b = run({ cover: layer, rect: { x: 120, y: 105, w: 300, h: 40 } });
     expect(check([a, b], ['overlap', 'min-size'])).toEqual([]);
@@ -151,6 +151,7 @@ describe('rules on plain data', () => {
     expect(f[0]).toMatchObject({ rule: 'covered', severity: 'warn' });
     expect(f[0]!.message).toMatch(/cuadro completo/);
     expect(check([run({ cover: { ...layer, motion: 80 } })], ['covered'])[0]!.severity).toBe('info');
+    expect(check([run({ cover: { ...layer, opacity: 0.95 } })], ['covered'])[0]!.severity).toBe('info'); // lavado a medio fundido
     expect(check([run({ cover: layer, opacity: 0.1 })], ['covered'])).toEqual([]); // fundido: no cuenta
     expect(check([run({ cover: { ...layer, ignore: ['covered'] } })], ['covered'])).toEqual([]);
   });

@@ -32,8 +32,12 @@ export function ChatThread(p: ChatThreadProps) {
   const dur = p.duration ?? 80;
   const sched = chatSchedule(messages, dur);
   const fs = theme.type.caption * 0.85;
+  // El "pop" escala solo el fondo de la burbuja; el texto no se escala (se desvanece), así el trazado de las letras no depende del historial.
   const bubble = (key: string, mine: boolean, scale: number, children: React.ReactNode) => (
-    <div key={key} style={{ alignSelf: mine ? "flex-end" : "flex-start", maxWidth: "76%", boxSizing: "border-box", padding: "16px 24px", background: mine ? theme.color.accent : theme.color.surfaceAlt, color: mine ? theme.color.onAccent : theme.color.text, border: mine ? "none" : `1px solid ${theme.color.border}`, borderRadius: theme.radius.lg, fontSize: fs, lineHeight: 1.3, transform: `scale(${scale.toFixed(4)})`, transformOrigin: mine ? "100% 100%" : "0% 100%", opacity: Math.min(1, scale * 1.4) }}>{children}</div>
+    <div key={key} style={{ position: "relative", alignSelf: mine ? "flex-end" : "flex-start", maxWidth: "76%", boxSizing: "border-box", padding: "16px 24px", color: mine ? theme.color.onAccent : theme.color.text, fontSize: fs, lineHeight: 1.3, opacity: Math.min(1, scale * 1.4) }}>
+      <div style={{ position: "absolute", inset: 0, background: mine ? theme.color.accent : theme.color.surfaceAlt, border: mine ? "none" : `1px solid ${theme.color.border}`, borderRadius: theme.radius.lg, boxSizing: "border-box", transform: `scale(${scale.toFixed(4)})`, transformOrigin: mine ? "100% 100%" : "0% 100%" }} />
+      <div style={{ position: "relative", opacity: Math.min(1, Math.max(0, (scale - 0.55) * 2.2)) }}>{children}</div>
+    </div>
   );
   const out: React.ReactNode[] = [];
   messages.forEach((m, i) => {
@@ -44,7 +48,7 @@ export function ChatThread(p: ChatThreadProps) {
     if (typing) {
       out.push(bubble(`t${i}`, false, Easing.out(progress(local, s.typingAt!, 6)), (
         <span style={{ display: "inline-flex", gap: 8, alignItems: "center", height: fs * 0.9 }}>
-          {[0, 1, 2].map((d) => <span key={d} style={{ width: 12, height: 12, borderRadius: theme.radius.pill, background: theme.color.textMuted, transform: `translateY(${(Math.sin(local * 0.55 - d * 0.9) * -5).toFixed(2)}px)`, display: "inline-block" }} />)}
+          {[0, 1, 2].map((d) => <span key={d} style={{ width: 12, height: 12, borderRadius: theme.radius.pill, background: theme.color.textMuted, transform: `translateY(${Math.round(Math.sin(local * 0.55 - d * 0.9) * -5)}px)`, display: "inline-block" }} />)}
         </span>
       )));
     }

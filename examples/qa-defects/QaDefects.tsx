@@ -8,8 +8,12 @@ import { Fill, useFrame } from '../../engine';
  * Frames 8-11 are NON-defects that must stay free of errors: a full-frame wash over fading text (8), a card
  * flying over text (9-10, moving 60 px per frame), faint decorative text (11) and a label leaving the frame
  * while clearly moving (12-14, 60 px per frame).
+ * Frames 15-17 are defects that the first version of the rules missed: static text at 50% opacity that looks washed out
+ * once composited (15), a gradient strip over the LEFT 40% of a line with its centre free (16), and static text fully
+ * hidden under a static card (17). All three are errors.
+ * Frame 18 builds a term and an e-mail out of one span per letter / per part: only the privacy check cares (block-level scan).
  */
-export const QA_DEFECT_FRAMES = { clean: 0, clip: 1, offscreen: 2, overlap: 3, tiny: 4, contrast: 5, covered: 6, privacy: 7, wash: 8, flyingA: 9, flyingB: 10, faint: 11, leavingA: 12, leavingB: 13, leavingC: 14 } as const;
+export const QA_DEFECT_FRAMES = { clean: 0, clip: 1, offscreen: 2, overlap: 3, tiny: 4, contrast: 5, covered: 6, privacy: 7, wash: 8, flyingA: 9, flyingB: 10, faint: 11, leavingA: 12, leavingB: 13, leavingC: 14, stillFaint: 15, sideCover: 16, hiddenStatic: 17, split: 18 } as const;
 
 const font: CSSProperties = { fontFamily: 'Arial, Helvetica, sans-serif', color: '#1b1f2a' };
 const abs = (left: number, top: number, extra: CSSProperties = {}): CSSProperties => ({ position: 'absolute', left, top, margin: 0, whiteSpace: 'nowrap', ...font, ...extra });
@@ -71,8 +75,8 @@ export function QaDefects() {
     case 7:
       body = (
         <Card>
-          <p data-testid="email-text" style={abs(40, 70, { fontSize: 28 })}>Escribinos a lucia.paredes@lumbrera-datos.com</p>
-          <p data-testid="domain-text" style={abs(40, 150, { fontSize: 28 })}>Mas en www.lumbrera-datos.com/ayuda</p>
+          <p data-testid="email-text" style={abs(40, 70, { fontSize: 28 })}>Escribinos a persona.ejemplo@dominio-ficticio.com</p>
+          <p data-testid="domain-text" style={abs(40, 150, { fontSize: 28 })}>Mas en www.dominio-ficticio.com/ayuda</p>
           <p data-testid="safe-text" style={abs(40, 230, { fontSize: 28 })}>Contacto de ejemplo: ejemplo@example.com</p>
         </Card>
       );
@@ -101,6 +105,37 @@ export function QaDefects() {
     case 13:
     case 14:
       body = <p data-testid="leaving-text" style={abs(1060 + (f - 12) * 60, 300, { fontSize: 40, fontWeight: 600 })}>Facturación total</p>;
+      break;
+    case 15:
+      body = <p data-testid="still-faint" style={abs(96, 250, { fontSize: 40, fontWeight: 700, color: '#6b6b6b', opacity: 0.5 })}>Saldo disponible</p>;
+      break;
+    case 16:
+      body = (
+        <Card>
+          <p data-testid="side-covered" style={abs(40, 120, { fontSize: 32, fontWeight: 600 })}>Detalle del presupuesto anual</p>
+          <div data-testid="side-strip" style={{ position: 'absolute', left: 20, top: 100, width: 190, height: 72, borderRadius: 12, background: 'linear-gradient(90deg, #cfd6e6, #dfe4ef)' }} />
+        </Card>
+      );
+      break;
+    case 17:
+      body = (
+        <Card>
+          <p data-testid="hidden-static" style={abs(40, 120, { fontSize: 32, fontWeight: 600 })}>Dato escondido</p>
+          <div data-testid="hiding-card" style={{ position: 'absolute', left: 20, top: 100, width: 420, height: 72, borderRadius: 12, background: '#d7dbe6' }} />
+        </Card>
+      );
+      break;
+    case 18:
+      body = (
+        <Card>
+          <p data-testid="split-term" style={abs(40, 70, { fontSize: 28 })}>
+            {[...'Acme Corp'].map((ch, i) => <span key={i}>{ch}</span>)}
+          </p>
+          <p data-testid="split-email" style={abs(40, 150, { fontSize: 28 })}>
+            <span>persona</span><span>@</span><span>dominio-ficticio</span><span>.com</span>
+          </p>
+        </Card>
+      );
       break;
     default:
       body = (
