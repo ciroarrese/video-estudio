@@ -10,7 +10,7 @@ import {
 } from "./index";
 import type { StorySpec, TopicScene } from "./index";
 import { TopicContext } from "./topic";
-import { closingWall, labelAt, listLayout, panelLayout, panelRects, pillBudget, reservedSlots, textWidth } from "./layout";
+import { closingWall, labelAt, listLayout, panelEntryLift, panelLayout, panelRects, pillBudget, reservedSlots, textWidth } from "./layout";
 
 const config = { fps: 30, width: 1920, height: 1080, durationInFrames: 1000 };
 const html = (node: React.ReactNode, theme: Theme, frame: number) =>
@@ -349,6 +349,22 @@ describe("cierre: píldoras y paneles", () => {
             if (i !== j && o.panel.y < r.panel.y) expect(r.pill.y - (o.panel.y + o.panel.h), `${name} n=${n} ${i + 1} vs ${j + 1}`).toBeGreaterThanOrEqual(30);
           }));
         }
+      }
+    }
+  });
+  it("la entrada de los paneles no saca la píldora del cuadro: la profundidad extra se acota en los formatos que llenan el cuadro", () => {
+    for (const [name, w, h] of SIZES) {
+      for (let n = 2; n <= 6; n++) {
+        const p = panelLayout(n, w, h);
+        p.forEach((c, i) => {
+          const lift = panelEntryLift(c, neutral, "Nombre de tema", pillBudget(p, i, w), w, h);
+          expect(lift, `${name} n=${n}`).toBeGreaterThanOrEqual(0);
+          expect(lift).toBeLessThanOrEqual(260);
+          // con ese levantamiento, perspectiva 2200 y el zoom 1,1 de la cámara, la píldora de arriba sigue dentro del cuadro
+          const { pill } = panelRects(c, neutral, "Nombre de tema", pillBudget(p, i, w));
+          const s = 1.1 * (2200 / (2200 - (c.z + lift)));
+          expect(h / 2 - (h / 2 - pill.y) * s, `${name} n=${n} píldora ${i + 1}`).toBeGreaterThanOrEqual(lift === 0 ? -1e9 : 0);
+        });
       }
     }
   });

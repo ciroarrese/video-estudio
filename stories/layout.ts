@@ -353,6 +353,26 @@ export function panelRects(c: PanelPlace, theme: Theme, name = "", maxW?: number
   return { panel: { x: c.x - W / 2, y: c.y - H / 2, w: W, h: H }, pill: { x: c.x - pill.w / 2, y: cy - pill.h / 2, w: pill.w, h: pill.h } };
 }
 
+/** Perspectiva de los paneles del cierre (px) y lo que se aleja cada uno del cuadro al entrar (px de profundidad, como máximo). */
+const CARD_PERSP = 2200;
+const ENTRY_LIFT = 260;
+
+/**
+ * Cuánta profundidad extra (px, hacia la cámara) puede tener el panel `c` al empezar a entrar sin que su píldora, ya agrandada por la
+ * perspectiva y el zoom inicial de la cámara (1,1), se salga del cuadro (64 px de holgura por la inclinación). Hasta `ENTRY_LIFT`:
+ * en horizontal queda entero; en vertical, donde los paneles llenan el alto, es menor.
+ */
+export function panelEntryLift(c: PanelPlace, theme: Theme, name: string, maxW: number | undefined, width: number, height: number): number {
+  const cx = width / 2, cy = height / 2;
+  const { panel, pill } = panelRects(c, theme, name, maxW);
+  const reach = Math.max(cy - pill.y, panel.y + panel.h - cy, Math.abs(c.x - cx) + Math.max(pill.w, panel.w) / 2 * 1.0);
+  const room = Math.min(cy, cx) - 64;
+  const factor = room / reach / CLOSING_CAM_MAX; // factor de perspectiva máximo que se tolera
+  if (factor <= 1) return 0;
+  const z = CARD_PERSP * (1 - 1 / factor);
+  return Math.round(Math.max(0, Math.min(ENTRY_LIFT, z - c.z)));
+}
+
 /**
  * Disposición de los paneles flotantes del cierre según la cantidad de temas (`k` = escala del lienzo 560x340).
  * Invariante: entre una fila y la siguiente queda un hueco de `ROW_GAP_Y` (>= lo que ocupa la píldora de la fila de abajo),

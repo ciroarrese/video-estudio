@@ -13,6 +13,9 @@ export type CardFlipProps = ThreeProps & {
   cardHeight?: number;
 };
 
+// Una escala casi 1 (menos de 1,5 %) se toma como 1: bordes con escala casi identidad bajo una cámara con zoom se rasterizan distinto según el historial.
+const snap = (k: number) => (Math.abs(k - 1) < 0.015 ? 1 : k);
+
 /** Tarjeta que da media vuelta; la cara que no mira al espectador se oculta por ángulo. Proyección a mano: escala en X y en Y, sin `rotateY`. */
 export function CardFlip(p: CardFlipProps) {
   const { local, duration, width, height, theme, pal } = useThreeFx(p, { width: 900, height: 600, duration: 75 });
@@ -46,7 +49,7 @@ export function CardFlip(p: CardFlipProps) {
     background: showFront ? theme.color.surface : theme.color.surfaceAlt,
     border: `2px solid ${showFront ? theme.color.border : pal.accent}`,
     overflow: "hidden",
-    transform: xform({ y: -lift, scaleX: sx * grow, scaleY: grow }),
+    transform: xform({ y: -lift, scaleX: snap(sx * grow), scaleY: snap(grow) }),
     transformOrigin: "50% 50%",
     visibility: sx < 0.012 ? "hidden" : "visible",
     fontFamily: theme.font.family,

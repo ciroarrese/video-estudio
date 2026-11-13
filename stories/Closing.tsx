@@ -1,7 +1,7 @@
 import { Easing, random, useFrame, useVideoConfig } from "../engine";
 import { GradientText, kf } from "../kit";
 import { useTheme, withAlpha } from "../themes";
-import { PILL_OFF, closingWall, fitText, panelLayout, pillBudget, pillFit, rigProject, rigTransform } from "./layout";
+import { PILL_OFF, closingWall, fitText, panelEntryLift, panelLayout, pillBudget, pillFit, rigProject, rigTransform } from "./layout";
 import { Chip, Logo, Pill, StoryStage, scaler, useEase } from "./shared";
 import type { StorySpec, TopicScene } from "./types";
 
@@ -55,6 +55,8 @@ export function Closing({ spec, scenes }: { spec: StorySpec; scenes: TopicScene[
   const { inner, outer, slots } = closingWall(spec, width, height);
   const panels = panelLayout(n, width, height);
   const stagger = Math.min(6, 30 / n);
+  // cuánto se acerca cada panel a la cámara al entrar (menos en los formatos donde los paneles llenan el cuadro)
+  const lifts = panels.map((c, i) => panelEntryLift(c, theme, spec.topics[i]!.name, pillBudget(panels, i, width), width, height));
   const T = { wall: u(130), fold: [u(170), u(200)] as [number, number], fly: [u(200), u(254)] as [number, number], light: u(262), pull: u(372), wash: [u(368), u(398)] as [number, number], logo: u(394), sign: u(418) };
 
   const cam = {
@@ -125,7 +127,7 @@ export function Closing({ spec, scenes }: { spec: StorySpec; scenes: TopicScene[
           if (a <= 0) return null;
           const W = Math.round(PANEL.w * c.k);
           const H = Math.round(PANEL.h * c.k);
-          const z = c.z + (1 - a) * 260;
+          const z = c.z + (1 - a) * lifts[i]!;
           const Thumb = scenes[i]?.thumbnail;
           const titleGone = f >= flyStart(i);
           return (
