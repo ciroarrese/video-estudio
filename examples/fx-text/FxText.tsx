@@ -1,14 +1,16 @@
 import React from "react";
 import { Series, useFrame } from "../../engine";
-import { ThemeProvider, dark, neutral, useTheme } from "../../themes";
+import { ThemeProvider, dark, editorial, neon, neutral, papel, useTheme } from "../../themes";
 import type { Theme } from "../../themes";
 import { Stage } from "../../kit";
 import {
   DigitRoll, KineticWords, MarqueeBands, MaskedRise, ScrambleDecode, SplitFlap, TypeRing, Typewriter,
 } from "../../fx";
 
-/** `theme`: "neutral" | "dark" (por defecto neutral); tambien acepta un objeto Theme. */
-export type FxTextProps = { theme?: "neutral" | "dark" | Theme };
+/** `theme`: nombre de un tema de `themes/` (por defecto neutral); tambien acepta un objeto Theme. */
+export type FxTextProps = { theme?: "neutral" | "dark" | "editorial" | "neon" | "papel" | Theme };
+
+const POR_NOMBRE = { neutral, dark, editorial, neon, papel };
 
 /** Cada efecto dura 75 cuadros mas 15 de pausa con la imagen final. */
 export const SEG = 90;
@@ -95,7 +97,7 @@ function Showcase() {
 }
 
 export function FxText({ theme = "neutral" }: FxTextProps) {
-  const t = typeof theme === "string" ? (theme === "dark" ? dark : neutral) : theme;
+  const t = typeof theme === "string" ? POR_NOMBRE[theme] ?? neutral : theme;
   return (
     <ThemeProvider theme={t}>
       <Showcase />

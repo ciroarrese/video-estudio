@@ -1,9 +1,10 @@
-import { withAlpha } from "../../themes";
+import { chartFill, chartStyle, withAlpha } from "../../themes";
 import { Easing } from "../../engine";
 import { fxBox, progress, roleColor, useFx } from "../core";
 import type { ColorRole, FxProps } from "../core";
 import { catmullRom, fmtInt, niceTicks, pointAt, polyLength, toPath, trimPolyline } from "./geom";
 import type { Pt } from "./geom";
+import { FillDef } from "./styleKit";
 
 export type LineDrawProps = FxProps & {
   data?: number[];
@@ -37,6 +38,10 @@ export function LineDraw(p: LineDrawProps) {
   const dur = p.duration ?? 60;
   const color = roleColor(theme, p.color ?? "accent");
   const uid = `ld${p.color ?? "accent"}`;
+  // Estilo del diseño: grosor de línea (la punta lo sigue), guías y relleno del área.
+  const cs = chartStyle(theme);
+  const lw = cs.lineWidth;
+  const areaFill = chartFill(theme, color, `line-${p.color ?? "accent"}`);
   const L = lineLayout(data, w, h);
   const tAxes = progress(local, 0, dur * 0.3, Easing.out);
   const draw = progress(local, dur * 0.1, dur * 0.8, Easing.inOut);
@@ -52,16 +57,18 @@ export function LineDraw(p: LineDrawProps) {
   return (
     <svg width={w} height={h} viewBox={`0 0 ${w} ${h}`} style={{ display: "block", fontFamily: theme.font.family, ...p.style }}>
       <defs>
+        {areaFill.kind !== "solid" && <FillDef fill={areaFill} />}
         <linearGradient id={`ld-${uid}`} x1="0" y1="0" x2="0" y2="1">
           <stop offset="0" stopColor={withAlpha(color, 0.32)} />
           <stop offset="1" stopColor={withAlpha(color, 0)} />
         </linearGradient>
       </defs>
+      {cs.grid === "on" && L.pts.map((q, i) => <line key={`v${i}`} x1={q.x} x2={q.x} y1={L.y1} y2={L.y0} stroke={theme.color.border} strokeWidth={1.5} opacity={tAxes * 0.55} />)}
       {L.ticks.map((tk, i) => {
         const y = L.y0 - ((L.y0 - L.y1) * tk) / L.max;
         return (
           <g key={i} opacity={tAxes}>
-            <line x1={L.x0} x2={L.x0 + (L.x1 - L.x0) * tAxes} y1={y} y2={y} stroke={theme.color.border} strokeWidth={1.5} />
+            {(cs.grid !== "off" || i === 0) && <line x1={L.x0} x2={L.x0 + (L.x1 - L.x0) * tAxes} y1={y} y2={y} stroke={theme.color.border} strokeWidth={1.5} />}
             <text x={L.x0 - 14} y={y + fs * 0.35} textAnchor="end" fontSize={fs} fill={theme.color.textMuted}>{fmtInt(tk)}</text>
           </g>
         );
@@ -70,12 +77,12 @@ export function LineDraw(p: LineDrawProps) {
         if (data.length > 8 && i % 2 === 1) return null;
         return <text key={i} x={L.pts[i]!.x} y={L.y0 + fs + 16} textAnchor="middle" fontSize={fs} fill={theme.color.textMuted} opacity={tAxes}>{lb}</text>;
       })}
-      {area && <path d={area} fill={`url(#ld-${uid})`} opacity={fade} />}
-      {trimmed.length > 1 && <path d={toPath(trimmed)} fill="none" stroke={color} strokeWidth={5} strokeLinecap="round" strokeLinejoin="round" />}
+      {area && <path d={area} fill={areaFill.kind === "solid" ? `url(#ld-${uid})` : areaFill.fill} opacity={fade} />}
+      {trimmed.length > 1 && <path d={toPath(trimmed)} fill="none" stroke={color} strokeWidth={lw} strokeLinecap="round" strokeLinejoin="round" />}
       {draw > 0 && (
         <g>
-          <circle cx={tip.x} cy={tip.y} r={16} fill={withAlpha(color, 0.25)} />
-          <circle cx={tip.x} cy={tip.y} r={8} fill={theme.color.surface} stroke={color} strokeWidth={4} />
+          <circle cx={tip.x} cy={tip.y} r={lw * 3.2} fill={withAlpha(color, 0.25)} />
+          <circle cx={tip.x} cy={tip.y} r={lw * 1.6} fill={theme.color.surface} stroke={color} strokeWidth={lw * 0.8} />
         </g>
       )}
       {p.showValue !== false && (

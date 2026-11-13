@@ -1,11 +1,12 @@
 import { useMemo } from "react";
-import { withAlpha } from "../../themes";
+import { cornerRadius, staggerScale, withAlpha } from "../../themes";
 import { Easing } from "../../engine";
 import { fxBox, progress, useFx } from "../core";
 import type { FxProps } from "../core";
 import { parsePath, pointAt, toPath, trimPolyline } from "../data/geom";
 import type { Pt } from "../data/geom";
 import { staggerT } from "../data/geom";
+import { SvgShadow, parseSurface } from "../data/styleKit";
 
 export type BpShape =
   | { type: "rect"; x: number; y: number; w: number; h: number }
@@ -41,13 +42,17 @@ export function BlueprintDraw(p: BlueprintDrawProps) {
   const polys = useMemo(() => shapes.map(shapePolyline), [shapes]);
   const gridIn = progress(local, 0, dur * 0.15, Easing.out);
   const draw = progress(local, dur * 0.08, dur * 0.8);
-  const ts = shapes.map((_, i) => Easing.inOut(staggerT(draw, i, n, 0.6)));
+  const ts = shapes.map((_, i) => Easing.inOut(staggerT(draw, i, n, Math.min(0.95, 0.6 * staggerScale(theme)))));
   // pluma: la ultima forma con trazo en curso, o la ultima terminada
   let penIdx = -1;
   ts.forEach((t, i) => { if (t > 0) penIdx = i; });
   const pen = penIdx >= 0 ? pointAt(polys[penIdx]!, ts[penIdx]!) : null;
   const penOn = pen && draw < 1 ? 1 : 0;
   const fs = theme.type.eyebrow * 0.8;
+  // Estilo del diseño: el papel del plano es un panel (esquinas, relleno, filo duro o halo); la grilla y las cotas son su contenido y no cambian.
+  const surf = parseSurface(theme, "panel");
+  const paper = surf.fill === theme.color.surface ? theme.color.surfaceAlt : surf.fill;
+  const rim = surf.edge !== theme.color.border && surf.border > 0;
   const minor: string[] = [], major: string[] = [];
   for (let x = 0; x <= w; x += gs) (Math.round(x / gs) % 5 === 0 ? major : minor).push(`M${x} 0V${h}`);
   for (let y = 0; y <= h; y += gs) (Math.round(y / gs) % 5 === 0 ? major : minor).push(`M0 ${y}H${w}`);
@@ -61,7 +66,8 @@ export function BlueprintDraw(p: BlueprintDrawProps) {
   );
   return (
     <svg width={w} height={h} viewBox={`0 0 ${w} ${h}`} style={{ display: "block", fontFamily: theme.font.family, ...p.style }}>
-      <rect width={w} height={h} fill={theme.color.surfaceAlt} rx={theme.radius.lg} />
+      <SvgShadow shadow={surf.shadow} x={0} y={0} width={w} height={h} rx={cornerRadius(theme, "panel")} />
+      <rect width={w} height={h} fill={paper} rx={cornerRadius(theme, "panel")} {...(rim ? { stroke: surf.edge, strokeWidth: surf.border * 2 } : {})} />
       <path d={minor.join(" ")} stroke={theme.color.border} strokeWidth={1} opacity={0.55 * gridIn} fill="none" />
       <path d={major.join(" ")} stroke={theme.color.border} strokeWidth={1.8} opacity={gridIn} fill="none" />
       {shapes.map((_s, i) => {

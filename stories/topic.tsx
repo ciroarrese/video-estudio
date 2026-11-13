@@ -1,8 +1,10 @@
 import React, { createContext, useContext } from "react";
 import { DockedHeadline } from "../kit";
 import { useVideoConfig } from "../engine";
-import { useTheme } from "../themes";
+import { storyDefaults, useTheme } from "../themes";
+import type { Theme } from "../themes";
 import { AVG_REG, fitText, textWidth } from "./layout";
+import { useStorySpec } from "./shared";
 import { listOptions } from "./types";
 import type { StorySpec } from "./types";
 
@@ -19,11 +21,18 @@ export type TopicInfo = {
 /** Lo que la historia decide de la píldora del titular: `design.list` ("inline" → una sola línea con la del tema), `design.headline.size` y `design.gradient.loop`. */
 export type HeadlineDefaults = { layout: "stacked" | "inline"; size: "md" | "sm"; gradientLoop?: number };
 
+/** Recibe el `spec` con el diseño ya mezclado con el del tema (`useStorySpec` / `resolveStorySpec`). */
 export const headlineDefaults = (spec: StorySpec): HeadlineDefaults => ({
   layout: listOptions(spec.design).layout,
   size: spec.design?.headline?.size ?? "md",
   gradientLoop: spec.design?.gradient?.loop,
 });
+
+/** Lo que decide el design system del titular cuando la escena se renderiza sola (sin historia): `style.story.listLayout`, `headlineSize` y `decor.gradientLoop`. */
+const themeHeadline = (theme: Theme): HeadlineDefaults => {
+  const d = storyDefaults(theme);
+  return { layout: d.list.layout, size: d.headline.size, gradientLoop: d.gradient?.loop };
+};
 
 /** Cuadros que tarda en entrar la píldora del titular (los de `DockedHeadline`). */
 const DOCK_IN = 18;
@@ -34,7 +43,8 @@ export const TopicContext = createContext<TopicInfo | null>(null);
  * Da el tema `index` de `spec` a lo que va dentro (`useTopic()`, `<TopicHeadline />`): es lo que hace `composeStory` con cada escena, para
  * quien arma la historia a mano con `Sequence`. `docked`: la apertura terminó acoplando este titular (ver `StoryDesign.handoff`).
  */
-export function TopicProvider({ spec, index, docked, children }: { spec: StorySpec; index: number; docked?: boolean; children?: React.ReactNode }) {
+export function TopicProvider({ spec: specIn, index, docked, children }: { spec: StorySpec; index: number; docked?: boolean; children?: React.ReactNode }) {
+  const spec = useStorySpec(specIn);
   const t = spec.topics[index];
   if (!t) throw new Error(`TopicProvider: el tema ${index} no existe (hay ${spec.topics.length})`);
   return <TopicContext.Provider value={{ index, name: t.name, line: t.line, docked, headline: headlineDefaults(spec) }}>{children}</TopicContext.Provider>;
@@ -94,7 +104,7 @@ export function TopicHeadline({ start = 0, hide = 0, frame, title, number, layou
   }
   // con la apertura acoplada la píldora ya está puesta desde el cuadro 0 de la escena: su entrada ocurrió al final de la apertura
   const at = t?.docked && title === undefined ? Math.min(start, -DOCK_IN) : start;
-  const def = t?.headline;
+  const def = t?.headline ?? themeHeadline(theme);
   // inline solo en formatos anchos (igual que la lista); en vertical y cuadrado, apilado
   const wide = width / height >= 1.3;
   const lay = (layout ?? def?.layout ?? "stacked") === "inline" && wide ? "inline" : "stacked";

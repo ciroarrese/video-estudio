@@ -1,26 +1,72 @@
 import React, { useEffect } from "react";
 import { asset, holdRender, releaseRender, useFrame, useVideoConfig } from "../engine";
-import { CloudBackground, GradientText, Stage, kf } from "../kit";
+import { CloudBackground, GradientText, Highlight, Numeral, Stage, kf } from "../kit";
 import type { CloudOptions } from "../kit";
 import { themeEasing } from "../kit/util";
-import { contrastRatio, parseColor, resolveColor, useTheme, withAlpha } from "../themes";
+import {
+  accentMark, backgroundLayer, backgroundSamples, borderWidth, contrastRatio, cornerRadius, entrance, numeralStyle, parseColor, resolveColor,
+  resolveStyle, surfaceStyle, textStyle, useTheme, withAlpha, withStoryDefaults,
+} from "../themes";
 import type { Theme } from "../themes";
 import { fade, styleKey, svgScale, xform } from "../fx/core/math";
 import type { ListLayout } from "./layout";
 import { INLINE_SEP, ROW_GAP, fitText, pillFit } from "./layout";
 import { parseRich } from "./types";
+import type { StoryDesign, StorySpec } from "./types";
 
 
 /**
- * `Stage` con las nubes del tamaño del cuadro: el fondo de `kit` se reparte por 1920×1080 y en vertical o cuadrado
- * quedaba como una franja arriba; acá se lo pide con el ancho y el alto reales (en horizontal es idéntico).
+ * Diseño de la historia: `spec.design` del video sobre los valores del design system (`withStoryDefaults`). Lo que el video indica gana; lo
+ * que no, sale de `theme.style` (con el tema por defecto es el aspecto de siempre). Función pura del tema, del `spec` y del tamaño del cuadro.
+ * En formato alto (vertical) las columnas y filas del muro del TEMA no rigen (están pensadas para el ancho: el muro alto lo decide el formato);
+ * las que el video pide en `spec.design.wall` sí.
+ */
+export function resolveStoryDesign(theme: Theme, design: StoryDesign | undefined, width: number, height: number): StoryDesign {
+  const d = withStoryDefaults(theme, design) as StoryDesign;
+  if (height / width > 1.3 && d.wall && (design?.wall?.columns === undefined || design?.wall?.rows === undefined)) {
+    const { columns, rows, ...rest } = d.wall;
+    return { ...d, wall: { ...rest, ...(design?.wall?.columns !== undefined ? { columns } : {}), ...(design?.wall?.rows !== undefined ? { rows } : {}) } };
+  }
+  return d;
+}
+
+/** `spec` con el diseño ya mezclado con el del tema: lo que todo bloque lee en lugar de `spec.design` crudo. Idempotente. */
+export function resolveStorySpec(theme: Theme, spec: StorySpec, width: number, height: number): StorySpec {
+  return { ...spec, design: resolveStoryDesign(theme, spec.design, width, height) };
+}
+
+/** El diseño de la historia con el del tema debajo (ver `resolveStoryDesign`). */
+export function useStoryDesign(spec: StorySpec): StoryDesign {
+  const theme = useTheme();
+  const { width, height } = useVideoConfig();
+  return resolveStoryDesign(theme, spec.design, width, height);
+}
+
+/** `spec` con `design` ya mezclado (ver `useStoryDesign`). */
+export function useStorySpec(spec: StorySpec): StorySpec {
+  const theme = useTheme();
+  const { width, height } = useVideoConfig();
+  return resolveStorySpec(theme, spec, width, height);
+}
+
+/**
+ * Escenario de la historia: `Stage` (que dibuja la capa de fondo del design system, `background.kind`: nubes, nada, grilla, puntos,
+ * degradado o ruido) con las nubes del tamaño del cuadro. El fondo de `kit` se reparte por 1920×1080 y en vertical o cuadrado quedaba como una
+ * franja arriba; acá se lo pide con el ancho y el alto reales (en horizontal es idéntico). Si el video pide nubes a propósito
+ * (`spec.design.clouds`) se dibujan aunque el fondo del tema sea otro.
  */
 export function StoryStage({ frame, cloud, children }: { frame?: number; /** Nubes de la historia (`spec.design.clouds`); lo que falte sale del tema. */ cloud?: CloudOptions; children?: React.ReactNode }) {
   const { width, height } = useVideoConfig();
+  const theme = useTheme();
   const cur = useFrame();
+  const layer = backgroundLayer(theme);
+  const intensity = resolveStyle(theme).background.intensity;
+  // nubes: las del tema solo con `background.kind: "clouds"`; con la intensidad por defecto no se pisa la opacidad (queda la del tema, como siempre)
+  const clouds = layer.clouds || cloud !== undefined;
+  const opacity = cloud?.opacity ?? (layer.clouds && intensity !== 1 ? layer.cloudOpacity : undefined);
   return (
     <Stage clouds={false} frame={frame}>
-      <CloudBackground {...cloud} frame={frame ?? cur} width={width} height={height} />
+      {clouds && <CloudBackground {...cloud} opacity={opacity} frame={frame ?? cur} width={width} height={height} />}
       {children}
     </Stage>
   );
@@ -34,15 +80,17 @@ export function Chip({ text, lit, pop, faint }: { text: string; lit: number; pop
   const theme = useTheme();
   const on = lit > 0.5;
   const t = fitText(text, 400, theme.type.caption * 0.94, { min: theme.type.caption * 0.75, avg: 0.54 });
+  // superficie, borde y sombra del design system (`surfaceStyle`); el borde nominal es de 2 px: si el tema lo cambia, el relleno lo compensa
+  // y la pieza mide lo mismo (la medida no depende del estilo)
+  const surf = surfaceStyle(theme, "chip", { on, faint, glow: pop });
+  const lab = textStyle(theme, "label");
+  const pad = (v: number) => `${v + (2 - borderWidth(theme, "chip"))}px`;
   // en reposo (pop = 0) sin `transform`: un `scale(1)` residual compone la pieza en capa propia y se rasteriza según el historial
   const style: React.CSSProperties = {
-    padding: `${t.size * 0.5}px ${t.size * 0.9}px`,
-    borderRadius: theme.radius.pill,
-    background: theme.color.surface,
-    border: `2px solid ${on ? withAlpha(theme.color.accent, faint ? 0.3 : 0.55) : theme.color.border}`,
-    boxShadow: pop > 0.01 ? `${theme.shadow.md}, 0 0 ${10 + pop * 34}px ${withAlpha(theme.color.accent, 0.45 * pop)}` : theme.shadow.md,
+    padding: `${pad(t.size * 0.5)} ${pad(t.size * 0.9)}`,
+    ...surf,
     fontSize: t.size,
-    fontWeight: theme.font.weights.medium,
+    fontWeight: lab.fontWeight,
     color: on ? (faint ? theme.color.textMuted : theme.color.text) : theme.color.textMuted,
     whiteSpace: "nowrap",
     transform: pop > 0.01 ? xform({ scale: 1 + pop * 0.12 }) : undefined,
@@ -69,6 +117,8 @@ export function pillNumberColor(theme: Theme, bg: string = theme.color.surface, 
  * `design.clouds`): el color de mancha más contrastante a la opacidad efectiva sobre `theme.color.bg`. Con nubes tenues no cambia `base`.
  */
 export function quietOpacity(theme: Theme, clouds: CloudOptions | undefined, base: number): number {
+  // con un fondo de patrón (grilla, puntos, degradado, ruido) y sin nubes pedidas por el video, el peor fondo es el del patrón (`backgroundSamples`)
+  if (!backgroundLayer(theme).clouds && clouds === undefined) return quietOverSamples(theme, backgroundSamples(theme), base);
   const eff = clouds?.opacity ?? theme.cloud.opacity;
   const roles = [...(clouds?.colors ?? theme.cloud.colors), ...(clouds?.blobs ?? theme.cloud.blobs ?? []).flatMap((b) => (b.color ? [b.color] : []))];
   const bg = parseColor(theme.color.bg), fg = parseColor(theme.color.textMuted);
@@ -87,52 +137,109 @@ export function quietOpacity(theme: Theme, clouds: CloudOptions | undefined, bas
   return q;
 }
 
+/** Opacidad mínima (desde `base`) con que el texto atenuado (`textMuted`) conserva 3,1:1 sobre el peor de los fondos `samples`. */
+function quietOverSamples(theme: Theme, samples: string[], base: number): number {
+  const fg = parseColor(theme.color.textMuted);
+  if (!fg) return base;
+  const mixc = (a: { r: number; g: number; b: number }, b: { r: number; g: number; b: number }, p: number) => `rgb(${Math.round(a.r * (1 - p) + b.r * p)},${Math.round(a.g * (1 - p) + b.g * p)},${Math.round(a.b * (1 - p) + b.b * p)})`;
+  let q = base;
+  for (const bg$ of samples) {
+    const under = parseColor(bg$);
+    if (!under) continue;
+    let k = base;
+    while (k < 1 && contrastRatio(mixc(under, fg, k), bg$) < 3.1) k = Math.round((k + 0.01) * 100) / 100;
+    q = Math.max(q, k);
+  }
+  return q;
+}
+
 /** Píldora con el número y el nombre del tema (cierre, ~34 px de letra). */
 export function Pill({ index, name, scale = 1, glow = 0, maxW }: { index: number; name: string; scale?: number; glow?: number; /** Ancho total máximo (px): achica la letra y corta con "…" (ver `pillFit`). */ maxW?: number }) {
   const theme = useTheme();
+  const f = useFrame();
   const t = pillFit(theme, name, maxW);
+  // superficie del design system; el borde nominal es de 3 px (`pillFit` lo cuenta): si el tema lo cambia, el relleno lo compensa
+  const surf = surfaceStyle(theme, "pill", { glow });
+  const comp = 3 - borderWidth(theme, "pill");
+  const title = textStyle(theme, "title");
+  // el degradado no llega a 4,5:1 sobre la superficie: con `numerals: "gradient"` el número va en un color sólido; con otro estilo, el del tema
+  const numeral = resolveStyle(theme).type.numerals === "gradient" ? { color: pillNumberColor(theme) } : numeralStyle(theme, { frame: f });
   return (
     <div
       style={{
         display: "flex",
         alignItems: "baseline",
         gap: 16,
-        padding: `${t.size * 0.42}px ${t.size * 0.9}px`,
-        borderRadius: theme.radius.pill,
-        background: theme.color.surface,
-        border: `3px solid ${withAlpha(theme.color.accent, 0.66)}`,
-        boxShadow: `${theme.shadow.lg}, 0 0 ${18 + glow * 34}px ${withAlpha(theme.color.accent, 0.25 + glow * 0.4)}`,
+        padding: `${t.size * 0.42 + comp}px ${t.size * 0.9 + comp}px`,
+        ...surf,
         whiteSpace: "nowrap",
         transform: scale === 1 ? undefined : `scale(${scale})`,
         transformOrigin: "50% 50%",
       }}
     >
-      <span style={{ fontSize: t.numSize, fontWeight: theme.font.weights.stat, color: pillNumberColor(theme) }}>{String(index + 1).padStart(2, "0")}</span>
-      <span style={{ fontSize: t.size, fontWeight: theme.font.weights.semibold, color: theme.color.text }}>{t.text}</span>
+      <span style={{ fontSize: t.numSize, fontWeight: theme.font.weights.stat, ...numeral }}>{String(index + 1).padStart(2, "0")}</span>
+      <span style={{ fontSize: t.size, fontWeight: title.fontWeight, ...(title.letterSpacing ? { letterSpacing: title.letterSpacing } : {}), color: theme.color.text }}>{t.text}</span>
     </div>
   );
 }
 
-/** Círculo con tilde que se dibuja: p de 0 a 1 (primera mitad el círculo, segunda la tilde). */
+/**
+ * Marca con tilde que se dibuja: p de 0 a 1 (primera mitad la forma, segunda la tilde). La forma sigue el lenguaje de esquinas del design
+ * system (`cornerRadius` de chip): círculo con `pill`, cuadrado de esquinas suaves con `rounded`, cuadrado con `sharp`. El relleno es el degradado
+ * de marca con `numerals: "gradient"` y el acento sólido con cualquier otro estilo de números.
+ */
 export function CheckMark({ p, size, id }: { p: number; size: number; id: string }) {
   const theme = useTheme();
   const c = Math.min(1, p * 2);
+  const radius = cornerRadius(theme, "chip");
+  const round = radius >= size / 2;
+  const gradient = resolveStyle(theme).type.numerals === "gradient";
+  const fill = gradient ? `url(#story-check-${id})` : theme.color.accent;
+  const shape = { fill, opacity: c, transform: svgScale(23, 23, 0.6 + c * 0.4) };
   return (
     <svg width={size} height={size} viewBox="0 0 46 46" style={{ overflow: "visible", display: "block" }}>
-      <defs>
-        <linearGradient id={`story-check-${id}`} x1="0" x2="1">
-          <stop offset="0" stopColor={theme.color.accent} />
-          <stop offset="1" stopColor={theme.color.accent2} />
-        </linearGradient>
-      </defs>
-      <circle cx={23} cy={23} r={21} fill={`url(#story-check-${id})`} opacity={c} transform={svgScale(23, 23, 0.6 + c * 0.4)} />
+      {gradient && (
+        <defs>
+          <linearGradient id={`story-check-${id}`} x1="0" x2="1">
+            <stop offset="0" stopColor={theme.color.accent} />
+            <stop offset="1" stopColor={theme.color.accent2} />
+          </linearGradient>
+        </defs>
+      )}
+      {round ? <circle cx={23} cy={23} r={21} {...shape} /> : <rect x={2} y={2} width={42} height={42} rx={Math.min(21, (radius / size) * 46)} {...shape} />}
       <path d="M13 24l7 7 13-15" fill="none" stroke={theme.color.onAccent} strokeWidth={4.2} strokeLinecap="round" strokeLinejoin="round" strokeDasharray={34} strokeDashoffset={34 * (1 - Math.max(0, p * 2 - 1))} />
     </svg>
   );
 }
 
 /**
- * Fila de la lista: número (o su reemplazo), nombre, línea y subrayado de degradado.
+ * Número de la lista según `style.type.numerals`: el degradado de marca (`GradientText`, con su vaivén) o sólido, tenue o de contorno
+ * (`numeralStyle`). Los números van sobre el fondo de la escena (`on: bg`): el sólido elige el acento que llega a 4,5:1 sobre él.
+ */
+export function StoryNumeral({ children, loop }: { children: string; loop?: number }) {
+  const theme = useTheme();
+  const f = useFrame();
+  if (resolveStyle(theme).type.numerals === "gradient") return <GradientText loop={loop}>{children}</GradientText>;
+  return <Numeral frame={f} loop={loop} on={theme.color.bg}>{children}</Numeral>;
+}
+
+/**
+ * Entrada de una fila (o de lo que se mueva con la lista) según `style.motion.entrance`: solo el movimiento (`transform` / `clipPath`);
+ * el fundido lo lleva la opacidad de la pieza. `dy` suma un desplazamiento vertical propio (el acople). Con la entrada `auto` es el
+ * deslizamiento lateral de siempre (`native: "slide"`, de la derecha).
+ */
+export function rowEntrance(theme: Theme, p: number, index: number, o: { distance: number; dy?: number; round?: boolean }): React.CSSProperties {
+  const e = entrance(theme, p, index, { native: "slide", side: "right", distance: o.distance, round: o.round });
+  const out: React.CSSProperties = {};
+  const dy = o.dy ?? 0;
+  const tr = [e.transform, dy !== 0 ? `translateY(${dy}px)` : undefined].filter(Boolean).join(" ");
+  if (tr) out.transform = tr;
+  if (e.clipPath) out.clipPath = e.clipPath;
+  return out;
+}
+
+/**
+ * Fila de la lista: número (o su reemplazo), nombre, línea y marca de acento (barra de degradado, filete o punto según `decor.accent`).
  * Se ubica en coordenadas del mundo (esquina de la fila). Todo lo que se anima (`opacity`, `transform`, `filter`, sombra del
  * subrayado) se emite solo mientras cambia: en reposo la fila no lleva transformaciones ni opacidades residuales.
  */
@@ -151,12 +258,17 @@ export function HeadlineRow({
   gradientLoop?: number;
 }) {
   const theme = useTheme();
+  const title = textStyle(theme, "title", { tracking: -0.02 });
   const root: React.CSSProperties = { position: "absolute", left: L.left, top: L.top + i * L.rowH, width: L.rowW, height: L.rowH, opacity: fade(opacity), ...style };
-  const bar: React.CSSProperties = {
-    position: "absolute", left: L.barLeft, top: L.barTop, height: ROW_GAP.bar, borderRadius: theme.radius.pill, width: Math.round((L.barWs[i] ?? L.barW) * underline),
-    background: theme.gradient.brand, boxShadow: underline > 0.02 ? `0 0 18px ${withAlpha(theme.color.accent, 0.5)}` : undefined, opacity: fade(underlineOpacity),
+  const mark = accentMark(theme, { length: L.barWs[i] ?? L.barW, thickness: ROW_GAP.bar, progress: underline });
+  // la marca ocupa el hueco de la barra: el filete y el punto (más finos) se centran en él
+  const mh = mark ? Number(mark.style.height) : 0;
+  const bar: React.CSSProperties | null = mark && {
+    position: "absolute", left: L.barLeft, top: L.barTop + Math.round((ROW_GAP.bar - mh) / 2), height: mark.style.height, borderRadius: mark.style.borderRadius, width: mark.style.width,
+    background: mark.style.background, boxShadow: mark.kind === "bar" && underline > 0.02 ? `0 0 18px ${withAlpha(theme.color.accent, 0.5)}` : undefined, opacity: mark.kind === "dot" ? mark.style.opacity : fade(underlineOpacity),
   };
-  const num = number ?? <GradientText loop={gradientLoop}>{String(i + 1).padStart(2, "0")}</GradientText>;
+  const num = number ?? <StoryNumeral loop={gradientLoop}>{String(i + 1).padStart(2, "0")}</StoryNumeral>;
+  const nameStyle = { fontWeight: title.fontWeight, color: theme.color.text, letterSpacing: title.letterSpacing };
   if (L.stacked) {
     const nameTop = L.blockTop + L.numH + L.numGap;
     const block: React.CSSProperties = { position: "absolute", left: 0, top: L.blockTop, width: L.rowW, opacity: fade(quiet) };
@@ -164,12 +276,12 @@ export function HeadlineRow({
       <div key={styleKey(root)} style={root}>
         <div key={`block-${styleKey(block)}`} style={block}>
           <div style={{ height: L.numH, lineHeight: `${L.numH}px`, fontSize: L.numSize, fontWeight: theme.font.weights.stat, position: "relative", whiteSpace: "nowrap" }}>{num}</div>
-          <div style={{ position: "absolute", left: 0, top: nameTop - L.blockTop, fontSize: L.nameSize, lineHeight: `${L.nameH}px`, height: L.nameH, fontWeight: theme.font.weights.semibold, color: theme.color.text, letterSpacing: "-0.02em", whiteSpace: "nowrap" }}>{L.names[i]}</div>
+          <div style={{ position: "absolute", left: 0, top: nameTop - L.blockTop, fontSize: L.nameSize, lineHeight: `${L.nameH}px`, height: L.nameH, ...nameStyle, whiteSpace: "nowrap" }}>{L.names[i]}</div>
           <div style={{ position: "absolute", left: 0, top: nameTop - L.blockTop + L.nameH + ROW_GAP.a, fontSize: L.lineSize, lineHeight: `${L.lineH}px`, color: theme.color.textMuted, whiteSpace: "nowrap" }}>
             {L.lineRows[i]!.map((r, k) => <div key={k}>{r}</div>)}
           </div>
         </div>
-        <div key={`bar-${styleKey(bar)}`} style={bar} />
+        {bar && <div key={`bar-${styleKey(bar)}`} style={bar} />}
       </div>
     );
   }
@@ -179,7 +291,7 @@ export function HeadlineRow({
       <div key={`block-${styleKey(block)}`} style={block}>
         <div style={{ display: "flex", alignItems: "baseline", height: L.nameH, whiteSpace: "nowrap" }}>
           <span style={{ width: L.numW, flexShrink: 0, fontSize: L.numSize, fontWeight: theme.font.weights.stat, position: "relative" }}>{num}</span>
-          <span style={{ fontSize: L.nameSize, lineHeight: `${L.nameH}px`, fontWeight: theme.font.weights.semibold, color: theme.color.text, letterSpacing: "-0.02em" }}>{L.names[i]}</span>
+          <span style={{ fontSize: L.nameSize, lineHeight: `${L.nameH}px`, ...nameStyle }}>{L.names[i]}</span>
           {L.inline && (
             <>
               <span style={{ fontSize: L.lineSize, lineHeight: `${L.nameH}px`, color: theme.color.textMuted, whiteSpace: "pre" }}>{` ${INLINE_SEP} `}</span>
@@ -189,7 +301,7 @@ export function HeadlineRow({
         </div>
         {!L.inline && <div style={{ marginLeft: L.numW, marginTop: ROW_GAP.a, height: L.lineH, fontSize: L.lineSize, lineHeight: `${L.lineH}px`, color: theme.color.textMuted, whiteSpace: "nowrap" }}>{L.lines[i]}</div>}
       </div>
-      <div key={`bar-${styleKey(bar)}`} style={bar} />
+      {bar && <div key={`bar-${styleKey(bar)}`} style={bar} />}
     </div>
   );
 }
@@ -204,14 +316,20 @@ export function RichText({ text, bold }: { text: string; bold?: number }) {
   );
 }
 
-/** Texto con el fragmento `highlight` pintado con el degradado del tema. */
-export function HighlightedTitle({ text, highlight, loop }: { text: string; highlight?: string; loop?: number }) {
+/**
+ * Texto con el fragmento `highlight` resaltado según `style.type.highlight`: el degradado de marca (con su vaivén), el color de acento, un
+ * filete debajo o un marcador detrás. `progress` (0 a 1) dibuja el filete y el marcador de izquierda a derecha; los demás aparecen completos.
+ */
+export function HighlightedTitle({ text, highlight, loop, progress = 1 }: { text: string; highlight?: string; loop?: number; progress?: number }) {
+  const theme = useTheme();
+  const f = useFrame();
   const at = highlight ? text.indexOf(highlight) : -1;
   if (!highlight || at < 0) return <>{text}</>;
+  const hl = resolveStyle(theme).type.highlight === "gradient" ? <GradientText loop={loop}>{highlight}</GradientText> : <Highlight frame={f} loop={loop} progress={progress}>{highlight}</Highlight>;
   return (
     <>
       {text.slice(0, at)}
-      <GradientText loop={loop}>{highlight}</GradientText>
+      {hl}
       {text.slice(at + highlight.length)}
     </>
   );

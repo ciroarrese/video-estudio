@@ -1,6 +1,7 @@
 import { holdRender, releaseRender } from "../../engine";
 
-export type FontSpec = { family: string; weight?: number };
+/** `letterSpacing` en em: se suma al ancho de cada carácter (el canvas no lo mide, el DOM sí lo dibuja). */
+export type FontSpec = { family: string; weight?: number; letterSpacing?: number };
 
 const isJsdom = () => typeof navigator !== "undefined" && /jsdom/i.test(navigator.userAgent);
 
@@ -35,17 +36,18 @@ export function glyphWidthEm(ch: string): number {
   return 0.56;
 }
 
-/** Ancho en px de `text`. Con navegador mide con canvas (`measureText`); en jsdom estima por glifo. */
+/** Ancho en px de `text`. Con navegador mide con canvas (`measureText`); en jsdom estima por glifo. Suma `font.letterSpacing` (em) por carácter. */
 export function measureWidth(text: string, fontSize: number, font: FontSpec): number {
+  const spacing = (font.letterSpacing ?? 0) * fontSize * Array.from(text).length;
   const c = ctx2d();
   if (c) {
     holdForFonts();
     c.font = `${font.weight ?? 400} ${fontSize}px ${font.family}`;
-    return c.measureText(text).width;
+    return c.measureText(text).width + spacing;
   }
   let w = 0;
   for (const ch of text) w += glyphWidthEm(ch);
-  return w * fontSize;
+  return w * fontSize + spacing;
 }
 
 export type FitOptions = { font: FontSpec; max: number; min?: number; measure?: (text: string, fontSize: number, font: FontSpec) => number };

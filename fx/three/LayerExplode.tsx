@@ -1,6 +1,7 @@
 import { Easing, FrameCanvas, lerp, progress, sub } from "../core";
 import { isometric } from "./math";
-import { poly, seg, shadeColor, useThreeFx } from "./common";
+import { textStyle } from "../../themes";
+import { poly, seg, shadeColor, stepDelay, useThreeFx } from "./common";
 import type { ThreeProps } from "./common";
 
 export type LayerExplodeProps = ThreeProps & {
@@ -12,7 +13,7 @@ const LABELS = ["Infraestructura", "Datos", "Lógica", "Interfaz"];
 
 /** Una tarjeta isométrica que se separa en capas rotuladas, unidas por conectores de esquina punteados. */
 export function LayerExplode(p: LayerExplodeProps) {
-  const { t, local, width, height, theme, pal, k } = useThreeFx(p, { width: 1300, height: 800, duration: 75 });
+  const { t, local, duration, width, height, theme, pal, k } = useThreeFx(p, { width: 1300, height: 800, duration: 75 });
   const labels = p.labels ?? LABELS;
   const n = labels.length;
   const S = 3; // lado de la tarjeta (unidades)
@@ -76,7 +77,7 @@ export function LayerExplode(p: LayerExplodeProps) {
           connectors([1, 2, 3]);
           // Lineas guia a los rotulos.
           for (let i = 0; i < n; i++) {
-            const a = progress(local, 30 + i * 6, 14, Easing.out);
+            const a = progress(local, 30 + stepDelay(theme, i, n, 6, duration - 30 - 14 - 6), 14, Easing.out);
             if (a <= 0) continue;
             const q = labelPos(i);
             const x0 = q.x - cx + 10 * k, y0 = q.y - cy;
@@ -85,7 +86,7 @@ export function LayerExplode(p: LayerExplodeProps) {
         }}
       />
       {labels.map((txt, i) => {
-        const a = progress(local, 38 + i * 6, 14, Easing.out);
+        const a = progress(local, 38 + stepDelay(theme, i, n, 6, duration - 38 - 14), 14, Easing.out);
         const q = labelPos(i);
         return (
           <div
@@ -99,7 +100,7 @@ export function LayerExplode(p: LayerExplodeProps) {
               whiteSpace: "nowrap",
               fontFamily: theme.font.family,
               fontSize: theme.type.body,
-              fontWeight: theme.font.weights.semibold,
+              ...textStyle(theme, "title"),
               color: i === n - 1 ? pal.accent : pal.ink,
             }}
           >

@@ -28,7 +28,7 @@ export function Typewriter(props: TypewriterProps) {
   // El extra solo lleva opacidad y traslado mientras aparece.
   const afterStyle: React.CSSProperties = { display: "inline-block", opacity: afterP > 0 ? undefined : 0, transform: xform({ y: (1 - afterP) * fs * 0.5, round: true }) };
   return (
-    <div style={{ ...baseText(theme, { ...props, fontSize: fs }), whiteSpace: "pre-wrap", display: "flex", alignItems: "center", gap: "0.5em", width: props.width, ...style }}>
+    <div style={{ ...baseText(theme, { ...props, fontSize: fs }, true), whiteSpace: "pre-wrap", display: "flex", alignItems: "center", gap: "0.5em", width: props.width, ...style }}>
       <span>
         <span>{chars.slice(0, count).join("")}</span>
         <span

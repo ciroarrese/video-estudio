@@ -1,7 +1,8 @@
 import React from "react";
 import { Easing, fade, lerp, progress, styleKey, xform } from "../core";
 import { camera, sortBackToFront } from "./math";
-import { useThreeFx } from "./common";
+import { cornerRadius, textStyle } from "../../themes";
+import { cardSurface, stepDelay, useThreeFx } from "./common";
 import type { ThreeProps } from "./common";
 
 export type CarouselRingProps = ThreeProps & {
@@ -14,7 +15,7 @@ export type CarouselRingProps = ThreeProps & {
 
 /** N tarjetas sobre un anillo que gira; las de atrás, más chicas y apagadas. La tarjeta 0 termina al frente. */
 export function CarouselRing(p: CarouselRingProps) {
-  const { local, t, width, height, theme, pal } = useThreeFx(p, { width: 1500, height: 760, duration: 75 });
+  const { local, t, duration, width, height, theme, pal } = useThreeFx(p, { width: 1500, height: 760, duration: 75 });
   const kids = React.Children.toArray(p.children);
   const n = kids.length || (p.count ?? 6);
   const cw = p.cardWidth ?? 300;
@@ -23,7 +24,7 @@ export function CarouselRing(p: CarouselRingProps) {
   const unit = Math.min(width / 8.5, 190);
   const cam = camera({ distance: D, tilt: 0.22, unit });
   const rot = (1 - Easing.inOut(t)) * -Math.PI * 1.0;
-  const enter = (i: number) => progress(local, i * 3, 20, Easing.lands);
+  const enter = (i: number) => progress(local, stepDelay(theme, i, n, 3, duration - 20 - 4), 20, Easing.lands);
   const cards = Array.from({ length: n }, (_, i) => {
     const a = (i / n) * Math.PI * 2 + rot;
     const pos = { x: Math.sin(a) * R, y: 0, z: Math.cos(a) * R };
@@ -48,9 +49,8 @@ export function CarouselRing(p: CarouselRingProps) {
           transformOrigin: "50% 50%",
           opacity: fade(lerp(0.35, 1, Math.pow(c.front, 0.8)) * Math.min(1, e * 2)),
           zIndex: z,
-          background: c.front > 0.85 ? theme.color.surface : theme.color.surfaceAlt,
-          border: `2px solid ${c.front > 0.92 ? pal.accent : theme.color.border}`,
-          borderRadius: theme.radius.lg,
+          // Forma, relleno, borde y sombra del design system (por defecto: radio `lg`, borde de 2 px y sin sombra).
+          ...cardSurface(theme, { alt: c.front <= 0.85, accent: c.front > 0.92 ? pal.accent : undefined }),
           overflow: "hidden",
           fontFamily: theme.font.family,
         };
@@ -63,10 +63,10 @@ export function CarouselRing(p: CarouselRingProps) {
           >
             {kids.length ? kids[c.i] : (
               <div style={{ padding: 24, display: "flex", flexDirection: "column", gap: 12, height: "100%", boxSizing: "border-box", justifyContent: "flex-end" }}>
-                <div style={{ width: 52, height: 52, borderRadius: theme.radius.md, background: c.i % 2 ? pal.accent2 : pal.accent }} />
-                <div style={{ fontSize: theme.type.caption, fontWeight: theme.font.weights.semibold, color: pal.ink }}>{`Tarjeta ${c.i + 1}`}</div>
-                <div style={{ height: 8, borderRadius: 4, background: pal.line, opacity: 0.35 }} />
-                <div style={{ height: 8, width: "70%", borderRadius: 4, background: pal.line, opacity: 0.35 }} />
+                <div style={{ width: 52, height: 52, borderRadius: cornerRadius(theme, "control"), background: c.i % 2 ? pal.accent2 : pal.accent }} />
+                <div style={{ fontSize: theme.type.caption, ...textStyle(theme, "title"), color: pal.ink }}>{`Tarjeta ${c.i + 1}`}</div>
+                <div style={{ height: 8, borderRadius: Math.min(4, cornerRadius(theme, "bar")), background: pal.line, opacity: 0.35 }} />
+                <div style={{ height: 8, width: "70%", borderRadius: Math.min(4, cornerRadius(theme, "bar")), background: pal.line, opacity: 0.35 }} />
               </div>
             )}
           </div>

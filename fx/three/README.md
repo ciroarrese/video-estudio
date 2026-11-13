@@ -29,6 +29,10 @@ Efectos 3D proyectados a mano (sin librerías 3D): se rota cada punto, se proyec
 
 Ayudas puras en `math.ts`: `rotateX/Y/Z`, `camera({distance|fov, tilt, yaw})` con `project`, `sortBackToFront`, `faceNormal` + `shade`, `greatCircle`, `fibonacciSphere`, `isometric`, `lineByDepth`.
 
+## Estilo del design system
+
+`CardFlip` y `CarouselRing` toman radio, relleno, borde y sombra de `surfaceStyle(theme, "card")` (`cardSurface` en `common.ts`; por defecto borde de 2 px y sin sombra, como siempre; con `elevation: "shadow"` tampoco se dibuja sombra), los cuadrados de muestra de `cornerRadius("control")` y los rótulos el peso de titular. `LayerExplode` usa el peso de titular en sus rótulos. `CarouselRing` y `LayerExplode` escalan su escalonado con `motion.stagger` (`stepDelay`, sin pasarse del tiempo disponible). El resto es geometría y no cambia; `PhoneOrbit` está exento.
+
 ## Notas
 
 - **Canvas o DOM**: lo que tiene muchas primitivas usa `FrameCanvas`. `CardFlip`, `CarouselRing`, `ExtrudeType` y los rótulos de `LayerExplode` van en DOM (el texto lo ve `qa`) con traslado y escala 2D: no usan `rotateY` ni perspectiva de CSS (la perspectiva se proyecta a mano). Las posiciones de layout van en enteros y el texto bajo `scale()` pasa `--check` (si una pieza propia no lo pasa, animá `font-size` o escalá solo el fondo). El CSS 3D solo se admite como `perspective()` propio de cada elemento (ver `docs/reglas.md`): `PhoneOrbit` con pantalla es el ejemplo. `CardFlip` esconde la cara que no mira por ángulo (el ancho sigue a `cos`).

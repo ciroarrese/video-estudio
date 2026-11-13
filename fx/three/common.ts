@@ -1,8 +1,9 @@
 // Ayudas compartidas por las piezas 3D: paleta del tema, tiempo local y primitivas de dibujo en canvas.
 import { clamp, fxBox, mix, progress, roleColor, useFx } from "../core";
 import type { ColorRole, FxProps } from "../core";
-import { parseColor } from "../../themes";
+import { borderWidth, parseColor, staggerFrames, surfaceStyle } from "../../themes";
 import type { Theme } from "../../themes";
+import type React from "react";
 import { sortBackToFront } from "./math";
 
 /** Props comunes de las piezas 3D: las de `FxProps` y sobrescrituras de color por rol del tema. */
@@ -186,4 +187,33 @@ export function roundedRect(x0: number, y0: number, x1: number, y1: number, r: n
     }
   }
   return out;
+}
+
+/**
+ * Superficie de una tarjeta plana (`CardFlip`, `CarouselRing`) según `style.shape` y `style.surface`: radio, relleno, borde y sombra de
+ * `surfaceStyle(theme, "card")`. Con el estilo por defecto reproduce lo de siempre: borde de 2 px (`shape.border` + 1) y SIN sombra (la
+ * elevación `shadow` no se dibuja: estas tarjetas ya se sombrean al girar); `flat` la deja así, `border` y `glow` sí agregan su filo o halo.
+ * - `alt`: cara apagada (reverso, tarjetas del fondo): `surfaceAlt` si el relleno es el sólido del tema; vidrio, contorno y teñido se respetan.
+ * - `accent`: color de acento (CSS) para el borde en vez del de la superficie (cara que mira al frente); sin borde en el estilo no lo agrega.
+ */
+export function cardSurface(theme: Theme, o: { alt?: boolean; accent?: string } = {}): React.CSSProperties {
+  const s = surfaceStyle(theme, "card");
+  const out: React.CSSProperties = {};
+  out.background = o.alt && s.background === theme.color.surface ? theme.color.surfaceAlt : s.background;
+  const w = borderWidth(theme, "card");
+  if (w > 0 && s.border) {
+    out.border = o.accent ? `${w + 1}px solid ${o.accent}` : String(s.border).replace(/^[\d.]+px/, `${w + 1}px`);
+  }
+  out.borderRadius = s.borderRadius;
+  if (s.boxShadow && s.boxShadow !== theme.shadow.md) out.boxShadow = s.boxShadow;
+  return out;
+}
+
+/**
+ * Demora (cuadros) del elemento `i` de `n` con el paso propio `base` escalado por `motion.stagger` (4 = sin cambio). Con `room` (cuadros
+ * disponibles desde el primero hasta el último), el paso no crece más de lo que deja terminar a tiempo (nunca baja del propio): el último cuadro sigue siendo imagen fija.
+ */
+export function stepDelay(theme: Theme, i: number, n: number, base: number, room: number): number {
+  const step = staggerFrames(theme, 1, { base });
+  return i * (n > 1 ? Math.min(step, Math.max(base, room / (n - 1))) : step);
 }

@@ -1,6 +1,8 @@
 import type React from "react";
 import { Easing } from "../../engine";
 import { kf } from "../../kit";
+import { cornerRadius, textStyle } from "../../themes";
+import { bareShadow, parseSurface } from "../data/styleKit";
 import { fxBox, progress, useFx } from "../core";
 import type { FxProps } from "../core";
 
@@ -24,16 +26,17 @@ export const wipeInset = (pos: number): number => +(100 - pos * 100).toFixed(3);
 
 function Wireframe({ w, h }: { w: number; h: number }) {
   const { theme } = useFx({});
+  const rx = Math.min(4, cornerRadius(theme, "control"));
   const s = { fill: "none", stroke: theme.color.textMuted, strokeWidth: 2.5, strokeDasharray: "9 7" } as const;
   return (
     <svg width={w} height={h} style={{ display: "block" }}>
       <rect width={w} height={h} fill={theme.color.bg} />
-      <rect x={40} y={36} width={w - 80} height={64} rx={4} {...s} />
-      <rect x={40} y={128} width={(w - 120) * 0.55} height={h - 270} rx={4} {...s} />
+      <rect x={40} y={36} width={w - 80} height={64} rx={rx} {...s} />
+      <rect x={40} y={128} width={(w - 120) * 0.55} height={h - 270} rx={rx} {...s} />
       <line x1={40} y1={128} x2={40 + (w - 120) * 0.55} y2={h - 142} {...s} />
       <line x1={40 + (w - 120) * 0.55} y1={128} x2={40} y2={h - 142} {...s} />
-      {[0, 1, 2].map((i) => <rect key={i} x={40 + (w - 120) * 0.55 + 40} y={128 + i * 70} width={(w - 120) * 0.45} height={46} rx={4} {...s} />)}
-      <rect x={40} y={h - 100} width={180} height={52} rx={4} {...s} />
+      {[0, 1, 2].map((i) => <rect key={i} x={40 + (w - 120) * 0.55 + 40} y={128 + i * 70} width={(w - 120) * 0.45} height={46} rx={rx} {...s} />)}
+      <rect x={40} y={h - 100} width={180} height={52} rx={rx} {...s} />
     </svg>
   );
 }
@@ -41,16 +44,18 @@ function Wireframe({ w, h }: { w: number; h: number }) {
 function Design({ w, h }: { w: number; h: number }) {
   const { theme } = useFx({});
   const mw = (w - 120) * 0.55;
+  // La interfaz del "después" sigue las esquinas del diseño.
+  const rMd = cornerRadius(theme, "control"), rLg = cornerRadius(theme, "card"), rPill = cornerRadius(theme, "chip");
   return (
     <svg width={w} height={h} style={{ display: "block" }}>
       <rect width={w} height={h} fill={theme.color.surface} />
-      <rect x={40} y={36} width={w - 80} height={64} rx={theme.radius.md} fill={theme.color.surfaceAlt} />
+      <rect x={40} y={36} width={w - 80} height={64} rx={rMd} fill={theme.color.surfaceAlt} />
       <circle cx={76} cy={68} r={14} fill={theme.color.accent} />
       <rect x={104} y={60} width={110} height={16} rx={8} fill={theme.color.text} />
-      <rect x={40} y={128} width={mw} height={h - 270} rx={theme.radius.lg} fill={theme.color.accent} />
+      <rect x={40} y={128} width={mw} height={h - 270} rx={rLg} fill={theme.color.accent} />
       <circle cx={40 + mw * 0.7} cy={128 + (h - 270) * 0.35} r={(h - 270) * 0.22} fill={theme.color.accent2} opacity={0.85} />
-      {[0, 1, 2].map((i) => <rect key={i} x={40 + mw + 40} y={128 + i * 70} width={(w - 120) * 0.45} height={46} rx={theme.radius.md} fill={theme.color.surfaceAlt} stroke={theme.color.border} />)}
-      <rect x={40} y={h - 100} width={180} height={52} rx={theme.radius.pill} fill={theme.color.accent} />
+      {[0, 1, 2].map((i) => <rect key={i} x={40 + mw + 40} y={128 + i * 70} width={(w - 120) * 0.45} height={46} rx={rMd} fill={theme.color.surfaceAlt} stroke={theme.color.border} />)}
+      <rect x={40} y={h - 100} width={180} height={52} rx={rPill} fill={theme.color.accent} />
       <rect x={72} y={h - 80} width={116} height={12} rx={6} fill={theme.color.onAccent} />
     </svg>
   );
@@ -64,16 +69,21 @@ export function BeforeAfter(p: BeforeAfterProps) {
   const pos = wipePosition(progress(local, 0, dur), p.rest ?? 0.5);
   const hx = pos * w;
   const fs = theme.type.eyebrow * 0.85;
+  // Estilo del diseño: marco (borde doble del nominal, esquinas) y rótulos (relleno, borde, esquinas) según `surfaceStyle`.
+  const frame = parseSurface(theme, "card");
+  const tag = parseSurface(theme, "chip");
+  const tagBorder = Math.max(0, tag.border - 1);
+  const knob = cornerRadius(theme, "chip");
   const chip = (txt: string, left: boolean) => (
-    <div style={{ position: "absolute", top: 18, [left ? "left" : "right"]: 18, padding: "6px 18px", fontSize: fs, fontWeight: theme.font.weights.semibold, background: theme.color.surface, color: theme.color.text, border: `1px solid ${theme.color.border}`, borderRadius: theme.radius.pill }}>{txt}</div>
+    <div style={{ position: "absolute", top: 18, [left ? "left" : "right"]: 18, padding: "6px 18px", fontSize: fs, fontWeight: theme.font.weights.semibold, background: tag.fill, color: theme.color.text, border: tagBorder > 0 ? `${tagBorder}px solid ${tag.edge}` : "none", borderRadius: cornerRadius(theme, "chip"), boxShadow: bareShadow(tag), ...textStyle(theme, "eyebrow") }}>{txt}</div>
   );
   return (
-    <div style={{ position: "relative", width: w, height: h, overflow: "hidden", fontFamily: theme.font.family, border: `2px solid ${theme.color.border}`, borderRadius: theme.radius.lg, boxSizing: "border-box", ...p.style }}>
+    <div style={{ position: "relative", width: w, height: h, overflow: "hidden", fontFamily: theme.font.family, border: frame.border > 0 ? `${frame.border * 2}px solid ${frame.edge}` : "none", borderRadius: cornerRadius(theme, "card"), boxShadow: bareShadow(frame), boxSizing: "border-box", ...p.style }}>
       <div style={{ position: "absolute", inset: 0 }}>{p.before ?? <Wireframe w={w} h={h} />}</div>
       <div style={{ position: "absolute", inset: 0, clipPath: `inset(0 ${wipeInset(pos)}% 0 0)` }}>{p.after ?? <Design w={w} h={h} />}</div>
       <div style={{ position: "absolute", left: hx - 2, top: 0, width: 4, height: h, background: theme.color.accent }} />
       <svg width={56} height={56} style={{ position: "absolute", left: hx - 28, top: h / 2 - 28 }} viewBox="0 0 56 56">
-        <circle cx={28} cy={28} r={26} fill={theme.color.accent} stroke={theme.color.surface} strokeWidth={4} />
+        {knob >= 26 ? <circle cx={28} cy={28} r={26} fill={theme.color.accent} stroke={theme.color.surface} strokeWidth={4} /> : <rect x={2} y={2} width={52} height={52} rx={knob} fill={theme.color.accent} stroke={theme.color.surface} strokeWidth={4} />}
         <path d="M22 20 L14 28 L22 36 M34 20 L42 28 L34 36" fill="none" stroke={theme.color.onAccent} strokeWidth={4} strokeLinecap="round" strokeLinejoin="round" />
       </svg>
       {/* Los rótulos van después de la manija: ella pasa por debajo y nunca tapa un texto. */}

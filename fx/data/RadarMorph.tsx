@@ -1,9 +1,10 @@
-import { withAlpha } from "../../themes";
+import { chartFill, chartStyle, withAlpha } from "../../themes";
 import { Easing } from "../../engine";
 import { fxBox, progress, roleColor, useFx } from "../core";
 import type { ColorRole, FxProps } from "../core";
 import { toPath } from "./geom";
 import type { Pt } from "./geom";
+import { FillDef } from "./styleKit";
 
 export type RadarMorphProps = FxProps & {
   axes?: string[];
@@ -46,13 +47,19 @@ export function RadarMorph(p: RadarMorphProps) {
   const fs = theme.type.eyebrow * 0.8;
   const vals = radarValues(from, to, morph).map((v) => v * intro);
   const pts = radarPoints(cx, cy, R, vals);
+  // Estilo del diseño: grosor del contorno (los vértices lo siguen), guías (`on` suma anillos intermedios, `off` deja solo el anillo exterior) y relleno.
+  const cs = chartStyle(theme);
+  const lw = Math.max(1, cs.lineWidth - 1);
+  const areaFill = chartFill(theme, color, `radar-${p.color ?? "accent"}`);
+  const rings = cs.grid === "on" ? [0.125, 0.25, 0.375, 0.5, 0.625, 0.75, 0.875, 1] : cs.grid === "off" ? [1] : [0.25, 0.5, 0.75, 1];
   const ring = (k: number) => toPath(radarPoints(cx, cy, R * grid, Array(n).fill(k)), true);
   return (
     <svg width={w} height={h} viewBox={`0 0 ${w} ${h}`} style={{ display: "block", fontFamily: theme.font.family, ...p.style }}>
-      {[0.25, 0.5, 0.75, 1].map((k) => <path key={k} d={ring(k)} fill="none" stroke={theme.color.border} strokeWidth={1.5} />)}
-      {radarPoints(cx, cy, R * grid, Array(n).fill(1)).map((q, i) => <line key={i} x1={cx} y1={cy} x2={q.x} y2={q.y} stroke={theme.color.border} strokeWidth={1.5} />)}
-      <path d={toPath(pts, true)} fill={withAlpha(color, 0.22)} stroke={color} strokeWidth={4} strokeLinejoin="round" />
-      {pts.map((q, i) => <circle key={i} cx={q.x} cy={q.y} r={7} fill={theme.color.surface} stroke={color} strokeWidth={3.5} />)}
+      {areaFill.kind !== "solid" && <defs><FillDef fill={areaFill} /></defs>}
+      {rings.map((k) => <path key={k} d={ring(k)} fill="none" stroke={theme.color.border} strokeWidth={1.5} opacity={k % 0.25 === 0 ? undefined : 0.5} />)}
+      {cs.grid !== "off" && radarPoints(cx, cy, R * grid, Array(n).fill(1)).map((q, i) => <line key={i} x1={cx} y1={cy} x2={q.x} y2={q.y} stroke={theme.color.border} strokeWidth={1.5} />)}
+      <path d={toPath(pts, true)} fill={areaFill.kind === "solid" ? withAlpha(color, 0.22) : areaFill.fill} stroke={color} strokeWidth={lw} strokeLinejoin="round" />
+      {pts.map((q, i) => <circle key={i} cx={q.x} cy={q.y} r={lw * 1.75} fill={theme.color.surface} stroke={color} strokeWidth={lw * 0.875} />)}
       {axes.map((ax, i) => {
         const a = -Math.PI / 2 + (i / n) * Math.PI * 2;
         const lx = cx + Math.cos(a) * (R + 22), ly = cy + Math.sin(a) * (R + 22);

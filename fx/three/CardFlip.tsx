@@ -1,6 +1,7 @@
 import React from "react";
 import { Easing, lerp, progress, styleKey, xform } from "../core";
-import { useThreeFx } from "./common";
+import { cornerRadius } from "../../themes";
+import { cardSurface, useThreeFx } from "./common";
 import type { ThreeProps } from "./common";
 
 export type CardFlipProps = ThreeProps & {
@@ -32,7 +33,7 @@ export function CardFlip(p: CardFlipProps) {
   const shadeA = 0.28 * s;
   const placeholder = (title: string, hint: string, accent: boolean) => (
     <div style={{ padding: Math.round(36 * sc), display: "flex", flexDirection: "column", gap: Math.round(14 * sc), height: "100%", boxSizing: "border-box", justifyContent: "center" }}>
-      <div style={{ width: Math.round(64 * sc), height: Math.round(64 * sc), borderRadius: theme.radius.md, background: accent ? pal.accent : pal.line, opacity: accent ? 1 : 0.5 }} />
+      <div style={{ width: Math.round(64 * sc), height: Math.round(64 * sc), borderRadius: cornerRadius(theme, "control"), background: accent ? pal.accent : pal.line, opacity: accent ? 1 : 0.5 }} />
       <div style={{ fontSize: theme.type.h1, fontWeight: theme.font.weights.stat, color: pal.ink, lineHeight: 1.05 }}>{title}</div>
       <div style={{ fontSize: theme.type.body, color: theme.color.textMuted }}>{hint}</div>
     </div>
@@ -45,9 +46,8 @@ export function CardFlip(p: CardFlipProps) {
     width: cw,
     height: ch,
     boxSizing: "border-box",
-    borderRadius: theme.radius.lg,
-    background: showFront ? theme.color.surface : theme.color.surfaceAlt,
-    border: `2px solid ${showFront ? theme.color.border : pal.accent}`,
+    // Forma, relleno, borde y sombra del design system (por defecto: radio `lg`, borde de 2 px y sin sombra).
+    ...cardSurface(theme, showFront ? {} : { alt: true, accent: pal.accent }),
     overflow: "hidden",
     transform: xform({ y: -lift, scaleX: snap(sx * grow), scaleY: snap(grow) }),
     transformOrigin: "50% 50%",

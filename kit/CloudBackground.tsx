@@ -1,5 +1,5 @@
 import { random, useVideoConfig } from "../engine";
-import { resolveColor, useTheme } from "../themes";
+import { backgroundLayer, resolveColor, useTheme } from "../themes";
 import type { CloudBlob } from "../themes";
 import { useFrameOr } from "./util";
 
@@ -21,6 +21,7 @@ export type CloudOptions = {
  * Manchas difuminadas a la deriva con los colores de `theme.cloud`; posición y deriva salen de `random(seed)` y del cuadro.
  * Cada propiedad (`colors`, `count`, `seed`, `blobs`, `opacity`) pisa a la de `theme.cloud`; sin ninguna, el resultado es el de siempre.
  * Con `blobs` el reparto es explícito y la deriva sigue saliendo de la semilla y el cuadro. Es determinista en todos los casos.
+ * La opacidad por defecto es `theme.cloud.opacity` por `style.background.intensity` (`backgroundLayer(theme).cloudOpacity`).
  * `width`/`height` (el área donde se reparten las manchas) son por defecto el tamaño del cuadro del video (`useVideoConfig()`):
  * en vertical o cuadrado las nubes se acomodan al cuadro en vez de quedar recortadas como si fuera 1920 x 1080.
  */
@@ -48,7 +49,7 @@ export function CloudBackground({
   const blobs = blobsProp ?? theme.cloud.blobs;
   const n = blobs?.length ? blobs.length : count ?? theme.cloud.count ?? 6;
   return (
-    <div style={{ position: "absolute", inset: 0, overflow: "hidden", pointerEvents: "none", opacity: opacity ?? theme.cloud.opacity }}>
+    <div style={{ position: "absolute", inset: 0, overflow: "hidden", pointerEvents: "none", opacity: opacity ?? backgroundLayer(theme).cloudOpacity }}>
       {Array.from({ length: n }, (_, i) => {
         const r = (k: string) => random(`${sd}-${i}-${k}`);
         const b = blobs?.[i];

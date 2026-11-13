@@ -1,6 +1,6 @@
 import { random } from "../../engine";
 import { clamp, progress, useFx } from "../core";
-import { baseText } from "./shared";
+import { baseText, titleTreatment } from "./shared";
 import type { TextFxProps } from "./shared";
 import { measureWidth } from "./measure";
 
@@ -38,9 +38,10 @@ export function ScrambleDecode(props: ScrambleDecodeProps) {
   const duration = props.duration ?? Math.max(20, Array.from(text).length * 3);
   const shown = Array.from(scrambleAt(text, local, duration, seed, glyphs, hold));
   const finals = Array.from(text);
-  const font = { family: theme.font.family, weight: props.weight ?? theme.font.weights.semibold };
+  const tt = titleTreatment(theme, props.weight);
+  const font = { family: theme.font.family, weight: tt.weight, letterSpacing: tt.tracking };
   return (
-    <div style={{ ...baseText(theme, props), display: "flex", ...style }}>
+    <div style={{ ...baseText(theme, props, true), display: "flex", ...style }}>
       {finals.map((ch, i) => {
         const w = ch === " " ? measureWidth(" ", fs, font) : measureWidth(ch, fs, font);
         const resolved = shown[i] === ch;

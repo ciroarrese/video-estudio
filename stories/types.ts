@@ -79,6 +79,8 @@ export type StoryDesign = {
   closing?: {
     /** Rol del tema para el fondo del cierre cuando entra la firma (`"bg"` por defecto, p. ej. `"surface"`). */
     bg?: string;
+    /** Marca de acento bajo la firma (la barra de degradado, el filete o el punto según `decor.accent` del tema). `true` por defecto; `false` la quita. */
+    bar?: boolean;
   };
   /** Muro de etiquetas de la apertura (y del cierre, en lo que toca al desenfoque). */
   wall?: {
@@ -189,7 +191,12 @@ function validateDesign(d: StoryDesign | undefined): void {
   }
   if (d.headline !== undefined && d.headline.size !== undefined && d.headline.size !== "md" && d.headline.size !== "sm") bad(`headline.size debe ser "md" o "sm" (recibió ${JSON.stringify(d.headline.size)})`);
   if (d.gradient?.loop !== undefined && (!isInt(d.gradient.loop) || d.gradient.loop < 2)) bad("gradient.loop debe ser un número entero de cuadros >= 2");
+  if (d.closing !== undefined) {
+    if (d.closing === null || typeof d.closing !== "object") bad("closing debe ser un objeto { bg?, bar? }");
+    for (const k of Object.keys(d.closing)) if (k !== "bg" && k !== "bar") bad(`closing.${k} no existe (las claves válidas son bg, bar)`);
+  }
   if (d.closing?.bg !== undefined && (typeof d.closing.bg !== "string" || d.closing.bg === "")) bad("closing.bg debe ser el nombre de un rol del tema (p. ej. \"surface\")");
+  if (d.closing?.bar !== undefined && typeof d.closing.bar !== "boolean") bad(`closing.bar debe ser true o false (recibió ${JSON.stringify(d.closing.bar)})`);
   const w = d.wall;
   if (w) {
     for (const k of ["columns", "rows"] as const) {

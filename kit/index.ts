@@ -1,6 +1,7 @@
 export { kf, track, typed } from "./kf";
 export { cameraAt, zoomThrough } from "./camera";
 export type { CameraKey, Camera, CameraOptions } from "./camera";
+export { useCameraAt } from "./useCameraAt";
 export { World } from "./World";
 export { Wash } from "./Wash";
 export { Cursor } from "./Cursor";
@@ -8,6 +9,9 @@ export { Vignette } from "./Vignette";
 export { DoodleCircle, DoodleArrow, DoodleUnderline } from "./Doodles";
 export { circlePoints, arrowPoints, underlinePoints, boilSeed } from "./doodle";
 export { GradientText } from "./GradientText";
+export { Eyebrow } from "./Eyebrow";
+export { Highlight } from "./Highlight";
+export { Numeral } from "./Numeral";
 export { CloudBackground } from "./CloudBackground";
 export type { CloudOptions } from "./CloudBackground";
 export { flyInZ } from "./depth";
