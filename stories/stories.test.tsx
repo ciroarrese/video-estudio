@@ -336,8 +336,10 @@ describe("cierre: píldoras y paneles", () => {
             rects.forEach((o, j) => expect(hit(r.pill, o.panel), `${name} n=${n}: píldora ${i + 1} sobre el panel ${j + 1}`).toBe(false));
             // todo el conjunto entra en el cuadro
             expect(r.pill.y, `${name} n=${n} píldora ${i + 1} arriba`).toBeGreaterThanOrEqual(0);
-            expect(r.pill.x).toBeGreaterThanOrEqual(0);
-            expect(r.pill.x + r.pill.w).toBeLessThanOrEqual(w);
+            // con el zoom inicial de la cámara (1,1) sobre el centro del cuadro, la píldora sigue dentro
+            const zoomed = (x: number) => w / 2 + (x - w / 2) * 1.1;
+            expect(zoomed(r.pill.x), `${name} n=${n} píldora ${i + 1} a la izquierda`).toBeGreaterThanOrEqual(0);
+            expect(zoomed(r.pill.x + r.pill.w), `${name} n=${n} píldora ${i + 1} a la derecha`).toBeLessThanOrEqual(w);
             expect(r.panel.y + r.panel.h).toBeLessThanOrEqual(h);
           });
           // entre píldoras vecinas de una misma fila hay aire

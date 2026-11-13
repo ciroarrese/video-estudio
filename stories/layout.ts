@@ -330,15 +330,19 @@ export function pillFit(theme: Theme, name: string, maxW?: number): { text: stri
   return { text: t.text, size: t.size, numSize: Math.max(26, t.size * 0.8), w: Math.round(textWidth(t.text, t.size) + over(t.size)), h: Math.round(t.size * 1.25 + 2 * t.size * 0.42 + 6) };
 }
 
+/** Zoom máximo de la cámara del cierre (arranca en 1,1) y holgura (px) que se deja por la perspectiva y la inclinación de los paneles. */
+const CLOSING_CAM_MAX = 1.1, CLOSING_EDGE_SLACK = 32;
+
 /**
- * Ancho máximo de la píldora del panel `i`: la distancia al panel vecino de su fila (menos 24 px de aire) y el doble de lo que
- * queda entre su centro y el borde del cuadro (menos un margen), con tope en 900 px.
+ * Ancho máximo de la píldora del panel `i`: la distancia al panel vecino de su fila (menos 24 px de aire) y lo que entra entre su
+ * centro y el borde del cuadro contando el zoom inicial de la cámara (1,1) y 32 px de holgura por la inclinación; con tope en 900 px.
  */
 export function pillBudget(panels: PanelPlace[], i: number, width: number): number {
   const c = panels[i]!;
-  let b = Math.min(900, 2 * (Math.min(c.x, width - c.x) - 24));
+  const d = Math.abs(c.x - width / 2);
+  let b = Math.min(900, 2 * ((width / 2 - CLOSING_EDGE_SLACK) / (CLOSING_CAM_MAX * 1.03) - d));
   for (const o of panels) if (o !== c && Math.abs(o.y - c.y) < 1) b = Math.min(b, Math.abs(o.x - c.x) - 24);
-  return Math.floor(b);
+  return Math.max(120, Math.floor(b));
 }
 
 /** Rectángulo de pantalla (en reposo) del panel `c` y de su píldora. */

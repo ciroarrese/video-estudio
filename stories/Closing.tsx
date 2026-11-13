@@ -138,7 +138,7 @@ export function Closing({ spec, scenes }: { spec: StorySpec; scenes: TopicScene[
               }}
             >
               <div style={{ width: PANEL.w, height: PANEL.h, transform: `scale(${c.k}, ${Math.max(0.001, c.k * (1 - fold)).toFixed(4)})`, transformOrigin: "0 0" }}>
-                <div style={{ width: PANEL.w, height: PANEL.h, borderRadius: theme.radius.lg, boxShadow: `0 44px 80px -28px ${withAlpha(theme.color.text, 0.42)}` }}>
+                <div data-qa-ignore="min-size" style={{ width: PANEL.w, height: PANEL.h, borderRadius: theme.radius.lg, boxShadow: `0 44px 80px -28px ${withAlpha(theme.color.text, 0.42)}` }}>
                   {Thumb ? <Thumb /> : <DefaultThumbnail index={i} name={spec.topics[i]!.name} />}
                 </div>
               </div>
