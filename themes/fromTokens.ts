@@ -238,7 +238,7 @@ export function themeFromTokensWithReport(
       [`chart-${i}`, `chart-color-${i}`, `series-${i}`, `data-${i}`],
       isValidColor,
       "Color",
-      false,
+      true,
     );
     if (v) chart.push(v);
   }

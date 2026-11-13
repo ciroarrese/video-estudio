@@ -2,3 +2,5 @@
 import '../../examples/hello';
 import '../../examples/audio-check';
 import '../../examples/kit-demo';
+import '../../examples/story-demo';
+import '../../examples/qa-defects';

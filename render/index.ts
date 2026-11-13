@@ -1,0 +1,6 @@
+// Public surface of render/ (shared with qa/).
+export { renderVideo, checkVideo, ensureBundle, hashDir, newRunId, defaultRoot, defaultConcurrency } from './render';
+export type { RenderOptions, RenderResult, CheckResult } from './render';
+export { serveStatic } from './server';
+export { launchChromium } from './browser';
+export type { PwBrowser, PwContext, PwPage, PwCdp } from './browser';

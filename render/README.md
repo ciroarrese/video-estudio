@@ -31,7 +31,10 @@ Tambien `npx ve-render <id> ...`. **La herramienta se ejecuta desde un clon de e
 | `--frame-format png\|jpeg` | Captura sin perdida (por defecto) o JPEG (algo mas rapido, con perdida) |
 | `--jpeg-quality N` | Calidad JPEG (por defecto 95) |
 | `--assets <dir>` | Directorio extra de estaticos/audio (repetible, se busca primero) |
-| `--check` | No codifica: verifica determinismo (sale con codigo 1 si falla) |
+| `--check` | No codifica: verifica determinismo (sale con codigo 1 si falla). Tolerante por defecto |
+| `--check-max-delta N` | Maxima diferencia por canal tolerada (por defecto 2) |
+| `--check-max-ratio R` | Fraccion maxima de pixeles distintos (por defecto 0.001 = 0.1 %) |
+| `--check-strict` | Comparacion de PNG byte a byte (implica `--check`) |
 
 API: `renderVideo(options)` devuelve `{out, frames, seconds, renderedSegments, cachedSegments}`; `checkVideo(options)` devuelve `{ok, ...}` (ambos en `render/render.ts`).
 
@@ -44,6 +47,18 @@ API: `renderVideo(options)` devuelve `{out, frames, seconds, renderedSegments, c
 5. Todo lo temporal vive en `.ve-cache/tmp-<pid>-<id>/` y se borra al terminar, al fallar y con Ctrl-C / SIGTERM (el CLI cierra Chromium y limpia antes de salir con 130 / 143).
 
 Chromium se lanza con `--disable-partial-raster` (entre otras banderas): sin ella, el rasterizado parcial reutiliza teselas del cuadro anterior y algunos cuadros salen con diferencias de 1 nivel segun el historial. Se puede agregar mas banderas con `VE_CHROMIUM_ARGS`.
+
+## `--check`: que compara y por que es tolerante
+
+Dos pruebas: (1) `__ve.checkDeterminism` sobre ~12 cuadros, **siempre estricto** (compara el DOM: si falla, la escena depende del historial); (2) esos cuadros se capturan dos veces en layouts de paginas distintos y se comparan los PNG.
+
+La comparacion de PNG es tolerante por defecto porque Chromium rasteriza desenfoques, sombras e inclinaciones 3D con diferencias de ~1 nivel en unos pocos pixeles segun el historial de cuadros de la pagina; ese ruido es imperceptible y exigir igualdad byte a byte empujaba a quitar esos efectos. Un cuadro pasa si **delta maximo por canal <= 2** (de 0 a 255) **y pixeles distintos <= 0.1 %** del cuadro. Para cada cuadro con diferencias se imprime el delta maximo, la cantidad y proporcion de pixeles distintos y el rectangulo (bbox) que los contiene; los toleradas se marcan como "ruido tolerado". Un cambio real (un bloque de 40x40 con +30 niveles, o delta 3 en unos pocos pixeles) falla: ver `render/compare.test.ts`. `--check-strict` exige igualdad exacta. Los PNG se decodifican con un decodificador propio minimo (`render/png.ts`), sin dependencias.
+
+`--disable-partial-raster` (ver arriba) ya elimina la mayor parte de ese ruido.
+
+## Uso desde otras herramientas
+
+`render/index.ts` exporta `renderVideo`, `checkVideo`, `ensureBundle(root, cacheDir, runId, log)` (bundle de vite en `<cacheDir>/bundles/<hash>`; devuelve el directorio), `newRunId()`, `defaultRoot`, `hashDir`, `serveStatic(roots, pageRoot)`, `launchChromium()`.
 
 ## Cache por partes
 

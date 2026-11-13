@@ -15,6 +15,9 @@ export type CliOptions = {
   frameFormat: 'png' | 'jpeg';
   jpegQuality: number;
   check: boolean;
+  checkMaxDelta: number;
+  checkMaxRatio: number;
+  checkStrict: boolean;
   assets: string[];
   help: boolean;
 };
@@ -34,7 +37,10 @@ export const USAGE = `Uso: ve-render <videoId> [opciones]
   --frame-format png|jpeg  Formato de captura (png sin perdida, por defecto; jpeg mas rapido)
   --jpeg-quality N       Calidad JPEG 1-100 (por defecto 95)
   --assets <dir>         Directorio extra con archivos estaticos y de audio (repetible)
-  --check                Verificar determinismo en vez de codificar
+  --check                Verificar determinismo en vez de codificar (tolerante por defecto)
+  --check-max-delta N    Con --check: maxima diferencia por canal tolerada (por defecto 2)
+  --check-max-ratio R    Con --check: fraccion maxima de pixeles distintos (por defecto 0.001 = 0.1%)
+  --check-strict         Con --check: comparacion byte a byte
   -h, --help             Esta ayuda
 `;
 
@@ -65,6 +71,9 @@ export function parseCliArgs(argv: string[]): CliOptions {
         'frame-format': { type: 'string' },
         'jpeg-quality': { type: 'string' },
         check: { type: 'boolean' },
+        'check-max-delta': { type: 'string' },
+        'check-max-ratio': { type: 'string' },
+        'check-strict': { type: 'boolean' },
         assets: { type: 'string', multiple: true },
         help: { type: 'boolean', short: 'h' },
       },
@@ -74,7 +83,7 @@ export function parseCliArgs(argv: string[]): CliOptions {
   }
   const { values: v, positionals } = parsed;
   if (v.help) {
-    return { videoId: '', props: {}, scale: 1, crf: 18, segment: 150, audio: true, cache: true, keepFrames: false, frameFormat: 'png', jpegQuality: 95, check: false, assets: [], help: true };
+    return { videoId: '', props: {}, scale: 1, crf: 18, segment: 150, audio: true, cache: true, keepFrames: false, frameFormat: 'png', jpegQuality: 95, check: false, checkMaxDelta: 2, checkMaxRatio: 0.001, checkStrict: false, assets: [], help: true };
   }
   if (positionals.length !== 1) throw new Error('Falta <videoId> (o sobran argumentos posicionales)');
 
@@ -113,6 +122,13 @@ export function parseCliArgs(argv: string[]): CliOptions {
   const jpegQuality = v['jpeg-quality'] === undefined ? 95 : int('--jpeg-quality', v['jpeg-quality'], 1);
   if (jpegQuality > 100) throw new Error('--jpeg-quality debe estar entre 1 y 100');
 
+  const checkMaxDelta = v['check-max-delta'] === undefined ? 2 : int('--check-max-delta', v['check-max-delta'], 0);
+  let checkMaxRatio = 0.001;
+  if (v['check-max-ratio'] !== undefined) {
+    checkMaxRatio = Number(v['check-max-ratio']);
+    if (!Number.isFinite(checkMaxRatio) || checkMaxRatio < 0 || checkMaxRatio > 1) throw new Error(`--check-max-ratio debe estar en [0, 1] (recibido "${v['check-max-ratio']}")`);
+  }
+
   return {
     videoId: positionals[0]!,
     out: v.out,
@@ -128,6 +144,9 @@ export function parseCliArgs(argv: string[]): CliOptions {
     frameFormat,
     jpegQuality,
     check: !!v.check,
+    checkMaxDelta,
+    checkMaxRatio,
+    checkStrict: !!v['check-strict'],
     assets: v.assets ?? [],
     help: false,
   };

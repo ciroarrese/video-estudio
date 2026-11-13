@@ -11,7 +11,10 @@
     "typecheck": "tsc --noEmit",
     "dev": "vite",
     "build": "vite build",
-    "render": "tsx render/cli.ts"
+    "render": "tsx render/cli.ts",
+    "qa": "tsx qa/cli.ts qa",
+    "sheet": "tsx qa/cli.ts sheet",
+    "privacy": "tsx qa/cli.ts privacy"
   },
   "dependencies": {
     "react": "^18.3.1",
@@ -30,7 +33,10 @@
     "vitest": "^5.1.0"
   },
   "bin": {
-    "ve-render": "./render/bin.mjs"
+    "ve-render": "./render/bin.mjs",
+    "ve-qa": "./qa/bin-qa.mjs",
+    "ve-sheet": "./qa/bin-sheet.mjs",
+    "ve-privacy": "./qa/bin-privacy.mjs"
   },
   "peerDependencies": {
     "playwright": ">=1.40"

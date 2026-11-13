@@ -5,6 +5,7 @@ import { createReadStream, existsSync, mkdirSync, readdirSync, renameSync, rmSyn
 import { writeFile } from 'node:fs/promises';
 import { dirname, join, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { comparePngs, DEFAULT_TOLERANCE, formatDiff, withinTolerance, type CheckTolerance } from './compare';
 import { buildAudioGraph, resolveSrc, windowTracks, type Track } from './audio';
 import { launchChromium, type PwBrowser, type PwPage } from './browser';
 import { trackChild, trackCloser, trackPath, untrackPath } from './cleanup';
@@ -28,6 +29,10 @@ export type RenderOptions = {
   /** Frame capture format: lossless png (default) or jpeg (faster, lossy). */
   frameFormat?: 'png' | 'jpeg';
   jpegQuality?: number;
+  /** `--check` tolerance for the PNG comparison (defaults: delta <= 2, <= 0.1% of pixels). */
+  checkMaxDelta?: number;
+  checkMaxRatio?: number;
+  checkStrict?: boolean;
   /** Extra static / audio directories (searched first). */
   assets?: string[];
   /** Project root (default: parent of render/). */
@@ -37,13 +42,13 @@ export type RenderOptions = {
 };
 
 export type RenderResult = { out: string; frames: number; seconds: number; renderedSegments: number; cachedSegments: number };
-export type CheckResult = { ok: boolean; frames: number[]; determinism: { frame: number; ok: boolean }[]; mismatches: number[] };
+export type CheckResult = { ok: boolean; frames: number[]; determinism: { frame: number; ok: boolean }[]; mismatches: number[]; diffs: Record<number, string> };
 
 type VideoMeta = { id: string; fps: number; width: number; height: number; durationInFrames: number };
 
-const defaultRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..');
+export const defaultRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 export const defaultConcurrency = () => Math.max(1, Math.min(cpus().length, 6));
-const newRunId = () => `${process.pid}-${randomBytes(3).toString('hex')}`;
+export const newRunId = () => `${process.pid}-${randomBytes(3).toString('hex')}`;
 
 // ---------- helpers ----------
 
@@ -98,7 +103,7 @@ export function assetsDigest(dirs: string[]): string {
  * (`bundles/<hash of all project inputs>`). It is never modified once built, so concurrent runs
  * (or `npm run build` writing dist/) cannot corrupt a render in progress, and no lock is needed.
  */
-async function ensureBundle(root: string, cacheDir: string, runId: string, log: (m: string) => void): Promise<string> {
+export async function ensureBundle(root: string, cacheDir: string, runId: string, log: (m: string) => void): Promise<string> {
   const skipTop = new Set(['node_modules', 'dist', 'out', 'render', 'docs']);
   const files = walk(root, [], (name, depth) => name.startsWith('.') || (depth === 0 && skipTop.has(name)) || name.endsWith('.md'));
   const key = (await hashFiles(root, files)).slice(0, 16); // includes package-lock.json, tsconfig.json, vite config
@@ -424,10 +429,23 @@ export async function checkVideo(options: RenderOptions): Promise<CheckResult> {
     // Layout A: 2 shards in order; layout B: reversed order in 3 shards (different pages, different history).
     await captureFrames(env, frames, 2, (n, png) => void layoutA.set(n, png));
     await captureFrames(env, [...frames].reverse(), 3, (n, png) => void layoutB.set(n, png));
-    const mismatches = frames.filter((n) => !layoutA.get(n)!.equals(layoutB.get(n)!));
-    if (mismatches.length) log(`check: PNG distintos entre layouts en cuadros ${mismatches.join(', ')}`);
-    else log('check: PNG identicos en ambos layouts');
-    return { ok: bad.length === 0 && mismatches.length === 0, frames, determinism: det, mismatches };
+    const tol: CheckTolerance = { maxDelta: options.checkMaxDelta ?? DEFAULT_TOLERANCE.maxDelta, maxRatio: options.checkMaxRatio ?? DEFAULT_TOLERANCE.maxRatio, strict: options.checkStrict ?? false };
+    const mismatches: number[] = [];
+    const diffs: Record<number, string> = {};
+    let noisy = 0;
+    for (const n of frames) {
+      const stats = comparePngs(layoutA.get(n)!, layoutB.get(n)!);
+      if (stats.diffPixels === 0) continue;
+      noisy++;
+      const ok = withinTolerance(stats, tol) && !(tol.strict && !layoutA.get(n)!.equals(layoutB.get(n)!));
+      diffs[n] = formatDiff(stats);
+      log(`check: cuadro ${n} ${ok ? 'ruido tolerado' : 'DIFERENTE'}: ${diffs[n]}`);
+      if (!ok) mismatches.push(n);
+    }
+    const mode = tol.strict ? 'estricto (byte a byte)' : `tolerante (delta <= ${tol.maxDelta}, <= ${(tol.maxRatio * 100).toFixed(3)}% de pixeles)`;
+    if (mismatches.length) log(`check: PNG distintos entre layouts en cuadros ${mismatches.join(', ')} [${mode}]`);
+    else log(`check: PNG equivalentes en ambos layouts [${mode}]${noisy ? `, ${noisy} cuadros con ruido tolerado` : ', todos identicos'}`);
+    return { ok: bad.length === 0 && mismatches.length === 0, frames, determinism: det, mismatches, diffs };
   } finally {
     await s.context.close().catch(() => {});
     await s.cleanup();
