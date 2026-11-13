@@ -50,7 +50,7 @@ export function CarouselRing(p: CarouselRingProps) {
           opacity: fade(lerp(0.35, 1, Math.pow(c.front, 0.8)) * Math.min(1, e * 2)),
           zIndex: z,
           // Forma, relleno, borde y sombra del design system (por defecto: radio `lg`, borde de 2 px y sin sombra).
-          ...cardSurface(theme, { alt: c.front <= 0.85, accent: c.front > 0.92 ? pal.accent : undefined }),
+          ...cardSurface(theme, { alt: c.front <= 0.85, accent: c.front > 0.92 ? pal.accent : undefined, guide: c.front <= 0.85 }),
           overflow: "hidden",
           fontFamily: theme.font.family,
         };

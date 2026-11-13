@@ -201,17 +201,23 @@ export function roundedRect(x0: number, y0: number, x1: number, y1: number, r: n
  * elevación `shadow` no se dibuja: estas tarjetas ya se sombrean al girar); `flat` la deja así, `border` y `glow` sí agregan su filo o halo.
  * - `alt`: cara apagada (reverso, tarjetas del fondo): `surfaceAlt` si el relleno es el sólido del tema; vidrio, contorno y teñido se respetan.
  * - `accent`: color de acento (CSS) para el borde en vez del de la superficie (cara que mira al frente); sin borde en el estilo no lo agrega.
+ * - `guide`: tarjeta de fondo (construcción): el borde toma el carácter de `style.line.dash` (discontinuo o punteado).
+ * El grosor del borde sigue a `style.line.weight` y, con `style.line.glow`, el borde de acento suma un halo.
  */
-export function cardSurface(theme: Theme, o: { alt?: boolean; accent?: string } = {}): React.CSSProperties {
+export function cardSurface(theme: Theme, o: { alt?: boolean; accent?: string; guide?: boolean } = {}): React.CSSProperties {
   const s = surfaceStyle(theme, "card");
   const out: React.CSSProperties = {};
   out.background = o.alt && s.background === theme.color.surface ? theme.color.surfaceAlt : s.background;
   const w = borderWidth(theme, "card");
   if (w > 0 && s.border) {
-    out.border = o.accent ? `${w + 1}px solid ${o.accent}` : String(s.border).replace(/^[\d.]+px/, `${w + 1}px`);
+    const L = lineLook(theme);
+    const bw = L.widthK === 1 ? w + 1 : Math.max(1, Math.round((w + 1) * L.widthK * 2) / 2);
+    const kind = o.guide && L.dash !== "solid" ? L.dash : "solid";
+    out.border = o.accent ? `${bw}px ${kind} ${o.accent}` : String(s.border).replace(/^[\d.]+px/, `${bw}px`).replace(" solid ", ` ${kind} `);
   }
   out.borderRadius = s.borderRadius;
   if (s.boxShadow && s.boxShadow !== theme.shadow.md) out.boxShadow = s.boxShadow;
+  else if (o.accent && lineLook(theme).glow > 0) out.boxShadow = `0 0 ${Math.round(28 * lineLook(theme).glow)}px ${mix(o.accent, theme.color.bg, 0.5)}`;
   return out;
 }
 
@@ -245,6 +251,8 @@ export interface Pen {
   w: number;
   /** `false`: sin atenuación ni afinado por distancia (`style.depth.fog`). */
   fog: boolean;
+  /** Extrusión elegida (`style.depth.extrude`): la leen `ExtrudeType`, `IsoCity` y `LayerExplode`. */
+  extrude: "stack" | "long-shadow" | "outline-stack" | "none";
   /** `true` con `accentUse: "sparse"`: el acento solo en lo principal. */
   sparse: boolean;
   /** Corrimiento de umbrales de acento por `accentUse` (sparse +0,25; balanced 0; rich -0,2). */
@@ -346,6 +354,7 @@ export function penFor(theme: Theme, pal: Palette, k: number): Pen {
     w,
     fog: D.fog,
     glow: L.glow,
+    extrude: D.extrude,
     sparse: L.accentUse === "sparse",
     bias: L.accentUse === "sparse" ? 0.25 : L.accentUse === "rich" ? -0.2 : 0,
     soft: L.accentUse === "sparse" ? pal.ink : pal.accent,

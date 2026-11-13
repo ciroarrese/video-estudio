@@ -1,7 +1,7 @@
 import { Easing, FrameCanvas, lerp, progress, sub } from "../core";
 import { isometric } from "./math";
 import { textStyle } from "../../themes";
-import { poly, seg, shadeColor, stepDelay, useThreeFx } from "./common";
+import { stepDelay, useThreeFx } from "./common";
 import type { ThreeProps } from "./common";
 
 export type LayerExplodeProps = ThreeProps & {
@@ -13,11 +13,11 @@ const LABELS = ["Infraestructura", "Datos", "Lógica", "Interfaz"];
 
 /** Una tarjeta isométrica que se separa en capas rotuladas, unidas por conectores de esquina punteados. */
 export function LayerExplode(p: LayerExplodeProps) {
-  const { t, local, duration, width, height, theme, pal, k } = useThreeFx(p, { width: 1300, height: 800, duration: 75 });
+  const { t, local, duration, width, height, theme, pal, k, pen } = useThreeFx(p, { width: 1300, height: 800, duration: 75 });
   const labels = p.labels ?? LABELS;
   const n = labels.length;
   const S = 3; // lado de la tarjeta (unidades)
-  const thick = 0.14;
+  const thick = pen.extrude === "none" ? 0.04 : 0.14;
   const gap = 1.05;
   const unit = Math.min((width * 0.44) / (S * 1.732), (height * 0.97) / (S + (n - 1) * gap + 1.2));
   const cx = width * 0.36;
@@ -36,11 +36,11 @@ export function LayerExplode(p: LayerExplodeProps) {
         frame={p.frame}
         draw={(ctx) => {
           ctx.translate(cx, cy);
-          ctx.lineCap = "round";
+          pen.caps(ctx, { cap: true });
           // Esquinas: 0 atrás, 1 derecha, 2 frente, 3 izquierda.
-          const corner = (k: number, y: number) => {
+          const corner = (k: number, y: number, off = 0) => {
             const px = k === 0 ? [-1, -1] : k === 1 ? [1, -1] : k === 2 ? [1, 1] : [-1, 1];
-            return isometric({ x: (px[0]! * S) / 2, y, z: (px[1]! * S) / 2 }, unit);
+            return isometric({ x: (px[0]! * S) / 2 + off, y, z: (px[1]! * S) / 2 + off }, unit);
           };
           const connectors = (ks: number[]) => {
             if (e <= 0.02) return;
@@ -48,7 +48,7 @@ export function LayerExplode(p: LayerExplodeProps) {
             for (let i = 0; i < n - 1; i++) {
               for (const k of ks) {
                 const a = corner(k, yOf(i) + thick), b = corner(k, yOf(i + 1));
-                seg(ctx, a.x, a.y, b.x, b.y, pal.ink, 0.55 * Math.min(1, e * 3), 1.5 * k);
+                pen.seg(ctx, a.x, a.y, b.x, b.y, pal.ink, 0.55 * Math.min(1, e * 3), 1.5 * k, { main: true });
               }
             }
             ctx.setLineDash([]);
@@ -59,15 +59,31 @@ export function LayerExplode(p: LayerExplodeProps) {
             const top = [0, 1, 2, 3].map((k) => corner(k, y1));
             const bot = [0, 1, 2, 3].map((k) => corner(k, y0));
             const isTop = i === n - 1;
-            const base = isTop ? pal.accent : i % 2 ? pal.line : pal.surface;
+            const base = isTop ? pal.accent : i % 2 ? pen.quiet(pal.line) : pal.surface;
+            if (pen.extrude === "long-shadow" && i > 0 && e > 0.02) {
+              // Sombra larga: la tapa de esta capa proyectada sobre la de abajo (recortada a su contorno).
+              const under = [0, 1, 2, 3].map((q) => corner(q, yOf(i - 1) + thick));
+              ctx.save();
+              ctx.beginPath();
+              under.forEach((q, j) => (j ? ctx.lineTo(q.x, q.y) : ctx.moveTo(q.x, q.y)));
+              ctx.closePath();
+              ctx.clip();
+              ctx.globalAlpha = 0.22 * Math.min(1, e * 3);
+              ctx.fillStyle = pal.darkest;
+              ctx.beginPath();
+              [0, 1, 2, 3].map((q) => corner(q, yOf(i - 1) + thick, 0.55)).forEach((q, j) => (j ? ctx.lineTo(q.x, q.y) : ctx.moveTo(q.x, q.y)));
+              ctx.closePath();
+              ctx.fill();
+              ctx.restore();
+            }
             // Caras laterales visibles: la izquierda (3-2) y la derecha (2-1).
-            poly(ctx, [top[3]!, top[2]!, bot[2]!, bot[3]!], shadeColor(base, 0.45, pal), pal.ink, 1.2 * k, 0.5);
-            poly(ctx, [top[2]!, top[1]!, bot[1]!, bot[2]!], shadeColor(base, 0.25, pal), pal.ink, 1.2 * k, 0.5);
-            poly(ctx, top, isTop ? shadeColor(base, 0.85, pal) : base, pal.ink, 1.8 * k, 0.85);
+            pen.face(ctx, [top[3]!, top[2]!, bot[2]!, bot[3]!], base, 0.45, 1.2 * k, pal.ink, 0.5);
+            pen.face(ctx, [top[2]!, top[1]!, bot[1]!, bot[2]!], base, 0.25, 1.2 * k, pal.ink, 0.5);
+            pen.face(ctx, top, base, isTop ? 0.85 : null, 1.8 * k, pal.ink, 0.85);
             // Contenido ficticio en la cara superior: barras isométricas.
             const bar = (x0: number, z0: number, x1: number, z1: number, col: string) => {
               const pts = [[x0, z0], [x1, z0], [x1, z1], [x0, z1]].map(([x, z]) => isometric({ x: x!, y: y1, z: z! }, unit));
-              poly(ctx, pts, col, null);
+              pen.poly(ctx, pts, col, null);
             };
             const barCol = isTop ? pal.bg : pal.line;
             bar(-1.1, -1.1, 1.1, -0.7, barCol);
@@ -81,7 +97,7 @@ export function LayerExplode(p: LayerExplodeProps) {
             if (a <= 0) continue;
             const q = labelPos(i);
             const x0 = q.x - cx + 10 * k, y0 = q.y - cy;
-            seg(ctx, x0, y0, x0 + 70 * k * a, y0, pal.ink, 0.8, 1.5 * k);
+            pen.seg(ctx, x0, y0, x0 + 70 * k * a, y0, pal.ink, 0.8, 1.5 * k, { main: true });
           }
         }}
       />
