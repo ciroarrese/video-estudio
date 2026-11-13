@@ -1,6 +1,5 @@
 import React from "react";
 import { Easing } from "../../engine";
-import { withAlpha } from "../../themes";
 import { chartColor, fxBox, progress, useFx } from "../core";
 import type { FxProps } from "../core";
 import { staggerT } from "../data/geom";
@@ -41,8 +40,7 @@ export function CardFan(p: CardFanProps) {
   const gap = Math.min(70, (w - cw - 40) / Math.max(1, n - 1));
   const gT = progress(local, 0, dur * 0.2, Easing.out);
   const fs = theme.type.eyebrow;
-  // Sombra apilada sin desenfoque: el blur bajo rotate() no rasteriza igual según el historial de cuadros.
-  const softShadow = [0, 1, 2, 3, 4, 5].map((k) => `0 ${6 + k}px 0 ${k * 1.5}px ${withAlpha(theme.color.text, 0.035)}`).join(", ");
+  // Sin sombra: bajo rotate() una sombra (con o sin desenfoque) no rasteriza igual según el historial; el borde inferior grueso da el relieve.
   return (
     <div style={{ position: "relative", width: w, height: h, fontFamily: theme.font.family, ...p.style }}>
       {Array.from({ length: n }, (_, i) => {
@@ -53,7 +51,7 @@ export function CardFan(p: CardFanProps) {
         const stackY = (i - (n - 1) / 2) * -3 * (1 - t);
         const enter = gT;
         return (
-          <div key={i} data-qa-ignore="overlap covered" style={{ position: "absolute", left: (w - cw) / 2, top: h - ch - 40, width: cw, height: ch, boxSizing: "border-box", transformOrigin: "50% 130%", transform: `translate(${Math.round(x)}px, ${Math.round(stackY + (1 - enter) * 30)}px) rotate(${a.toFixed(3)}deg)`, opacity: enter, zIndex: i, background: theme.color.surface, border: `1px solid ${theme.color.border}`, borderRadius: theme.radius.lg, boxShadow: softShadow, padding: 22, overflow: "hidden" }}>
+          <div key={i} data-qa-ignore="overlap covered" style={{ position: "absolute", left: (w - cw) / 2, top: h - ch - 40, width: cw, height: ch, boxSizing: "border-box", transformOrigin: "50% 130%", transform: `translate(${Math.round(x)}px, ${Math.round(stackY + (1 - enter) * 30)}px) rotate(${a.toFixed(3)}deg)`, opacity: enter, zIndex: i, background: theme.color.surface, border: `1px solid ${theme.color.border}`, borderRadius: theme.radius.lg, borderBottom: `5px solid ${theme.color.border}`, padding: 22, overflow: "hidden" }}>
             {kids ? kids[i] : (
               <>
                 <div style={{ width: 44, height: 44, borderRadius: theme.radius.pill, background: chartColor(theme, i) }} />
