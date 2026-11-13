@@ -18,7 +18,10 @@ npm run render -- kit-demo                 # out/kit-demo.mp4 (video de ejemplo,
 npm run sheet -- kit-demo --count 12       # out/kit-demo-sheet.png: hoja de cuadros
 npm run qa -- kit-demo                     # control de calidad automático
 npm run privacy -- kit-demo --deny lista.txt   # chequeo de privacidad (lista.txt: un término por línea)
-npm run dev                                # vista en el navegador: /?video=kit-demo
+npm run dev                                # vista en el navegador: /?video=kit-demo (y &format=vertical)
+npm run render -- --list                   # videos descubiertos (examples/* y videos/*), con tamaños y formatos
+npm run render -- hello --format vertical  # vertical (1080x1920 / 720x1280); también cuadrado
+npm run render -- story-demo --list-scenes # escenas con nombre; --scene <id|índice> renderiza solo una
 npm run sheet -- fx-text --count 8         # galería del catálogo de efectos (también fx-3d y fx-data-ui-art)
 ```
 
@@ -39,7 +42,7 @@ Catálogo de efectos listos (texto, 3D, datos, interfaz y arte): [docs/animacion
 | `templates/` | Escena e historia de arranque (con `nuevo.sh` para copiarlas) |
 | `docs/` | Reglas de producción (con la lista de determinismo), guía de escenas, catálogo de animaciones, origen del motor |
 | `.claude/` | Skill `video-estudio` (cuestionario y etapas con aprobación) |
-| `videos/` | Los videos que se producen (`videos/<slug>/`); lo crea la skill |
+| `videos/` | Los videos que se producen (`videos/<slug>/`); lo crea la skill y se descubre solo |
 | `public/` | Fuentes, imágenes y música con licencia, referenciadas con `asset()` |
 
 ## Hacer un video nuevo
@@ -60,4 +63,4 @@ Las reglas de producción y sus motivos: [docs/reglas.md](docs/reglas.md). Cómo
 - El repo no incluye fuentes, música, efectos de sonido, logos ni marcas de terceros. Quien los agrega es responsable de que su licencia permita usarlos en el lugar donde se va a mostrar el video y, si se suben al repo, redistribuirlos.
 - Los datos, nombres y cifras de los ejemplos son ficticios.
 - Licencia del código del repo: MIT (ver `LICENSE`).
-- La carpeta `videos/` no se sube al repo (está en `.gitignore`): ahí viven los guiones y las escenas de cada persona. Por eso la línea de import de un video propio en `engine/runtime/videos.ts` tampoco se sube.
+- La carpeta `videos/` no se sube al repo (está en `.gitignore`): ahí viven los guiones y las escenas de cada persona. El motor descubre solo las carpetas `videos/<slug>/` (no hay que editar `engine/runtime/videos.ts`), así que un video propio no deja cambios locales en el motor.

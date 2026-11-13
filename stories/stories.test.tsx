@@ -276,3 +276,47 @@ describe("labelAt y fitText", () => {
     expect(Array.from(r.text).every((c) => c === "😀" || c === "…")).toBe(true);
   });
 });
+
+describe("formatos vertical y cuadrado", () => {
+  const FORMATS: [number, number][] = [[1080, 1920], [1080, 1080]];
+  it("los paneles del cierre entran en el cuadro, sin pisarse, de 2 a 6 temas", () => {
+    for (const [w, h] of FORMATS) {
+      for (let n = 2; n <= 6; n++) {
+        const p = panelLayout(n, w, h);
+        expect(p).toHaveLength(n);
+        for (const q of p) {
+          expect(q.x - 280 * q.k).toBeGreaterThanOrEqual(0);
+          expect(q.x + 280 * q.k).toBeLessThanOrEqual(w);
+          expect(q.y - 170 * q.k - 50).toBeGreaterThanOrEqual(0);
+          expect(q.y + 170 * q.k).toBeLessThanOrEqual(h);
+        }
+        for (let a = 0; a < n; a++) for (let b = a + 1; b < n; b++) {
+          const overlapX = Math.abs(p[a]!.x - p[b]!.x) < 280 * (p[a]!.k + p[b]!.k);
+          const overlapY = Math.abs(p[a]!.y - p[b]!.y) < 170 * (p[a]!.k + p[b]!.k);
+          expect(overlapX && overlapY).toBe(false);
+        }
+      }
+    }
+  });
+  it("los lugares del cierre y la lista caben, y el muro esquiva los lugares", () => {
+    for (const [w, h] of FORMATS) {
+      for (let n = 2; n <= 6; n++) {
+        const slots = reservedSlots(n, w, h);
+        expect(slots).toHaveLength(n);
+        for (const s of slots) expect(Math.abs(s.y)).toBeLessThan(h / 2 / 0.8);
+        const { inner } = closingWall(specN(n), w, h);
+        for (const c of inner) for (const s of slots) expect(Math.abs(c.x - s.x) < 480 && Math.abs(c.y - s.y) < 120).toBe(false);
+        const L = listLayout(specN(n), neutral, w, h);
+        expect(L.left).toBeGreaterThanOrEqual(0);
+        expect(L.left + L.rowW).toBeLessThanOrEqual(w - neutral.safe.x + 1);
+        expect(L.top + n * L.rowH).toBeLessThanOrEqual(h);
+      }
+    }
+  });
+  it("story-demo declara los formatos y las escenas de la línea de tiempo", () => {
+    expect(Object.keys(storyDemo.formatSizes!)).toEqual(["horizontal", "vertical", "cuadrado"]);
+    expect(storyDemo.formatSizes!.vertical).toEqual({ width: 1080, height: 1920 });
+    expect(storyDemo.scenes!.map((s) => s.id)).toEqual(["opening", "ventas", "interlude-1", "inventario", "interlude-2", "atencion", "interlude-3", "closing"]);
+    expect(storyDemo.scenes![1]).toMatchObject({ name: "Panel de ventas", from: 300, durationInFrames: 150 });
+  });
+});

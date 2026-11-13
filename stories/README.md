@@ -16,7 +16,8 @@ const spec: StorySpec = {
 
 - `labels` vacío usa los nombres de los temas. Los textos largos se ajustan con `fitText` (caracteres × ancho medio del glifo, sin medir): primero se achica la letra, después se corta con "…".
 - `signoff.logo` es una ruta de `/public` (se resuelve con `asset()` y bloquea el cuadro hasta cargar). Sin logo, `text` se muestra con el degradado.
-- Se asume 30 fps y 1920×1080 (los tamaños salen de `useVideoConfig()` y del tema).
+- Se asume 30 fps. El tamaño sale de `useVideoConfig()` y del tema. `defineStory` habilita por defecto `formats: ["vertical", "cuadrado"]` (1080×1920 y 1080×1080 con el base 1920×1080; se cambia con la opción `formats`) y declara su línea de tiempo como escenas (`--list-scenes`, `--scene opening|<id de tema>|interlude-N|closing`).
+- Vertical y cuadrado: la apertura baja el título a hasta 3 renglones y separa las filas del muro; la lista usa el ancho seguro; el cierre acomoda los paneles en una o dos columnas con la escala que entra en el cuadro (`panelLayout(n, width, height)`), los lugares reservados van en una columna (`reservedSlots`) y el muro de etiquetas cubre el alto. Las escenas de tema tienen que adaptarse ellas mismas con `useFormat()` (ver `examples/story-demo`).
 
 ## Conectar las escenas
 
@@ -44,7 +45,7 @@ Convención: la escena termina con un `Wash` (o atravesando algo); la vuelta al 
 Opening (300) → [escena i → Interlude(done = i+1) (120)] × n → Closing (480)
 ```
 
-`timeline` = `[{ id, kind: "opening"|"topic"|"interlude"|"closing", from, durationInFrames }]`, contiguo y sin huecos. Con `interludes: false` los temas van uno tras otro. `defineStory` registra el video con `engine.defineVideo` y acepta `theme` ("neutral", "dark" o un objeto `Theme`), también por `&props={"theme":"dark"}`.
+`timeline` = `[{ id, kind: "opening"|"topic"|"interlude"|"closing", from, durationInFrames }]`, contiguo y sin huecos. Con `interludes: false` los temas van uno tras otro. `defineStory` registra el video con `engine.defineVideo` (con `formats` y `scenes`) y acepta `theme` ("neutral", "dark" o un objeto `Theme`), también por `&props={"theme":"dark"}`.
 
 Piezas sueltas: `<Opening spec />`, `<Interlude spec done />`, `<Closing spec scenes />` y sus duraciones `OPENING_FRAMES`, `INTERLUDE_FRAMES`, `CLOSING_FRAMES`.
 

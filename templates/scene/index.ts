@@ -1,7 +1,7 @@
 // Registra la escena como un video propio para poder verla y renderizarla sola:
 //   npx ve-sheet <id> --count 12   |   npm run render -- <id>
 // Se copia con: bash templates/nuevo.sh escena <slug> <nombre> (corrige imports e id).
-// Después agregá el import de esta carpeta a engine/runtime/videos.ts (ver SKILL.md).
+// No hace falta registrarla: el runtime descubre toda carpeta videos/<slug>/**/index.ts (npm run render -- --list).
 import { defineVideo } from "../../engine";
 import { DURACION, SceneVideo } from "./Scene";
 

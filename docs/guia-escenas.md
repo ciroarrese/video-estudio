@@ -266,3 +266,16 @@ import { dark } from "../../../themes";
 - Corré `checkTheme(tema)` una vez por cada tema que uses.
 
 Ejemplo completo: `examples/theme-scope` (`/?video=theme-scope`).
+
+## 11. Vertical y cuadrado
+
+El mismo video puede salir en 16:9 (1920×1080), vertical (1080×1920) y cuadrado (1080×1080). Se habilita con `formats` en `defineVideo` (`formats: ["vertical", "cuadrado"]`; con el base 1920×1080 los tamaños se derivan solos) y se elige con `--format horizontal|vertical|cuadrado` en `render`, `qa` y `sheet` (en el navegador, `&format=vertical`).
+
+- El tamaño del escenario sale de `useVideoConfig()` (`width`, `height`): no supongas 1920×1080 ni escribas `960`/`540` a mano; usá `width / 2`, `height / 2`.
+- `useFormat()` da `{ format, width, height, pick }`. `pick({ horizontal: 4, vertical: 2, cuadrado: 3 })` elige un valor según el formato (lo que falta usa el de `horizontal`). Con eso se cambian columnas, tamaños y posiciones: tarjetas en fila en horizontal y apiladas en vertical, tamaño de punto, zoom de cámara.
+- El texto del tema (`theme.type`) no cambia de tamaño: en vertical hay menos ancho, así que usá más renglones, apilá o achicá la composición, no la letra. El QA mide el tamaño mínimo contra el lado corto del cuadro (en vertical, el ancho).
+- Mirá una hoja de cada formato (`npm run sheet -- <id> --format vertical --count 12`) y corré `render --check` y `qa` en cada uno. Un ejemplo completo: `examples/hello` (punto y titular con `pick`) y `examples/story-demo` (la escena cambia de diseño por formato).
+
+## 12. Probar una escena sola
+
+`npm run render -- <id> --list-scenes` (también en `qa` y `sheet`) lista las escenas con nombre: las `<Series.Item name="...">` / `<Sequence name="...">`, las que declara `defineVideo({ scenes })` y, en una historia, la apertura, cada tema, las vueltas al listado y el cierre. Con `--scene <id|índice>` (índice desde 0) `render`, `qa` y `sheet` trabajan solo sobre el rango de cuadros de esa escena: `npm run sheet -- mi-video --scene ventas --count 8`.

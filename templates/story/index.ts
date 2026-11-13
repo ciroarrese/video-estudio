@@ -1,7 +1,7 @@
 // Historia inicial: apertura + (escena -> vuelta al listado) x n + cierre.
 // Se copia con: bash templates/nuevo.sh historia <slug> <escena> (corrige imports e id).
 // Después reemplazá `escena1`/`escena2` por las escenas reales (una carpeta por escena en videos/<slug>/)
-// y agregá el import de este archivo a engine/runtime/videos.ts.
+// (no hace falta registrarla: el runtime descubre toda carpeta videos/<slug>/**/index.ts).
 import React from "react";
 import { defineStory } from "../../stories";
 import type { TopicScene } from "../../stories";

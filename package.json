@@ -15,7 +15,8 @@
     "render": "tsx render/cli.ts",
     "qa": "tsx qa/cli.ts qa",
     "sheet": "tsx qa/cli.ts sheet",
-    "privacy": "tsx qa/cli.ts privacy"
+    "privacy": "tsx qa/cli.ts privacy",
+    "audio": "tsx audio/cli.ts"
   },
   "dependencies": {
     "react": "^18.3.1",

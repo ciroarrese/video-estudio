@@ -25,14 +25,11 @@ out/                    MP4, hojas de cuadros e informes (no se versiona)
 
 `<slug>`: minúsculas, números y guiones. Si la persona pide cosas que no puede mostrar un repo público (datos reales, marcas, capturas), `videos/` no se sube: avisale y no hagas commit de esa carpeta.
 
-**Registrar un video**: el render, la hoja de cuadros y el QA buscan el video por `id`, y los `id` salen de `engine/runtime/videos.ts`. Cada escena y la historia necesitan una línea ahí:
+**Registrar un video**: no hay que registrar nada. El runtime descubre solo toda carpeta `videos/<slug>/index.ts(x)` y `videos/<slug>/<carpeta>/index.ts(x)` (y `examples/*`); el render, la hoja de cuadros y el QA buscan el video por `id`. `npm run render -- --list` muestra lo que ve (con tamaños, formatos y carpeta). No se edita `engine/runtime/videos.ts`. Un `id` repetido entre dos carpetas falla con un error que nombra las dos: cambiá uno.
 
-```ts
-import "../../videos/<slug>/<escena>";   // registra el video "<slug>-<escena>"
-import "../../videos/<slug>/historia";   // registra el video "<slug>"
-```
+Plantillas: `bash templates/nuevo.sh escena <slug> <nombre>` y `bash templates/nuevo.sh historia <slug> <escena>` crean los archivos con los imports ya corregidos (y `videos/<slug>/theme.ts` si falta); ya quedan descubiertos.
 
-Plantillas: `bash templates/nuevo.sh escena <slug> <nombre>` y `bash templates/nuevo.sh historia <slug> <escena>` crean los archivos con los imports ya corregidos (y `videos/<slug>/theme.ts` si falta). No registran nada: la línea de arriba es a mano.
+**Formatos y escenas sueltas**: si la persona pide vertical o cuadrado, habilitá `formats: ["vertical", "cuadrado"]` en el `defineVideo` (`defineStory` ya lo hace) y adaptá la escena con `useFormat()` (`pick({ horizontal, vertical, cuadrado })`, ver `docs/guia-escenas.md` sección 11). Se mira con `--format vertical|cuadrado` en `render`, `qa` y `sheet`. Para revisar o renderizar una escena sola: `--list-scenes` y `--scene <id|índice>` (en una historia, cada tema es una escena).
 
 ## Comandos
 
@@ -134,7 +131,7 @@ En la columna "Efecto" nombrá el efecto del catálogo (`docs/animaciones.md`, p
 Para cada escena del guion, en orden:
 
 1. **Elegí efectos del catálogo antes de escribir desde cero:** abrí `docs/animaciones.md` (sección "Cómo elegir") y usá los efectos de `fx/` que ya existen para cada momento del guion; combinalos con cámara, cursor y garabatos del kit (`docs/guia-escenas.md`, sección 9). Podés ver cualquiera con `npm run dev` y `/?video=fx-text`, `fx-3d` o `fx-data-ui-art`.
-2. `bash templates/nuevo.sh escena <slug> <escena>` y agregá el import en `engine/runtime/videos.ts`. Construí la escena con piezas del kit siguiendo `docs/guia-escenas.md`: coordenadas del mundo, cámara con cuadros clave, todo del tema, interfaces recreadas con su estructura y rótulos, nunca capturas. Si va en una historia, el contenido es `SceneBody` (sin `Stage`) y el titular sale de `TopicHeadline` o `DockedHeadline`.
+2. `bash templates/nuevo.sh escena <slug> <escena>` (no hay que registrarla). Construí la escena con piezas del kit siguiendo `docs/guia-escenas.md`: coordenadas del mundo, cámara con cuadros clave, todo del tema, interfaces recreadas con su estructura y rótulos, nunca capturas. Si va en una historia, el contenido es `SceneBody` (sin `Stage`) y el titular sale de `TopicHeadline` o `DockedHeadline`.
 3. **Antes de mostrar nada**, corré en este orden y corregí lo que salga hasta que quede limpio:
    ```bash
    npm run typecheck
@@ -177,7 +174,7 @@ Si piden agregar, editar o corregir una escena: leé su carpeta y el guion, prop
 - `No se pudo cargar "playwright"` / `No se pudo lanzar Chromium`: `npm i -D playwright` y `npx playwright install chromium`, o `VE_CHROMIUM=/ruta/a/chrome`.
 - ffmpeg o ffprobe no encontrado: instalalo y comprobá con `ffmpeg -version`.
 - `Audio file ... not found`: poné el archivo en `public/` o pasá `--assets <dir>`.
-- No encuentra el video (`id` desconocido): falta el import en `engine/runtime/videos.ts`, o dos videos comparten `id` (el último reemplaza al anterior).
+- No encuentra el video (`id` desconocido): corré `npm run render -- --list` y fijate si aparece; la carpeta tiene que tener `index.ts(x)` con un `defineVideo` y estar en `videos/<slug>/` o `videos/<slug>/<carpeta>/`. Dos videos con el mismo `id` fallan con un error que nombra las dos carpetas.
 - Salió algo viejo: `--no-cache` o borrá `.ve-cache/`.
 - `cameraAt`/`kf`/`interpolate` lanzan error: los cuadros clave tienen que ser estrictamente crecientes.
-- Cualquier cambio en cualquier archivo del proyecto invalida el caché de partes: un render completo después de editar es normal.
+- El caché de partes es por video: editar tu video re-renderiza sus partes (y las de los videos que comparten el código que tocaste), no las de los demás. Un render completo después de editar es normal.

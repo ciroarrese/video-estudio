@@ -26,14 +26,18 @@ Motor de video propio, escrito desde cero (TypeScript + React 18); ver `docs/ORI
   - `to`: cuadro absoluto donde termina el `Sequence`/`Series.Item` mas cercano que tenga duracion (exclusivo, ya acotado por los padres); `Infinity` si no hay limite (en `__ve` llega como `null`). El mezclador debe recortar la pista ahi.
   - `startFrom`: cuadros a saltar del inicio del archivo (negativo lanza error). `volume`: multiplicador.
   - `collectAudio()` / `clearAudio()`.
-- `defineVideo({id, component, fps, width, height, durationInFrames, defaultProps?})`, `getVideos()`, `getVideo(id)`. Repetir un `id` reemplaza el anterior.
+- `defineVideo({id, component, fps, width, height, durationInFrames, defaultProps?, formats?, scenes?})`, `getVideos()`, `getVideo(id)`. Repetir un `id` en el mismo archivo reemplaza el anterior (HMR); el mismo `id` en dos carpetas lanza un error en español que nombra las dos.
+- **Formatos**: `width` x `height` es el formato base. `formats: ['vertical', 'cuadrado']` habilita los otros con tamaños derivados (lado largo L, corto S: horizontal L x S, vertical S x L, cuadrado S x S; 1920x1080 da 1080x1920 y 1080x1080), o un objeto `{ vertical: { width, height } }` con tamaños propios. Sin `formats` el video solo existe en su formato base. Se elige con `&format=vertical` en la página runtime y con `--format` en `render`, `qa` y `sheet`.
+- `useFormat()` -> `{ format, width, height, pick }`: `format` es `'horizontal' | 'vertical' | 'cuadrado'`; `pick({ horizontal: a, vertical: b, cuadrado: c })` elige un valor (lo que falta usa el de `horizontal`, que es obligatorio). El tamaño del escenario sale también de `useVideoConfig()` (`width`, `height`, `format`): las escenas tienen que leerlo de ahí y no suponer 1920x1080.
+- **Escenas**: `<Sequence name>` y `<Series.Item name>` (opcional) nombran una escena; `defineVideo({ scenes: [{ id, name?, from, durationInFrames }] })` las declara de antemano (`defineStory` lo hace con su línea de tiempo). `resolveScenes(stage)` devuelve las declaradas o, si no hay, las que aparecen al dibujar todos los cuadros una vez (como `scanAudio`).
 
 ## Contrato de la pagina runtime (para el agente Render)
 
 Pagina Vite: `engine/runtime/index.html` (`npm run dev` o `npm run build` + `vite preview`; salida en `dist/`).
 
 URL: `/?video=<id>` (por defecto, el primer video registrado). Opcional `&props=<json objeto>` se mezcla con `defaultProps`. Si es invalido (o el `video` no existe) `window.__ve` igual se define, con `ready` rechazado con un mensaje claro y `setFrame` rechazando lo mismo.
-Los videos disponibles se importan en `engine/runtime/videos.ts`.
+Los videos se descubren solos: `engine/runtime/videos.ts` usa `import.meta.glob` sobre `examples/*/index.{ts,tsx}`, `videos/*/index.{ts,tsx}` y `videos/*/*/index.{ts,tsx}` (donde `templates/nuevo.sh` deja escenas e historia) y las carga de a una, en orden alfabético (`engine/runtime/discover.ts`), diciéndole al registro de qué carpeta sale cada `id`. Si `videos/` no existe no pasa nada. Un archivo roto o un `id` repetido deja `__ve.loadError` con el mensaje y hace fallar `ready`.
+Opcional `&format=<horizontal|vertical|cuadrado>`: dibuja el video en ese formato (el `#stage` toma su tamaño).
 
 La pagina monta el video en un `#stage` de exactamente `width x height` px (position relative, overflow hidden, en la esquina 0,0 de la pagina). Para capturar: viewport = width x height y `page.screenshot()` o clip a `#stage`.
 
@@ -42,7 +46,9 @@ La pagina monta el video en un `#stage` de exactamente `width x height` px (posi
 | Miembro | Descripcion |
 |---|---|
 | `ready: Promise<void>` | Se resuelve tras montar el cuadro 0, `document.fonts.ready` y sin holds. Rechaza si el id es desconocido. |
-| `videos` | Lista de metadatos `{id, fps, width, height, durationInFrames}` de todos los videos registrados. |
+| `videos` | Lista de metadatos `{id, fps, width, height, durationInFrames, format, formats, source}` de todos los videos registrados (`formats`: tamaño de cada formato habilitado; `source`: carpeta de origen). |
+| `loadError` | Mensaje si falló la carga de las carpetas de video (id repetido, archivo roto); `null` si todo cargó. |
+| `scenes()` | `Promise<{id, name?, from, durationInFrames}[]>`: escenas declaradas o juntadas de `<Sequence name>` (recorre todos los cuadros una vez; solo cuando se pide). |
 | `setFrame(n): Promise<void>` | `n` entero en `[0, durationInFrames-1]` (si no, `RangeError`). Renderiza el cuadro de forma sincrona (`flushSync`) y se resuelve cuando: fuentes listas, todos los holds liberados (`waitForHolds`, 30 s de limite) y pasaron dos `requestAnimationFrame`. Despues se puede capturar. |
 | `audio()` | Pistas `{src, from, to, startFrom, volume}` registradas hasta ahora (`to: null` = sin limite), ordenadas por `from`. Solo incluye cuadros ya visitados. |
 | `scanAudio()` | Desmonta el escenario, limpia el registro, renderiza todos los cuadros una vez (sin esperas) y devuelve todas las pistas; luego vuelve al cuadro que se mostraba. El resultado se guarda en cache (la pagina esta atada a un video y unas props; recargar invalida). **Llamarlo una sola vez, antes de renderizar; nunca por parte/shard** (cada shard con su propia pagina daria el mismo resultado: mezclar el audio una vez, a nivel global). |

@@ -16,7 +16,7 @@ npx ve-privacy mi-video --deny prohibidos.txt [--allow permitidos.txt] [--scan-s
 
 (Tambien `npm run qa|sheet|privacy -- <id> ...`.) Codigo de salida: 0 limpio, 1 hay hallazgos (`ve-qa`: errores, o avisos con `--fail-on warn`), 2 uso incorrecto.
 
-Seleccion de cuadros (igual en los tres): `--frames 0,60,120` (admite `10-40/10`), `--every N` o `--count N`. `--props '{...}'` mezcla props con las del video.
+Seleccion de cuadros (igual en los tres): `--frames 0,60,120` (admite `10-40/10`), `--every N` o `--count N`. `--props '{...}'` mezcla props con las del video. `--format horizontal|vertical|cuadrado` revisa el video en ese formato (si lo habilita `defineVideo({ formats })`); `--scene <id|índice>` limita el muestreo al rango de una escena (no se combina con `--frames`) y `--list-scenes` las lista. En `min-size` y `contrast` el tamaño de referencia es el lado corto del cuadro (1080 = 18 px mínimos): en vertical es el ancho.
 
 ## Reglas de `ve-qa`
 

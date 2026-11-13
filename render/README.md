@@ -10,6 +10,10 @@ npm run render -- hello --out out/a.mp4 --props '{"title":"Hola"}'
 npm run render -- hello --frames 30-59 --scale 0.5 --crf 23
 npm run render -- audio-check --assets ./mis-audios
 npm run render -- hello --check               # verifica determinismo
+npm run render -- --list                      # videos descubiertos (examples/* y videos/*)
+npm run render -- hello --format vertical     # horizontal, vertical o cuadrado
+npm run render -- hello --list-scenes         # escenas con nombre y sus cuadros
+npm run render -- hello --scene world         # solo esa escena (id, nombre o índice desde 0)
 ```
 
 Tambien `npx ve-render <id> ...`. **La herramienta se ejecuta desde un clon de este repositorio**: el bin carga el TypeScript con `tsx` y compila el runtime con `vite`, ambos devDependencies (instalados con `npm install` en el clon). No esta pensada para instalarse como paquete suelto; se eligio esto para no ensanchar las dependencias de ejecucion del motor (solo React).
@@ -21,6 +25,10 @@ Tambien `npx ve-render <id> ...`. **La herramienta se ejecuta desde un clon de e
 | `--out` | Archivo de salida (por defecto `out/<id>.mp4`) |
 | `--props '<json>'` | Objeto JSON mezclado con `defaultProps` |
 | `--frames a-b` | Solo ese rango (inclusive); el audio se recorta igual |
+| `--format f` | `horizontal`, `vertical` o `cuadrado`. El video tiene que habilitarlo (`formats` en `defineVideo`); si no, error que dice cuáles admite. La salida por defecto pasa a `out/<id>-<formato>.mp4` |
+| `--scene id\|n` | Solo esa escena (id o nombre; o el índice desde 0 que muestra `--list-scenes`). Fija el rango de cuadros: no se combina con `--frames`. Salida por defecto `out/<id>-<escena>.mp4`. También en `--check` |
+| `--list` | Lista los videos que descubrió el runtime con su tamaño, duración, formatos y carpeta (no lleva `<videoId>`) |
+| `--list-scenes` | Lista las escenas con nombre del video (id, cuadros, duración) |
 | `--concurrency N` | Paginas en paralelo (por defecto `min(cpus, 6)`) |
 | `--scale N` | Escala de salida (`0.5`, `2`...); dimensiones pares garantizadas |
 | `--crf N` | Calidad H.264 (por defecto 18) |
@@ -36,11 +44,11 @@ Tambien `npx ve-render <id> ...`. **La herramienta se ejecuta desde un clon de e
 | `--check-max-ratio R` | Fraccion maxima de pixeles con delta mayor que 1 (por defecto 0.001 = 0.1 %); los de delta 1 tienen su propia cota de 20 % |
 | `--check-strict` | Comparacion de PNG byte a byte (implica `--check`) |
 
-API: `renderVideo(options)` devuelve `{out, frames, seconds, renderedSegments, cachedSegments}`; `checkVideo(options)` devuelve `{ok, ...}` (ambos en `render/render.ts`).
+API: `renderVideo(options)` (con `format` y `scene`) devuelve `{out, frames, seconds, renderedSegments, cachedSegments}`; `checkVideo(options)` devuelve `{ok, ...}`, `listScenes(options)` y `listVideos()` (todos en `render/render.ts`).
 
 ## Como funciona
 
-1. Compila el runtime con vite en `.ve-cache/bundles/<hash de las fuentes>/` (se reutiliza si nada cambio; el hash incluye `package-lock.json`, `tsconfig.json`, `vite.config.ts` y todo el proyecto salvo `node_modules`, `dist`, `out`, `render`, `docs` y `*.md`). El directorio nunca se modifica una vez creado, asi que dos renders simultaneos (o `npm run build`) no se pisan. Lo sirve en un puerto libre.
+1. Compila el runtime con vite en `.ve-cache/bundles/<hash de las fuentes>/` (se reutiliza si nada cambio; el hash incluye `package-lock.json`, `tsconfig.json`, `vite.config.ts` y todo el proyecto salvo `node_modules`, `dist`, `out`, `render`, `docs`, `*.md` y lo que empieza con punto; **incluye `videos/`**, aunque no esté en git). El directorio nunca se modifica una vez creado, asi que dos renders simultaneos (o `npm run build`) no se pisan. Lo sirve en un puerto libre.
 2. Una pagina dedicada llama `__ve.scanAudio()` una sola vez, y todos los archivos de audio se resuelven ANTES de renderizar (si falta uno, falla de inmediato).
 3. Los cuadros pendientes se reparten en tramos contiguos entre N paginas; cada una espera `__ve.ready` y por cuadro hace `await __ve.setFrame(n)` + captura de `#stage` (CDP `Page.captureScreenshot`). Un rechazo de `setFrame` o un error de pagina aborta con el mensaje.
 4. En cuanto una parte tiene todos sus cuadros se codifica a `.ve-cache/seg-<clave>.mp4` (H.264, yuv420p, fps constante) y se borran sus cuadros (uso de disco acotado; la codificacion se solapa con la captura). Al final se concatenan sin recodificar y en la misma pasada se mezcla el audio (`atrim`, `adelay`, `volume`, `amix`) con `+faststart`.
@@ -68,11 +76,13 @@ Asi, una sombra o un desenfoque de cualquier tamano con 1 nivel de ruido no hace
 
 ## Cache por partes
 
-Clave de cada parte = hash de: hash del contenido del bundle, id, props, rango de cuadros, escala, crf, version de ffmpeg, version de Chromium, `VE_CHROMIUM`/`VE_CHROMIUM_ARGS`, fps y dimensiones del video, ajustes del codificador (preset, bframes, pix_fmt), formato de captura y un resumen (ruta+tamano+mtime) de cada directorio `--assets`. Una segunda corrida sin cambios no renderiza nada.
+Clave de cada parte = hash de: huella del código **de ese video** (ver abajo; si no se puede calcular, el hash de todo el bundle), id, props, rango de cuadros, escala, crf, version de ffmpeg, version de Chromium, `VE_CHROMIUM`/`VE_CHROMIUM_ARGS`, fps, dimensiones y formato del video, ajustes del codificador (preset, bframes, pix_fmt), formato de captura y un resumen (ruta+tamano+mtime) de cada directorio `--assets`. Una segunda corrida sin cambios no renderiza nada.
 
 Las partes se alinean a multiplos de `--segment`. Con `--frames a-b` solo se comparten con un render completo las partes que quedan **enteras** dentro del rango; las de los bordes son parciales (su rango es distinto) y tienen su propia clave.
 
-**Limitacion:** cualquier cambio en el bundle (cualquier archivo de `engine/`, `examples/`, `public/`...) invalida todas las partes. El hash por escena queda como trabajo futuro. `.ve-cache/` (partes y bundles) no se limpia solo: borrarlo a mano si crece.
+**Huella por video.** vite.config.ts emite `ve-deps.json` en el bundle: los fuentes que usa el runtime y los que alcanza cada carpeta de video siguiendo los imports estáticos. La huella de un video (`videoCodeHash`) mezcla esos fuentes, todos los archivos de la carpeta del video, `public/` entero, `package-lock.json`, `tsconfig.json`, `vite.config.ts` y `engine/runtime/index.html`. Editar `videos/a/` ya no invalida las partes de `videos/b/` ni las de los ejemplos; tocar el motor, el kit, el tema o `public/` sí invalida las de los videos que los usan (los barriles `engine/index.ts` y `kit/index.ts` arrastran todo su contenido, así que en la práctica es casi todo). Supuesto: un video no depende del código de otro video; los módulos de los otros videos se cargan en la página pero solo registran su `defineVideo`.
+
+**Por escena: no se hace.** Una escena es una función de React: el motor no sabe de qué archivos depende ni en qué carpeta vive, y los segmentos cruzan los límites entre escenas (una vuelta al listado depende de todas las anteriores y de la línea de tiempo). Una clave por carpeta de escena daría cachés viejas sin avisar cuando la escena usa código compartido; por eso la granularidad es el video. Para iterar sobre una escena se renderiza sola con `--scene`, que solo toca sus partes. `.ve-cache/` (partes y bundles) no se limpia solo: borrarlo a mano si crece.
 
 ## Requisitos
 
