@@ -44,3 +44,14 @@ describe('interpolate', () => {
     expect(() => interpolate(0, [0, NaN], [0, 1])).toThrow(/finite/);
   });
 });
+
+describe('interpolate with overshooting easing', () => {
+  it('passes eased values above 1 through to the output', async () => {
+    const { Easing } = await import('./Easing');
+    const v = interpolate(30, [0, 100], [0, 200], { easing: Easing.lands });
+    expect(v).toBeGreaterThan(200 * 0.9);
+    const peak = Math.max(...Array.from({ length: 100 }, (_, f) => interpolate(f, [0, 100], [0, 200], { easing: Easing.lands })));
+    expect(peak).toBeGreaterThan(200);
+    expect(interpolate(150, [0, 100], [0, 200], { easing: Easing.lands })).toBe(200);
+  });
+});

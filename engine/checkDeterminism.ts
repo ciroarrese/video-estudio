@@ -1,5 +1,16 @@
 import type { Stage } from './stage';
 
+/** Firma de un cuadro: el HTML mas el contenido de los `<canvas>` (si el stage los expone). */
+const signature = (stage: Stage): string => {
+  let c = '';
+  try {
+    c = stage.canvasData?.() ?? '';
+  } catch {
+    c = '';
+  }
+  return stage.html() + c;
+};
+
 export type DeterminismResult = { frame: number; ok: boolean };
 
 /**
@@ -24,10 +35,10 @@ export async function checkDeterminism(
     if (!Number.isInteger(f) || f < 0 || f > last) throw new RangeError(`checkDeterminism: frame ${f} out of range [0, ${last}]`);
     if (f !== 0) await show(0);
     await show(f);
-    const a = stage.html();
+    const a = signature(stage);
     await show(f === last ? Math.max(0, last - 1) : last);
     await show(f);
-    out.push({ frame: f, ok: a === stage.html() });
+    out.push({ frame: f, ok: a === signature(stage) });
   }
   if (prev !== null) await show(prev);
   return out;

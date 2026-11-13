@@ -7,14 +7,15 @@ Motor de video propio, escrito desde cero (TypeScript + React 18); ver `docs/ORI
 **Toda escena debe ser una funcion pura del numero de cuadro (y de sus props).** El runtime reutiliza UNA sola raiz de React y salta entre cuadros en cualquier orden (y en paralelo por partes), asi que el estado que persiste entre renders cambia el resultado segun el historial.
 
 - Prohibido: `useState`/`useRef` que acumulen valores entre cuadros, `setTimeout`/`setInterval`/`requestAnimationFrame`, `Date.now()`, `Math.random()` (usar `random(seed)`), animaciones/transiciones CSS.
-- Los efectos solo se permiten para `holdRender`/`releaseRender` (esperar fuentes e imagenes).
+- Los efectos solo se permiten para `holdRender`/`releaseRender` (esperar fuentes e imagenes) y para el dibujo de `FrameCanvas` (un `useLayoutEffect` que en cada render limpia el lienzo y lo redibuja entero desde el cuadro y las props; no guarda nada entre cuadros).
 - Verificacion: `__ve.checkDeterminism([frames])` renderiza cada cuadro dos veces (tras el cuadro 0 y tras otro cuadro) y compara `innerHTML`; `ok: false` significa que la escena depende del historial. Correrlo en QA sobre cuadros representativos.
 
 ## API (todo sale de `engine/index.ts`)
 
 - `FrameProvider({frame, config, children})`, `useFrame()`, `useVideoConfig()`; `VideoConfig = {fps, width, height, durationInFrames}`.
 - `interpolate(frame, input, output, {easing?, clamp = true})`: lineal por tramos, easing por tramo; lanza error si `input` no es estrictamente creciente o las longitudes difieren.
-- `Easing`: `linear`, `cubicIn/cubicOut/cubicInOut`, `bezier(x1,y1,x2,y2)`, presets `Easing.out` = bezier(0.16,1,0.3,1) y `Easing.inOut` = bezier(0.65,0,0.35,1).
+- `Easing`: `linear`, `cubicIn/cubicOut/cubicInOut`, `bezier(x1,y1,x2,y2)`, presets `Easing.out` = bezier(0.16,1,0.3,1) y `Easing.inOut` = bezier(0.65,0,0.35,1); `Easing.back(overshoot = 1.56)` (salida con sobrepaso) y `Easing.lands` = bezier(0.34,1.56,0.64,1). El resultado del easing puede superar 1: `interpolate` lo aplica tal cual (solo recorta el rango de entrada).
+- `FrameCanvas({width, height, draw(ctx, frame, {width, height}), deps?, frame?, pixelRatio?, style?})`: `<canvas>` que se limpia y se redibuja por completo en cada render (`useLayoutEffect` sin dependencias, asi `setFrame` lo captura ya dibujado dentro de `flushSync`). Coordenadas logicas; la resolucion real sigue a `devicePixelRatio`. `draw` debe ser pura. `checkDeterminism` compara tambien el `toDataURL` de los lienzos (`Stage.canvasData()`).
 - `random(seed)`: determinista, en [0,1).
 - `Sequence({from, durationInFrames?})`, `Series` + `Series.Item({durationInFrames})`: componen anidados; fuera de rango no montan nada.
 - `Fill({style})`: div absoluto a cuadro completo.

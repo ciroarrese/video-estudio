@@ -13,6 +13,8 @@ export type Stage = {
   /** Frame currently shown, or null when blank / nothing rendered yet. */
   current(): number | null;
   html(): string;
+  /** Contenido de los `<canvas>` del escenario (dataURL), para comparar cuadros dibujados en lienzo. Vacio si no hay. */
+  canvasData?(): string;
   destroy(): void;
 };
 
@@ -46,6 +48,16 @@ export function createStage(host: HTMLElement, def: VideoDefinition<any>, inputP
     },
     current: () => cur,
     html: () => host.innerHTML,
+    canvasData: () =>
+      Array.from(host.querySelectorAll('canvas'))
+        .map((c) => {
+          try {
+            return c.toDataURL();
+          } catch {
+            return '';
+          }
+        })
+        .join('|'),
     destroy() {
       root.unmount();
       cur = null;

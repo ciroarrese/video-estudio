@@ -72,7 +72,7 @@ function DemoScene({ variant }: { variant: number }) {
               }}
             >
               <div style={{ fontSize: theme.type.eyebrow, color: theme.color.textMuted }}>{label}</div>
-              <div style={{ fontSize: theme.type.stat * 0.6, fontWeight: theme.font.weights.stat, color: theme.color.chart[(i + variant) % theme.color.chart.length] }}>
+              <div style={{ fontSize: theme.type.stat * 0.6, fontWeight: theme.font.weights.stat, color: [theme.color.accent, theme.color.accent2, theme.color.success][(i + variant) % 3] }}>
                 <CountUp from={0} to={value} start={12 + i * 6} duration={40} />
               </div>
             </div>

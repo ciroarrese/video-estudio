@@ -10,7 +10,7 @@ const spec: StorySpec = {
   topics: [{ id: "ventas", name: "Panel de ventas", line: "los números del día" }, /* 2 a 6 */],
   labels: ["Resumen diario", "Stock mínimo" /* ... */],           // palabras del muro; si faltan se repiten
   signoff: { logo: "brand/logo.png", tagline: "Hecho con ...", text: "Gracias por mirar" },
-  timing: { opening: 300, interlude: 120, closing: 450 },          // opcional (cuadros, mínimo 60)
+  timing: { opening: 300, interlude: 120, closing: 480 },          // opcional (cuadros, mínimo 60)
 };
 ```
 
@@ -41,7 +41,7 @@ Convención: la escena termina con un `Wash` (o atravesando algo); la vuelta al 
 `composeStory(spec, scenes, { interludes = true, audio })` devuelve `{ component, durationInFrames, timeline }`:
 
 ```
-Opening (300) → [escena i → Interlude(done = i+1) (120)] × n → Closing (450)
+Opening (300) → [escena i → Interlude(done = i+1) (120)] × n → Closing (480)
 ```
 
 `timeline` = `[{ id, kind: "opening"|"topic"|"interlude"|"closing", from, durationInFrames }]`, contiguo y sin huecos. Con `interludes: false` los temas van uno tras otro. `defineStory` registra el video con `engine.defineVideo` y acepta `theme` ("neutral", "dark" o un objeto `Theme`), también por `&props={"theme":"dark"}`.
@@ -51,8 +51,10 @@ Piezas sueltas: `<Opening spec />`, `<Interlude spec done />`, `<Closing spec sc
 ## Límites
 
 - De 2 a 6 temas (otro número lanza un error claro). La lista, el tamaño de letra, los paneles del cierre y los lugares reservados del muro se calculan según `n`.
+- Escala (1920×1080, sale de `theme.type`): la lista es lo más grande de la pantalla (nombre ~0.8 × h1, línea ~0.9 × body, filas de ~170 px hasta 4 temas; con 5 o 6 se achica parejo y el nombre no baja de ~44 px). Título de apertura a `type.hero`, etiquetas del muro ~30 px (marcadas con `data-qa-ignore`), píldoras del cierre ~34 px, firma a `type.h2`.
 - Con nombres muy largos la lista usa un solo tamaño (el del nombre más largo, con piso al 60 %) y corta con "…".
-- Sin 3D de CSS: la profundidad (muro, paneles) se proyecta a mano y cada pieza usa solo traslado y escala, porque las capas 3D, los giros y los sesgos no se rasterizan igual según el historial de cuadros (`render --check` lo detecta). Por eso los planos no se inclinan. Tampoco hay `backdrop-filter`, `filter` ni sombras grandes sobre piezas escaladas.
+- Profundidad real: cada pieza del muro y cada panel lleva su propia `perspective()` en su `transform` (`rigTransform`), sin `preserve-3d` ni `perspective` en un ancestro; el orden se resuelve con `zIndex`. Hay inclinación, travelling lento, desenfoque por distancia, sombras y el muro desenfocado que entra en foco en el cierre.
+- Regla para no romper el determinismo: en una capa 3D todo el movimiento va dentro del `transform`; un `left`/`top` fraccionario (p. ej. un vaivén con `Math.sin` sumado a `top`) se rasteriza distinto según el historial de cuadros y `render --check` lo detecta. Las posiciones de layout van en enteros.
 - Si `timing` cambia una duración, los tiempos internos del bloque se escalan en proporción.
 
 Ejemplo: `examples/story-demo` (`/?video=story-demo&props={"theme":"dark"}`). Pruebas: `stories/stories.test.tsx`.

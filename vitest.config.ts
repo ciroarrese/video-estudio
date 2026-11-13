@@ -6,6 +6,6 @@ export default defineConfig({
   test: {
     environment: 'jsdom',
     setupFiles: ['./vitest.setup.ts'],
-    include: ['engine/**/*.test.{ts,tsx}', 'themes/**/*.test.{ts,tsx}', 'kit/**/*.test.{ts,tsx}', 'examples/**/*.test.{ts,tsx}', 'render/**/*.test.{ts,tsx}', 'stories/**/*.test.{ts,tsx}', 'qa/**/*.test.{ts,tsx}'],
+    include: ['engine/**/*.test.{ts,tsx}', 'themes/**/*.test.{ts,tsx}', 'kit/**/*.test.{ts,tsx}', 'examples/**/*.test.{ts,tsx}', 'render/**/*.test.{ts,tsx}', 'stories/**/*.test.{ts,tsx}', 'qa/**/*.test.{ts,tsx}', 'fx/**/*.test.{ts,tsx}'],
   },
 });
