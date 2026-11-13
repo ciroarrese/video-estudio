@@ -8,7 +8,7 @@ Motor de video propio, escrito desde cero (TypeScript + React 18); ver `docs/ORI
 
 - Lista completa de lo prohibido y permitido (con motivo y arreglo de cada punto): `docs/reglas.md`, sección "Lista única de determinismo". Resumen: nada de estado que acumule, temporizadores, `Date`, `Math.random()` (usar `random(seed)`), CSS animado ni `useId`.
 - Los efectos solo se permiten para `holdRender`/`releaseRender` (esperar fuentes e imagenes) y para el dibujo de `FrameCanvas` (un `useLayoutEffect` que en cada render limpia el lienzo y lo redibuja entero desde el cuadro y las props; no guarda nada entre cuadros).
-- Verificacion: `__ve.checkDeterminism([frames])` renderiza cada cuadro dos veces (tras el cuadro 0 y tras otro cuadro) y compara `innerHTML`; `ok: false` significa que la escena depende del historial. Correrlo en QA sobre cuadros representativos.
+- Verificacion: `__ve.checkDeterminism([frames])` renderiza cada cuadro dos veces (tras el cuadro 0 y tras otro cuadro) y compara `innerHTML` **normalizado** (`normalizeHtml`: ordena los atributos, los tokens de `class` y las propiedades de cada `style`; una diferencia que era solo de orden da `ok: true, reordered: true`). No normaliza hijos, texto, valores, el orden de las funciones dentro de un valor (`transform`) ni el orden entre un atajo y su componente (`margin` + `margin-left`, `transition`, propiedades repetidas), que sí cambian el resultado. `ok: false` significa que la escena depende del historial. Correrlo en QA sobre cuadros representativos.
 
 ## API (todo sale de `engine/index.ts`)
 
