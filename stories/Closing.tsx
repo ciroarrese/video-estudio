@@ -52,8 +52,8 @@ export function Closing({ spec, scenes }: { spec: StorySpec; scenes: TopicScene[
   const u = scaler(dur, CLOSING_FRAMES);
   const n = spec.topics.length;
   const cx = width / 2, cy = height / 2;
-  const { inner, outer, slots } = closingWall(spec);
-  const panels = panelLayout(n);
+  const { inner, outer, slots } = closingWall(spec, width, height);
+  const panels = panelLayout(n, width, height);
   const stagger = Math.min(6, 30 / n);
   const T = { wall: u(130), fold: [u(170), u(200)] as [number, number], fly: [u(200), u(254)] as [number, number], light: u(262), pull: u(372), wash: [u(368), u(398)] as [number, number], logo: u(394), sign: u(418) };
 
@@ -95,8 +95,9 @@ export function Closing({ spec, scenes }: { spec: StorySpec; scenes: TopicScene[
   };
 
   const signLines = spec.signoff;
-  const sf = fitText(signLines.text, 1560, theme.type.h2, { min: theme.type.body, lines: 2, avg: 0.55 });
-  const tagline = signLines.tagline ? fitText(signLines.tagline, 1500, theme.type.body, { min: theme.type.caption, avg: 0.5, lines: 2 }) : null;
+  const signW = Math.min(1560, width - 2 * theme.safe.x);
+  const sf = fitText(signLines.text, signW, theme.type.h2, { min: theme.type.body, lines: 2, avg: 0.55 });
+  const tagline = signLines.tagline ? fitText(signLines.tagline, Math.min(1500, signW), theme.type.body, { min: theme.type.caption, avg: 0.5, lines: 2 }) : null;
 
   return (
     <Stage frame={f}>
@@ -179,12 +180,12 @@ export function Closing({ spec, scenes }: { spec: StorySpec; scenes: TopicScene[
       {/* firma */}
       <div style={{ position: "absolute", inset: 0, background: theme.color.bg, opacity: wash, zIndex: 500 }} />
       <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", flexDirection: "column", gap: 40, zIndex: 600 }}>
-        {signLines.logo && <Logo src={signLines.logo} style={{ maxWidth: 1000, maxHeight: 360, objectFit: "contain", opacity: logo, transform: `scale(${0.92 + logo * 0.08})` }} />}
-        <div style={{ maxWidth: 1600, textAlign: "center", fontSize: sf.size, lineHeight: 1.12, fontWeight: theme.font.weights.semibold, color: theme.color.text, opacity: signLines.logo ? sign : logo, transform: `translateY(${Math.round((1 - (signLines.logo ? sign : logo)) * 16)}px)` }}>
+        {signLines.logo && <Logo src={signLines.logo} style={{ maxWidth: Math.min(1000, width - 2 * theme.safe.x), maxHeight: 360, objectFit: "contain", opacity: logo, transform: `scale(${0.92 + logo * 0.08})` }} />}
+        <div style={{ maxWidth: signW, textAlign: "center", fontSize: sf.size, lineHeight: 1.12, fontWeight: theme.font.weights.semibold, color: theme.color.text, opacity: signLines.logo ? sign : logo, transform: `translateY(${Math.round((1 - (signLines.logo ? sign : logo)) * 16)}px)` }}>
           {signLines.logo ? sf.text : <GradientText>{sf.text}</GradientText>}
         </div>
         {tagline && (
-          <div style={{ maxWidth: 1500, textAlign: "center", fontSize: tagline.size, color: theme.color.textMuted, opacity: sign, transform: `translateY(${Math.round((1 - sign) * 16)}px)` }}>
+          <div style={{ maxWidth: Math.min(1500, signW), textAlign: "center", fontSize: tagline.size, color: theme.color.textMuted, opacity: sign, transform: `translateY(${Math.round((1 - sign) * 16)}px)` }}>
             {tagline.text}
           </div>
         )}

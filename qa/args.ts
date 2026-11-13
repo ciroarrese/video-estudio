@@ -1,6 +1,6 @@
 export type Parsed = { positional: string[]; flags: Map<string, string[]>; bools: Set<string> };
 
-const BOOLEAN = new Set(['help', 'labels', 'no-labels', 'phones', 'verbose']);
+const BOOLEAN = new Set(['help', 'labels', 'no-labels', 'phones', 'verbose', 'list-scenes']);
 
 /** Tiny flag parser: `--name value`, `--name=value`, repeatable, boolean flags listed in BOOLEAN. */
 export function parseArgs(argv: string[]): Parsed {

@@ -31,7 +31,13 @@ export const everyFrames = (duration: number, every: number): number[] => {
 
 export type SampleSpec = { frames?: number[] | string; every?: number; count?: number };
 
-export function sampleFrames(spec: SampleSpec, duration: number, defaultCount: number): number[] {
+export function sampleFrames(spec: SampleSpec, duration: number, defaultCount: number, range?: [number, number]): number[] {
+  if (range) {
+    // Dentro de una escena: se muestrea el rango [a, b] y el resultado se corre al cuadro absoluto.
+    if (spec.frames !== undefined) throw new Error('--scene y --frames no se combinan: usá --count o --every');
+    const [a, b] = range;
+    return sampleFrames({ ...spec, frames: undefined }, b - a + 1, defaultCount).map((f) => f + a);
+  }
   if (spec.frames !== undefined) {
     if (typeof spec.frames === 'string') return parseFrameList(spec.frames, duration);
     const bad = spec.frames.find((f) => !Number.isInteger(f) || f < 0 || f >= duration);

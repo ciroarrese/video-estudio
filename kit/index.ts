@@ -15,3 +15,5 @@ export { FlyingCard } from "./FlyingCard";
 export { flight } from "./flight";
 export type { FlightOptions } from "./flight";
 export { Stage } from "./Stage";
+export { ThemeScope } from "./ThemeScope";
+export type { ThemeScopeProps } from "./ThemeScope";

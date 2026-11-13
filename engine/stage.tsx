@@ -2,10 +2,14 @@ import { flushSync } from 'react-dom';
 import { createRoot } from 'react-dom/client';
 import { FrameProvider } from './FrameProvider';
 import { clearAudio, collectAudio, type AudioTrack } from './Audio';
-import type { VideoDefinition } from './defineVideo';
+import type { RegisteredVideo } from './defineVideo';
+import { configFor, type FormatName } from './format';
+import type { VideoConfig } from './config';
 
 export type Stage = {
-  def: VideoDefinition<any>;
+  def: RegisteredVideo<any>;
+  /** Configuración con la que se dibuja (tamaño y formato elegidos). */
+  config: VideoConfig;
   /** Synchronously render frame n (reuses the same React root). */
   render(n: number): void;
   /** Unmount everything (root renders null). */
@@ -18,12 +22,12 @@ export type Stage = {
   destroy(): void;
 };
 
-export function createStage(host: HTMLElement, def: VideoDefinition<any>, inputProps: object = {}): Stage {
-  const config = { fps: def.fps, width: def.width, height: def.height, durationInFrames: def.durationInFrames };
+export function createStage(host: HTMLElement, def: RegisteredVideo<any>, inputProps: object = {}, format?: FormatName): Stage {
+  const config = configFor(def, format);
   Object.assign(host.style, {
     position: 'relative',
-    width: `${def.width}px`,
-    height: `${def.height}px`,
+    width: `${config.width}px`,
+    height: `${config.height}px`,
     overflow: 'hidden',
   });
   const root = createRoot(host);
@@ -32,6 +36,7 @@ export function createStage(host: HTMLElement, def: VideoDefinition<any>, inputP
   let cur: number | null = null;
   return {
     def,
+    config,
     render(n) {
       flushSync(() => {
         root.render(

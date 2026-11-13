@@ -11,6 +11,8 @@ import { launchChromium, type PwBrowser, type PwPage } from './browser';
 import { trackChild, trackCloser, trackPath, untrackPath } from './cleanup';
 import { digestFiles, ENCODER_SETTINGS, evenFrames, frameFile, framePattern, planSegments, planShards, segmentKey } from './plan';
 import { serveStatic } from './server';
+import { metaForFormat, pageQuery, resolveScene, sceneRange, type VideoMeta } from './meta';
+import type { FormatName, SceneInfo } from '../engine';
 
 export type RenderOptions = {
   videoId: string;
@@ -35,6 +37,10 @@ export type RenderOptions = {
   checkStrict?: boolean;
   /** Extra static / audio directories (searched first). */
   assets?: string[];
+  /** Formato de pantalla (`horizontal`, `vertical`, `cuadrado`); sin esto, el formato base del video. */
+  format?: FormatName;
+  /** Renderiza solo esta escena (id/nombre o índice desde 0; ver `listScenes`). No se combina con `frames`. */
+  scene?: string;
   /** Project root (default: parent of render/). */
   root?: string;
   cacheDir?: string;
@@ -43,8 +49,6 @@ export type RenderOptions = {
 
 export type RenderResult = { out: string; frames: number; seconds: number; renderedSegments: number; cachedSegments: number };
 export type CheckResult = { ok: boolean; frames: number[]; determinism: { frame: number; ok: boolean }[]; mismatches: number[]; diffs: Record<number, string> };
-
-type VideoMeta = { id: string; fps: number; width: number; height: number; durationInFrames: number };
 
 export const defaultRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 export const defaultConcurrency = () => Math.max(1, Math.min(cpus().length, 6));
@@ -235,7 +239,7 @@ async function setup(o: RenderOptions, needAudio: boolean) {
     await server.close();
     throw e;
   });
-  const pageUrl = `${server.url}/?video=${encodeURIComponent(o.videoId)}${Object.keys(props).length ? `&props=${encodeURIComponent(JSON.stringify(props))}` : ''}`;
+  const pageUrl = `${server.url}/${pageQuery(o.videoId, props, o.format)}`;
   const untrack = trackCloser(() => browser.close());
   const cleanup = async () => {
     untrack();
@@ -252,8 +256,10 @@ async function setup(o: RenderOptions, needAudio: boolean) {
       });
       if (shared.error) throw shared.error;
       const metas = (await page.evaluate(() => (window as any).__ve.videos)) as VideoMeta[];
-      const meta = metas.find((m) => m.id === o.videoId);
-      if (!meta) throw new Error(`Video desconocido "${o.videoId}". Disponibles: ${metas.map((m) => m.id).join(', ')}`);
+      const found = metas.find((m) => m.id === o.videoId);
+      if (!found) throw new Error(`Video desconocido "${o.videoId}". Disponibles: ${metas.map((m) => m.id).join(', ')}`);
+      const meta = metaForFormat(found, o.format);
+      const scenes = async (): Promise<SceneInfo[]> => (await page.evaluate(() => (window as any).__ve.scenes())) as SceneInfo[];
       let tracks: Track[] = [];
       if (needAudio) tracks = (await page.evaluate(() => (window as any).__ve.scanAudio())) as Track[];
       const ffmpegVersion = (await run('ffmpeg', ['-version'])).split('\n')[0]!;
@@ -269,11 +275,12 @@ async function setup(o: RenderOptions, needAudio: boolean) {
         fps: meta.fps,
         width: meta.width,
         height: meta.height,
+        format: meta.format,
         encoder: ENCODER_SETTINGS,
         frameFormat: shot.format,
         jpegQuality: shot.format === 'jpeg' ? shot.quality : null,
       };
-      return { env, tracks, bundleHash, keyEnv, root, bundleDir, cacheDir, runId, assets, cleanup, page, context, log, props };
+      return { env, tracks, bundleHash, keyEnv, root, bundleDir, cacheDir, runId, assets, cleanup, page, context, log, props, scenes };
     } catch (e) {
       await context.close().catch(() => {});
       throw e;
@@ -286,6 +293,10 @@ async function setup(o: RenderOptions, needAudio: boolean) {
 
 // ---------- render ----------
 
+/** Sufijo del archivo de salida por defecto: `-vertical`, `-<escena>`. */
+export const suffixOf = (o: { format?: FormatName; scene?: string }) =>
+  `${o.format ? `-${o.format}` : ''}${o.scene !== undefined ? `-${o.scene.replace(/[^A-Za-z0-9_-]+/g, '_')}` : ''}`;
+
 export async function renderVideo(options: RenderOptions): Promise<RenderResult> {
   const t0 = Date.now();
   const scale = options.scale ?? 1;
@@ -297,13 +308,19 @@ export async function renderVideo(options: RenderOptions): Promise<RenderResult>
   const s = await setup(options, wantAudio);
   const { env, log } = s;
   const tmpDir = join(s.cacheDir, `tmp-${s.runId}`);
-  const out = resolve(options.out ?? join('out', `${options.videoId}.mp4`));
+  const out = resolve(options.out ?? join('out', `${options.videoId}${suffixOf(options)}.mp4`));
   const outTmp = `${out}.${s.runId}.tmp.mp4`;
   trackPath(tmpDir);
   trackPath(outTmp);
   try {
     const { meta } = env;
-    const [first, last] = options.frames ?? [0, meta.durationInFrames - 1];
+    let [first, last] = options.frames ?? [0, meta.durationInFrames - 1];
+    if (options.scene !== undefined) {
+      if (options.frames) throw new Error('--scene y --frames no se combinan: --scene ya fija el rango de cuadros');
+      const sc = resolveScene(await s.scenes(), options.scene);
+      [first, last] = sceneRange(sc);
+      log(`escena "${sc.id}" (índice ${sc.index}): cuadros ${first}-${last}`);
+    }
     if (last > meta.durationInFrames - 1) throw new RangeError(`--frames ${first}-${last} excede el video (0-${meta.durationInFrames - 1})`);
     const total = last - first + 1;
     mkdirSync(tmpDir, { recursive: true });
@@ -416,8 +433,15 @@ export async function checkVideo(options: RenderOptions): Promise<CheckResult> {
   const s = await setup({ ...options, frameFormat: 'png' }, false);
   const { env, log } = s;
   try {
-    const total = env.meta.durationInFrames;
-    const frames = evenFrames(total, 12);
+    let total = env.meta.durationInFrames;
+    let offset = 0;
+    if (options.scene !== undefined) {
+      const sc = resolveScene(await s.scenes(), options.scene);
+      total = sc.durationInFrames;
+      offset = sc.from;
+      log(`escena "${sc.id}" (índice ${sc.index}): cuadros ${sc.from}-${sc.from + total - 1}`);
+    }
+    const frames = evenFrames(total, 12).map((n) => n + offset);
     log(`check: cuadros ${frames.join(', ')}`);
     const det = (await s.page.evaluate((f: number[]) => (window as any).__ve.checkDeterminism(f), frames)) as { frame: number; ok: boolean; error?: string }[];
     for (const d of det) if (d.error) log(`check: cuadro ${d.frame}: ${d.error}`);
@@ -450,5 +474,44 @@ export async function checkVideo(options: RenderOptions): Promise<CheckResult> {
   } finally {
     await s.context.close().catch(() => {});
     await s.cleanup();
+  }
+}
+
+// ---------- listados ----------
+
+/** Escenas con nombre del video (declaradas o juntadas de `<Sequence name>`), en el formato indicado. */
+export async function listScenes(options: RenderOptions): Promise<{ meta: VideoMeta; scenes: SceneInfo[] }> {
+  const s = await setup({ ...options, frameFormat: 'png' }, false);
+  try {
+    return { meta: s.env.meta, scenes: await s.scenes() };
+  } finally {
+    await s.context.close().catch(() => {});
+    await s.cleanup();
+  }
+}
+
+/** Videos que el runtime descubrió (`examples/*` y `videos/*`), con tamaños y formatos. */
+export async function listVideos(options: { root?: string; cacheDir?: string; log?: (m: string) => void } = {}): Promise<VideoMeta[]> {
+  const root = options.root ?? defaultRoot;
+  const cacheDir = resolve(options.cacheDir ?? join(root, '.ve-cache'));
+  mkdirSync(cacheDir, { recursive: true });
+  const bundleDir = await ensureBundle(root, cacheDir, newRunId(), options.log ?? (() => {}));
+  const server = await serveStatic([bundleDir, join(root, 'public')], bundleDir);
+  let browser: PwBrowser | undefined;
+  try {
+    browser = await launchChromium();
+    const shared: Shared = { error: null };
+    const { page, context } = await openPage(browser, { width: 320, height: 180, scale: 1 }, `${server.url}/`, shared);
+    try {
+      await page.evaluate(() => (window as any).__ve.ready as Promise<unknown>).catch(() => undefined);
+      const err = (await page.evaluate(() => (window as any).__ve.loadError)) as string | null;
+      if (err) throw new Error(err);
+      return (await page.evaluate(() => (window as any).__ve.videos)) as VideoMeta[];
+    } finally {
+      await context.close().catch(() => {});
+    }
+  } finally {
+    await browser?.close().catch(() => {});
+    await server.close();
   }
 }

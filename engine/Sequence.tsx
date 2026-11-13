@@ -1,13 +1,16 @@
 import { Children, isValidElement, useContext, useMemo, type ReactElement, type ReactNode } from 'react';
 import { TimeContext } from './context';
+import { registerScene } from './scenes';
 
 export type SequenceProps = {
   from: number;
   durationInFrames?: number;
+  /** Nombre de la escena: permite renderizarla sola (`--scene <nombre>`) y listarla (`--list-scenes`). */
+  name?: string;
   children?: ReactNode;
 };
 
-export function Sequence({ from, durationInFrames, children }: SequenceProps) {
+export function Sequence({ from, durationInFrames, name, children }: SequenceProps) {
   const parent = useContext(TimeContext);
   if (!parent) throw new Error('<Sequence> must be used inside <FrameProvider>');
   const local = parent.frame - from;
@@ -21,10 +24,12 @@ export function Sequence({ from, durationInFrames, children }: SequenceProps) {
   );
   if (local < 0) return null;
   if (durationInFrames !== undefined && local >= durationInFrames) return null;
+  // Se registra al dibujar (idempotente, como Audio): el runtime recorre los cuadros y junta las escenas con nombre.
+  if (name) registerScene({ id: name, from: Math.max(0, state.offset), durationInFrames: state.end - Math.max(0, state.offset) });
   return <TimeContext.Provider value={state}>{children}</TimeContext.Provider>;
 }
 
-export type SeriesItemProps = { durationInFrames: number; children?: ReactNode };
+export type SeriesItemProps = { durationInFrames: number; name?: string; children?: ReactNode };
 
 function SeriesItem({ children }: SeriesItemProps) {
   return <>{children}</>;
@@ -44,7 +49,7 @@ export function Series({ children }: { children?: ReactNode }) {
       throw new Error('<Series.Item> needs a non-negative durationInFrames');
     }
     out.push(
-      <Sequence key={el.key ?? i} from={cursor} durationInFrames={d}>
+      <Sequence key={el.key ?? i} from={cursor} durationInFrames={d} name={el.props.name}>
         {el.props.children}
       </Sequence>,
     );

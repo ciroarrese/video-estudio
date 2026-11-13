@@ -17,6 +17,8 @@ export function Cursor({
 }) {
   const theme = useTheme();
   const f = useFrameOr(frame);
+  // Posición en píxeles enteros: con un `scale()` en un ancestro, Chromium rasteriza la flecha SVG de forma distinta
+  // según el historial de cuadros si el `left`/`top` es fraccionario (falla `--check`); ver docs/reglas.md.
   const { x, y } = track(f, keys);
   const out = themeEasing(theme.motion.easing.out);
   const len = show[1] - show[0];
@@ -29,7 +31,7 @@ export function Cursor({
   if (visible <= 0) return null;
   const press = clicks.reduce((a, c) => a + kf(f, [c - 3, c, c + 6], [0, 0.15, 0]), 0);
   return (
-    <div style={{ position: "absolute", left: x, top: y, opacity: visible, zIndex: 50, pointerEvents: "none" }}>
+    <div style={{ position: "absolute", left: Math.round(x), top: Math.round(y), opacity: visible, zIndex: 50, pointerEvents: "none" }}>
       {clicks.map((c) => {
         const p = kf(f, [c, c + 18], [0, 1], out);
         return (

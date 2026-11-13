@@ -141,8 +141,10 @@ export function listLayout(spec: StorySpec, theme: Theme, width: number, height:
 export type WallChip = { x: number; y: number; text: string };
 
 /** Muro de la apertura: 6 columnas × 6 filas en ladrillo; el azar solo mueve un poco cada pieza y le da su profundidad. */
-export function openingWall(spec: StorySpec): (WallChip & { z: number; on: number })[] {
+export function openingWall(spec: StorySpec, height = 1080): (WallChip & { z: number; on: number })[] {
   const fallback = spec.topics.map((t) => t.name);
+  // En formatos altos las filas se separan más (el muro llena el alto); el ancho se corta solo (las piezas de afuera no se ven).
+  const ky = height / 1080 > 1.2 ? height / 1080 : 1;
   const out: (WallChip & { z: number; on: number })[] = [];
   for (let i = 0; i < 36; i++) {
     const col = i % 6;
@@ -150,7 +152,7 @@ export function openingWall(spec: StorySpec): (WallChip & { z: number; on: numbe
     out.push({
       text: labelAt(spec.labels, i, fallback),
       x: Math.round((col - 2.5) * 400 + (row % 2) * 200 - 100 + (random(`x${i}`) - 0.5) * 40),
-      y: Math.round(-420 + row * 168 + (random(`y${i}`) - 0.5) * 24),
+      y: Math.round((-420 + row * 168) * ky + (random(`y${i}`) - 0.5) * 24),
       z: Math.round(-300 + random(`z${i}`) * 440),
       on: 10 + random(`on${i}`) * 60,
     });
@@ -161,7 +163,12 @@ export function openingWall(spec: StorySpec): (WallChip & { z: number; on: numbe
 export const CELL = { w: 480, h: 200, off: 70 };
 
 /** Lugares reservados en el centro del muro del cierre (dos filas, la de arriba con ceil(n/2)). */
-export function reservedSlots(n: number): Pt[] {
+export function reservedSlots(n: number, width = 1920, height = 1080): Pt[] {
+  if (width / height < 1.3) {
+    // Formato vertical o cuadrado: una sola columna centrada (las píldoras llegan a ~800 px de ancho al aterrizar).
+    const gap = Math.min(220, Math.floor((height * 0.66) / Math.max(1, n - 1) / 0.8));
+    return Array.from({ length: n }, (_, j) => ({ x: 0, y: Math.round((j - (n - 1) / 2) * gap) }));
+  }
   const top = Math.ceil(n / 2);
   const rows = [top, n - top];
   const out: Pt[] = [];
@@ -181,15 +188,21 @@ export const SLOT_CLEAR = { x: 540, y: 150 };
  * Muro del cierre: grilla de etiquetas sin las celdas que tapan los lugares reservados, más un anillo exterior
  * (que solo se ve al alejar la cámara) que llena el cuadro cuando el muro se aleja.
  */
-export function closingWall(spec: StorySpec): { inner: WallChip[]; outer: WallChip[]; slots: Pt[] } {
-  const slots = reservedSlots(spec.topics.length);
+export function closingWall(spec: StorySpec, width = 1920, height = 1080): { inner: WallChip[]; outer: WallChip[]; slots: Pt[] } {
+  const slots = reservedSlots(spec.topics.length, width, height);
   const fallback = spec.topics.map((t) => t.name);
   const inner: WallChip[] = [];
   const outer: WallChip[] = [];
-  for (let r = -2; r <= 7; r++) {
-    for (let c = -3; c <= 8; c++) {
+  // Horizontal: la grilla de siempre. Vertical y cuadrado: se cubre lo que la cámara alcanza a ver al alejarse (escala ~0.55).
+  const tall = width / height < 1.3;
+  const halfW = width / 2 / 0.55, halfH = height / 2 / 0.55;
+  const cols: [number, number] = tall ? [Math.ceil((-halfW - CELL.w + 1200) / CELL.w), Math.floor((halfW + CELL.w + 1200) / CELL.w)] : [-3, 8];
+  const rows: [number, number] = tall ? [Math.ceil((-halfH - CELL.h + 500) / CELL.h), Math.floor((halfH + CELL.h + 500) / CELL.h)] : [-2, 7];
+  const slotY = Math.max(...slots.map((s) => Math.abs(s.y)));
+  for (let r = rows[0]; r <= rows[1]; r++) {
+    for (let c = cols[0]; c <= cols[1]; c++) {
       const p = cellPos(r, c);
-      const inside = r >= 0 && r <= 5 && c >= 0 && c <= 5;
+      const inside = tall ? Math.abs(p.x) <= 1300 && Math.abs(p.y) <= slotY + 450 : r >= 0 && r <= 5 && c >= 0 && c <= 5;
       if (slots.some((s) => Math.abs(p.x - s.x) < SLOT_CLEAR.x && Math.abs(p.y - s.y) < SLOT_CLEAR.y)) continue;
       const list = inside ? inner : outer;
       list.push({ ...p, text: labelAt(spec.labels, inside ? inner.length : outer.length * 11 + 5, fallback) });
@@ -201,7 +214,8 @@ export function closingWall(spec: StorySpec): { inner: WallChip[]; outer: WallCh
 export type PanelPlace = { x: number; y: number; z: number; k: number };
 
 /** Disposición de los paneles flotantes del cierre según la cantidad de temas (`k` = escala del lienzo 560x340). */
-export function panelLayout(n: number): PanelPlace[] {
+export function panelLayout(n: number, width = 1920, height = 1080): PanelPlace[] {
+  if (width / height < 1.3) return panelGrid(n, width, height);
   const k = n === 2 ? 1.4 : n <= 4 ? 1.2 : 0.95;
   const rows = n === 2 ? [2] : [Math.ceil(n / 2), n - Math.ceil(n / 2)];
   const zs = [30, -90, -60, 50, 0, -40];
@@ -217,6 +231,36 @@ export function panelLayout(n: number): PanelPlace[] {
   });
   return out;
 }
+
+/**
+ * Paneles en formato vertical o cuadrado: una columna (vertical, hasta 3 temas) o dos columnas, con la escala `k` que
+ * entra en el ancho seguro y en el alto (cada panel lleva su píldora asomando ~50 px por arriba).
+ */
+function panelGrid(n: number, width: number, height: number): PanelPlace[] {
+  const cols = width > height || n > 3 ? 2 : 1;
+  const rows = Math.ceil(n / cols);
+  const gapX = 36, gapY = 96; // el hueco vertical deja lugar a la píldora del panel de abajo
+  const availW = width - 2 * 80;
+  const availH = height - 2 * 150;
+  const k = Math.min(1.4, (availW - (cols - 1) * gapX) / (cols * PANEL_W), (availH - (rows - 1) * gapY) / (rows * PANEL_H));
+  const zs = [30, -90, -60, 50, 0, -40];
+  const cw = PANEL_W * k, ch = PANEL_H * k;
+  const out: PanelPlace[] = [];
+  for (let r = 0; r < rows; r++) {
+    const cnt = Math.min(cols, n - r * cols);
+    for (let j = 0; j < cnt; j++) {
+      out.push({
+        x: Math.round(width / 2 + (j - (cnt - 1) / 2) * (cw + gapX)),
+        y: Math.round(height / 2 + (r - (rows - 1) / 2) * (ch + gapY)),
+        z: zs[out.length % zs.length]!,
+        k: Math.round(k * 1000) / 1000,
+      });
+    }
+  }
+  return out;
+}
+
+const PANEL_W = 560, PANEL_H = 340;
 
 // ---------------------------------------------------------------- proyección 3D
 

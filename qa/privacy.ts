@@ -3,13 +3,16 @@ import { basename, extname, join, relative } from 'node:path';
 import { collectAllText } from './page';
 import { collectStrings, parseTermList, scanText, type Hit, type Term } from './privacyCore';
 import { sampleFrames, type SampleSpec } from './sampling';
-import { openSession } from './session';
+import { openSession, sceneFrames } from './session';
+import type { FormatName } from '../engine';
 
 export type PrivacyFinding = Hit & { where: string; frames?: number[]; context: string };
 
 export type PrivacyOptions = Partial<SampleSpec> & {
   videoId?: string;
   props?: Record<string, unknown>;
+  format?: FormatName;
+  scene?: string;
   /** Contents (not paths) of the deny / allow lists. */
   deny: string;
   allow?: string;
@@ -64,9 +67,9 @@ export async function runPrivacy(o: PrivacyOptions): Promise<PrivacyResult> {
   let scannedFiles = 0;
 
   if (o.videoId) {
-    const session = await openSession({ videoId: o.videoId, props: o.props, log: o.log });
+    const session = await openSession({ videoId: o.videoId, props: o.props, format: o.format, log: o.log });
     try {
-      frames = sampleFrames(o, session.meta.durationInFrames, 24);
+      frames = sampleFrames(o, session.meta.durationInFrames, 24, await sceneFrames(session, o.scene));
       for (const s of collectStrings(o.props ?? {})) {
         scannedTexts++;
         for (const h of scanText(s, deny, allow)) add(h, 'props', ctx(s, h.value));

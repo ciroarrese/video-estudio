@@ -3,3 +3,4 @@ dist
 out
 .ve-cache/
 videos/
+public/sfx/

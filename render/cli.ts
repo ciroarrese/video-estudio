@@ -1,6 +1,7 @@
 import { parseCliArgs, USAGE } from './args';
 import { installSignalHandlers, isInterrupted } from './cleanup';
-import { checkVideo, renderVideo } from './render';
+import { checkVideo, listScenes, listVideos, renderVideo } from './render';
+import { formatSceneList, formatVideoList } from './meta';
 
 installSignalHandlers();
 
@@ -19,9 +20,18 @@ async function main(): Promise<number> {
   const log = (m: string) => console.log(m);
   const base = {
     videoId: o.videoId, out: o.out, props: o.props, frames: o.frames, concurrency: o.concurrency, scale: o.scale,
-    crf: o.crf, segment: o.segment, audio: o.audio, cache: o.cache, keepFrames: o.keepFrames, frameFormat: o.frameFormat, jpegQuality: o.jpegQuality, assets: o.assets, checkMaxDelta: o.checkMaxDelta, checkMaxRatio: o.checkMaxRatio, checkStrict: o.checkStrict, log,
+    crf: o.crf, segment: o.segment, audio: o.audio, cache: o.cache, keepFrames: o.keepFrames, frameFormat: o.frameFormat, jpegQuality: o.jpegQuality, assets: o.assets, checkMaxDelta: o.checkMaxDelta, checkMaxRatio: o.checkMaxRatio, checkStrict: o.checkStrict, format: o.format, scene: o.scene, log,
   };
   try {
+    if (o.list) {
+      console.log(formatVideoList(await listVideos({ log })));
+      return 0;
+    }
+    if (o.listScenes) {
+      const r = await listScenes(base);
+      console.log(formatSceneList(r.meta.id, r.scenes, r.meta.fps));
+      return 0;
+    }
     if (o.check || o.checkStrict) {
       const r = await checkVideo(base);
       console.log(r.ok ? 'check: OK (determinista)' : 'check: FALLO (no determinista)');

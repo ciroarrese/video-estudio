@@ -24,7 +24,7 @@ export function Opening({ spec }: { spec: StorySpec }) {
   const u = scaler(dur, OPENING_FRAMES);
   const n = spec.topics.length;
   const L = listLayout(spec, theme, width, height);
-  const wall = openingWall(spec);
+  const wall = openingWall(spec, height);
   const cx = width / 2, cy = height / 2;
 
   const gap = Math.min(16, 64 / n) * (dur / OPENING_FRAMES);
@@ -42,7 +42,10 @@ export function Opening({ spec }: { spec: StorySpec }) {
   // título: legible desde el cuadro 0 (solo se asienta con una escala corta)
   const titleIn = kf(f, [0, u(16)], [0, 1], ease.out);
   const titleOut = kf(f, T.titleOut, [0, 1]);
-  const tf = fitText(spec.title.text, 1560, theme.type.hero, { min: theme.type.hero * 0.5, lines: 2, avg: 0.55 });
+  // en formatos angostos el título baja a más renglones y el cartel se queda dentro del ancho seguro
+  const narrow = width / height < 1.3;
+  const titleW = Math.min(1560, width - 2 * theme.safe.x);
+  const tf = fitText(spec.title.text, titleW, theme.type.hero, { min: theme.type.hero * (narrow ? 0.45 : 0.5), lines: narrow ? 3 : 2, avg: 0.55 });
 
   // atravesado del primer titular
   const cam = cameraAt(f, [{ f: 0, x: cx, y: cy, scale: 1 }], {
@@ -75,7 +78,8 @@ export function Opening({ spec }: { spec: StorySpec }) {
         <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", pointerEvents: "none", zIndex: 3 }}>
           <div
             style={{
-              maxWidth: 1700,
+              maxWidth: Math.min(1700, width - theme.safe.x),
+              boxSizing: "border-box",
               padding: `${Math.round(tf.size * 0.3)}px ${Math.round(tf.size * 0.55)}px`,
               borderRadius: theme.radius.lg * 2,
               background: theme.color.surface,

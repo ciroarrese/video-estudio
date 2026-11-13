@@ -1,12 +1,10 @@
 import React from "react";
 import { useTheme } from "../themes";
 import { CloudBackground } from "./CloudBackground";
+import { firstFamily, fontFaceCss } from "./fonts";
+import { useThemeFonts } from "./ThemeScope";
 
-/** Primer nombre de familia de una pila CSS, sin comillas: es el nombre que se usa en `@font-face`. */
-export function firstFamily(stack: string): string {
-  const m = /^\s*(?:"([^"]+)"|'([^']+)'|([^,]+))/.exec(stack);
-  return (m?.[1] ?? m?.[2] ?? m?.[3] ?? stack).trim();
-}
+export { firstFamily };
 
 /** Escena a cuadro completo: fondo, tipografía y color de texto del tema, con nubes opcionales. */
 export function Stage({
@@ -21,10 +19,8 @@ export function Stage({
   children?: React.ReactNode;
 }) {
   const theme = useTheme();
-  const face = firstFamily(theme.font.family);
-  const fontCss = (theme.font.files ?? [])
-    .map((f) => `@font-face{font-family:${JSON.stringify(face)};font-weight:${f.weight};src:url(${JSON.stringify(f.src)});}`)
-    .join("");
+  useThemeFonts(theme);
+  const fontCss = fontFaceCss(theme);
   return (
     <div
       style={{
