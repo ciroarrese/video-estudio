@@ -13,7 +13,7 @@ export type FxDataUiArtProps = { theme?: "neutral" | "dark" | Theme };
 
 export const SEGMENT = 90;
 export const ANIM = 75;
-type Entry = { name: string; group: string; w: number; h: number; render: (f: number, w: number, h: number) => React.ReactNode };
+type Entry = { name: string; group: string; w: number; h: number; /** Sin ampliación con scale() (el cursor del kit no rasteriza estable bajo scale). */ noScale?: boolean; render: (f: number, w: number, h: number) => React.ReactNode };
 
 const D = ANIM - 5;
 const entries: Entry[] = [
@@ -31,7 +31,7 @@ const entries: Entry[] = [
   { group: "ui", name: "BeforeAfter", w: 900, h: 560, render: (f, w, h) => <BeforeAfter frame={f} width={w} height={h} duration={D} /> },
   { group: "ui", name: "TileGrid", w: 900, h: 560, render: (f, w, h) => <TileGrid frame={f} width={w} height={h} duration={D} /> },
   {
-    group: "ui", name: "TileDone + Cursor", w: 520, h: 170,
+    group: "ui", name: "TileDone + Cursor", w: 520, h: 170, noScale: true,
     render: (f, w, h) => (
       <div style={{ position: "relative", width: w, height: h }}>
         <TileDone frame={f} start={38} duration={28} width={w} height={h} />
@@ -83,7 +83,7 @@ function Scene() {
   const idx = Math.min(entries.length - 1, Math.floor(frame / SEGMENT));
   const local = Math.min(frame - idx * SEGMENT, SEGMENT - 1);
   const e = entries[idx]!;
-  const scale = e.w >= 1920 ? 1 : Math.min(1.6, 1700 / e.w, 860 / e.h);
+  const scale = e.w >= 1920 || e.noScale ? 1 : Math.min(1.6, 1700 / e.w, 860 / e.h);
   return (
     <Stage clouds={false}>
       <div style={{ position: "absolute", left: 90, top: 40, display: "flex", alignItems: "baseline", gap: 18 }}>

@@ -16,7 +16,7 @@ Tres galerías, un efecto por tramo de 90 cuadros (75 de animación y 15 de paus
 | Galería | Qué muestra | Ver en el navegador | Hoja de cuadros |
 |---|---|---|---|
 | `fx-text` | los 8 efectos de texto | `npm run dev` y `/?video=fx-text` | `npm run sheet -- fx-text --count 16` |
-| `fx-3d` | los 16 efectos 3D | `/?video=fx-3d` | `npm run sheet -- fx-3d --count 16` |
+| `fx-3d` | los 16 efectos 3D (17 tramos: `PhoneOrbit` con y sin pantalla) | `/?video=fx-3d` | `npm run sheet -- fx-3d --count 17` |
 | `fx-data-ui-art` | datos, interfaz y arte (25 tramos) | `/?video=fx-data-ui-art` | `npm run sheet -- fx-data-ui-art --count 25` |
 
 Todas admiten `&props={"theme":"dark"}`. Para ver un solo efecto: el tramo `i` (desde 0, en el orden de las tablas de abajo, o el de la etiqueta) ocupa los cuadros `i*90` a `i*90+89`: `npm run render -- fx-3d --frames 270-359 --scale 0.5 --crf 23` (`CubeFold`, el cuarto de `fx-3d`, es el tramo 3). En `fx-data-ui-art` el orden es datos (0 a 5), interfaz (6 a 13, con `TileDone` en el 13), arte (14 a 24).
@@ -34,7 +34,7 @@ Todas admiten `&props={"theme":"dark"}`. Para ver un solo efecto: el tramo `i` (
 | Comparar categorías | `BarsGrow` | `RadarMorph` (varios ejes), `IsoCity` (mapa de calor en bloques) |
 | Mapa, alcance global, red | `Globe` | `ParticleSphere`, `OrbitRings` |
 | Notificación o aviso | `NotificationStack` | `ChatThread`, `CommandPalette` |
-| Mostrar una app | `PhoneFrame` / `PhoneScroll` con tu contenido | `PhoneOrbit` (solo presentación, pantalla ficticia) |
+| Mostrar una app | `PhoneFrame` / `PhoneScroll` con tu contenido | `PhoneOrbit` (gira hacia el espectador; acepta tu interfaz como `children` o `screen`) |
 | Cierre con logo | `LogoLand` | `SealSpin`, `MaskedRise` con `dot` |
 | Resaltar algo a mano | `MarkerDraw` | los garabatos del kit (`DoodleCircle`, ...) |
 | Transición entre escenas | `DotWipe` | `Tunnel`, `HalftoneWave`, `MarqueeBands` (separador) |
@@ -79,9 +79,9 @@ Proyectadas a mano (sin librerías 3D). Props comunes (`ThreeProps`): `bg` (rol 
 | `CarouselRing` | Tarjetas en un anillo que gira. | Galería, lista de ejemplos. | `children`, `count`, `cardWidth`, `cardHeight` |
 | `IsoCity` | Bloques isométricos que crecen. | Crecimiento, mapa de calor. | `grid`, `maxHeight` |
 | `ExtrudeType` | Titular con volumen (capas apiladas). | Títulos con presencia. | `text`, `fontSize`, `layers`, `step` |
-| `PhoneOrbit` | Teléfono que gira hasta mirar al espectador. | Presentar una app. | `startAngle` |
+| `PhoneOrbit` | Teléfono que gira hasta mirar al espectador, con un anillo en órbita. | Presentar una app, con tu propia interfaz en la pantalla. | `startAngle`, `children` / `screen` |
 
-Limitaciones: **`PhoneOrbit` dibuja una pantalla ficticia de formas (un marcador de posición), sin texto y sin hijos**; si necesitás tu propia interfaz en un teléfono usá `PhoneFrame` / `PhoneScroll`. Estas piezas tapan lo que tienen detrás (rellenan con `bg`). Ayudas de cálculo (`rotateX/Y/Z`, `camera`, `sortBackToFront`, `shade`, ...) en `fx/three/math.ts`.
+Notas: **`PhoneOrbit` sin contenido dibuja una pantalla ficticia de formas; con `children` (o `screen({ width, height, frame })`) recibe tu interfaz recreada** en una caja del tamaño de la pantalla (`width: "100%"`, `height: "100%"`), con la misma cámara que el resto del teléfono. Para un teléfono quieto, `PhoneFrame` / `PhoneScroll`. Los trazos, puntos y rótulos de las piezas 3D escalan con el tamaño de la caja. Estas piezas tapan lo que tienen detrás (rellenan con `bg`). Ayudas de cálculo (`rotateX/Y/Z`, `camera`, `sortBackToFront`, `shade`, ...) en `fx/three/math.ts`.
 
 ## Datos (`fx/data`, galería `fx-data-ui-art`)
 
@@ -96,7 +96,7 @@ SVG puros; colores, tipografía y radios del tema.
 | `BarsGrow` | Barras comunes que crecen escalonadas, con valores. | Comparar categorías de forma clara. | `data`, `labels`, `singleColor`, `format` |
 | `FlowSteps` | Pasos en escalera unidos por un conector que se dibuja. | Un proceso en pasos. | `steps` (`{title, caption?, state?}`), `activeIndex` |
 
-Limitación: `Bars3D` se ve más chica que el cuadro que le das (la proyección isométrica deja aire); pedile un `width`/`height` generoso o usá `BarsGrow` si necesitás lectura de valores a distancia.
+Nota: `Bars3D` ocupa casi todo el cuadro que le das (barras más anchas y altas, rótulos del tamaño `eyebrow`); aun así la proyección isométrica de una fila deja aire a los lados: usá `BarsGrow` si necesitás lectura de valores a distancia.
 
 ## Interfaz (`fx/ui`, galería `fx-data-ui-art`)
 
@@ -132,7 +132,7 @@ Interfaces recreadas con el tema (no capturas). Se pueden poner dentro de `World
 | `SealSpin` | Sello circular con texto sobre un trazado que gira y frena. | Sello, garantía, cierre. | `text`, `turns` |
 | `RibbonTwist` | Cinta que se retuerce mostrando dos caras. | Decoración, separador. | `segments`, `twists`, `ribbonWidth` |
 
-Limitaciones: **`PixelBuild` muestrea la cobertura de los glifos en un canvas fuera de pantalla y, si la tipografía del tema todavía no cargó en ese momento, parte de la del sistema** (sin canvas, un patrón sembrado); verificá en la hoja que la forma sea legible. `DotWipe` va a cuadro completo: se superpone a la escena y, con `inout`, termina despejado. Los trazados (`path`) aceptan `M L H V C S Q T A Z`, absolutos y relativos.
+Notas: **`PixelBuild` muestrea la cobertura de los glifos en un canvas fuera de pantalla y espera a que cargue la tipografía del tema** (`holdRender` hasta que esté lista; la memoria de celdas es acotada y su clave incluye la fuente); sin canvas (pruebas), usa un patrón sembrado. Verificá en la hoja que la forma sea legible. `DotWipe` va a cuadro completo: se superpone a la escena y, con `inout`, termina despejado. Los trazados (`path`) aceptan `M L H V C S Q T A Z`, absolutos y relativos.
 
 ## Principios
 
@@ -141,7 +141,7 @@ Limitaciones: **`PixelBuild` muestrea la cobertura de los glifos en un canvas fu
 3. **Corte seco entre palabras** (`KineticWords`): el movimiento ocurre dentro de cada palabra, no entre ellas.
 4. **El último cuadro es un still.** Todo efecto termina compuesto y legible; se puede congelar para una miniatura o como primera imagen de la escena siguiente.
 5. **Oclusión pintando de lejos a cerca** y **profundidad con opacidad y grosor**: lo lejano se desvanece y se afina; lo cercano es más grande y más opaco. En `fx/three` la perspectiva se proyecta a mano.
-6. **Raster estable.** Para que el render sea idéntico según el historial de cuadros, ver la lista única en `docs/reglas.md` (traslados enteros, nada de `scale()` sobre texto, CSS 3D solo como `perspective()` propio de cada elemento).
+6. **Raster estable.** Para que el render sea idéntico según el historial de cuadros, ver la lista única en `docs/reglas.md` (traslados enteros, `scale()` sobre texto solo si la pieza pasa `--check` completo, CSS 3D solo como `perspective()` propio de cada elemento, sin sombras bajo `rotate()`).
 
 ## Base común
 
