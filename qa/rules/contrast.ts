@@ -52,10 +52,14 @@ export const contrastRule: Rule = {
       // texto en fundido. Un velo semitransparente QUIETO (fade ~ 0) sigue siendo error: ese contraste es el que se ve.
       const veilCrossing = !!r.veil && (r.veil.fade ?? 0) > VEIL_FADE;
       if (veilCrossing) sev = 'info';
+      // Texto en fundido junto con la superficie que pinta su fondo (un panel con su contenido que entra a la vez): el fondo muestreado esta
+      // mezclado con el de atras y el texto tambien, asi que el cuadro es una transicion, no un defecto. Un panel quieto sigue juzgandose.
+      const surfaceFading = !!r.fadingBg && (r.fade ?? 0) > STILL_FADE;
+      if (surfaceFading) sev = 'info';
       seen.add(r.elId);
       out.push({
         rule: 'contrast', severity: sev, frame,
-        message: `contraste ${ratio.toFixed(2)}:1 (${ratio < t.error ? `minimo ${t.error}` : `recomendado ${t.warn}`}:1)${r.opacity < t.minOpacity ? ` con opacidad ${r.opacity.toFixed(2)} (muy tenue)` : still && r.opacity < 0.99 ? ` con opacidad ${r.opacity.toFixed(2)} (quieto, se juzga como se ve)` : ''} ${r.color} sobre ${toRgb(r.bg)}${veilCrossing ? `; bajo un velo de cuadro completo que cruza (opacidad ${r.veil!.opacity.toFixed(2)}, cambia ${(r.veil!.fade ?? 0).toFixed(2)} por cuadro): transicion, no se juzga` : r.veil ? `; bajo un velo de cuadro completo QUIETO (opacidad ${r.veil.opacity.toFixed(2)}): el texto se ve asi; aclarar el velo, subir el contraste o quitarlo` : ''}`,
+        message: `contraste ${ratio.toFixed(2)}:1 (${ratio < t.error ? `minimo ${t.error}` : `recomendado ${t.warn}`}:1)${r.opacity < t.minOpacity ? ` con opacidad ${r.opacity.toFixed(2)} (muy tenue)` : still && r.opacity < 0.99 ? ` con opacidad ${r.opacity.toFixed(2)} (quieto, se juzga como se ve)` : ''} ${r.color} sobre ${toRgb(r.bg)}${surfaceFading ? '; el texto y la superficie de su fondo estan en fundido a la vez: transicion, no se juzga' : ''}${veilCrossing ? `; bajo un velo de cuadro completo que cruza (opacidad ${r.veil!.opacity.toFixed(2)}, cambia ${(r.veil!.fade ?? 0).toFixed(2)} por cuadro): transicion, no se juzga` : r.veil ? `; bajo un velo de cuadro completo QUIETO (opacidad ${r.veil.opacity.toFixed(2)}): el texto se ve asi; aclarar el velo, subir el contraste o quitarlo` : ''}`,
         element: describe(r), data: { ratio: Math.round(ratio * 100) / 100 },
       });
     }

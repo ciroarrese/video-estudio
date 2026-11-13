@@ -19,6 +19,8 @@ export type TextRun = {
   motion?: number;
   /** Largest change of the effective opacity of this text between this frame and its neighbours (0 when not matched): > 0 means mid-fade. */
   fade?: number;
+  /** An element at or above a surface painted behind the text has opacity < 1: the sampled background is mid-fade together with the text (see collect.inpage.js). */
+  fadingBg?: boolean;
   /** Id of the element that owns the text node, and of every element up to (excluding) the stage. */
   elId: number;
   chain: number[];

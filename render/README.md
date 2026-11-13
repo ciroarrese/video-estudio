@@ -95,6 +95,24 @@ Un video en construcción no tiene que dejar inservibles a los demás:
 
 Las pruebas que necesitan videos propios usan `withTempVideos` (`render/testing.ts`): una carpeta temporal bajo `out/` con `VE_VIDEOS_DIR` apuntando ahí. El `videos/` real queda fuera del bundle y del hash (no importa si hay un video en construcción con errores de tipos, y las carpetas temporales no se filtran a otros bundles). Los videos temporales importan el motor con ruta absoluta (`engineDir`). `stories/nuevo-sh.test.ts` arma un proyecto mínimo temporal (enlaces a `engine/`, `kit/`..., copia de `templates/`) y hace el typecheck solo de lo generado con un `tsconfig` propio. `withVideosDir` (cerrojo sobre el `videos/` real) queda para quien de verdad lo necesite; el cerrojo guarda el pid y se rompe solo si su dueño murió o tiene más de 15 minutos.
 
+## Videos fuera del repo (`VE_VIDEOS_DIR`)
+
+`VE_VIDEOS_DIR=/ruta/absoluta/mis-videos npm run render -- --list` (también render, `--check`, `qa` y `sheet`) carga los videos de esa carpeta (`<slug>/index.ts(x)` y `<slug>/<carpeta>/index.ts(x)`; se ignoran las carpetas que empiezan con punto) **además de los ejemplos**, y los muestra como `videos/<slug>`. Sirve para dejar los videos fuera del repo y para pruebas con videos temporales. Si la ruta no existe o no es una carpeta, el CLI falla con un mensaje en español (no lista vacío). Una carpeta sin videos es válida y no da error.
+
+Causa del listado vacío que había: `import.meta.glob` de vite con una ruta relativa que sale del proyecto (`../../../../tmp/...`) devuelve un mapa vacío, y se llevaba también los ejemplos. Ahora `vite.config.ts` saca los patrones de `videos/` y agrega imports dinámicos con ruta absoluta de lo que encuentra en la carpeta (se escanea al compilar; al agregar una carpeta nueva el hash del bundle cambia solo).
+
+Cómo importar el motor desde un video de afuera: con el alias `video-estudio/<carpeta>`, que apunta a la carpeta del repo.
+
+```ts
+import React from "react";                                  // un solo React: el del repo (resolve.dedupe)
+import { defineVideo, useFrame } from "video-estudio/engine";
+import { ThemeProvider, neutral } from "video-estudio/themes";
+import { Stage } from "video-estudio/kit";
+import { Typewriter } from "video-estudio/fx";               // y "video-estudio/fx/three"
+```
+
+También sirve la ruta absoluta al repo (`/clon/engine`). Los imports relativos entre archivos del propio video funcionan igual. Para que el editor y `tsc` entiendan el alias, la carpeta de afuera necesita un `tsconfig.json` con `"paths": { "video-estudio/*": ["/ruta/al/clon/*"] }` (`moduleResolution: Bundler`); el render no lo necesita. `npm run typecheck` del repo no revisa los videos de afuera. Los archivos de la carpeta entran en el hash del bundle como los de `videos/`.
+
 ## Cache de hashes de archivos
 
 El hash de contenido de los fuentes y de `public/` se calcula en cada render, pero no se relee todo: `.ve-cache/filehash.json` guarda, por archivo, el hash junto con (tamaño, mtime y ctime en nanosegundos, inodo). Solo se leen los archivos cuya firma cambió. Se eligió esto y no "tamaño + mtime como clave" porque esa clave no es correcta (un editor, `cp -p` o `git checkout` pueden dejar el mismo mtime con otro contenido); con el ctime incluido, una escritura que conserve tamaño y mtime igual cambia la firma. Límite: un sistema de archivos que no actualice ni mtime ni ctime (algunos montajes de red); ahí borrá `.ve-cache/filehash.json`.

@@ -253,6 +253,22 @@ describe('contrast bajo un velo de cuadro completo', () => {
   });
 });
 
+describe('contrast con la superficie del fondo en fundido', () => {
+  // texto claro sobre un panel oscuro a medio entrar sobre un video claro: el fondo muestreado es gris medio
+  const base = { color: 'rgba(169,174,198,1)', bg: { r: 134, g: 137, b: 149, samples: 9 }, screenPx: 30, opacity: 0.5 };
+  const out = (p: Partial<TextRun>) => contrastRule.check({ frame: 0, width: W, height: H, runs: [run({ ...base, ...p })], thresholds: DEFAULT_THRESHOLDS })[0]!;
+  it('el panel y el texto entran a la vez (fade > 0 y superficie con opacidad < 1): info', () => {
+    const f = out({ fadingBg: true, fade: 0.05 });
+    expect(f.severity).toBe('info');
+    expect(f.message).toMatch(/superficie de su fondo/);
+  });
+  it('quieto, o con el fundido solo en el texto (sin superficie que se funda): sigue siendo error', () => {
+    expect(out({ fadingBg: true, fade: 0 }).severity).not.toBe('info');
+    expect(out({ fadingBg: false, fade: 0.05 }).severity).toBe('error');
+    expect(out({ fade: 0.05 }).severity).toBe('error');
+  });
+});
+
 describe('thresholds', () => {
   it('merges overrides and rejects unknown ones', () => {
     expect(mergeThresholds({ overlap: { ratio: 0.5 } }).overlap.ratio).toBe(0.5);

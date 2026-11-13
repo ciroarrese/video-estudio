@@ -2,7 +2,7 @@
 // (también `videos/<slug>/<carpeta>/index.ts(x)`, que es donde `templates/nuevo.sh` deja las escenas y la historia)
 // se carga acá y se registra con su `defineVideo`. No hace falta editar este archivo para agregar un video.
 // Si `videos/` no existe (está fuera del repo), el patrón simplemente no encuentra nada.
-// Con la variable de entorno VE_VIDEOS_DIR, vite.config.ts reemplaza `../../videos/` por esa carpeta (pruebas con videos temporales).
+// Con la variable de entorno VE_VIDEOS_DIR, vite.config.ts quita los patrones de `videos/` y agrega imports con ruta absoluta de esa carpeta (ver render/README.md).
 import { loadVideos, type LoadError } from './discover';
 
 declare const __VE_VIDEOS_EXT__: string; // lo define vite.config.ts: prefijo relativo de VE_VIDEOS_DIR ('' si no se usa)

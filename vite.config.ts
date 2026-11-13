@@ -1,22 +1,46 @@
 import { defineConfig, type Plugin } from 'vite';
 import react from '@vitejs/plugin-react';
-import { relative, resolve, dirname, sep } from 'node:path';
+import { existsSync, readdirSync } from 'node:fs';
+import { relative, resolve, dirname, join, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const __dirname = fileURLToPath(new URL('.', import.meta.url));
 
-// VE_VIDEOS_DIR: carpeta que hace de `videos/` (pruebas con videos temporales, sin tocar el `videos/` real).
+// VE_VIDEOS_DIR: carpeta que hace de `videos/` (videos fuera del repo, o pruebas con videos temporales sin tocar el `videos/` real).
 const extVideos = process.env.VE_VIDEOS_DIR ? resolve(process.env.VE_VIDEOS_DIR) : null;
-const extPrefix = extVideos ? relative(resolve(__dirname, 'engine/runtime'), extVideos).split(sep).join('/') : '';
 
-/** Con VE_VIDEOS_DIR, `engine/runtime/videos.ts` busca los videos en esa carpeta en vez de en `videos/`. */
+/** Carpetas de video de `dir` (`<slug>/index.ts(x)` y `<slug>/<carpeta>/index.ts(x)`), con ruta relativa; ignora las que empiezan con punto y `node_modules`. */
+function indicesDeVideos(dir: string): string[] {
+  const salida: string[] = [];
+  const subcarpetas = (d: string) =>
+    existsSync(d) ? readdirSync(d, { withFileTypes: true }).filter((e) => e.isDirectory() && !e.name.startsWith('.') && e.name !== 'node_modules').map((e) => e.name).sort() : [];
+  const indice = (rel: string) => {
+    for (const ext of ['ts', 'tsx']) if (existsSync(join(dir, rel, `index.${ext}`))) salida.push(`${rel}/index.${ext}`);
+  };
+  for (const a of subcarpetas(dir)) {
+    indice(a);
+    for (const b of subcarpetas(join(dir, a))) indice(`${a}/${b}`);
+  }
+  return salida;
+}
+
+/**
+ * Con VE_VIDEOS_DIR, `engine/runtime/videos.ts` carga los videos de esa carpeta en vez de `videos/`.
+ * No se usa `import.meta.glob` con una ruta fuera del proyecto: con `../../../../tmp/...` vite devolvía un mapa VACÍO
+ * (tampoco aparecían los ejemplos). En su lugar se sacan los patrones de `videos/` y se agregan imports dinámicos con
+ * ruta absoluta, que rollup resuelve estén donde estén. Las claves imitan las de `videos/` (`../../videos/<slug>/index.ts`)
+ * para que el runtime muestre la carpeta como `videos/<slug>`.
+ */
 function veVideosDir(): Plugin {
   return {
     name: 've-videos-dir',
     enforce: 'pre',
     transform(code, id) {
       if (!extVideos || !id.split('?')[0]!.endsWith('engine/runtime/videos.ts')) return null;
-      return { code: code.replaceAll("'../../videos/", `'${extPrefix}/`), map: null };
+      const sinVideos = code.replace(/\s*'\.\.\/\.\.\/videos\/[^']*',?/g, '');
+      const entradas = indicesDeVideos(extVideos).map((rel) => `  ${JSON.stringify('../../videos/' + rel)}: () => import(${JSON.stringify(join(extVideos, rel))}),`);
+      const extra = `\nObject.assign(modules, {\n${entradas.join('\n')}\n});\n`;
+      return { code: sinVideos.replace(/(export const videosReady)/, extra + '$1'), map: null };
     },
   };
 }
@@ -105,8 +129,13 @@ function veDeps(): Plugin {
 export default defineConfig({
   root: resolve(__dirname, 'engine/runtime'),
   publicDir: resolve(__dirname, 'public'),
-  define: { __VE_VIDEOS_EXT__: JSON.stringify(extPrefix) },
+  define: { __VE_VIDEOS_EXT__: JSON.stringify('') },
+  resolve: {
+    // Videos fuera del repo: `import { ... } from 'video-estudio/engine'` (o /kit, /themes, /fx, /fx/three) y un solo React.
+    alias: [{ find: /^video-estudio\/(.+)$/, replacement: resolve(__dirname, '$1') }],
+    dedupe: ['react', 'react-dom'],
+  },
   plugins: [veVideosDir(), react(), veDeps()],
   build: { outDir: resolve(__dirname, 'dist'), emptyOutDir: true },
-  server: { fs: { allow: [resolve(__dirname)] } },
+  server: { fs: { allow: [resolve(__dirname), ...(extVideos ? [extVideos] : [])] } },
 });

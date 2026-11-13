@@ -83,7 +83,8 @@ function Scene({ frame }: { frame: number }) {
     <Stage clouds={false}>
       <CloudBackground frame={frame} />
       <World camera={cam} width={width} height={height}>
-        <Panel {...A} title="Panel de ejemplo" opacity={kf(frame, [148, 162, 192, 210], [1, 0.45, 0.45, 1])}>
+        {/* El panel vuelve a opacidad plena antes de que la cámara termine de acercarse al contador: así sus textos (ya fuera de cuadro) no entran en fundido recortados con la cámara quieta. */}
+        <Panel {...A} title="Panel de ejemplo" opacity={kf(frame, [148, 162, 180, 194], [1, 0.45, 0.45, 1])}>
           {[0, 1, 2].map((i) => {
             const p = cardPos(i);
             const a = kf(frame, [i * 6 - 14, i * 6 + 8], [0, 1]);

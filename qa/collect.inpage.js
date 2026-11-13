@@ -19,6 +19,17 @@
     for (var e = el; e && e !== stage.parentElement; e = e.parentElement) o *= parseFloat(getComputedStyle(e).opacity);
     return o;
   }
+  // Un ancestro (o el propio elemento) con opacidad < 1 que, a su altura o por debajo, pinta una superficie (color de fondo o imagen/degradado)
+  // detras del texto: el fondo muestreado esta a medio fundido junto con el texto (p. ej. un panel oscuro que entra con su contenido).
+  function fadingSurface(el) {
+    var paints = false;
+    for (var e = el; e && e !== stage.parentElement; e = e.parentElement) {
+      var cs = getComputedStyle(e);
+      if (parseRgba(cs.backgroundColor).a > 0.02 || (cs.backgroundImage && cs.backgroundImage !== 'none' && cs.backgroundClip !== 'text' && cs.webkitBackgroundClip !== 'text')) paints = true;
+      if (paints && parseFloat(cs.opacity) < 0.99) return true;
+    }
+    return false;
+  }
   function ignoreOf(el) {
     var out = [];
     for (var e = el; e; e = e.parentElement) {
@@ -129,7 +140,7 @@
       rect: { x: x0, y: y0, w: x1 - x0, h: y1 - y0 }, lines: rects,
       opacity: opacityUp(el), fontPx: fontPx, scale: scale, transformed: transformed, screenPx: fontPx * scale, bold: weight >= 700,
       color: 'rgba(' + fill.r + ',' + fill.g + ',' + fill.b + ',' + fill.a + ')', transparentFill: fill.a < 0.05,
-      ignore: ignoreOf(el), clips: clips,
+      fadingBg: fadingSurface(el), ignore: ignoreOf(el), clips: clips,
       own: {
         sw: el.scrollWidth, cw: el.clientWidth, sh: el.scrollHeight, ch: el.clientHeight,
         ox: cs.overflowX, oy: cs.overflowY, ellipsis: cs.textOverflow === 'ellipsis',

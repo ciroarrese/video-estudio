@@ -122,6 +122,9 @@ let buildChain: Promise<unknown> = Promise.resolve();
  */
 export async function ensureBundle(root: string, cacheDir: string, runId: string, log: (m: string) => void, opts: { videosDir?: string | null } = {}): Promise<string> {
   const videosDir = opts.videosDir === undefined ? videosDirFromEnv() : opts.videosDir ? resolve(opts.videosDir) : null;
+  if (videosDir && !(existsSync(videosDir) && statSync(videosDir).isDirectory())) {
+    throw new Error(`VE_VIDEOS_DIR apunta a "${videosDir}", que no existe o no es una carpeta. Pasá la ruta de la carpeta que contiene los videos (<carpeta>/<slug>/index.ts) o quitá la variable.`);
+  }
   const skipTop = new Set(['node_modules', 'dist', 'out', 'render', 'docs']);
   if (videosDir) skipTop.add('videos');
   const files = walk(root, [], (name, depth) => name.startsWith('.') || (depth === 0 && skipTop.has(name)) || name.endsWith('.md'));
