@@ -23,7 +23,7 @@ export function IsoCity(p: IsoCityProps) {
       frame={p.frame}
       style={p.style}
       draw={(ctx) => {
-        const unit = Math.min((width * 0.94) / (g * 1.732 + 0.4), (height * 0.94) / (g + maxH * 1.1));
+        const unit = Math.min((width * 0.94) / (g * 1.732 + 0.4), (height * 1.0) / (g + maxH * 1.1));
         ctx.translate(width / 2, height * 0.58 + (maxH * unit) / 2 - (g * unit) / 2 + 20);
         const c = (g - 1) / 2;
         const foot = 0.78;

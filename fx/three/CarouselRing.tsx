@@ -14,13 +14,13 @@ export type CarouselRingProps = ThreeProps & {
 
 /** N tarjetas sobre un anillo que gira; las de atrás, más chicas y apagadas. La tarjeta 0 termina al frente. */
 export function CarouselRing(p: CarouselRingProps) {
-  const { local, t, width, height, theme, pal } = useThreeFx(p, { width: 1400, height: 640, duration: 75 });
+  const { local, t, width, height, theme, pal } = useThreeFx(p, { width: 1500, height: 760, duration: 75 });
   const kids = React.Children.toArray(p.children);
   const n = kids.length || (p.count ?? 6);
-  const cw = p.cardWidth ?? 240;
-  const ch = p.cardHeight ?? 320;
+  const cw = p.cardWidth ?? 300;
+  const ch = p.cardHeight ?? 400;
   const R = 2.6, D = 8;
-  const unit = Math.min(width / 9.5, 150);
+  const unit = Math.min(width / 8.5, 190);
   const cam = camera({ distance: D, tilt: 0.22, unit });
   const rot = (1 - Easing.inOut(t)) * -Math.PI * 1.0;
   const enter = (i: number) => progress(local, i * 3, 20, Easing.lands);
@@ -41,8 +41,8 @@ export function CarouselRing(p: CarouselRingProps) {
             key={c.i}
             style={{
               position: "absolute",
-              left: width / 2 + c.pr.x - cw / 2,
-              top: height / 2 + c.pr.y - ch / 2,
+              left: Math.round(width / 2 + c.pr.x - cw / 2),
+              top: Math.round(height / 2 + c.pr.y - ch / 2),
               width: cw,
               height: ch,
               boxSizing: "border-box",

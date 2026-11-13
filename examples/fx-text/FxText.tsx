@@ -22,13 +22,13 @@ function Label({ name }: { name: string }) {
         position: "absolute",
         left: theme.safe.x,
         bottom: theme.safe.y - 30,
-        fontSize: theme.type.eyebrow,
+        fontSize: theme.type.body,
         fontWeight: theme.font.weights.semibold,
         color: theme.color.text,
         background: theme.color.surface,
         border: `1px solid ${theme.color.border}`,
         borderRadius: theme.radius.pill,
-        padding: "8px 24px",
+        padding: "10px 32px",
         letterSpacing: "0.02em",
       }}
     >
@@ -54,9 +54,9 @@ function Effect({ name }: { name: (typeof SEGMENTS)[number] }) {
           <Typewriter
             text="Escribiendo una idea cada vez."
             duration={60}
-            fontSize={theme.type.h2}
+            fontSize={theme.type.h1}
             after={
-              <span style={{ padding: "6px 22px", borderRadius: theme.radius.pill, background: theme.color.accent, color: theme.color.onAccent, fontSize: theme.type.caption, fontWeight: theme.font.weights.semibold }}>
+              <span style={{ padding: "6px 22px", borderRadius: theme.radius.pill, background: theme.color.accent, color: theme.color.onAccent, fontSize: theme.type.body, fontWeight: theme.font.weights.semibold }}>
                 listo
               </span>
             }

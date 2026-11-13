@@ -11,7 +11,7 @@ export type OrbitRingsProps = ThreeProps & {
 
 /** Esfera central con anillos inclinados y satélites que los recorren; los anillos pasan por detrás y por delante. */
 export function OrbitRings(p: OrbitRingsProps) {
-  const { local, t, width, height, pal, k } = useThreeFx(p, { width: 900, height: 900, duration: 75 });
+  const { local, t, width, height, pal, k: sw } = useThreeFx(p, { width: 900, height: 900, duration: 75 });
   const n = Math.max(1, Math.min(5, p.rings ?? 3));
   return (
     <FrameCanvas
@@ -20,7 +20,7 @@ export function OrbitRings(p: OrbitRingsProps) {
       frame={p.frame}
       style={p.style}
       draw={(ctx) => {
-        const unit = Math.min(width, height) * 0.26;
+        const unit = Math.min(width, height) * 0.19;
         const D = 7;
         const cam = camera({ distance: D, tilt: 0.45, yaw: lerp(-0.5, 0.35, Easing.out(t)), unit });
         ctx.translate(width / 2, height / 2);
@@ -44,7 +44,7 @@ export function OrbitRings(p: OrbitRingsProps) {
           },
         });
         for (let k = 0; k < n; k++) {
-          const R = 1.7 + k * 0.55;
+          const R = 1.6 + k * 0.42;
           const rx = 0.5 + k * 0.62, rz = k * 1.05 + 0.3;
           const on = Easing.out(sub(t, k * 0.08, 0.4 + k * 0.08));
           const pointAt = (a: number): Vec3 => rotateXYZ({ x: Math.cos(a) * R, y: 0, z: Math.sin(a) * R }, rx, 0, rz);
@@ -54,13 +54,13 @@ export function OrbitRings(p: OrbitRingsProps) {
             if ((i / N) * Math.PI * 2 > sweep) break;
             const A = cam.project(pointAt((i / N) * Math.PI * 2)), B = cam.project(pointAt(((i + 1) / N) * Math.PI * 2));
             const d = (A.depth + B.depth) / 2;
-            const s = lineByDepth(d, near, far, { minAlpha: 0.12, maxAlpha: 0.9, minWidth: 1 * k, maxWidth: 3 * k });
+            const s = lineByDepth(d, near, far, { minAlpha: 0.12, maxAlpha: 0.9, minWidth: 1 * sw, maxWidth: 3 * sw });
             prims.push({ depth: d, draw: (c) => seg(c, A.x, A.y, B.x, B.y, pal.line, s.alpha, s.width) });
           }
           // Satélite.
           const ang = k * 2.1 + t * Math.PI * 2 * (1 + k * 0.5);
           const S = cam.project(pointAt(ang));
-          const ss = lineByDepth(S.depth, near, far, { minAlpha: 0.5, maxAlpha: 1, minWidth: 5 * k, maxWidth: 11 * k });
+          const ss = lineByDepth(S.depth, near, far, { minAlpha: 0.5, maxAlpha: 1, minWidth: 5 * sw, maxWidth: 11 * sw });
           prims.push({ depth: S.depth, draw: (c) => dot(c, S.x, S.y, ss.width * on, k % 2 ? pal.ink : pal.accent2, 1) });
         }
         flush(ctx, prims);

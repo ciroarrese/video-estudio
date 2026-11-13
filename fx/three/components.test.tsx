@@ -88,3 +88,28 @@ describe("colores del tema", () => {
     expect(a.calls).not.toBe(b.calls);
   });
 });
+
+describe("PhoneOrbit con pantalla propia", () => {
+  it("monta los hijos con el perspective() propio y es pura", () => {
+    const el = (p: { frame: number }) => <PhoneOrbit width={500} height={500} {...p}><span data-testid="hijo">Hola</span></PhoneOrbit>;
+    const a = snap(el, 50);
+    snap(el, 3);
+    const b = snap(el, 50);
+    expect(a.html).toContain("Hola");
+    expect(a.html).toContain("perspective(");
+    expect(a.html).not.toContain("preserve-3d");
+    expect(b.html).toBe(a.html);
+    expect(snap(el, 75).html).toBe(snap(el, 140).html);
+  });
+  it("el render prop `screen` recibe el tamaño de la pantalla y el cuadro local", () => {
+    const seen: { width: number; height: number; frame: number }[] = [];
+    snap((p) => <PhoneOrbit width={500} height={500} {...p} screen={(box) => { seen.push(box); return <i>x</i>; }} />, 20);
+    expect(seen[0]!.width).toBeGreaterThan(100);
+    expect(seen[0]!.height).toBeGreaterThan(seen[0]!.width);
+    expect(seen[0]!.frame).toBe(20);
+  });
+  it("sin hijos sigue dibujando la interfaz ficticia en el canvas (sin DOM extra)", () => {
+    const a = snap((p) => <PhoneOrbit width={500} height={500} {...p} />, 50);
+    expect(a.html).not.toContain("perspective(");
+  });
+});

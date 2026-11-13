@@ -33,18 +33,18 @@ export function Bars3D(p: Bars3DProps) {
   const dur = p.duration ?? 65;
   const fmt = p.format ?? fmtInt;
   const n = data.length;
-  const bw = 64, gap = 44, D = 64, Hmax = 170;
+  const bw = 84, gap = 30, D = 100, Hmax = 250;
   const Lx = n * bw + (n - 1) * gap;
   const max = Math.max(...data, 1);
   const spanX = (Lx + D) * C30, spanY = (Lx + D) * S30 + Hmax + 50;
-  const s = Math.min((w - 80) / spanX, (h - 70) / spanY);
+  const s = Math.min((w - 40) / spanX, (h - 40) / spanY);
   const ox = w / 2 - s * ((Lx - D) * C30) / 2;
   const oy = h / 2 + s * (((Lx + D) * S30 - Hmax) / 2) - 8;
   const P = (q: Pt) => ({ x: ox + q.x * s, y: oy + q.y * s });
   const poly = (pts: Pt[]) => toPath(pts.map(P), true);
   const slab = [iso(-30, -30, 0), iso(Lx + 30, -30, 0), iso(Lx + 30, D + 30, 0), iso(-30, D + 30, 0)];
   const g = progress(local, 0, dur * 0.2, Easing.out);
-  const fs = theme.type.eyebrow * 0.85;
+  const fs = theme.type.eyebrow;
   return (
     <svg width={w} height={h} viewBox={`0 0 ${w} ${h}`} style={{ display: "block", fontFamily: theme.font.family, ...p.style }}>
       <path d={poly(slab)} fill={theme.color.surfaceAlt} stroke={theme.color.border} strokeWidth={2} opacity={g} />

@@ -35,7 +35,7 @@ export function CubeStack(p: CubeStackProps) {
       frame={p.frame}
       style={p.style}
       draw={(ctx) => {
-        const unit = Math.min(width, height) / 4.5;
+        const unit = Math.min(width, height) / 5.9;
         const yaw = lerp(-1.0, 0.62, Easing.out(t));
         const cam = camera({ distance: 9, tilt: 0.5, yaw, unit });
         ctx.translate(width / 2, height / 2);

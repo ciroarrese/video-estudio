@@ -22,7 +22,7 @@ export function Helix(p: HelixProps) {
       frame={p.frame}
       style={p.style}
       draw={(ctx) => {
-        const unit = Math.min(width * 0.46, height * 0.3);
+        const unit = Math.min(width * 0.46, height * 0.25);
         const H = 2.4; // alto total en unidades
         const R = 1;
         const grow = Easing.out(sub(t, 0, 0.7));

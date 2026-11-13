@@ -22,7 +22,7 @@ export function WaveDots(p: WaveDotsProps) {
       frame={p.frame}
       style={p.style}
       draw={(ctx) => {
-        const unit = Math.min(width, height) * 0.5;
+        const unit = Math.min(width, height) * 0.31;
         const cam = camera({ distance: 4.2, tilt: 0.78, yaw: 0.5, unit });
         ctx.translate(width / 2, height * 0.5);
         const phase = t * Math.PI * 4;

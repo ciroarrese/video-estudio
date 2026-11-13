@@ -59,4 +59,5 @@ Las reglas de producción y sus motivos: [docs/reglas.md](docs/reglas.md). Cómo
 
 - El repo no incluye fuentes, música, efectos de sonido, logos ni marcas de terceros. Quien los agrega es responsable de que su licencia permita usarlos en el lugar donde se va a mostrar el video y, si se suben al repo, redistribuirlos.
 - Los datos, nombres y cifras de los ejemplos son ficticios.
-- Licencia del código del repo: pendiente de definir.
+- Licencia del código del repo: MIT (ver `LICENSE`).
+- La carpeta `videos/` no se sube al repo (está en `.gitignore`): ahí viven los guiones y las escenas de cada persona. Por eso la línea de import de un video propio en `engine/runtime/videos.ts` tampoco se sube.

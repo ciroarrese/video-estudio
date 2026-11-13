@@ -1,4 +1,4 @@
-import { Easing, random } from "../../engine";
+import { Easing, holdRender, random, releaseRender } from "../../engine";
 import { chartColor, fxBox, progress, useFx } from "../core";
 import type { FxProps } from "../core";
 
@@ -9,7 +9,28 @@ export type PixelBuildProps = FxProps & {
 };
 
 export type Cell = { c: number; r: number };
-const cache = new Map<string, { cells: Cell[]; cols: number; rows: number }>();
+type Cells = { cells: Cell[]; cols: number; rows: number };
+/** Memoria acotada de celdas (función pura de su clave); la clave incluye la fuente ya resuelta. */
+const cache = new Map<string, Cells>();
+const CACHE_MAX = 24;
+/** Cargas de fuente en curso (clave de fuente -> id de holdRender), para no frenar dos veces lo mismo. */
+const loading = new Map<string, number>();
+
+/** Si la fuente todavía no está disponible la pide y frena la captura (holdRender) hasta que cargue. Devuelve si ya está lista. */
+function fontReady(font: string, text: string): boolean {
+  const fonts = (document as unknown as { fonts?: { check(f: string, t?: string): boolean; load(f: string, t?: string): Promise<unknown> } }).fonts;
+  if (!fonts) return true;
+  let ok = true;
+  try { ok = fonts.check(font, text); } catch { return true; }
+  if (ok) return true;
+  if (!loading.has(font)) {
+    const id = holdRender("fx-art: fuente de PixelBuild");
+    loading.set(font, id);
+    const done = () => { loading.delete(font); releaseRender(id); };
+    fonts.load(font, text).then(done, done);
+  }
+  return false;
+}
 
 /** Patron sembrado (para entornos sin canvas, p. ej. las pruebas): bloques por letra. */
 export function fallbackCells(text: string, rows: number, seed: string | number): { cells: Cell[]; cols: number; rows: number } {
@@ -28,8 +49,10 @@ export function fallbackCells(text: string, rows: number, seed: string | number)
 /** Celdas ocupadas por el texto: muestrea la cobertura de los glifos en un canvas fuera de pantalla. */
 export function glyphCells(text: string, family: string, weight: number, rows: number, seed: string | number): { cells: Cell[]; cols: number; rows: number } {
   const hasCanvas = typeof document !== "undefined" && typeof navigator !== "undefined" && !/jsdom/i.test(navigator.userAgent);
-  const fontsState = typeof document !== "undefined" ? ((document as unknown as { fonts?: { status?: string } }).fonts?.status ?? "") : "";
-  const key = `${text}|${family}|${weight}|${rows}|${fontsState}`;
+  const font = `${weight} ${rows * 8}px ${family}`;
+  // Sin la fuente del tema cargada no se muestrea (saldría la de respaldo): se espera con holdRender y se dibuja el patrón sembrado mientras tanto.
+  if (hasCanvas && !fontReady(font, text)) return fallbackCells(text, rows, seed);
+  const key = `${text}|${font}`;
   const hit = cache.get(key);
   if (hit) return hit;
   let res: { cells: Cell[]; cols: number; rows: number } | null = null;
@@ -64,6 +87,7 @@ export function glyphCells(text: string, family: string, weight: number, rows: n
     } catch { res = null; }
   }
   const out = res ?? fallbackCells(text, rows, seed);
+  if (cache.size >= CACHE_MAX) cache.clear();
   cache.set(key, out);
   return out;
 }

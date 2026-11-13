@@ -29,8 +29,9 @@ export function LiquidBlob(p: LiquidBlobProps) {
   const cell = p.cell ?? 6;
   const n = p.balls ?? 6;
   const t = progress(local, 0, dur);
-  const A = parseColor(theme.color.accent) ?? { r: 59, g: 91, b: 219, a: 1 };
-  const B = parseColor(theme.color.accent2) ?? { r: 112, g: 72, b: 232, a: 1 };
+  // Si un color del tema no se puede leer, se cae a otro color del tema (nunca a uno fijo).
+  const A = parseColor(theme.color.accent) ?? parseColor(theme.color.text) ?? parseColor(theme.color.bg) ?? { r: 0, g: 0, b: 0, a: 1 };
+  const B = parseColor(theme.color.accent2) ?? A;
   const draw = (ctx: CanvasRenderingContext2D) => {
     const gw = Math.ceil(w / cell), gh = Math.ceil(h / cell);
     const off = document.createElement("canvas");
@@ -63,5 +64,5 @@ export function LiquidBlob(p: LiquidBlobProps) {
     ctx.imageSmoothingQuality = "high";
     ctx.drawImage(off, 0, 0, gw * cell, gh * cell);
   };
-  return <FrameCanvas width={w} height={h} draw={draw} frame={local} style={p.style} />;
+  return <FrameCanvas width={w} height={h} draw={draw} frame={p.frame} style={p.style} />;
 }

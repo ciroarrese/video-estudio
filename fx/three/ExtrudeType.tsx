@@ -14,11 +14,11 @@ export type ExtrudeTypeProps = ThreeProps & {
 
 /** Texto con extrusión profunda: capas apiladas cuya dirección de desplazamiento barre con el tiempo. */
 export function ExtrudeType(p: ExtrudeTypeProps) {
-  const { t, width, height, theme, pal } = useThreeFx(p, { width: 1300, height: 460, duration: 75 });
+  const { t, width, height, theme, pal } = useThreeFx(p, { width: 1500, height: 560, duration: 75 });
   const text = p.text ?? "Volumen";
-  const fontSize = p.fontSize ?? theme.type.hero * 1.35;
+  const fontSize = p.fontSize ?? theme.type.hero * 2.1;
   const n = p.layers ?? 46;
-  const step = p.step ?? 1.6;
+  const step = p.step ?? fontSize * 0.01;
   const depth = Easing.out(sub(t, 0, 0.3));
   // La dirección barre de arriba a la izquierda hasta abajo a la derecha (grados de pantalla, y hacia abajo).
   const ang = (lerp(-150, 52, Easing.inOut(sub(t, 0.05, 1))) * Math.PI) / 180;

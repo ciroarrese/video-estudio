@@ -20,7 +20,7 @@ const entries: Entry[] = [
   { group: "data", name: "LineDraw", w: 900, h: 520, render: (f, w, h) => <LineDraw frame={f} width={w} height={h} duration={D} /> },
   { group: "data", name: "DonutRing", w: 520, h: 520, render: (f, w, h) => <DonutRing frame={f} width={w} height={h} duration={D} /> },
   { group: "data", name: "RadarMorph", w: 640, h: 560, render: (f, w, h) => <RadarMorph frame={f} width={w} height={h} duration={D} /> },
-  { group: "data", name: "Bars3D", w: 900, h: 560, render: (f, w, h) => <Bars3D frame={f} width={w} height={h} duration={D} /> },
+  { group: "data", name: "Bars3D", w: 1100, h: 640, render: (f, w, h) => <Bars3D frame={f} width={w} height={h} duration={D} /> },
   { group: "data", name: "BarsGrow", w: 900, h: 520, render: (f, w, h) => <BarsGrow frame={f} width={w} height={h} duration={D} /> },
   { group: "data", name: "FlowSteps", w: 1100, h: 620, render: (f, w, h) => <FlowSteps frame={f} width={w} height={h} duration={D} /> },
   { group: "ui", name: "NotificationStack", w: 760, h: 560, render: (f, w, h) => <NotificationStack frame={f} width={w} height={h} duration={D} /> },
@@ -35,7 +35,6 @@ const entries: Entry[] = [
     render: (f, w, h) => (
       <div style={{ position: "relative", width: w, height: h }}>
         <TileDone frame={f} start={38} duration={28} width={w} height={h} />
-        <Cursor frame={f} keys={[[6, w + 120, h + 120], [34, 70, h / 2 + 6]]} clicks={[38]} show={[6, 86]} />
       </div>
     ),
   },
@@ -83,14 +82,14 @@ function Scene() {
   const idx = Math.min(entries.length - 1, Math.floor(frame / SEGMENT));
   const local = Math.min(frame - idx * SEGMENT, SEGMENT - 1);
   const e = entries[idx]!;
-  const scale = e.w >= 1920 ? 1 : Math.min(1.5, 1500 / e.w, 800 / e.h);
+  const scale = e.w >= 1920 ? 1 : Math.min(1.6, 1700 / e.w, 860 / e.h);
   return (
     <Stage clouds={false}>
-      <div style={{ position: "absolute", left: 90, top: 56, display: "flex", alignItems: "baseline", gap: 18 }}>
-        <span style={{ fontSize: theme.type.caption, fontWeight: theme.font.weights.semibold, color: theme.color.text }}>{e.name}</span>
-        <span style={{ fontSize: theme.type.eyebrow * 0.8, color: theme.color.textMuted }}>{`fx/${e.group} · ${idx + 1}/${entries.length}`}</span>
+      <div style={{ position: "absolute", left: 90, top: 40, display: "flex", alignItems: "baseline", gap: 18 }}>
+        <span style={{ fontSize: theme.type.h2, fontWeight: theme.font.weights.semibold, color: theme.color.text }}>{e.name}</span>
+        <span style={{ fontSize: theme.type.caption, color: theme.color.textMuted }}>{`fx/${e.group} · ${idx + 1}/${entries.length}`}</span>
       </div>
-      <div style={{ position: "absolute", left: e.w >= 1920 ? 0 : 960 - (e.w * scale) / 2, top: e.w >= 1920 ? 0 : 570 - (e.h * scale) / 2, width: e.w, height: e.h, transform: `scale(${scale})`, transformOrigin: "0 0" }}>
+      <div style={{ position: "absolute", left: e.w >= 1920 ? 0 : 960 - (e.w * scale) / 2, top: e.w >= 1920 ? 0 : 590 - (e.h * scale) / 2, width: e.w, height: e.h, transform: `scale(${scale})`, transformOrigin: "0 0" }}>
         {e.render(local, e.w, e.h)}
       </div>
     </Stage>
