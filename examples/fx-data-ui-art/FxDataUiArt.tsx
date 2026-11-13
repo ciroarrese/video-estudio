@@ -35,6 +35,7 @@ const entries: Entry[] = [
     render: (f, w, h) => (
       <div style={{ position: "relative", width: w, height: h }}>
         <TileDone frame={f} start={38} duration={28} width={w} height={h} />
+        <Cursor frame={f} keys={[[6, w + 120, h + 120], [34, 70, h / 2 + 6]]} clicks={[38]} show={[6, 86]} />
       </div>
     ),
   },
