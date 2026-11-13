@@ -78,7 +78,7 @@ export function ExtrudeType(p: ExtrudeTypeProps) {
         transform: xform({ x: dx * d, y: dy * d }),
       };
       echoes.push(
-        <div key={`${j}:${styleKey(st)}`} aria-hidden="true" data-qa-decor="" style={st}>
+        <div key={`${j}:${styleKey(st)}`} aria-hidden="true" data-qa-decor="" data-qa-ignore="overlap covered" style={st}>
           {text}
         </div>,
       );

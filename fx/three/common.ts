@@ -307,13 +307,14 @@ export function penFor(theme: Theme, pal: Palette, k: number): Pen {
     if (main || !guideDash) return null;
     return L.dash === "dashed" ? [Math.max(6, width * 3.4), Math.max(5, width * 2.6)] : [0.01, Math.max(4, width * 2.6)];
   };
-  const stroke = (ctx: Ctx, pts: Pt[], close: boolean, color: string, alpha: number, lw: number, dash: number[] | null) => {
+  const stroke = (ctx: Ctx, pts: Pt[], close: boolean, color: string, alpha: number, lw: number, dash: number[] | null, built = false, join = false) => {
     if (L.glow > 0 && alpha > 0.2) {
       ctx.strokeStyle = color;
       ctx.lineWidth = lw * (2.2 + 2 * L.glow);
       ctx.globalAlpha = clamp(alpha) * 0.14 * L.glow;
-      path(ctx, pts, close);
+      if (!built) path(ctx, pts, close);
       ctx.stroke();
+      built = true;
       ctx.lineWidth = lw * 1.7;
       ctx.globalAlpha = clamp(alpha) * 0.24 * L.glow;
       ctx.stroke();
@@ -321,8 +322,9 @@ export function penFor(theme: Theme, pal: Palette, k: number): Pen {
     ctx.globalAlpha = clamp(alpha);
     ctx.strokeStyle = color;
     ctx.lineWidth = lw;
+    if (join) ctx.lineJoin = L.square ? "miter" : "round";
     if (dash) ctx.setLineDash(dash);
-    path(ctx, pts, close);
+    if (!built) path(ctx, pts, close);
     ctx.stroke();
     if (dash) ctx.setLineDash([]);
     ctx.globalAlpha = 1;
@@ -418,10 +420,7 @@ export function penFor(theme: Theme, pal: Palette, k: number): Pen {
       const P = wobble(pts);
       path(ctx, P, true);
       if (fill) { ctx.fillStyle = fill; ctx.fill(); }
-      if (strokeColor) {
-        ctx.lineJoin = L.square ? "miter" : "round";
-        stroke(ctx, P, true, strokeColor, strokeAlpha, lineWidth * w, guide ? dashFor(lineWidth * w) : null);
-      }
+      if (strokeColor) stroke(ctx, P, true, strokeColor, strokeAlpha, lineWidth * w, guide ? dashFor(lineWidth * w) : null, true, true);
     },
     face: (ctx, pts, base, s, lineWidth, habitual, strokeAlpha = 1) => {
       if (pts.length < 2) return;
@@ -456,13 +455,12 @@ export function penFor(theme: Theme, pal: Palette, k: number): Pen {
       }
       path(ctx, P, true);
       ctx.fillStyle = fill;
-      if (fillAlpha < 1) ctx.globalAlpha = fillAlpha;
-      ctx.fill();
-      ctx.globalAlpha = 1;
-      if (edge) {
-        ctx.lineJoin = L.square ? "miter" : "round";
-        stroke(ctx, P, true, edge, ea, lw, null);
-      }
+      if (fillAlpha < 1) {
+        ctx.globalAlpha = fillAlpha;
+        ctx.fill();
+        ctx.globalAlpha = 1;
+      } else ctx.fill();
+      if (edge) stroke(ctx, P, true, edge, ea, lw, null, true, true);
     },
     disc: (ctx, x, y, r, color, alpha, grad) => {
       const circle = () => { ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); };

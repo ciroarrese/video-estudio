@@ -2,7 +2,9 @@ import React from "react";
 import { Easing } from "../../engine";
 import { clamp, lerp, progress, roleColor, styleKey, useFx, xform } from "../core";
 import type { ColorRole, FxProps } from "../core";
+import { textLook } from "../../themes";
 import { baseText } from "./shared";
+import { decoration, decorationHost, landStyle } from "./look";
 
 export type DigitRollProps = FxProps & {
   value: number;
@@ -75,18 +77,18 @@ export function DigitRoll(props: DigitRollProps) {
     display: "inline-block",
     marginLeft: fs * 0.08,
     color: roleColor(theme, suffixColor),
-    opacity: sufP > 0 ? undefined : 0,
-    fontSize: sufP >= 1 ? undefined : `${(fs * (0.6 + 0.4 * sufP)).toFixed(1)}px`,
-    transform: xform({ y: (1 - sufP) * fs * 0.5, round: true }),
+    ...landStyle(theme, sufP, fs, true),
   };
+  const deco = textLook(theme).decoration !== "none";
   return (
-    <div style={{ ...baseText(theme, { fontSize: fs, color: props.color, weight: props.weight ?? theme.font.weights.stat }), display: "flex", alignItems: "center", lineHeight: 1, ...style }}>
+    <div style={{ ...baseText(theme, { fontSize: fs, color: props.color, weight: props.weight ?? theme.font.weights.stat }), display: "flex", alignItems: "center", lineHeight: 1, ...(deco ? { width: "fit-content", ...decorationHost(theme) } : {}), ...style }}>
       {slots}
       {suffix && (
         <span key={styleKey(sufStyle)} style={sufStyle}>
           {suffix}
         </span>
       )}
+      {decoration(theme, progress(local, duration - 6, 14, Easing.out), fs, roleColor(theme, "accent"))}
     </div>
   );
 }

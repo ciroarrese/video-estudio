@@ -4,6 +4,7 @@ import { fxBox, progress, roleColor, stagger, styleKey, useFx, xform } from "../
 import type { ColorRole } from "../core";
 import { measureWidth } from "./measure";
 import { staggerScale } from "../../themes";
+import { arrivalInner, decoration, decorationHost } from "./look";
 import { baseText, titleTreatment } from "./shared";
 import type { TextFxProps } from "./shared";
 
@@ -13,6 +14,8 @@ export type MaskedRiseProps = TextFxProps & {
   /** Punto de acento que aterriza al final. */
   dot?: boolean;
   dotColor?: ColorRole;
+  /** `false`: sin el adorno bajo cada palabra de `style.text.decoration` (lo usa `KineticWords`, donde la palabra ya ocupa un fondo propio). */
+  decorate?: boolean;
 };
 
 type Plan = { each: number; rise: number; units: number; total: number };
@@ -37,7 +40,7 @@ export function maskedRisePlan(text: string, o: { by?: "letter" | "word"; durati
 
 /** Letras (o palabras) que suben desde una mascara con escalonado, un asentado de escala 108% a 100% y, opcional, un punto que aterriza. */
 export function MaskedRise(props: MaskedRiseProps) {
-  const { text, by = "letter", dot = false, dotColor = "accent", style } = props;
+  const { text, by = "letter", dot = false, dotColor = "accent", decorate = true, style } = props;
   const { local, theme } = useFx(props);
   const box = fxBox(props, { width: 0, height: 0 });
   const plan = maskedRisePlan(text, { by, duration: props.duration, dot, stagger: staggerScale(theme) });
@@ -51,10 +54,7 @@ export function MaskedRise(props: MaskedRiseProps) {
 
   // En reposo (p >= 1) el span no lleva tamano ni transformacion: solo se emiten mientras sube. El asentado 108% -> 100% se hace
   // con el tamano de letra (no con `scale`): una escala deja el texto rasterizado segun el historial de cuadros.
-  const inner = (p: number): React.CSSProperties =>
-    p >= 1
-      ? { display: "block" }
-      : { display: "block", fontSize: `${(fs * (1 + 0.08 * (1 - p))).toFixed(1)}px`, transform: xform({ y: (1 - p) * fs * 1.36, round: true }), transformOrigin: "0% 100%" };
+  const inner = (p: number): React.CSSProperties => arrivalInner(theme, p, fs);
 
   const dotStyle: React.CSSProperties = {
     display: "inline-block",
@@ -85,7 +85,7 @@ export function MaskedRise(props: MaskedRiseProps) {
       {words.map((w, wi) => {
         const chars = by === "word" ? [w] : Array.from(w);
         return (
-          <span key={wi} style={{ display: "inline-flex", alignItems: "flex-end" }}>
+          <span key={wi} style={{ display: "inline-flex", alignItems: "flex-end", ...(decorate ? decorationHost(theme) : {}) }}>
             {chars.map((ch, ci) => {
               const p = rise(by === "word" ? wi : idx++);
               return (
@@ -100,6 +100,7 @@ export function MaskedRise(props: MaskedRiseProps) {
                 </span>
               );
             })}
+            {decorate && decoration(theme, progress(local, plan.total - 20 + (wi / Math.max(1, words.length)) * 8, 12, Easing.out), fs, roleColor(theme, "accent"))}
             {dot && wi === lastWord && (
               <span key={styleKey(dotStyle)} style={dotStyle} />
             )}

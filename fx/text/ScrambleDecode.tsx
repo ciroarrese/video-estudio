@@ -1,5 +1,7 @@
 import { random } from "../../engine";
-import { clamp, progress, useFx } from "../core";
+import { Easing, clamp, progress, roleColor, useFx } from "../core";
+import { textLook } from "../../themes";
+import { decoration, decorationHost, frontCaretStyle, hasFrontCaret } from "./look";
 import { baseText, titleTreatment } from "./shared";
 import type { TextFxProps } from "./shared";
 import { measureWidth } from "./measure";
@@ -36,21 +38,26 @@ export function ScrambleDecode(props: ScrambleDecodeProps) {
   const { local, theme } = useFx(props);
   const fs = props.fontSize ?? theme.type.h2;
   const duration = props.duration ?? Math.max(20, Array.from(text).length * 3);
-  const shown = Array.from(scrambleAt(text, local, duration, seed, glyphs, hold));
+  const alphabet = glyphs ?? textLook(theme).glyphs;
+  const shown = Array.from(scrambleAt(text, local, duration, seed, alphabet, hold));
   const finals = Array.from(text);
+  const deco = textLook(theme).decoration !== "none";
+  // Cursor de bloque o guion bajo en el primer glifo sin resolver (con la barra, que es lo de siempre, no hay cursor acá).
+  const front = hasFrontCaret(theme) ? shown.findIndex((c, i) => c !== finals[i]) : -1;
   const tt = titleTreatment(theme, props.weight);
   const font = { family: theme.font.family, weight: tt.weight, letterSpacing: tt.tracking };
   return (
-    <div style={{ ...baseText(theme, props, true), display: "flex", ...style }}>
+    <div style={{ ...baseText(theme, props, true), display: "flex", ...(deco ? { width: "fit-content", ...decorationHost(theme) } : {}), ...style }}>
       {finals.map((ch, i) => {
         const w = ch === " " ? measureWidth(" ", fs, font) : measureWidth(ch, fs, font);
         const resolved = shown[i] === ch;
         return (
-          <span key={`${i}${resolved ? "r" : "s"}`} data-qa-ignore={resolved ? undefined : "overlap"} style={{ display: "inline-block", width: w, textAlign: "center", opacity: resolved ? 1 : 0.75 }}>
+          <span key={`${i}${resolved ? "r" : "s"}${i === front ? "c" : ""}`} data-qa-ignore={resolved ? undefined : "overlap"} style={{ display: "inline-block", width: w, textAlign: "center", opacity: resolved ? 1 : 0.75, ...(i === front ? frontCaretStyle(theme, roleColor(theme, "accent")) : {}) }}>
             {shown[i] === " " ? " " : shown[i]}
           </span>
         );
       })}
+      {decoration(theme, progress(local, duration - 8, 12, Easing.out), fs, roleColor(theme, "accent"))}
     </div>
   );
 }

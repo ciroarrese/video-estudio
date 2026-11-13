@@ -1,8 +1,9 @@
 import React from "react";
 import { Easing } from "../../engine";
-import { progress, roleColor, styleKey, useFx, xform } from "../core";
+import { progress, roleColor, styleKey, useFx } from "../core";
 import type { ColorRole } from "../core";
 import { baseText } from "./shared";
+import { caretStyle, decoration, decorationHost, landStyle } from "./look";
 import type { TextFxProps } from "./shared";
 
 export type TypewriterProps = TextFxProps & {
@@ -26,24 +27,14 @@ export function Typewriter(props: TypewriterProps) {
   const caretOn = !done && (typedP < 1 ? (count > 0 && count < n ? true : blink) : false);
   const afterP = progress(local, duration + 2, 14, Easing.lands);
   // El extra solo lleva opacidad y traslado mientras aparece.
-  const afterStyle: React.CSSProperties = { display: "inline-block", opacity: afterP > 0 ? undefined : 0, transform: xform({ y: (1 - afterP) * fs * 0.5, round: true }) };
+  const afterStyle: React.CSSProperties = { display: "inline-block", ...landStyle(theme, afterP, fs) };
   return (
     <div style={{ ...baseText(theme, { ...props, fontSize: fs }, true), whiteSpace: "pre-wrap", display: "flex", alignItems: "center", gap: "0.5em", width: props.width, ...style }}>
-      <span>
+      <span style={decorationHost(theme)}>
         <span>{chars.slice(0, count).join("")}</span>
-        <span
-          style={{
-            display: "inline-block",
-            width: "0.09em",
-            height: "1em",
-            marginLeft: "0.04em",
-            marginRight: "-0.13em",
-            verticalAlign: "text-bottom",
-            background: roleColor(theme, caretColor),
-            opacity: caretOn ? 1 : 0,
-          }}
-        />
+        <span style={caretStyle(theme, roleColor(theme, caretColor), caretOn)} />
         <span style={{ visibility: "hidden" }}>{chars.slice(count).join("")}</span>
+        {decoration(theme, progress(local, duration - 6, 14, Easing.out), fs, roleColor(theme, "accent"))}
       </span>
       {after !== undefined && (
         <span key={styleKey(afterStyle)} style={afterStyle}>

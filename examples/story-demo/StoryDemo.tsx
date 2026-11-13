@@ -1,8 +1,9 @@
 import { useFormat, useFrame } from "../../engine";
-import { CountUp, Cursor, GradientText, Wash, World, cameraAt, hideFromScale, kf, zoomThrough } from "../../kit";
+import { CountUp, Cursor, Wash, World, cameraAt, hideFromScale, kf, zoomThrough } from "../../kit";
 import type { CameraKey } from "../../kit";
-import { useTheme } from "../../themes";
-import { TopicHeadline, defineStory } from "../../stories";
+import { borderWidth, cornerRadius, surfaceStyle, useTheme } from "../../themes";
+import type { Theme } from "../../themes";
+import { HighlightedTitle, TopicHeadline, defineStory } from "../../stories";
 import type { StorySpec, TopicScene } from "../../stories";
 
 // Invented content: generic topics, no real systems or figures.
@@ -51,6 +52,10 @@ const LAYOUTS: Record<"horizontal" | "vertical" | "cuadrado", Layout> = {
 const DUR = 150;
 const THROUGH: [number, number] = [112, 149];
 
+// La escena de ejemplo sigue al design system: superficies, bordes y esquinas salen de `theme.style` (con `sharp` las tarjetas y filas son rectas;
+// con el estilo por defecto conservan los radios de siempre) y el título del panel se resalta como el resto de la historia.
+const squareOr = (theme: Theme, px: number) => (cornerRadius(theme, "card") === 0 ? 0 : px);
+
 function DemoScene({ variant }: { variant: number }) {
   const theme = useTheme();
   const f = useFrame();
@@ -73,9 +78,9 @@ function DemoScene({ variant }: { variant: number }) {
   return (
     <>
       <World camera={cam} width={width} height={height}>
-        <div style={{ position: "absolute", left: P.x, top: P.y, width: P.w, height: P.h, background: theme.color.surface, border: `1px solid ${theme.color.border}`, borderRadius: theme.radius.lg, boxShadow: theme.shadow.lg, opacity: appear }}>
+        <div style={{ position: "absolute", left: P.x, top: P.y, width: P.w, height: P.h, ...surfaceStyle(theme, "panel"), opacity: appear }}>
           <div style={{ padding: "26px 50px", fontSize: theme.type.body, fontWeight: theme.font.weights.semibold, color: theme.color.text }}>
-            <GradientText>Resumen</GradientText>
+            <HighlightedTitle text="Resumen" highlight="Resumen" />
           </div>
         </div>
         {v.stats.map(([label, value], i) => {
@@ -86,8 +91,8 @@ function DemoScene({ variant }: { variant: number }) {
               key={label}
               style={{
                 position: "absolute", left: cardPos(i).x, top: cardPos(i).y + (1 - a) * 30, width: CARD.w, height: CARD.h, opacity: a,
-                background: theme.color.surfaceAlt, borderRadius: theme.radius.panel, padding: 30, boxSizing: "border-box",
-                border: `2px solid ${selected && f > 55 ? theme.color.accent : theme.color.border}`,
+                background: theme.color.surfaceAlt, borderRadius: squareOr(theme, theme.radius.panel), padding: 30, boxSizing: "border-box",
+                ...(borderWidth(theme, "chip") > 0 ? { border: `${borderWidth(theme, "chip")}px solid ${selected && f > 55 ? theme.color.accent : theme.color.border}` } : {}),
               }}
             >
               <div style={{ fontSize: theme.type.eyebrow, color: theme.color.textMuted }}>{label}</div>
@@ -100,9 +105,9 @@ function DemoScene({ variant }: { variant: number }) {
         {v.rows.map((r, i) => {
           const a = kf(f, [30 - lead * 2 + i * 5, 48 - lead * 2 + i * 5], [0, 1]);
           return (
-            <div key={r} style={{ position: "absolute", left: P.x + 50, top: P.y + rowsTop + i * 74, width: P.w - 100, height: 56, opacity: a, display: "flex", alignItems: "center", padding: "0 24px", boxSizing: "border-box", borderRadius: theme.radius.md, background: theme.color.bg, border: `1px solid ${theme.color.border}`, fontSize: theme.type.eyebrow, color: theme.color.text }}>
+            <div key={r} style={{ position: "absolute", left: P.x + 50, top: P.y + rowsTop + i * 74, width: P.w - 100, height: 56, opacity: a, display: "flex", alignItems: "center", padding: "0 24px", boxSizing: "border-box", borderRadius: squareOr(theme, theme.radius.md), background: theme.color.bg, border: `${borderWidth(theme, "card")}px solid ${theme.color.border}`, fontSize: theme.type.eyebrow, color: theme.color.text }}>
               {r}
-              <span style={{ marginLeft: "auto", width: 80 + ((i * 53 + variant * 31) % 120), height: 14, borderRadius: theme.radius.pill, background: theme.color.chart[(i + variant) % theme.color.chart.length] }} />
+              <span style={{ marginLeft: "auto", width: 80 + ((i * 53 + variant * 31) % 120), height: 14, borderRadius: cornerRadius(theme, "bar"), background: theme.color.chart[(i + variant) % theme.color.chart.length] }} />
             </div>
           );
         })}
@@ -123,9 +128,9 @@ scenes[1] = {
   thumbnail: () => {
     const theme = useTheme();
     return (
-      <div style={{ width: 560, height: 340, borderRadius: theme.radius.lg, background: theme.color.surface, border: `1px solid ${theme.color.border}`, boxShadow: theme.shadow.lg, padding: 34, boxSizing: "border-box" }}>
+      <div style={{ width: 560, height: 340, ...surfaceStyle(theme, "card", { level: "lg" }), padding: 34, boxSizing: "border-box" }}>
         {[0.9, 0.7, 0.5, 0.8].map((w, i) => (
-          <div key={i} style={{ height: 36, width: `${w * 100}%`, marginBottom: 22, borderRadius: theme.radius.pill, background: theme.color.chart[i % theme.color.chart.length], opacity: 0.85 }} />
+          <div key={i} style={{ height: 36, width: `${w * 100}%`, marginBottom: 22, borderRadius: cornerRadius(theme, "bar"), background: theme.color.chart[i % theme.color.chart.length], opacity: 0.85 }} />
         ))}
       </div>
     );

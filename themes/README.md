@@ -119,6 +119,11 @@ Un design system no es solo una paleta: cambia la forma de las esquinas, el tipo
 | `story` | `titleCard` `solid`/`glass`; `listLayout` `stacked`/`inline`; `listUnderline` `row`/`name`; `handoff` `wash`/`dock`/`through`; `headlineSize` `md`/`sm`; `closingBg` rol de color (`bg`); `signoffBar` `true`/`false`; `wallColumns` y `wallRows` 2 a 12 o vacío (según el formato); `wallChipScale` 0,5 a 3 (1); `wallDolly` -240 a 2000 (0); `wallDepth` 0 a 3 (1); `wallBlurOpening` y `wallBlurClosing` `true`/`false` |
 | `chart` | `barRadius` `none`/`sm`/`md`/`lg`/`pill` (`md`); `lineWidth` 1 a 12 px (5); `grid` `auto`/`on`/`off`; `fill` `solid`/`gradient`/`hatched` |
 
+| `line` | `weight` `regular`/`hairline`/`bold` (x1, x0,5, x1,8 sobre los trazos); `dash` `solid`/`dashed`/`dotted` (solo las líneas guía); `cap` `round`/`square`; `glow` 0 a 1 (0); `dotShape` `round`/`square`/`cross`; `accentUse` `balanced`/`sparse`/`rich`; `sketch` 0 a 1 (0, temblor de mano fijo por posición) |
+| `solid` | `fill` `shaded`/`flat`/`outline`/`translucent`; `contrast` 0,2 a 1,6 (1); `edge` `gap`/`ink`/`accent`/`none` (`gap` = la arista de siempre de cada pieza) |
+| `depth` | `extrude` `stack`/`long-shadow`/`outline-stack`/`none`; `fog` `true`/`false` |
+| `text` | `arrival` `rise`/`fade`/`slide`/`scale`; `caret` `bar`/`block`/`underscore`; `tile` `card`/`flat`/`outline`; `charset` `caps`/`hex`/`binary`/`symbols`; `decoration` `none`/`underline`/`marker`/`box` |
+
 `STYLE_FIELDS` lista todos los campos con su valor por defecto y su descripción; `DEFAULT_STYLE` es el estilo por defecto.
 
 ### Tokens
@@ -138,7 +143,7 @@ Un valor inválido (o un `--style-...` que no existe) no lanza: se ignora, queda
 
 ### Ayudas para las piezas
 
-Las piezas no leen cadenas de `theme.style`: llaman a estas ayudas (puras, deterministas, sin valores identidad en el estilo que devuelven): `cornerRadius`, `borderWidth`, `surfaceStyle`, `textStyle`, `numeralStyle`, `highlightStyle`, `backgroundLayer`, `entrance`, `settle`, `staggerFrames`, `staggerScale`, `transitionVeil`, `cameraOptions`, `doodleStyle`, `vignetteStrength`, `accentMark`, `chartStyle`, `chartFill`, `storyDefaults`, `withStoryDefaults`. Cuál usa cada pieza: `docs/estilo.md`.
+Las piezas no leen cadenas de `theme.style`: llaman a estas ayudas (puras, deterministas, sin valores identidad en el estilo que devuelven): `cornerRadius`, `borderWidth`, `surfaceStyle`, `textStyle`, `numeralStyle`, `highlightStyle`, `backgroundLayer`, `entrance`, `settle`, `staggerFrames`, `staggerScale`, `transitionVeil`, `cameraOptions`, `doodleStyle`, `vignetteStrength`, `accentMark`, `chartStyle`, `chartFill`, `storyDefaults`, `withStoryDefaults`; para `fx/`: `lineLook`, `solidLook`, `depthLook`, `textLook` y `sketchOffset` (`themes/styleLine.ts`). Cuál usa cada pieza: `docs/estilo.md`.
 
 ### `checkTheme` y el estilo
 

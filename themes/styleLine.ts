@@ -69,12 +69,19 @@ export interface TextLook {
   /** Alfabeto elegido por el tema; `undefined` = el propio del efecto. */
   glyphs: string | undefined;
   decoration: TextDecoration;
+  /** `style.line.glow`: halo de cursor, losetas y letras de `TypeRing` (0 = ninguno). */
+  glow: number;
+  /** `style.line.dotShape`: forma del separador de `MarqueeBands` y `TypeRing`. */
+  dotShape: DotShape;
+  /** Multiplicador del grosor de trazos (`style.line.weight`): contornos de bandas y de `TypeRing`. */
+  weightK: number;
 }
 
 /** Lectura de `style.text`. Con el estilo por defecto: `rise`, `bar`, `card`, alfabeto propio y sin adorno. */
 export function textLook(theme: Theme): TextLook {
-  const t = resolveStyle(theme).text;
-  return { arrival: t.arrival, caret: t.caret, tile: t.tile, glyphs: CHARSETS[t.charset], decoration: t.decoration };
+  const st = resolveStyle(theme);
+  const t = st.text;
+  return { arrival: t.arrival, caret: t.caret, tile: t.tile, glyphs: CHARSETS[t.charset], decoration: t.decoration, glow: st.line.glow, dotShape: st.line.dotShape, weightK: WEIGHT_K[st.line.weight] };
 }
 
 /**

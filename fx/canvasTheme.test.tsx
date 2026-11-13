@@ -2,7 +2,7 @@ import React from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { render } from "@testing-library/react";
 import { FrameProvider } from "../engine";
-import { ThemeProvider, neutral, parseColor } from "../themes";
+import { ThemeProvider, dark, editorial, neon, neutral, papel, parseColor } from "../themes";
 import type { Theme } from "../themes";
 import {
   CubeFold, CubeStack, Globe, Helix, IsoCity, LayerExplode, OrbitRings, ParticleSphere, PhoneOrbit, TerrainMesh, TorusWire, Tunnel, WaveDots,
@@ -77,10 +77,10 @@ beforeEach(() => {
 afterEach(() => vi.restoreAllMocks());
 
 const config = { fps: 30, width: 1920, height: 1080, durationInFrames: 400 };
-function draw(el: (p: { frame: number }) => React.ReactElement, frame: number) {
+function draw(el: (p: { frame: number }) => React.ReactElement, frame: number, theme: Theme = sentinel) {
   current = recorder();
   const { unmount } = render(
-    <ThemeProvider theme={sentinel}><FrameProvider frame={frame} config={config}>{el({ frame })}</FrameProvider></ThemeProvider>,
+    <ThemeProvider theme={theme}><FrameProvider frame={frame} config={config}>{el({ frame })}</FrameProvider></ThemeProvider>,
   );
   const out = { colors: [...current.colors], pixels: [...current.pixels] };
   unmount();
@@ -118,6 +118,20 @@ describe("canvas: todo color sale del tema (tema centinela)", () => {
       let seen = 0;
       for (const f of [0, 20, 45, 75, 150]) {
         for (const c of draw(el, f).colors) {
+          seen++;
+          expect(derived(c), `cuadro ${f}`).toBeNull();
+        }
+      }
+      expect(seen).toBeGreaterThan(0);
+    });
+  });
+  // El estilo del design system (trazos, caras, halos, formas de punto) tampoco introduce colores fijos: se repite con el estilo de los cinco temas.
+  describe.each([neutral, dark, editorial, neon, papel])("con el estilo de $name", (t) => {
+    const themed: Theme = { ...sentinel, name: `centinela-${t.name}`, style: t.style };
+    it.each(CASES)("%s", (_name, el) => {
+      let seen = 0;
+      for (const f of [0, 20, 45, 75, 150]) {
+        for (const c of draw(el, f, themed).colors) {
           seen++;
           expect(derived(c), `cuadro ${f}`).toBeNull();
         }

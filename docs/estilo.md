@@ -2,7 +2,7 @@
 
 Contrato para quien migra `kit/`, `stories/`, `fx/` y `examples/`. Objetivo: cambiar el design system cambia la **estética** (forma, superficies, tratamiento del texto, fondo, movimiento, decoración) y no solo los colores, sin tocar el código de las escenas. Hasta ahora un tema cambiaba colores, tipografías, radios, sombras, curvas y nubes; la composición y el carácter estaban fijos en las piezas, y las decisiones de estilo vivían en `spec.design` de cada video. `theme.style` sube esas decisiones al tema; `spec.design` pasa a ser un ajuste por video sobre el design system.
 
-Estado: **la capa existe en `themes/` y ninguna pieza la lee todavía.** Con el estilo por defecto el resultado es idéntico al de hoy (lo prueban las pruebas de `themes/style.test.tsx`, que comparan contra los valores literales de las piezas). Cada pieza se migra en el orden de la lista del final.
+Estado: **la capa existe en `themes/`; `fx/text` y `fx/three` leen los grupos `type`, `shape`, `surface`, `motion.stagger`, `line`, `solid`, `depth` y `text` (ver las tablas); el resto de las piezas todavía no.** Con el estilo por defecto el resultado es idéntico al de hoy (lo prueban las pruebas de `themes/style.test.tsx`, que comparan contra los valores literales de las piezas). Cada pieza se migra en el orden de la lista del final.
 
 ## Cómo se usa
 
@@ -97,6 +97,32 @@ Ayudas: `storyDefaults(theme)` da los valores del tema en la forma larga de `Sto
 | `lineWidth` | 1 a 12 px (5) | `LineDraw` (hoy 5), contorno de `RadarMorph` (hoy 4). | `chartStyle(theme).lineWidth` | sin consumidor |
 | `grid` | `auto` (por defecto), `on`, `off` | `auto` = cada gráfico como hoy (`LineDraw` y `RadarMorph` dibujan guías de 1,5 px; `BarsGrow` solo la línea base). `on` / `off` fuerzan. | `chartStyle(theme).grid` | sin consumidor |
 | `fill` | `solid` (por defecto), `gradient`, `hatched` | Relleno de barras y áreas (`BarsGrow`, `Bars3D` no: es geometría). `gradient` y `hatched` necesitan un `<defs>` con un id derivado de las props (nunca `useId`). | `chartFill(theme, color, id)` | sin consumidor |
+
+### `line`, `solid`, `depth`, `text`: efectos de línea, sólidos y texto (`fx/three`, `fx/text`)
+
+Los campos de arriba movían tarjetas y titulares; los alambres, puntos, sólidos y letras de los efectos eran siempre el mismo dibujo. Estos cuatro grupos (todos con valor por defecto idéntico al aspecto anterior; `neutral` y `dark` no los declaran) cubren eso. Las piezas de `fx/three` los leen por la **pluma** (`penFor`, en `fx/three/common.ts`, que envuelve `lineLook`, `solidLook` y `depthLook`; `useThreeFx` la entrega como `pen`) y las de `fx/text` por `fx/text/look.tsx` (sobre `textLook`). Ninguna pieza compara cadenas.
+
+| Campo | Valores (por defecto) | Qué cambia | Quién lo cumple |
+|---|---|---|---|
+| `line.weight` | `regular` (x1), `hairline` (x0,5), `bold` (x1,8) | Grosor de todos los trazos y tamaño de los puntos (x0,8 / x1 / x1,25) | todas las de canvas de `three/` (`Globe`, `ParticleSphere`, `CubeStack`, `CubeFold`, `Tunnel`, `TerrainMesh`, `TorusWire`, `Helix`, `OrbitRings`, `WaveDots`, `LayerExplode`, `IsoCity`, anillo de `PhoneOrbit`), borde de `CardFlip` y `CarouselRing`; contorno de `MarqueeBands` y del `SplitFlap` |
+| `line.dash` | `solid`, `dashed`, `dotted` | Solo las líneas guía (retícula, marcos, aristas, órbitas, tarjetas de fondo); lo principal (rutas, hebras, marcos en acento) sigue lleno | `Globe`, `Tunnel`, `TerrainMesh`, `TorusWire`, `Helix`, `OrbitRings`, anillo de `PhoneOrbit`, `CarouselRing` (tarjetas de atrás) |
+| `line.cap` | `round`, `square` | `square` = corte recto y esquinas vivas (`butt` + `miter`) | las mismas que `weight` (por `pen.caps`) |
+| `line.glow` | 0 a 1 (0) | Halo: una segunda pasada ancha y tenue (no `shadowBlur`: así pasa `--check`). En DOM, `box-shadow` | trazos y puntos de `three/`, `TerrainMesh`, `ExtrudeType` (halo de la pila), bordes de `CardFlip`/`CarouselRing`; cursor y adorno de texto, `SplitFlap`, `MarqueeBands` (contorno), `TypeRing` |
+| `line.dotShape` | `round`, `square`, `cross` | Forma de los puntos y del separador de texto | `Globe`, `ParticleSphere`, `Helix`, `OrbitRings`, `WaveDots`, `PhoneOrbit`; separador de `MarqueeBands` y `TypeRing` |
+| `line.accentUse` | `balanced`, `sparse`, `rich` | Cuánto de una figura va en acento: `sparse` deja el acento solo en lo principal; `rich` tiñe también lo neutro | `ParticleSphere` (fracción), `CubeStack` (cubos), `Tunnel` (cada cuántos marcos), `TorusWire`, `Helix`, `TerrainMesh`, `IsoCity` (umbral de altura), `WaveDots`, `Globe`, `OrbitRings`, `CubeFold`, `LayerExplode` |
+| `line.sketch` | 0 a 1 (0) | Temblor de mano: desplazamiento fijo según la posición en pantalla (`sketchOffset`), sin azar ni dependencia del cuadro; los vértices compartidos no se separan | todo lo que dibuja la pluma (`three/`) |
+| `solid.fill` | `shaded`, `flat`, `outline`, `translucent` | Relleno de las caras: sombreado por cara, un tono por pieza, solo contorno (tapa lo de atrás) o cristal con borde | `CubeStack`, `CubeFold`, `IsoCity`, `LayerExplode`, esfera de `OrbitRings`, sol de `TerrainMesh` |
+| `solid.contrast` | 0,2 a 1,6 (1) | Diferencia de luz entre las caras (en `shaded` y `flat`) | `CubeStack`, `CubeFold`, `IsoCity`, `LayerExplode` |
+| `solid.edge` | `gap`, `ink`, `accent`, `none` | Arista: `gap` = la de siempre de cada pieza (color del fondo en los cubos, tinta en las capas) | las mismas que `fill` |
+| `depth.extrude` | `stack`, `long-shadow`, `outline-stack`, `none` | Volumen: pila con degradé, sombra larga de un tono que se desvanece, copias de contorno que se tapan entre sí, o plano | `ExtrudeType` (los cuatro), `IsoCity` (`long-shadow`: sombra en el suelo), `LayerExplode` (`none`: capas finas; `long-shadow`: sombra de cada capa sobre la de abajo) |
+| `depth.fog` | `true`, `false` | `false`: sin atenuación ni afinado por distancia (trazos parejos y nítidos) | `Globe`, `ParticleSphere`, `Tunnel`, `TerrainMesh`, `TorusWire`, `Helix`, `OrbitRings`, `WaveDots`, anillo de `PhoneOrbit`, `TypeRing` (letras de atrás) |
+| `text.arrival` | `rise`, `fade`, `slide`, `scale` | Cómo llegan las letras y los extras | `MaskedRise`, `KineticWords` (por `MaskedRise`), extra de `Typewriter`, sufijo de `DigitRoll` |
+| `text.caret` | `bar`, `block`, `underscore` | Cursor. En `ScrambleDecode`, `bar` no dibuja cursor (como siempre); `block` y `underscore` marcan el glifo que se está resolviendo | `Typewriter`, `ScrambleDecode` |
+| `text.tile` | `card`, `flat`, `outline` | Losetas y bandas: llena con bisagra y radio, llena sin ellos, o solo contorno con el glifo del color de la loseta. En `MarqueeBands`, `flat` = `card` | `SplitFlap`, `MarqueeBands` |
+| `text.charset` | `caps` (el propio del efecto), `hex`, `binary`, `symbols` | Alfabeto de los glifos al azar | `ScrambleDecode`, `SplitFlap` |
+| `text.decoration` | `none`, `underline`, `marker`, `box` | Adorno que se dibuja bajo el texto al terminar: subrayado que avanza, barrido de marcador o recuadro (por palabra en `MaskedRise`; `KineticWords` lo apaga) | `MaskedRise`, `Typewriter`, `ScrambleDecode`, `DigitRoll` (solo el adorno: las cifras siguen exentas de `numerals`) |
+
+Reglas: con el valor por defecto cada llamada de la pluma hace las mismas operaciones de canvas que antes (`fx/three/pen.test.ts`) y las hojas de `neutral` y `dark` son idénticas píxel a píxel; los colores salen siempre de la paleta del tema (`fx/canvasTheme.test.tsx` lo prueba con el estilo de los cinco temas); en reposo no quedan `transform`, `opacity` ni `font-size` identidad.
 
 ### Lo que decidí no incluir
 

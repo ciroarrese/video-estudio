@@ -14,6 +14,8 @@ export type Case = {
   noScene?: number[];
   /** Pone un `signoff.slot` propio (un nodo no se puede guardar en el JSON del spec). */
   slot?: boolean;
+  /** Design system con el que se renderiza (`neutral` por defecto): los de estilo propio cambian el cartel, la lista, el fondo y el movimiento. */
+  theme?: "neutral" | "dark" | "editorial" | "neon" | "papel";
   /** Formatos extra que se verifican además del horizontal. */
   formats?: ("vertical" | "cuadrado")[];
 };
@@ -43,6 +45,10 @@ export const CASES: Case[] = [
   { id: "o-bucle", formats: ["vertical", "cuadrado"], spec: { title: { text: "Degradado en bucle", highlight: "bucle" }, topics: T(3), labels: ["Alfa", "Beta"], signoff: { text: "Gracias por **mirar**" }, design: { handoff: "dock", list: "inline", headline: { size: "sm" }, gradient: { loop: 45 } } } },
   { id: "o-muro", spec: { title: { text: "Muro con opciones", highlight: "opciones" }, topics: T(3), labels: ["Alfa", "Beta", "Gamma"], signoff: { text: "Fin" }, design: { wall: { chipScale: 1.4, dolly: 500, depth: 1.6, blur: { opening: false, closing: true } }, closing: { bg: "surface" } } } },
   { id: "o-vistos", noScene: [1], spec: { title: { text: "Tema visto sin escena" }, topics: T(3).map((t, i) => (i === 1 ? { ...t, seen: true } : t)), labels: [], signoff: { text: "Fin" } } },
+  // design systems con estilo propio (sin `design` en el video: lo decide el tema; ver `docs/estilo.md`)
+  { id: "e-editorial", theme: "editorial", formats: ["vertical"], spec: { title: { text: "Un día en la oficina", highlight: "la oficina" }, topics: T(3), labels: ["Resumen diario", "Metas del mes", "Pedidos nuevos"], signoff: { text: "Gracias por mirar", tagline: "Datos ficticios" } } },
+  { id: "e-neon", theme: "neon", formats: ["cuadrado"], spec: { title: { text: "Atravesamos y brillamos", highlight: "brillamos" }, topics: T(4, true), labels: ["Alfa", "Beta", "Gamma", "Delta"], signoff: { text: "Hasta pronto", tagline: "Nota al pie" } } },
+  { id: "e-papel", theme: "papel", noScene: [0], spec: { title: { text: "Papel con marcador", highlight: "marcador" }, topics: T(3), labels: ["Uno", "Dos", "Tres"], signoff: { text: "Fin" }, design: { closing: { bar: true } } } },
   { id: "o-sin-escenas", noScene: [0, 1, 2], spec: { title: { text: "Solo apertura y cierre" }, topics: T(3), labels: [], signoff: { text: "Fin" } } },
 ];
 
@@ -64,7 +70,7 @@ const spec = ${JSON.stringify(spec)};
 ${c.slot ? 'spec.signoff.slot = React.createElement("div", { style: { width: 220, height: 220, borderRadius: 40, background: "#3b5bdb" } });' : ""}
 const none = ${JSON.stringify(c.noScene ?? [])};
 const scenes = spec.topics.map((t, i) => (none.includes(i) ? null : { id: t.id, component: Scene, durationInFrames: 60 }));
-export default defineStory({ id: ${JSON.stringify(c.id)}, spec, scenes, ${c.formats ? `formats: ${JSON.stringify(c.formats)}, ` : ""}...${JSON.stringify(c.storyOpts ?? {})} });
+export default defineStory({ id: ${JSON.stringify(c.id)}, spec, scenes, theme: ${JSON.stringify(c.theme ?? "neutral")}, ${c.formats ? `formats: ${JSON.stringify(c.formats)}, ` : ""}...${JSON.stringify(c.storyOpts ?? {})} });
 `;
 }
 

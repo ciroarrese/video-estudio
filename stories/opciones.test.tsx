@@ -7,7 +7,8 @@ import { Closing, DefaultThumbnail, Interlude, InterludeCompact, Opening, TopicH
 import type { StorySpec, TopicScene } from "./index";
 import { listLayout, openingWall } from "./layout";
 import { pillNumberColor, quietOpacity } from "./shared";
-import { contrastRatio, dark } from "../themes";
+import { contrastRatio, dark, editorial, neon, papel, storyDefaults } from "../themes";
+import { resolveStoryDesign } from "./shared";
 
 const spec = (over: Partial<StorySpec> = {}): StorySpec => ({
   title: { text: "Título de prueba", highlight: "prueba" },
@@ -340,5 +341,56 @@ describe("segunda migración: píldora acoplada, opciones y contrastes", () => {
     expect(def![1] ?? def![2]).toBe(neutral.color.bg);
     const surf = wash(spec({ design: { closing: { bg: "surface" } } }));
     expect(surf![1] ?? surf![2]).toBe(neutral.color.surface);
+  });
+});
+
+describe("el diseño del video y el del design system", () => {
+  it("un video que no indica nada recibe el estilo de historias del design system", () => {
+    const d = resolveStoryDesign(editorial, undefined, 1920, 1080);
+    expect(d.handoff).toBe("dock");
+    expect(d.list).toEqual({ layout: "inline", underline: "name" });
+    expect(d.headline?.size).toBe("sm");
+    expect(d.closing).toEqual({ bg: "surface", bar: false });
+    expect(d.wall).toMatchObject({ columns: 5, rows: 6, chipScale: 0.9, depth: 0.5, blur: { opening: true, closing: false } });
+    expect(resolveStoryDesign(neon, undefined, 1920, 1080).gradient).toEqual({ loop: 90 });
+  });
+  it("el diseño del video pisa al del tema, opción por opción", () => {
+    const d = resolveStoryDesign(editorial, { handoff: "wash", list: "stacked", wall: { columns: 3, blur: false }, closing: { bar: true } }, 1920, 1080);
+    expect(d.handoff).toBe("wash");
+    expect(d.list).toEqual({ layout: "stacked", underline: "name" }); // lo que el video no dice sale del tema
+    expect(d.wall).toMatchObject({ columns: 3, rows: 6, blur: { opening: false, closing: false } });
+    expect(d.closing).toEqual({ bg: "surface", bar: true });
+  });
+  it("con el tema por defecto el diseño resuelto es el de siempre", () => {
+    for (const t of [neutral, dark]) {
+      const d = resolveStoryDesign(t, undefined, 1920, 1080);
+      expect(d).toEqual(storyDefaults(t));
+      expect(d.handoff).toBe("wash");
+      expect(d.titleCard).toBe("solid");
+      expect(d.wall).toEqual({ chipScale: 1, dolly: 0, depth: 1, blur: { opening: true, closing: true } });
+    }
+  });
+  it("en formato alto las columnas y filas del muro del tema no rigen; las del video sí", () => {
+    expect(resolveStoryDesign(editorial, undefined, 1080, 1920).wall).not.toHaveProperty("columns");
+    expect(resolveStoryDesign(editorial, { wall: { columns: 4 } }, 1080, 1920).wall).toMatchObject({ columns: 4 });
+    expect(resolveStoryDesign(editorial, undefined, 1080, 1920).wall).not.toHaveProperty("rows");
+  });
+  it("closing.bar: valida y quita la marca de acento bajo la firma", () => {
+    expect(() => validateSpec(spec({ design: { closing: { bar: "si" as never } } }))).toThrow(/closing.bar/);
+    expect(() => validateSpec(spec({ design: { closing: { otra: 1 } as never } }))).toThrow(/closing.otra/);
+    const on = html(<Closing spec={spec()} />, 470, 480);
+    const off = html(<Closing spec={spec({ design: { closing: { bar: false } } })} />, 470, 480);
+    expect(on).toContain("height:8px");
+    expect(off).not.toContain("height:8px");
+    // el tema editorial no dibuja la barra por defecto; el video la pide
+    expect(html(<Closing spec={spec()} />, 470, 480, editorial)).not.toContain("linear-gradient(90deg");
+    expect(html(<Closing spec={spec({ design: { closing: { bar: true } } })} />, 470, 480, editorial)).toContain("height:3px");
+  });
+  it("el mismo guion se ve distinto en cada design system (cartel, lista, fondo)", () => {
+    const frame = (t: typeof neutral) => html(<Opening spec={spec()} />, 20, 300, t);
+    const out = [neutral, editorial, neon, papel].map(frame);
+    expect(new Set(out).size).toBe(4);
+    expect(frame(editorial)).toContain("linear-gradient(to right"); // fondo de grilla
+    expect(frame(neon)).toContain("radial-gradient(circle"); // fondo de puntos
   });
 });
