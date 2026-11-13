@@ -97,7 +97,7 @@ function Scene({ frame }: { frame: number }) {
         <Panel {...A} title="Panel de ejemplo" opacity={kf(frame, [148, 162, 180, 194], [1, 0.45, 0.45, 1])}>
           {[0, 1, 2].map((i) => {
             const p = cardPos(i);
-            const d = staggerFrames(theme, i, { base: 6 });
+            const d = staggerFrames(theme, i, { base: 6, context: "items" });
             const a = kf(frame, [d - 14, d + 18], [0, 1]);
             const hidden = i === PICK && left;
             // Entrada en profundidad: perspective() propio de cada tarjeta, layout entero (ver docs/reglas.md).
@@ -112,7 +112,7 @@ function Scene({ frame }: { frame: number }) {
             );
           })}
           {ROWS.map((r, i) => {
-            const d = staggerFrames(theme, i, { base: 5 });
+            const d = staggerFrames(theme, i, { base: 5, context: "rows" });
             const a = kf(frame, [d - 10, d + 10], [0, 1]);
             const row = surfaceStyle(theme, "card", { level: "sm" });
             // El borde (más grueso o ausente) no cambia la caja: el relleno de la fila lo compensa.

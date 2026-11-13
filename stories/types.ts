@@ -99,6 +99,14 @@ export type StoryDesign = {
     dolly?: number;
     /** Multiplicador de la dispersión en profundidad de las piezas del muro de la apertura (1 por defecto; de 0 a 3). */
     depth?: number;
+    /** Multiplicador de la separación horizontal entre columnas del muro (1 por defecto = la de siempre; de 0,4 a 3). */
+    gapX?: number;
+    /** Multiplicador de la separación vertical entre filas del muro (1 por defecto; de 0,4 a 3). */
+    gapY?: number;
+    /** Multiplicador del corrimiento "ladrillo" entre filas alternas (1 por defecto = 200 px; de 0 a 3; 0 = columnas alineadas, una grilla ajustada). */
+    brick?: number;
+    /** Multiplicador del temblor de posición de cada pieza (1 por defecto; de 0 a 4; 0 = sin temblor). Sembrado por el índice de la pieza: determinista. */
+    jitter?: number;
   };
   /** Fondo de nubes de todos los bloques generados: colores, manchas, opacidad, cantidad y semilla (lo que falte sale de `theme.cloud`). */
   clouds?: CloudOptions;
@@ -211,6 +219,9 @@ function validateDesign(d: StoryDesign | undefined): void {
     if (w.chipScale !== undefined && !inRange(w.chipScale, 0.5, 3)) bad("wall.chipScale debe ser un número entre 0,5 y 3");
     if (w.dolly !== undefined && !inRange(w.dolly, -240, 2000)) bad("wall.dolly debe ser un número de px entre -240 y 2000");
     if (w.depth !== undefined && !inRange(w.depth, 0, 3)) bad("wall.depth debe ser un número entre 0 y 3");
+    for (const k of ["gapX", "gapY"] as const) if (w[k] !== undefined && !inRange(w[k], 0.4, 3)) bad(`wall.${k} debe ser un número entre 0,4 y 3`);
+    if (w.brick !== undefined && !inRange(w.brick, 0, 3)) bad("wall.brick debe ser un número entre 0 y 3");
+    if (w.jitter !== undefined && !inRange(w.jitter, 0, 4)) bad("wall.jitter debe ser un número entre 0 y 4");
   }
 }
 
@@ -226,7 +237,7 @@ export function parseRich(text: string): { text: string; bold: boolean }[] {
 /** El mismo texto sin las marcas de negrita (para medirlo). */
 export const plainRich = (text: string): string => text.replace(/\*\*/g, "");
 
-/** Opciones del muro con sus valores por defecto: desenfoque por bloque, tamaño de piezas, recorrido extra de cámara y dispersión en profundidad. */
+/** Opciones del muro con sus valores por defecto: desenfoque por bloque, tamaño de piezas, recorrido extra de cámara y dispersión en profundidad, separación entre piezas, corrimiento ladrillo y temblor. */
 export function wallOptions(d: StoryDesign | undefined) {
   const w = d?.wall;
   const b = w?.blur;
@@ -236,5 +247,9 @@ export function wallOptions(d: StoryDesign | undefined) {
     chipScale: w?.chipScale ?? 1,
     dolly: w?.dolly ?? 0,
     depth: w?.depth ?? 1,
+    gapX: w?.gapX ?? 1,
+    gapY: w?.gapY ?? 1,
+    brick: w?.brick ?? 1,
+    jitter: w?.jitter ?? 1,
   };
 }

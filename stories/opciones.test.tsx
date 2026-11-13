@@ -367,7 +367,7 @@ describe("el diseño del video y el del design system", () => {
       expect(d).toEqual(storyDefaults(t));
       expect(d.handoff).toBe("wash");
       expect(d.titleCard).toBe("solid");
-      expect(d.wall).toEqual({ chipScale: 1, dolly: 0, depth: 1, blur: { opening: true, closing: true } });
+      expect(d.wall).toEqual({ chipScale: 1, dolly: 0, depth: 1, gapX: 1, gapY: 1, brick: 1, jitter: 1, blur: { opening: true, closing: true } });
     }
   });
   it("en formato alto las columnas y filas del muro del tema no rigen; las del video sí", () => {
@@ -384,7 +384,7 @@ describe("el diseño del video y el del design system", () => {
     expect(off).not.toContain("height:8px");
     // el tema editorial no dibuja la barra por defecto; el video la pide
     expect(html(<Closing spec={spec()} />, 470, 480, editorial)).not.toContain("linear-gradient(90deg");
-    expect(html(<Closing spec={spec({ design: { closing: { bar: true } } })} />, 470, 480, editorial)).toContain("height:3px");
+    expect(html(<Closing spec={spec({ design: { closing: { bar: true } } })} />, 470, 480, editorial)).toContain("height:2px"); // el filete fino de editorial (`decor.accentThickness: 0.5`)
   });
   it("el mismo guion se ve distinto en cada design system (cartel, lista, fondo)", () => {
     const frame = (t: typeof neutral) => html(<Opening spec={spec()} />, 20, 300, t);

@@ -24,18 +24,20 @@ const num = (n: number, d: number) => String(+n.toFixed(d));
  * `pill` (por defecto): chip y barra = `radius.pill`, tarjeta y ventana = `radius.lg`, panel = `radius.panel`, cartel = `radius.lg * 2`, control = `radius.md`.
  * `rounded`: chip = `radius.md`, tarjeta y ventana = `radius.lg`, panel = `radius.panel`, cartel = `radius.lg * 1.5`, control y barra = `radius.sm`.
  * `sharp`: 0 en todo.
+ * `shape.heroScale` (si no es `null`) reemplaza el múltiplo del cartel: `radius.lg * heroScale` en `pill` y en `rounded`.
  * `panel` es el contenedor de tamaño medio (un panel dentro de una interfaz, un paso de un diagrama); `window` es el grande (la paleta de
  * comandos, el plano, el panel que ocupa la escena) y `card` la tarjeta suelta.
  */
 export function cornerRadius(theme: Theme, role: CornerRole): number {
   const r = theme.radius;
-  switch (resolveStyle(theme).shape.corners) {
+  const sh = resolveStyle(theme).shape;
+  switch (sh.corners) {
     case "sharp":
       return 0;
     case "rounded":
-      return { chip: r.md, card: r.lg, panel: r.panel, window: r.lg, hero: r.lg * 1.5, control: r.sm, bar: r.sm }[role];
+      return { chip: r.md, card: r.lg, panel: r.panel, window: r.lg, hero: r.lg * (sh.heroScale ?? 1.5), control: r.sm, bar: r.sm }[role];
     default:
-      return { chip: r.pill, card: r.lg, panel: r.panel, window: r.lg, hero: r.lg * 2, control: r.md, bar: r.pill }[role];
+      return { chip: r.pill, card: r.lg, panel: r.panel, window: r.lg, hero: r.lg * (sh.heroScale ?? 2), control: r.md, bar: r.pill }[role];
   }
 }
 
@@ -181,19 +183,30 @@ const STRONGER = { regular: "medium", medium: "semibold", semibold: "stat", stat
 
 /**
  * Peso e interletrado de un rol de texto. `title`: `titleWeight` y `titleTracking`; `label`: `labelWeight`; `eyebrow`: caja alta y
- * `eyebrowTracking` (el peso lo deja a la pieza). `tracking` es lo que la pieza ya lleva (por ejemplo -0,02 em en los nombres de la lista):
+ * `eyebrowTracking` (el peso lo deja a la pieza); `caption`: subtítulos y líneas de apoyo de las historias, con su propia caja
+ * (`captionCase`), interletrado (`captionTracking`) y peso (`captionWeight`). `tracking` es lo que la pieza ya lleva (por ejemplo -0,02 em en los nombres de la lista):
  * el del estilo se suma. Omite `letterSpacing` y `textTransform` cuando no cambian nada.
  * `strong` (solo en `label`): el rótulo que va un escalón más fuerte que el común (los nombres de una tarjeta, la etiqueta de una ficha):
  * `labelWeight` subido un escalón (`regular` a `medium`, `medium` a `semibold`, `semibold` a `stat`). Con el estilo por defecto, `semibold`.
+ * `caption`: con `captionCase: "eyebrow"` y `captionTracking: null` (por defecto) sigue al eyebrow, así que un design system que no los toca no
+ * cambia; `follow: false` hace que "seguir al eyebrow" signifique "no tocar" (la línea de la lista, que nunca llevó caja ni interletrado del estilo).
  */
-export function textStyle(theme: Theme, role: "title" | "label" | "eyebrow", o: { tracking?: number; strong?: boolean } = {}): React.CSSProperties {
+export function textStyle(theme: Theme, role: "title" | "label" | "eyebrow" | "caption", o: { tracking?: number; strong?: boolean; follow?: boolean } = {}): React.CSSProperties {
   const st = resolveStyle(theme).type;
   const out: React.CSSProperties = {};
-  const extra = role === "title" ? st.titleTracking : role === "eyebrow" ? st.eyebrowTracking : 0;
+  const follow = o.follow !== false;
+  const captionTracking = st.captionTracking ?? (follow ? st.eyebrowTracking : 0);
+  const extra = role === "title" ? st.titleTracking : role === "eyebrow" ? st.eyebrowTracking : role === "caption" ? captionTracking : 0;
   const ls = +((o.tracking ?? 0) + extra).toFixed(3);
   if (role === "title") out.fontWeight = theme.font.weights[st.titleWeight];
   if (role === "label") out.fontWeight = theme.font.weights[o.strong ? STRONGER[st.labelWeight] : st.labelWeight];
   if (role === "eyebrow" && st.eyebrowCase === "upper") out.textTransform = "uppercase";
+  if (role === "caption") {
+    const kase = st.captionCase === "eyebrow" ? (follow && st.eyebrowCase === "upper" ? "upper" : "as-is") : st.captionCase;
+    if (kase === "upper") out.textTransform = "uppercase";
+    else if (kase === "lower") out.textTransform = "lowercase";
+    if (st.captionWeight !== "auto") out.fontWeight = theme.font.weights[st.captionWeight];
+  }
   if (ls !== 0) out.letterSpacing = `${ls}em`;
   return out;
 }
@@ -269,18 +282,45 @@ export function highlightStyle(theme: Theme, o: GradientOptions & { progress?: n
 
 // ---------- movimiento ----------
 
-/** Cuadros de demora del elemento `index` de un conjunto escalonado: `index * style.motion.stagger`. */
-export function staggerFrames(theme: Theme, index: number, o: { base?: number } = {}): number {
-  const s = resolveStyle(theme).motion.stagger;
+/** Contextos de escalonado con paso propio en `style.motion`: la lista de la apertura, las filas, los elementos pequeños y las piezas del muro. */
+export type StaggerContext = "list" | "rows" | "items" | "chips";
+
+const STAGGER_KEY = { list: "staggerList", rows: "staggerRows", items: "staggerItems", chips: "staggerChips" } as const;
+
+/** Paso (cuadros) que el design system fija para un contexto (`motion.staggerList`, `staggerRows`, `staggerItems`, `staggerChips`), o `null` si no lo fija. */
+export const staggerOverride = (theme: Theme, context: StaggerContext): number | null => resolveStyle(theme).motion[STAGGER_KEY[context]];
+
+export interface StaggerOptions {
+  /** Paso propio de la pieza, en cuadros: el tema lo escala respecto del paso por defecto (4 = sin cambio). Lo ignora un paso de contexto. */
+  base?: number;
+  /** Contexto de la pieza: si el design system fijó el paso de ese contexto (`motion.staggerList`...), manda ese número, en cuadros, sin escalar. */
+  context?: StaggerContext;
+  /** Solo con un paso de contexto: multiplicador del paso (por ejemplo `dur / duraciónPorDefecto` cuando el bloque se estira con `timing`). */
+  scale?: number;
+}
+
+/**
+ * Cuadros de demora del elemento `index` de un conjunto escalonado. Sin `context` (o si el design system no fijó el paso de ese contexto):
+ * `index * style.motion.stagger`, o `index * base * (stagger / 4)` con el paso propio de la pieza. Con un paso de contexto (`motion.staggerList`,
+ * `staggerRows`, `staggerItems` o `staggerChips`): `index * paso * scale`, en cuadros, sin pasar por `base`.
+ */
+export function staggerFrames(theme: Theme, index: number, o: StaggerOptions = {}): number {
+  const m = resolveStyle(theme).motion;
+  const ctx = o.context ? m[STAGGER_KEY[o.context]] : null;
+  if (ctx !== null) return index * ctx * (o.scale ?? 1);
+  const s = m.stagger;
   // con `base` (el paso propio de la pieza), el tema lo escala respecto del paso por defecto: 4 cuadros = sin cambio
   return o.base === undefined ? index * s : index * o.base * (s / DEFAULT_STYLE.motion.stagger);
 }
 
 /**
  * Factor (`stagger / 4`) para las piezas que escalonan con una fracción de su duración (`staggerT(p, i, n, spread)`) y no con cuadros:
- * `spread * staggerScale(theme)`, con tope en 0,95. 1 con el valor por defecto.
+ * `spread * staggerScale(theme)`, con tope en 0,95. 1 con el valor por defecto. Con `context` y un paso de contexto fijado, el factor sale de ese paso (`paso / 4`).
  */
-export const staggerScale = (theme: Theme): number => resolveStyle(theme).motion.stagger / DEFAULT_STYLE.motion.stagger;
+export const staggerScale = (theme: Theme, context?: StaggerContext): number => {
+  const m = resolveStyle(theme).motion;
+  return (context ? m[STAGGER_KEY[context]] ?? m.stagger : m.stagger) / DEFAULT_STYLE.motion.stagger;
+};
 
 /** Curva de asentado con rebote: 0 en 0, 1 en 1, y pasa de 1 hasta `overshoot` (fracción) antes de volver. Con `overshoot` 0 es la identidad. */
 export function settle(p: number, overshoot: number): number {
@@ -293,9 +333,11 @@ export function settle(p: number, overshoot: number): number {
 
 export interface EntranceOptions {
   /** Entrada propia de la pieza: la que se usa con `motion.entrance: "auto"` (por defecto, `rise`). Con otro valor, manda el tema. */
-  native?: "rise" | "fade" | "scale" | "slide" | "wipe";
+  native?: "rise" | "fade" | "scale" | "slide" | "wipe" | "depth";
   /** Distancia (px) de `rise` (24 por defecto) y de `slide` (48). */
   distance?: number;
+  /** `depth`: distancia en z (px) desde donde llega el elemento (600 por defecto; hasta 1300: la perspectiva es de 1400 px). */
+  depth?: number;
   /** `scale`: escala de partida (0,85). */
   from?: number;
   /** `slide`: lado de donde entra (`left` por defecto). */
@@ -313,9 +355,13 @@ export interface EntranceOptions {
   offset?: { x?: number; y?: number };
 }
 
+/** Perspectiva (px) de la entrada `depth`: la misma que `flyInZ` de `kit/` por defecto. */
+export const DEPTH_PERSPECTIVE = 1400;
+
 /**
  * Entrada de un elemento genérico según `style.motion.entrance` (con `auto`, la `native` de la pieza) y `overshoot`. `progress` (0 a 1) ya viene con la demora de
  * `staggerFrames` y la curva de la pieza; `index` solo decide el lado en `slide` con `alternate`.
+ * `depth` (`motion.entrance: "depth"`): el elemento llega desde `o.depth` px de profundidad con su propia `perspective()` (la regla de `docs/reglas.md`: nunca en un ancestro), igual que `flyInZ`.
  * En reposo (`progress` >= 1) devuelve `{}`: sin `opacity`, `transform` ni `clipPath` (con `offset`, solo el traslado). Con `progress` <= 0 devuelve `opacity: 0`.
  * `curve` deja que la pieza use una curva propia que se pasa de 1 (rebote) y `offset` suma un traslado extra al de la entrada.
  */
@@ -346,6 +392,14 @@ export function entrance(theme: Theme, progress: number, index = 0, o: EntranceO
     case "fade":
       parts.push(...shift());
       break;
+    case "depth": {
+      // como `flyInZ` de `kit/`: perspectiva propia del elemento (nunca en un ancestro) y todo el movimiento en un solo `translate3d`
+      const z = tr(Math.max(-1300, Math.min(1300, (1 - q) * (o.depth ?? 600))));
+      const x = tr(ox), y = tr(oy);
+      if (z !== 0) parts.push(`perspective(${DEPTH_PERSPECTIVE}px)`, `translate3d(${num(x, 2)}px, ${num(y, 2)}px, ${num(-z, 2)}px)`);
+      else parts.push(...shift());
+      break;
+    }
     case "scale": {
       const sc = +((o.from ?? 0.85) + (1 - (o.from ?? 0.85)) * q).toFixed(4);
       parts.push(...shift());
@@ -409,15 +463,21 @@ export function doodleStyle(theme: Theme): { enabled: boolean; jitter: boolean }
 /** Multiplicador de la viñeta (`Vignette strength`); 0 = apagada. */
 export const vignetteStrength = (theme: Theme): number => resolveStyle(theme).decor.vignette;
 
+/** Rol de color con que el design system tiñe la viñeta (`decor.vignetteColor`, `accent` por defecto). */
+export const vignetteColor = (theme: Theme): string => resolveStyle(theme).decor.vignetteColor;
+
 /**
  * Marca de acento (`style.decor.accent`) de una fila de lista o de la firma: `bar` (barra de degradado de `thickness` px, la de siempre),
  * `underline` (filete fino de acento), `dot` (punto) o `none` (`null`). `length` (px) y `progress` (0 a 1) dimensionan barra y filete;
- * el punto aparece con `progress`. Las esquinas salen de `cornerRadius(theme, "bar")`.
+ * el punto aparece con `progress`. Las esquinas salen de `cornerRadius(theme, "bar")`. `thickness` es el grosor propio de la pieza; el design system lo
+ * multiplica con `decor.accentThickness` (1 = el de siempre).
  */
 export function accentMark(theme: Theme, o: { length: number; thickness?: number; progress?: number }): { kind: "bar" | "underline" | "dot"; style: React.CSSProperties } | null {
-  const kind = resolveStyle(theme).decor.accent;
+  const decor = resolveStyle(theme).decor;
+  const kind = decor.accent;
   if (kind === "none") return null;
-  const t = o.thickness ?? 8;
+  // `decor.accentThickness` multiplica el grosor propio de la pieza (8 px por defecto); con 1 es el de siempre
+  const t = decor.accentThickness === 1 ? o.thickness ?? 8 : Math.max(1, Math.round((o.thickness ?? 8) * decor.accentThickness));
   const p = clamp01(o.progress ?? 1);
   const radius = cornerRadius(theme, "bar");
   if (kind === "dot") {
@@ -467,7 +527,7 @@ export interface StoryStyleDesign {
   headline: { size: "md" | "sm" };
   gradient?: { loop: number };
   closing: { bg: string; bar: boolean };
-  wall: { columns?: number; rows?: number; blur: { opening: boolean; closing: boolean }; chipScale: number; dolly: number; depth: number };
+  wall: { columns?: number; rows?: number; blur: { opening: boolean; closing: boolean }; chipScale: number; dolly: number; depth: number; gapX: number; gapY: number; brick: number; jitter: number };
 }
 
 /** Valores por defecto de `StoryDesign` que decide el tema (`style.story` y `style.decor.gradientLoop`), en la forma larga de cada opción. */
@@ -488,6 +548,10 @@ export function storyDefaults(theme: Theme): StoryStyleDesign {
       chipScale: w.wallChipScale,
       dolly: w.wallDolly,
       depth: w.wallDepth,
+      gapX: w.wallGapX,
+      gapY: w.wallGapY,
+      brick: w.wallBrick,
+      jitter: w.wallJitter,
     },
   };
 }

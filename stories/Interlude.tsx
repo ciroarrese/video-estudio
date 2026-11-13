@@ -68,7 +68,7 @@ export function Interlude({ spec: specIn, done, skip = [], next: nextProp }: { s
             const cp = justDone ? checkP : isDone ? 1 : 0;
             // las ya vistas quedan más tenues que la próxima, pero con el contraste del texto atenuado por encima del mínimo del control de calidad
             const quiet = isDone ? quietDone + (1 - cp) * (1 - quietDone) : skipped ? quietDone : 1;
-            const stag = staggerFrames(theme, i, { base: 3 }); // el paso entre filas lo escala el tema
+            const stag = staggerFrames(theme, i, { base: 3, context: "rows" }); // el paso entre filas lo escala el tema, o es el de `motion.staggerRows`
             const rowIn = kf(f, [u(stag), u(stag + 14)], [0, 1], ease.out);
             const pop = justDone ? kf(f, [T.check[1] - u(4), T.check[1] + u(2), T.check[1] + u(14)], [0, 1, 0]) : 0;
             const rowOpacity = rowIn * (isNext ? 1 : others) * (isNext ? 1 - kf(f, [T.fly[1] - u(16), T.fly[1] - u(10)], [0, 1]) : 1);

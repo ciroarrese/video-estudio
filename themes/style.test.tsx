@@ -113,7 +113,7 @@ describe("valores por defecto = lo que las piezas dibujan hoy", () => {
       handoff: "wash",
       headline: { size: "md" },
       closing: { bg: "bg", bar: true },
-      wall: { blur: { opening: true, closing: true }, chipScale: 1, dolly: 0, depth: 1 },
+      wall: { blur: { opening: true, closing: true }, chipScale: 1, dolly: 0, depth: 1, gapX: 1, gapY: 1, brick: 1, jitter: 1 },
     });
   });
 
@@ -205,7 +205,7 @@ describe("tokens -> style", () => {
   it("mapea los tokens y lo informa", () => {
     const { theme, report } = themeFromTokensWithReport(css);
     const s = theme.style;
-    expect(s.shape).toEqual({ corners: "sharp", border: 2, outlined: false });
+    expect(s.shape).toEqual({ corners: "sharp", border: 2, outlined: false, heroScale: null });
     expect(s.surface).toMatchObject({ kind: "glass", opacity: 0.8, elevation: "shadow" });
     expect(s.type.eyebrowCase).toBe("upper");
     expect(s.motion).toMatchObject({ overshoot: 0.1, cameraBlur: false });

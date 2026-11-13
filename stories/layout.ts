@@ -284,6 +284,8 @@ export const isTall = (width: number, height: number) => height / width > 1.3;
 /**
  * Muro de la apertura: `columns` × `rows` piezas (6 × 6 en horizontal, 3 × 12 en vertical por defecto, `spec.design.wall`) en ladrillo;
  * el azar solo mueve un poco cada pieza y le da su profundidad. Con los valores por defecto el reparto es el de siempre.
+ * `design.wall.gapX` y `gapY` estiran o aprietan la grilla (multiplicadores de la separación; gapY escala desde el centro del cuadro), `brick` el
+ * corrimiento de las filas alternas (0 = columnas alineadas) y `jitter` el temblor de cada pieza (0 = ninguno; el azar es `random("x" + i)`: sembrado y determinista).
  */
 export function openingWall(spec: StorySpec, height = 1080, width = 1920): (WallChip & { z: number; on: number; k: number })[] {
   const fallback = spec.topics.map((t) => t.name);
@@ -292,7 +294,7 @@ export function openingWall(spec: StorySpec, height = 1080, width = 1920): (Wall
   const out: (WallChip & { z: number; on: number; k: number })[] = [];
   const tall = isTall(width, height);
   const w = spec.design?.wall;
-  const { chipScale, depth } = wallOptions(spec.design);
+  const { chipScale, depth, gapX, gapY, brick, jitter } = wallOptions(spec.design);
   const cols = w?.columns ?? (tall ? 3 : 6);
   const rows = w?.rows ?? (tall ? 12 : 6);
   for (let i = 0; i < cols * rows; i++) {
@@ -302,8 +304,8 @@ export function openingWall(spec: StorySpec, height = 1080, width = 1920): (Wall
       // piezas a escala 1,15 que cubren el alto del cuadro (3 columnas separadas 410 px y 12 filas, por defecto)
       out.push({
         text: labelAt(spec.labels, i, fallback),
-        x: Math.round((col - (cols - 1) / 2) * (1230 / cols) + (row % 2 ? 100 : -100) + (random(`x${i}`) - 0.5) * 30),
-        y: Math.round((row - (rows - 1) / 2) * ((height / 12.2) * (12 / rows)) + (random(`y${i}`) - 0.5) * 20),
+        x: Math.round((col - (cols - 1) / 2) * (1230 / cols) * gapX + (row % 2 ? 100 : -100) * brick + (random(`x${i}`) - 0.5) * 30 * jitter),
+        y: Math.round((row - (rows - 1) / 2) * ((height / 12.2) * (12 / rows)) * gapY + (random(`y${i}`) - 0.5) * 20 * jitter),
         z: Math.round((-250 + random(`z${i}`) * 360) * depth),
         on: 10 + random(`on${i}`) * 60,
         k: Math.round(1.15 * chipScale * 1000) / 1000,
@@ -312,8 +314,8 @@ export function openingWall(spec: StorySpec, height = 1080, width = 1920): (Wall
     }
     out.push({
       text: labelAt(spec.labels, i, fallback),
-      x: Math.round((col - (cols - 1) / 2) * (2400 / cols) + (row % 2) * 200 - 100 + (random(`x${i}`) - 0.5) * 40),
-      y: Math.round((-420 + row * (840 / (rows - 1))) * ky + (random(`y${i}`) - 0.5) * 24),
+      x: Math.round((col - (cols - 1) / 2) * (2400 / cols) * gapX + ((row % 2) * 200 - 100) * brick + (random(`x${i}`) - 0.5) * 40 * jitter),
+      y: Math.round((-420 + row * (840 / (rows - 1))) * ky * gapY + (random(`y${i}`) - 0.5) * 24 * jitter),
       z: Math.round((-300 + random(`z${i}`) * 440) * depth),
       on: 10 + random(`on${i}`) * 60,
       k: chipScale,

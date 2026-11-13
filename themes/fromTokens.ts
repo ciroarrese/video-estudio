@@ -1,9 +1,9 @@
-import type { CloudBlob, DataCheck, ResolvedTheme, Surface, Theme } from "./types";
+import type { CloudBlob, CubicBezier, DataCheck, DataSurface, ResolvedTheme, Theme } from "./types";
 import type { ThemeStyleInput } from "./styleTypes";
 import { STYLE_FIELDS, acceptedValues, mergeStyleInput, parseStyleValue, styleIssues, styleTokenName } from "./style";
 import { neutral } from "./neutral";
 import { isValidColor, shiftColor } from "./color";
-import { checkTheme, contrastRatio, pairColors } from "./contrast";
+import { checkTheme, contrastRatio, pairColors, surfaceColor } from "./contrast";
 import { deepClone } from "./util";
 import { DATA_NAME, DEFAULT_TYPE_DISPLAY, resolveTheme } from "./data";
 
@@ -15,7 +15,9 @@ export interface TokenOptions {
   /**
    * Colores con nombre del video que no tienen rol en `Theme` (estados, severidades, fondos de ficha...), legibles con `useTheme().data.<nombre>`.
    * Cada entrada es el nombre de un token (o un color, si no hay un token con ese nombre), o `{ token | color, on?, min? }`:
-   * `on` son las superficies donde se dibuja (por defecto `surface`) y `min` el contraste que se le pide (3 por defecto; 4.5 para texto).
+   * `on` son las superficies donde se dibuja (por defecto `surface`; un rol, otro color de datos como `data.fichaFondo` o un color, para las superficies
+   * propias de una interfaz recreada dentro de un `ThemeScope`) y `min` el contraste que se le pide (3 por defecto; 4.5 para texto).
+   * `scope` es una nota de dónde aparece (queda en `report.data` y en el aviso); `checkTheme` lo juzga solo contra esas superficies, y `qa` sigue juzgando el texto real.
    * Entran en `report.data` y en los avisos de contraste de `checkTheme`.
    */
   data?: Record<string, DataRoleInput>;
@@ -30,7 +32,7 @@ export interface TokenOptions {
 
 export type DataRoleInput =
   | string
-  | { token?: string; color?: string; on?: Surface | Surface[]; min?: number };
+  | { token?: string; color?: string; on?: DataSurface | DataSurface[]; min?: number; scope?: string };
 
 export interface TokenReport {
   /** rol del tema -> nombre del token de origen */
@@ -85,6 +87,9 @@ function flattenObject(obj: unknown, path: string[], out: Flat): void {
     if (leaf !== undefined) {
       if (typeof leaf === "string" || typeof leaf === "number" || typeof leaf === "boolean") {
         out.set(norm(path.join("-")), String(leaf));
+      } else if (Array.isArray(leaf)) {
+        // una lista como valor (`"$value": [0.4, 0, 0.2, 1]`, una curva): queda como `nombre-1` ... `nombre-4`
+        flattenObject(leaf, path, out);
       }
       return;
     }
@@ -185,6 +190,44 @@ function toPx(v: string): number | null {
 }
 
 const UNRESOLVED = /var\(|\{[^}]*\}/;
+
+const EASE_KEYS: [keyof Theme["motion"]["easing"], string[]][] = [
+  ["standard", ["ease-standard"]],
+  ["out", ["ease-out"]],
+  ["inOut", ["ease-in-out", "ease-inout"]],
+];
+
+/** Curva de un token: `cubic-bezier(.4, 0, .2, 1)`, `0.4 0 0.2 1` o `0.4, 0, 0.2, 1`. `null` si no son cuatro números con x1 y x2 entre 0 y 1. */
+export function parseBezier(v: string): CubicBezier | null {
+  const body = /^cubic-bezier\(([^)]*)\)$/i.exec(v.trim())?.[1] ?? v.trim().replace(/^\[|\]$/g, "");
+  const p = body.split(/[\s,]+/).filter(Boolean).map(Number);
+  if (p.length !== 4 || !p.every(Number.isFinite)) return null;
+  if (p[0]! < 0 || p[0]! > 1 || p[2]! < 0 || p[2]! > 1) return null;
+  return [p[0]!, p[1]!, p[2]!, p[3]!];
+}
+
+/** Curva dada como lista JSON (`"$value": [0.4, 0, 0.2, 1]` llega aplanada como `nombre-1` ... `nombre-4`). */
+function bezierFromParts(flat: Flat, names: string[]): readonly [string, CubicBezier] | undefined {
+  for (const n of names) {
+    const parts = [1, 2, 3, 4].map((i) => flat.get(`${n}-${i}`));
+    if (parts.every((x) => x !== undefined)) {
+      const b = parseBezier(parts.join(" "));
+      if (b) return [n, b];
+    }
+  }
+  return undefined;
+}
+
+/** Duración de un token en cuadros: `12`, `12f`, `400ms` o `0.4s` (a 30 fps). `null` si no es un número positivo de 1 a 600 cuadros. */
+export function parseDuration(v: string): number | null {
+  const m = /^(\d*\.?\d+)\s*(f|frames?|ms|s)?$/i.exec(v.trim());
+  if (!m) return null;
+  const n = parseFloat(m[1]!);
+  const u = (m[2] ?? "f").toLowerCase();
+  const frames = u === "ms" ? (n * 30) / 1000 : u === "s" ? n * 30 : n;
+  const r = Math.round(frames);
+  return r >= 1 && r <= 600 ? r : null;
+}
 
 /** Mapea tokens de diseño (JSON W3C/plano o CSS con variables) a un Theme. */
 export function themeFromTokensWithReport(
@@ -328,6 +371,11 @@ export function themeFromTokensWithReport(
     return Number.isFinite(n) && n >= 0 && n <= 1;
   }, "Opacidad de nubes", false);
   if (op) theme.cloud.opacity = op.trim().endsWith("%") ? parseFloat(op) / 100 : Number(op);
+  const cb = pick("cloud.blur", ["cloud-blur"], (x) => {
+    const m = /^(\d*\.?\d+)\s*(px)?$/.exec(x.trim());
+    return !!m && +m[1]! >= 0 && +m[1]! <= 400;
+  }, "Desenfoque de nubes (px, de 0 a 400)", false);
+  if (cb) theme.cloud.blur = parseFloat(cb);
   const blobs: CloudBlob[] = [];
   // el valor puede venir entre comillas ("x y tamaño") o sin ellas
   const sinComillas = (x: string) => x.trim().replace(/^(["'])([\s\S]*)\1$/, "$2").trim();
@@ -408,12 +456,26 @@ export function themeFromTokensWithReport(
     const check: DataCheck = {
       on: spec.on === undefined ? ["surface"] : Array.isArray(spec.on) ? spec.on : [spec.on],
       min: spec.min ?? 3,
+      ...(spec.scope?.trim() ? { scope: spec.scope.trim() } : {}),
     };
     theme.data[role] = color;
     theme.dataChecks[role] = check;
     report.data[role] = { color, source, ...check };
     report.mapped[`data.${role}`] = source;
     if (source !== "valor") used.add(source);
+  }
+  // Superficies declaradas en `on`: un rol, un color de datos declarado o un color; si no, el nombre queda con un aviso y se descarta esa superficie
+  for (const [role, chk] of Object.entries(report.data)) {
+    const ok = chk.on.filter((x) => {
+      if (surfaceColor(theme, x) !== undefined) return true;
+      report.warnings.push(`Color de datos "${role}": la superficie "${x}" de \`on\` no es un rol de superficie, un color de datos declarado ni un color válido; se ignora`);
+      return false;
+    });
+    if (ok.length !== chk.on.length) {
+      const fixed: DataCheck = { ...chk, on: ok.length ? ok : ["surface"] };
+      theme.dataChecks![role] = { on: fixed.on, min: fixed.min, ...(fixed.scope ? { scope: fixed.scope } : {}) };
+      report.data[role] = { color: chk.color, source: chk.source, ...theme.dataChecks![role]! };
+    }
   }
   // Los reconocimientos van atados a los colores con que se aprobaron: los que vienen de `base` con los colores de `base`,
   // los nuevos con los de este tema. Así un tema derivado con otro color en ese par no hereda un "aprobado" que no le corresponde.
@@ -438,6 +500,31 @@ export function themeFromTokensWithReport(
   for (const sh of SHADOW_KEYS) {
     const v = noUnresolved(`shadow.${sh}`, [`shadow-${sh}`, `box-shadow-${sh}`, `elevation-${sh}`, `shadows-${sh}`], "Sombra");
     if (v) theme.shadow[sh] = v;
+  }
+
+  // Movimiento: curvas (`--ease-standard|out|in-out`) y duraciones (`--duration-fast|base|slow`, en cuadros o en ms a 30 fps)
+  for (const [key, names] of EASE_KEYS) {
+    const all = names.flatMap((n) => [n, `motion-${n}`, `easing-${n}`, `easings-${n}`]);
+    let found: readonly [string, CubicBezier] | undefined;
+    for (const [k, v] of matches(all, false)) {
+      const b = parseBezier(v);
+      if (b) {
+        found = [k, b];
+        break;
+      }
+      report.warnings.push(`Curva inválida ignorada en "${k}": ${v} (se espera cubic-bezier(x1, y1, x2, y2) o cuatro números; x1 y x2 entre 0 y 1)`);
+    }
+    found ??= bezierFromParts(flat, all);
+    if (found) {
+      theme.motion.easing[key] = found[1];
+      report.mapped[`motion.easing.${key}`] = found[0];
+      used.add(found[0]);
+    }
+  }
+  for (const d of ["fast", "base", "slow"] as const) {
+    const names = [`duration-${d}`, `motion-duration-${d}`, `durations-${d}`, `time-${d}`];
+    const v = pick(`motion.duration.${d}`, names, (x) => parseDuration(x) !== null, "Duración (cuadros, o ms / s a 30 fps)", false);
+    if (v) theme.motion.duration[d] = parseDuration(v)!;
   }
 
   // Estilo: tokens `style-*` y, encima, la forma compacta `options.style`

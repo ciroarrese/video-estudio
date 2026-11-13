@@ -13,6 +13,7 @@ const E = STYLE_ENUMS;
 const en = (path: string, values: readonly string[], def: string, doc: string): StyleFieldSpec => ({ path, type: "enum", values, def, doc });
 const bo = (path: string, def: boolean, doc: string): StyleFieldSpec => ({ path, type: "bool", def, doc });
 const nu = (path: string, min: number, max: number, def: number, doc: string, int = false): StyleFieldSpec => ({ path, type: "num", min, max, def, int, doc });
+const nf = (path: string, min: number, max: number, doc: string): StyleFieldSpec => ({ path, type: "num", min, max, def: null, int: false, nullable: true, doc });
 const nn = (path: string, min: number, max: number, doc: string): StyleFieldSpec => ({ path, type: "num", min, max, def: null, int: true, nullable: true, doc });
 
 /**
@@ -23,6 +24,7 @@ export const STYLE_FIELDS: readonly StyleFieldSpec[] = [
   en("shape.corners", E.corners, "pill", "lenguaje de esquinas"),
   nu("shape.border", 0, 6, 1, "grosor base del borde (px)"),
   bo("shape.outlined", true, "las superficies llevan borde"),
+  nf("shape.heroScale", 0.5, 4, "radio del cartel del título, como múltiplo de radius.lg (vacío = el de siempre: 2 con pill, 1,5 con rounded)"),
   en("surface.kind", E.surfaceKind, "solid", "tratamiento de la tarjeta"),
   en("surface.elevation", E.elevation, "shadow", "modelo de elevación"),
   nu("surface.opacity", 0.3, 1, 0.74, "opacidad de las superficies translúcidas"),
@@ -31,6 +33,9 @@ export const STYLE_FIELDS: readonly StyleFieldSpec[] = [
   nu("type.titleTracking", -0.1, 0.2, 0, "interletrado extra de titulares (em)"),
   en("type.eyebrowCase", E.eyebrowCase, "as-is", "caja de los eyebrows"),
   nu("type.eyebrowTracking", 0, 0.4, 0, "interletrado de eyebrows (em)"),
+  en("type.captionCase", E.captionCase, "eyebrow", "caja de subtítulos y líneas de apoyo (eyebrow = sigue a eyebrowCase)"),
+  nf("type.captionTracking", 0, 0.4, "interletrado de subtítulos y líneas de apoyo (em; vacío = el de eyebrowTracking)"),
+  en("type.captionWeight", E.captionWeight, "auto", "peso de subtítulos y líneas de apoyo (auto = el de la pieza)"),
   en("type.numerals", E.numerals, "gradient", "estilo de los números"),
   en("type.highlight", E.highlight, "gradient", "estilo de la palabra resaltada"),
   en("background.kind", E.backgroundKind, "clouds", "tipo de fondo"),
@@ -38,13 +43,19 @@ export const STYLE_FIELDS: readonly StyleFieldSpec[] = [
   en("motion.entrance", E.entrance, "auto", "entrada de los elementos (auto = la propia de cada pieza)"),
   nu("motion.overshoot", 0, 0.3, 0, "rebote al asentarse"),
   nu("motion.stagger", 0, 12, 4, "cuadros entre elementos escalonados", true),
+  nn("motion.staggerList", 0, 60, "cuadros entre filas de la lista de la apertura (vacío = según stagger)"),
+  nn("motion.staggerRows", 0, 60, "cuadros entre filas de interfaces y de la vuelta al listado (vacío = según stagger)"),
+  nn("motion.staggerItems", 0, 60, "cuadros entre elementos pequeños (vacío = según stagger)"),
+  nf("motion.staggerChips", 0, 10, "cuadros por pieza entre las piezas del muro (vacío = 0,5 de siempre)"),
   bo("motion.cameraBlur", true, "desenfoque de movimiento de la cámara"),
   nu("motion.cameraTilt", 0, 3, 1, "multiplicador de la inclinación de la cámara"),
   en("motion.transition", E.transition, "wash", "transición entre escenas"),
   bo("decor.doodles", true, "garabatos activados"),
   en("decor.doodleStroke", E.doodleStroke, "hand", "trazo de los garabatos"),
   nu("decor.vignette", 0, 2, 1, "multiplicador de la viñeta"),
+  { path: "decor.vignetteColor", type: "role", def: "accent", doc: "rol de color de la viñeta" },
   en("decor.accent", E.accent, "bar", "marca de acento"),
+  nu("decor.accentThickness", 0.25, 4, 1, "multiplicador del grosor de la marca de acento"),
   nu("decor.gradientLoop", 0, 600, 0, "cuadros del vaivén del degradado (0 = quieto)", true),
   en("story.titleCard", E.titleCard, "solid", "cartel del título"),
   en("story.listLayout", E.listLayout, "stacked", "diseño de la lista de temas"),
@@ -58,6 +69,10 @@ export const STYLE_FIELDS: readonly StyleFieldSpec[] = [
   nu("story.wallChipScale", 0.5, 3, 1, "tamaño de las piezas del muro"),
   nu("story.wallDolly", -240, 2000, 0, "recorrido extra de cámara (px)"),
   nu("story.wallDepth", 0, 3, 1, "dispersión en profundidad del muro"),
+  nu("story.wallGapX", 0.4, 3, 1, "separación horizontal entre piezas del muro (multiplicador)"),
+  nu("story.wallGapY", 0.4, 3, 1, "separación vertical entre piezas del muro (multiplicador)"),
+  nu("story.wallBrick", 0, 3, 1, "corrimiento ladrillo entre filas del muro (multiplicador; 0 = grilla alineada)"),
+  nu("story.wallJitter", 0, 4, 1, "temblor de posición de las piezas del muro (multiplicador; 0 = ninguno)"),
   bo("story.wallBlurOpening", true, "desenfoque por distancia en la apertura"),
   bo("story.wallBlurClosing", true, "desenfoque del muro al arrancar el cierre"),
   en("chart.barRadius", E.barRadius, "md", "esquinas de las barras"),

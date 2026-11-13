@@ -228,8 +228,8 @@ export function StoryNumeral({ children, loop }: { children: string; loop?: numb
  * pieza, no esta ayuda. `dy` suma un desplazamiento vertical propio (el acople). Con la entrada `auto` es la propia de la pieza (`native`;
  * las filas de la lista se deslizan desde la derecha).
  */
-export function moveIn(theme: Theme, p: number, index: number, o: { native?: "rise" | "fade" | "scale" | "slide" | "wipe"; distance: number; dy?: number; round?: boolean; side?: "left" | "right" }): React.CSSProperties {
-  const e = entrance(theme, p, index, { native: o.native ?? "slide", side: o.side ?? "right", distance: o.distance, round: o.round });
+export function moveIn(theme: Theme, p: number, index: number, o: { native?: "rise" | "fade" | "scale" | "slide" | "wipe"; distance: number; /** Profundidad (px) con `motion.entrance: "depth"`. */ depth?: number; dy?: number; round?: boolean; side?: "left" | "right" }): React.CSSProperties {
+  const e = entrance(theme, p, index, { native: o.native ?? "slide", side: o.side ?? "right", distance: o.distance, depth: o.depth, round: o.round });
   const out: React.CSSProperties = {};
   const dy = o.dy ?? 0;
   const tr = [e.transform, dy !== 0 ? `translateY(${dy}px)` : undefined].filter(Boolean).join(" ");
@@ -272,6 +272,8 @@ export function HeadlineRow({
   };
   const num = number ?? <StoryNumeral loop={gradientLoop}>{String(i + 1).padStart(2, "0")}</StoryNumeral>;
   const nameStyle = { fontWeight: title.fontWeight, color: theme.color.text, letterSpacing: title.letterSpacing };
+  // la línea de apoyo lleva la caja, el interletrado y el peso del rol `caption` solo si el design system los fijó (`follow: false`: no hereda los del eyebrow)
+  const cap = textStyle(theme, "caption", { follow: false });
   if (L.stacked) {
     const nameTop = L.blockTop + L.numH + L.numGap;
     const block: React.CSSProperties = { position: "absolute", left: 0, top: L.blockTop, width: L.rowW, opacity: fade(quiet) };
@@ -280,7 +282,7 @@ export function HeadlineRow({
         <div key={`block-${styleKey(block)}`} style={block}>
           <div style={{ height: L.numH, lineHeight: `${L.numH}px`, fontSize: L.numSize, fontWeight: theme.font.weights.stat, position: "relative", whiteSpace: "nowrap" }}>{num}</div>
           <div style={{ position: "absolute", left: 0, top: nameTop - L.blockTop, fontSize: L.nameSize, lineHeight: `${L.nameH}px`, height: L.nameH, ...nameStyle, whiteSpace: "nowrap" }}>{L.names[i]}</div>
-          <div style={{ position: "absolute", left: 0, top: nameTop - L.blockTop + L.nameH + ROW_GAP.a, fontSize: L.lineSize, lineHeight: `${L.lineH}px`, color: theme.color.textMuted, whiteSpace: "nowrap" }}>
+          <div style={{ position: "absolute", left: 0, top: nameTop - L.blockTop + L.nameH + ROW_GAP.a, fontSize: L.lineSize, lineHeight: `${L.lineH}px`, color: theme.color.textMuted, whiteSpace: "nowrap", ...cap }}>
             {L.lineRows[i]!.map((r, k) => <div key={k}>{r}</div>)}
           </div>
         </div>
@@ -298,11 +300,11 @@ export function HeadlineRow({
           {L.inline && (
             <>
               <span style={{ fontSize: L.lineSize, lineHeight: `${L.nameH}px`, color: theme.color.textMuted, whiteSpace: "pre" }}>{` ${INLINE_SEP} `}</span>
-              <span style={{ fontSize: L.lineSize, lineHeight: `${L.nameH}px`, color: theme.color.textMuted }}>{L.lines[i]}</span>
+              <span style={{ fontSize: L.lineSize, lineHeight: `${L.nameH}px`, color: theme.color.textMuted, ...cap }}>{L.lines[i]}</span>
             </>
           )}
         </div>
-        {!L.inline && <div style={{ marginLeft: L.numW, marginTop: ROW_GAP.a, height: L.lineH, fontSize: L.lineSize, lineHeight: `${L.lineH}px`, color: theme.color.textMuted, whiteSpace: "nowrap" }}>{L.lines[i]}</div>}
+        {!L.inline && <div style={{ marginLeft: L.numW, marginTop: ROW_GAP.a, height: L.lineH, fontSize: L.lineSize, lineHeight: `${L.lineH}px`, color: theme.color.textMuted, whiteSpace: "nowrap", ...cap }}>{L.lines[i]}</div>}
       </div>
       {bar && <div key={`bar-${styleKey(bar)}`} style={bar} />}
     </div>

@@ -17,7 +17,7 @@ export function hideFromScale(scale: number, threshold = 1, range = 0.08): numbe
  *
  * El aspecto sale del design system (`theme.style`): la píldora es `surfaceStyle(theme, "headline")` (forma de las esquinas, relleno
  * sólido, vidrio, contorno o teñido, borde y sombra); el título lleva `textStyle("title")` (peso e interletrado); el subtítulo,
- * `textStyle("eyebrow")` (mayúsculas e interletrado); el número, `numeralStyle` (degradado, sólido, contorno o atenuado); y la entrada,
+ * `textStyle("caption")` (caja, interletrado y peso propios; por defecto sigue al eyebrow); el número, `numeralStyle` (degradado, sólido, contorno o atenuado); y la entrada,
  * `entrance` (por defecto desliza 30 px desde la izquierda; el tema puede pedir fundido, escala, subida o cortina). La letra, los
  * huecos y el tamaño exterior de la píldora no cambian con el estilo: un borde más grueso se compensa con el relleno.
  */
@@ -67,7 +67,7 @@ export function DockedHeadline({
     zIndex: 90,
   };
   const title = { fontSize: caption, ...textStyle(theme, "title"), color: theme.color.text, lineHeight: 1.15 };
-  const sub = (size: number, lineHeight: number) => ({ fontSize: size, color: theme.color.textMuted, ...textStyle(theme, "eyebrow"), lineHeight });
+  const sub = (size: number, lineHeight: number) => ({ fontSize: size, color: theme.color.textMuted, ...textStyle(theme, "caption"), lineHeight });
   return (
     <div key={resting ? "rest" : "anim"} style={style}>
       <Numeral loop={gradientLoop} frame={f} on={typeof surf.background === "string" ? surf.background : undefined} style={{ fontSize: caption, fontWeight: theme.font.weights.stat }}>{String(index).padStart(2, "0")}</Numeral>
