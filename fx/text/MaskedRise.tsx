@@ -1,5 +1,6 @@
+import React from "react";
 import { Easing } from "../../engine";
-import { fxBox, progress, roleColor, stagger, useFx } from "../core";
+import { fxBox, progress, roleColor, stagger, styleKey, useFx, xform } from "../core";
 import type { ColorRole } from "../core";
 import { measureWidth } from "./measure";
 import { baseText } from "./shared";
@@ -46,6 +47,25 @@ export function MaskedRise(props: MaskedRiseProps) {
   const lastWord = words.length - 1;
   const dotP = progress(local, plan.total - 16, 16, Easing.lands);
 
+  // En reposo (p >= 1) el span no lleva tamano ni transformacion: solo se emiten mientras sube. El asentado 108% -> 100% se hace
+  // con el tamano de letra (no con `scale`): una escala deja el texto rasterizado segun el historial de cuadros.
+  const inner = (p: number): React.CSSProperties =>
+    p >= 1
+      ? { display: "block" }
+      : { display: "block", fontSize: `${(fs * (1 + 0.08 * (1 - p))).toFixed(1)}px`, transform: xform({ y: (1 - p) * fs * 1.36, round: true }), transformOrigin: "0% 100%" };
+
+  const dotStyle: React.CSSProperties = {
+    display: "inline-block",
+    width: `${(fs * 0.17).toFixed(2)}px`,
+    height: `${(fs * 0.17).toFixed(2)}px`,
+    borderRadius: "50%",
+    background: roleColor(theme, dotColor),
+    marginLeft: "0.07em",
+    marginBottom: "0.2em",
+    opacity: dotP > 0 ? undefined : 0,
+    transform: xform({ y: -(1 - dotP) * fs * 0.9 }),
+  };
+
   const rise = (i: number) => progress(local, stagger(i, { each: plan.each }), plan.rise, Easing.out);
 
   return (
@@ -72,34 +92,14 @@ export function MaskedRise(props: MaskedRiseProps) {
                   data-qa-ignore="clip overlap offscreen"
                   style={{ display: "inline-block", overflow: "hidden", width: measureWidth(ch, fs, font), height: `${(fs * 1.15).toFixed(2)}px`, lineHeight: `${(fs * 1.15).toFixed(2)}px`, padding: "0 0.12em 0.14em", margin: "0 -0.12em -0.14em", whiteSpace: "nowrap" }}
                 >
-                  <span
-                    style={{
-                      display: "block",
-                      // El asentado 108% -> 100% se hace con el tamano de letra (no con `scale`): una escala deja el texto rasterizado segun el historial de cuadros.
-                      fontSize: p >= 1 ? undefined : `${(fs * (1 + 0.08 * (1 - p))).toFixed(1)}px`,
-                      transform: p >= 1 ? undefined : `translateY(${Math.round((1 - p) * fs * 1.36)}px)`,
-                      transformOrigin: "0% 100%",
-                    }}
-                  >
+                  <span key={styleKey(inner(p))} style={inner(p)}>
                     {ch}
                   </span>
                 </span>
               );
             })}
             {dot && wi === lastWord && (
-              <span
-                style={{
-                  display: "inline-block",
-                  width: `${(fs * 0.17).toFixed(2)}px`,
-                  height: `${(fs * 0.17).toFixed(2)}px`,
-                  borderRadius: "50%",
-                  background: roleColor(theme, dotColor),
-                  marginLeft: "0.07em",
-                  marginBottom: "0.2em",
-                  opacity: dotP > 0 ? 1 : 0,
-                  transform: `translateY(${(-(1 - dotP) * fs * 0.9).toFixed(2)}px)`,
-                }}
-              />
+              <span key={styleKey(dotStyle)} style={dotStyle} />
             )}
           </span>
         );

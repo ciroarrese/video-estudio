@@ -317,7 +317,7 @@ async function setup(o: RenderOptions, needAudio: boolean) {
   const cacheDir = resolve(o.cacheDir ?? join(root, '.ve-cache'));
   mkdirSync(cacheDir, { recursive: true });
   const bundleDir = await ensureBundle(root, cacheDir, runId, log);
-  const bundleHash = await hashDir(bundleDir);
+  const hashes = new FileHashCache(join(cacheDir, 'filehash.json'));
   const assets = (o.assets ?? []).map((a) => resolve(a));
   const server = await serveStatic([...assets, bundleDir, join(root, 'public')], bundleDir);
   const browser = await launchChromium().catch(async (e) => {
@@ -366,7 +366,11 @@ async function setup(o: RenderOptions, needAudio: boolean) {
         jpegQuality: shot.format === 'jpeg' ? shot.quality : null,
       };
       // La clave de las partes usa la huella de ESTE video (no la de todo el bundle) cuando se puede calcular.
-      const codeHash = (await videoCodeHash(root, bundleDir, found.source)) ?? bundleHash;
+      // Solo si hace falta se hashea todo el bundle (con la cache de hashes, no se relee lo que no cambió).
+      const codeHash = (await videoCodeHash(root, bundleDir, found.source, { cache: hashes })) ?? (await hashDir(bundleDir, hashes));
+      hashes.save();
+      const loadErrors = (await page.evaluate(() => (window as any).__ve.loadErrors)) as { message: string }[];
+      for (const e of loadErrors) log(`aviso: ${e.message.split('\n')[0]} (no afecta a este video)`);
       return { env, tracks, bundleHash: codeHash, keyEnv, root, bundleDir, cacheDir, runId, assets, cleanup, page, context, log, props, scenes };
     } catch (e) {
       await context.close().catch(() => {});
@@ -380,9 +384,19 @@ async function setup(o: RenderOptions, needAudio: boolean) {
 
 // ---------- render ----------
 
-/** Sufijo del archivo de salida por defecto: `-vertical`, `-<escena>`. */
-export const suffixOf = (o: { format?: FormatName; scene?: string }) =>
-  `${o.format ? `-${o.format}` : ''}${o.scene !== undefined ? `-${o.scene.replace(/[^A-Za-z0-9_-]+/g, '_')}` : ''}`;
+/**
+ * Sufijo del archivo de salida por defecto: `-vertical`, `-<escena>`. Si el nombre de la escena tiene caracteres que se
+ * reemplazan (`a b` y `a/b` darían los dos `a_b`), se agrega el índice de la escena (o, si todavía no se conoce, un hash
+ * corto del nombre) para que escenas distintas no pisen el mismo archivo.
+ */
+export const suffixOf = (o: { format?: FormatName; scene?: string }, sceneIndex?: number) => {
+  let scene = '';
+  if (o.scene !== undefined) {
+    const clean = o.scene.replace(/[^A-Za-z0-9_-]+/g, '_');
+    scene = `-${clean}${clean === o.scene ? '' : `-${sceneIndex ?? createHash('sha1').update(o.scene).digest('hex').slice(0, 6)}`}`;
+  }
+  return `${o.format ? `-${o.format}` : ''}${scene}`;
+};
 
 export async function renderVideo(options: RenderOptions): Promise<RenderResult> {
   const t0 = Date.now();
@@ -395,21 +409,29 @@ export async function renderVideo(options: RenderOptions): Promise<RenderResult>
   const s = await setup(options, wantAudio);
   const { env, log } = s;
   const tmpDir = join(s.cacheDir, `tmp-${s.runId}`);
-  const out = resolve(options.out ?? join('out', `${options.videoId}${suffixOf(options)}.mp4`));
-  const outTmp = `${out}.${s.runId}.tmp.mp4`;
+  let out = '';
+  let outTmp = '';
   trackPath(tmpDir);
-  trackPath(outTmp);
   try {
     const { meta } = env;
     let [first, last] = options.frames ?? [0, meta.durationInFrames - 1];
+    let sceneIndex: number | undefined;
     if (options.scene !== undefined) {
       if (options.frames) throw new Error('--scene y --frames no se combinan: --scene ya fija el rango de cuadros');
       const sc = resolveScene(await s.scenes(), options.scene);
       [first, last] = sceneRange(sc);
+      sceneIndex = sc.index;
       log(`escena "${sc.id}" (índice ${sc.index}): cuadros ${first}-${last}`);
     }
+    out = resolve(options.out ?? join('out', `${options.videoId}${suffixOf(options, sceneIndex)}.mp4`));
+    outTmp = `${out}.${s.runId}.tmp.mp4`;
+    trackPath(outTmp);
     if (last > meta.durationInFrames - 1) throw new RangeError(`--frames ${first}-${last} excede el video (0-${meta.durationInFrames - 1})`);
     const total = last - first + 1;
+    // Con --scale el tamaño de salida puede salir impar: ffmpeg agrega una fila/columna negra para que x264 lo acepte; se avisa.
+    const sw = Math.round(meta.width * scale);
+    const sh = Math.round(meta.height * scale);
+    if (sw % 2 || sh % 2) log(`aviso: ${meta.width}x${meta.height} con --scale ${scale} da ${sw}x${sh} (lado impar); se agrega ${sw % 2 ? 'una columna' : ''}${sw % 2 && sh % 2 ? ' y ' : ''}${sh % 2 ? 'una fila' : ''} negra para que sea par. Elegí otra escala si no lo querés.`);
     mkdirSync(tmpDir, { recursive: true });
     mkdirSync(dirname(out), { recursive: true });
 
@@ -434,7 +456,7 @@ export async function renderVideo(options: RenderOptions): Promise<RenderResult>
 
     if (todo.length) {
       const ext = env.shot.format === 'jpeg' ? 'jpg' : 'png';
-      const framesRoot = options.keepFrames ? join(dirname(out), `${options.videoId}-frames`) : join(tmpDir, 'frames');
+      const framesRoot = options.keepFrames ? join(dirname(out), `${options.videoId}${suffixOf(options, sceneIndex)}-frames`) : join(tmpDir, 'frames');
       mkdirSync(framesRoot, { recursive: true });
       const list: number[] = todo.flatMap((seg) => Array.from({ length: seg.end - seg.start + 1 }, (_, i) => seg.start + i));
       const remaining = new Map(todo.map((seg) => [seg, seg.end - seg.start + 1]));
@@ -505,9 +527,9 @@ export async function renderVideo(options: RenderOptions): Promise<RenderResult>
     return { out, frames: total, seconds, renderedSegments: todo.length, cachedSegments };
   } finally {
     rmSync(tmpDir, { recursive: true, force: true });
-    rmSync(outTmp, { force: true });
+    if (outTmp) rmSync(outTmp, { force: true });
     untrackPath(tmpDir);
-    untrackPath(outTmp);
+    if (outTmp) untrackPath(outTmp);
     await s.context.close().catch(() => {});
     await s.cleanup();
   }
