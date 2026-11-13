@@ -1,4 +1,5 @@
 import type { Theme } from "../themes";
+import { listOptions, wallOptions } from "./types";
 import type { StorySpec } from "./types";
 import { random } from "../engine";
 
@@ -99,6 +100,8 @@ export type ListLayout = {
   barLeft: number;
   /** Fila en un solo renglón (`01 Nombre · línea`); en `lines` va la línea ya ajustada y `lineSize` es su tamaño. */
   inline?: boolean;
+  /** Largo (px) del subrayado completo de cada fila: `barW` (`list.underline: "row"`) o lo que mide el nombre (`"name"`). */
+  barWs: number[];
 };
 
 /** Parte un texto en renglones de a lo sumo `maxW` px (estimado sin medir); si pasa de `maxLines`, corta el último con "…". */
@@ -122,7 +125,7 @@ export function wrapText(text: string, maxW: number, size: number, maxLines: num
  * Lista apilada para formato vertical (alto/ancho > 1,3): ocupa casi todo el ancho y buena parte del alto. Cada fila:
  * número (o tilde) arriba, nombre grande (~h1) y la línea debajo en hasta 2 renglones. Los tamaños salen de `theme.type`.
  */
-function stackedLayout(spec: StorySpec, theme: Theme, width: number, height: number): ListLayout {
+function stackedLayout(spec: StorySpec, theme: Theme, width: number, height: number): Omit<ListLayout, "barWs"> {
   const n = spec.topics.length;
   const marginX = Math.round(width * 0.085);
   const region = width - 2 * marginX;
@@ -177,7 +180,7 @@ export const INLINE_SEP = "·";
  * más chica y atenuada, en la misma línea de base. Todo cabe en el ancho seguro: primero se achican los dos (la línea hasta el 70 % del
  * nombre) y, si aun así no entra, se corta la línea con "…". Las filas son más bajas que las apiladas y la lista queda centrada.
  */
-function inlineLayout(spec: StorySpec, theme: Theme, width: number, height: number): ListLayout {
+function inlineLayout(spec: StorySpec, theme: Theme, width: number, height: number): Omit<ListLayout, "barWs"> {
   const n = spec.topics.length;
   const region = Math.max(600, width - 2 * theme.safe.x);
   const H = Math.max(300, height - 2 * theme.safe.y - 20);
@@ -222,8 +225,14 @@ function inlineLayout(spec: StorySpec, theme: Theme, width: number, height: numb
  * fraccionarias de capas compuestas se rasterizan según el historial de cuadros.
  */
 export function listLayout(spec: StorySpec, theme: Theme, width: number, height: number): ListLayout {
+  const L = baseLayout(spec, theme, width, height);
+  const byName = listOptions(spec.design).underline === "name";
+  return { ...L, barWs: L.names.map((nm) => (byName ? Math.max(24, Math.min(L.barW, Math.round(textWidth(nm, L.nameSize, AVG_BOLD)))) : L.barW)) };
+}
+
+function baseLayout(spec: StorySpec, theme: Theme, width: number, height: number): Omit<ListLayout, "barWs"> {
   if (height / width > 1.3) return stackedLayout(spec, theme, width, height);
-  if (spec.design?.list === "inline" && width / height >= 1.3) return inlineLayout(spec, theme, width, height);
+  if (listOptions(spec.design).layout === "inline" && width / height >= 1.3) return inlineLayout(spec, theme, width, height);
   const n = spec.topics.length;
   const region = Math.max(600, width - 2 * theme.safe.x);
   const H = Math.max(300, height - 2 * theme.safe.y - 20);
@@ -283,6 +292,7 @@ export function openingWall(spec: StorySpec, height = 1080, width = 1920): (Wall
   const out: (WallChip & { z: number; on: number; k: number })[] = [];
   const tall = isTall(width, height);
   const w = spec.design?.wall;
+  const { chipScale, depth } = wallOptions(spec.design);
   const cols = w?.columns ?? (tall ? 3 : 6);
   const rows = w?.rows ?? (tall ? 12 : 6);
   for (let i = 0; i < cols * rows; i++) {
@@ -294,9 +304,9 @@ export function openingWall(spec: StorySpec, height = 1080, width = 1920): (Wall
         text: labelAt(spec.labels, i, fallback),
         x: Math.round((col - (cols - 1) / 2) * (1230 / cols) + (row % 2 ? 100 : -100) + (random(`x${i}`) - 0.5) * 30),
         y: Math.round((row - (rows - 1) / 2) * ((height / 12.2) * (12 / rows)) + (random(`y${i}`) - 0.5) * 20),
-        z: Math.round(-250 + random(`z${i}`) * 360),
+        z: Math.round((-250 + random(`z${i}`) * 360) * depth),
         on: 10 + random(`on${i}`) * 60,
-        k: 1.15,
+        k: Math.round(1.15 * chipScale * 1000) / 1000,
       });
       continue;
     }
@@ -304,9 +314,9 @@ export function openingWall(spec: StorySpec, height = 1080, width = 1920): (Wall
       text: labelAt(spec.labels, i, fallback),
       x: Math.round((col - (cols - 1) / 2) * (2400 / cols) + (row % 2) * 200 - 100 + (random(`x${i}`) - 0.5) * 40),
       y: Math.round((-420 + row * (840 / (rows - 1))) * ky + (random(`y${i}`) - 0.5) * 24),
-      z: Math.round(-300 + random(`z${i}`) * 440),
+      z: Math.round((-300 + random(`z${i}`) * 440) * depth),
       on: 10 + random(`on${i}`) * 60,
-      k: 1,
+      k: chipScale,
     });
   }
   return out;

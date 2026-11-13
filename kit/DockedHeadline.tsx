@@ -12,6 +12,8 @@ export function hideFromScale(scale: number, threshold = 1, range = 0.08): numbe
 /**
  * Píldora arriba a la izquierda con el titular de la escena; se aparta (fundido) cuando `hide` va de 0 a 1.
  * `layout="stacked"` (por defecto) apila el subtítulo bajo el título; `layout="inline"` lo pone en la misma línea, en una sola píldora: "04 Nombre · línea".
+ * `size`: `"md"` (por defecto) o `"sm"` (85 % de la letra, los huecos y el relleno; el subtítulo apilado queda en ~19 px a 1080p).
+ * `gradientLoop`: cuadros de un vaivén del degradado del número (sin él, quieto).
  */
 export function DockedHeadline({
   index,
@@ -21,6 +23,8 @@ export function DockedHeadline({
   start = 0,
   hide = 0,
   layout = "stacked",
+  size = "md",
+  gradientLoop,
 }: {
   index: number;
   title: string;
@@ -29,8 +33,12 @@ export function DockedHeadline({
   start?: number;
   hide?: number;
   layout?: "stacked" | "inline";
+  size?: "md" | "sm";
+  gradientLoop?: number;
 }) {
   const theme = useTheme();
+  const k = size === "sm" ? 0.85 : 1;
+  const caption = theme.type.caption * k, eyebrow = theme.type.eyebrow * k;
   const f = useFrameOr(frame);
   const a = kf(f, [start, start + 18], [0, 1], themeEasing(theme.motion.easing.out)) * (1 - clamp(hide, 0, 1));
   if (a <= 0) return null;
@@ -43,8 +51,8 @@ export function DockedHeadline({
     top: theme.safe.y / 2,
     display: "flex",
     alignItems: "center",
-    gap: theme.type.caption * 0.5,
-    padding: `${theme.type.eyebrow * 0.45}px ${theme.type.caption * 0.9}px ${theme.type.eyebrow * 0.45}px ${theme.type.eyebrow * 0.5}px`,
+    gap: caption * 0.5,
+    padding: `${eyebrow * 0.45}px ${caption * 0.9}px ${eyebrow * 0.45}px ${eyebrow * 0.5}px`,
     borderRadius: theme.radius.pill,
     background: theme.color.surface,
     border: `1px solid ${theme.color.border}`,
@@ -55,21 +63,21 @@ export function DockedHeadline({
   };
   return (
     <div key={resting ? "rest" : "anim"} style={style}>
-      <GradientText style={{ fontSize: theme.type.caption, fontWeight: theme.font.weights.stat }}>{String(index).padStart(2, "0")}</GradientText>
+      <GradientText loop={gradientLoop} frame={f} style={{ fontSize: caption, fontWeight: theme.font.weights.stat }}>{String(index).padStart(2, "0")}</GradientText>
       {layout === "inline" ? (
-        <div style={{ display: "flex", alignItems: "baseline", gap: theme.type.eyebrow * 0.4, whiteSpace: "nowrap" }}>
-          <span style={{ fontSize: theme.type.caption, fontWeight: theme.font.weights.semibold, color: theme.color.text, lineHeight: 1.15 }}>{title}</span>
+        <div style={{ display: "flex", alignItems: "baseline", gap: eyebrow * 0.4, whiteSpace: "nowrap" }}>
+          <span style={{ fontSize: caption, fontWeight: theme.font.weights.semibold, color: theme.color.text, lineHeight: 1.15 }}>{title}</span>
           {subtitle && (
             <>
-              <span style={{ fontSize: theme.type.eyebrow, color: theme.color.textMuted, lineHeight: 1.15 }}>·</span>
-              <span style={{ fontSize: theme.type.eyebrow, color: theme.color.textMuted, lineHeight: 1.15 }}>{subtitle}</span>
+              <span style={{ fontSize: eyebrow, color: theme.color.textMuted, lineHeight: 1.15 }}>·</span>
+              <span style={{ fontSize: eyebrow, color: theme.color.textMuted, lineHeight: 1.15 }}>{subtitle}</span>
             </>
           )}
         </div>
       ) : (
         <div style={{ display: "flex", flexDirection: "column" }}>
-          <span style={{ fontSize: theme.type.caption, fontWeight: theme.font.weights.semibold, color: theme.color.text, lineHeight: 1.15 }}>{title}</span>
-          {subtitle && <span style={{ fontSize: theme.type.eyebrow * 0.85, color: theme.color.textMuted, lineHeight: 1.2 }}>{subtitle}</span>}
+          <span style={{ fontSize: caption, fontWeight: theme.font.weights.semibold, color: theme.color.text, lineHeight: 1.15 }}>{title}</span>
+          {subtitle && <span style={{ fontSize: eyebrow * 0.85, color: theme.color.textMuted, lineHeight: 1.2 }}>{subtitle}</span>}
         </div>
       )}
     </div>

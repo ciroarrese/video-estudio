@@ -22,7 +22,7 @@ Tambien `npx ve-render <id> ...`. **La herramienta se ejecuta desde un clon de e
 
 | Opcion | Descripcion |
 |---|---|
-| `--out` | Archivo de salida (por defecto `out/<id>.mp4`) |
+| `--out` | Archivo de salida (por defecto `out/<id>.mp4`; con `VE_VIDEOS_DIR`, `<VE_VIDEOS_DIR>/out/<id>.mp4`) |
 | `--props '<json>'` | Objeto JSON mezclado con `defaultProps` |
 | `--frames a-b` | Solo ese rango (inclusive); el audio se recorta igual |
 | `--format f` | `horizontal`, `vertical` o `cuadrado`. El video tiene que habilitarlo (`formats` en `defineVideo`); si no, error que dice cuáles admite. La salida por defecto pasa a `out/<id>-<formato>.mp4` |
@@ -176,6 +176,12 @@ El costo es de CPU en Chromium, no de codificación ni de disco. `render` imprim
 Render completo de `story-demo` (1590 cuadros, 53 s, 1920x1080, con 3D y desenfoques, `--no-cache`) medido mientras la máquina estaba ocupada por otras tareas (promedio de carga 8 sobre 4 núcleos): **7.6 min de reloj, 4 min de CPU** (5.4 fps al principio, 4 fps al final), con 4 páginas: dibujar los cuadros 233 s, captura 1390 s, escritura 24 s (sumas entre las 4 páginas). Con la máquina libre, esos 4 min de CPU son ~1 a 1.5 min de reloj.
 
 **Regla práctica:** tiempo de un render completo ≈ `cuadros × (0.07 a 0.25 s de CPU) / núcleos libres` más ~15 s fijos (compilar el bundle la primera vez, abrir las páginas, concatenar). `--concurrency` solo ayuda hasta la cantidad de núcleos libres: con más páginas que núcleos todo se enlentece. Un video de 60 s (1800 cuadros) con 3D y desenfoques son ~4 a 6 min de CPU: ~1.5 a 2 min con 4 núcleos libres, 5 a 8 min si la máquina está ocupada o tiene 1 o 2 núcleos (ahí se ven 4 a 6 cuadros por segundo, que es lo que se reportó con 5.5 min). El `--scale 0.5` para borradores es el atajo que más rinde (~2x). No se encontró un ajuste seguro que acelere más sin cambiar píxeles.
+
+## Cache y salidas con videos privados
+
+Con `VE_VIDEOS_DIR` (videos en una carpeta fuera del clon) la cache de compilación (bundle con fuentes, logos y código de las escenas, segmentos, cuadros) y las salidas por defecto (mp4, hojas) **no se escriben en el clon público**: van a `<VE_VIDEOS_DIR>/.ve-cache/` y `<VE_VIDEOS_DIR>/out/`. Sin la variable siguen en `.ve-cache/` y `out/` del clon (ignoradas por git). Se pueden forzar con `VE_CACHE_DIR` y `VE_OUT_DIR` (rutas absolutas o relativas al directorio actual); `--out` sigue mandando sobre todo. La carpeta `out/` de la carpeta externa no cuenta como código del video ni entra en el hash.
+
+`npm run clean` borra `.ve-cache/` y `out/` del clon y, si está definida, de la carpeta externa (o las de `VE_CACHE_DIR`/`VE_OUT_DIR`); no toca los videos.
 
 ## Cache de hashes de archivos
 

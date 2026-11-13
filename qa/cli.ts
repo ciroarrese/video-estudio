@@ -6,6 +6,7 @@ import { makeSheet } from './sheet';
 import { openSession } from './session';
 import { budgetFromScenes, formatStoryBudget } from '../stories/budget';
 import { formatSceneList, parseFormat, suffixOf } from '../render/index';
+import { salidaPorDefecto } from '../render/dirs';
 import { runPrivacy } from './privacy';
 import { failsAt, runQa } from './run';
 import { RULES } from './rules';
@@ -17,7 +18,7 @@ const USAGE = {
              [--assets dir]... [--allow-missing-fonts] [--cols 4] [--scale 0.25] [--out out/<id>[-<formato>]-sheet.png] [--no-labels]   (--out acepta cualquier ruta, se crean las carpetas)`,
   qa: `Uso: ve-qa <videoId> [--frames 0,60,120 | --every N | --count 24] [--props json] [--format horizontal|vertical|cuadrado] [--scene id|índice] [--list-scenes] [--json salida.json | --out salida.json] [--fail-on error|warn] [--verbose] [--max 40]
              [--assets dir]... [--allow-missing-fonts] [--rules clip,overlap,...] [--skip regla,...] [--set regla.umbral=valor]... [--concurrency N]
-Reglas: ${ALL_RULES.join(', ')}  (silenciar: data-qa-ignore="regla" en el elemento o un ancestro)`,
+Reglas: ${ALL_RULES.join(', ')}  (silenciar: data-qa-ignore="regla" en el elemento o un ancestro; adorno de interfaz: data-qa-decor)`,
   privacy: `Uso: ve-privacy [<videoId>] --deny lista.txt [--allow lista.txt] [--frames … | --every N | --count 24] [--props json] [--format …] [--scene id|índice] [--scan-source dir]... [--assets dir]... [--allow-missing-fonts] [--json salida.json | --out salida.json]`,
 };
 
@@ -113,7 +114,7 @@ async function main(cmd: string, argv: string[]): Promise<number> {
 
   if (cmd === 'sheet') {
     if (!id) throw new Error('Falta <videoId>');
-    const r = await makeSheet({ videoId: id, props, format, scene, ...sample(p), cols: num(p, 'cols'), scale: num(p, 'scale'), out: one(p, 'out') ?? `out/${id}${suffixOf({ format, scene })}-sheet.png`, labels: !p.bools.has('no-labels'), ...common(p), log });
+    const r = await makeSheet({ videoId: id, props, format, scene, ...sample(p), cols: num(p, 'cols'), scale: num(p, 'scale'), out: one(p, 'out') ?? salidaPorDefecto(`${id}${suffixOf({ format, scene })}-sheet.png`), labels: !p.bools.has('no-labels'), ...common(p), log });
     console.log(`hoja: ${r.out} (${r.width}x${r.height}, ${r.frames.length} cuadros: ${r.frames.join(',')})`);
     return 0;
   }
@@ -132,6 +133,11 @@ async function main(cmd: string, argv: string[]): Promise<number> {
     printQa(r.findings, r.summary.frames, { verbose: p.bools.has('verbose'), max: p.bools.has('verbose') && one(p, 'max') === undefined ? Infinity : num(p, 'max') ?? 40 });
     const s = r.summary;
     if (s.detailSmallText) console.log(`\ninfo: ${s.detailSmallText.texts} ${s.detailSmallText.texts === 1 ? 'texto' : 'textos'} por debajo del mínimo en el plano general ${s.detailSmallText.texts === 1 ? 'se lee' : 'se leen'} al acercar dentro de su escena (detalle, no es error; ${s.detailSmallText.frames} ${s.detailSmallText.frames === 1 ? 'cuadro afectado' : 'cuadros afectados'}; --verbose lo muestra por cuadro)`);
+    if (s.decor) console.log(`\ninfo: ${s.decor.texts} ${s.decor.texts === 1 ? 'texto de adorno' : 'textos de adorno'} (data-qa-decor) quedaron fuera de min-size y contrast (${s.decor.frames} ${s.decor.frames === 1 ? 'cuadro' : 'cuadros'}); clip, overlap contra texto normal y offscreen (si es data-qa-decor="main") siguen aplicando`);
+    if (s.silenced) {
+      const parts = Object.entries(s.silenced).map(([rule, c]) => `${rule}: ${[c.ignore ? `${c.ignore} por data-qa-ignore` : '', c.decor ? `${c.decor} por data-qa-decor` : ''].filter(Boolean).join(', ')}`);
+      console.log(`\ncallados (no cuentan arriba): ${parts.join('; ')}`);
+    }
     const per = Object.entries(s.byRule).map(([k, v]) => `${k}=${v}`).join(' ') || 'ninguno';
     console.log(`\n${id}: ${s.frames.length} cuadros revisados en ${s.seconds}s; ${s.errors} errores, ${s.warnings} avisos, ${s.infos} info${p.bools.has('verbose') ? '' : ' (ocultos; --verbose)'} (${per})`);
     writeReport(one(p, 'out') ?? one(p, 'json'), r);

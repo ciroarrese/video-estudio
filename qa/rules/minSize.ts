@@ -15,7 +15,7 @@ export const minSizeRule: Rule = {
     const out: Finding[] = [];
     const seen = new Set<number>();
     for (const r of runs) {
-      if (r.opacity < 0.05 || ignored(r, 'min-size') || seen.has(r.elId)) continue;
+      if (r.opacity < 0.05 || ignored(r, 'min-size') || r.decor || seen.has(r.elId)) continue;
       if (r.screenPx >= min - t.tolerancePx) continue;
       seen.add(r.elId);
       const faint = r.opacity < t.minOpacity;

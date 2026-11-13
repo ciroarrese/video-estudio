@@ -3,10 +3,10 @@ import { renderToString } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 import { FrameProvider, Sequence } from "../engine";
 import { ThemeProvider, neutral } from "../themes";
-import { Closing, Interlude, InterludeCompact, Opening, TopicHeadline, TopicProvider, composeStory, nextTopic, parseRich, plainRich, storyBudget, useTopic, validateSpec } from "./index";
+import { Closing, DefaultThumbnail, Interlude, InterludeCompact, Opening, TopicHeadline, TopicProvider, composeStory, nextTopic, parseRich, plainRich, storyBudget, useTopic, validateSpec } from "./index";
 import type { StorySpec, TopicScene } from "./index";
 import { listLayout, openingWall } from "./layout";
-import { pillNumberColor } from "./shared";
+import { pillNumberColor, quietOpacity } from "./shared";
 import { contrastRatio, dark } from "../themes";
 
 const spec = (over: Partial<StorySpec> = {}): StorySpec => ({
@@ -197,5 +197,148 @@ describe("firma", () => {
     // un tema con acentos pálidos cae al color de texto
     const pale = { ...neutral, color: { ...neutral.color, accent: "#ffee99", accent2: "#ffeeaa" } };
     expect(pillNumberColor(pale)).toBe(pale.color.text);
+  });
+});
+
+/** Marcado de la píldora del titular (el `div` con z-index 90) dentro de un fragmento. */
+function pillMarkup(markup: string): string {
+  const at = markup.indexOf("z-index:90");
+  expect(at).toBeGreaterThan(0);
+  const start = markup.lastIndexOf("<div", at);
+  let depth = 0;
+  for (let i = start; i < markup.length; ) {
+    const open = markup.indexOf("<div", i), close = markup.indexOf("</div>", i);
+    if (open !== -1 && open < close) { depth++; i = open + 4; } else { depth--; i = close + 6; if (depth === 0) return markup.slice(start, i); }
+  }
+  throw new Error("píldora sin cerrar");
+}
+
+describe("segunda migración: píldora acoplada, opciones y contrastes", () => {
+  const variants: [string, Partial<StorySpec>][] = [
+    ["apilada", { design: { handoff: "dock" } }],
+    ["en un renglón", { design: { handoff: "dock", list: "inline" } }],
+    ["en un renglón con forma larga", { design: { handoff: "dock", list: { layout: "inline", underline: "name" } } }],
+    ["chica", { design: { handoff: "dock", headline: { size: "sm" }, list: "inline" } }],
+  ];
+  for (const [name, over] of variants) {
+    it(`la píldora del último cuadro de la apertura es idéntica a la del primero de la escena (${name})`, () => {
+      const s = spec(over);
+      const end = pillMarkup(html(<Opening spec={s} />, 299, 300));
+      const first = pillMarkup(html(<TopicProvider spec={s} index={0} docked><TopicHeadline start={4} /></TopicProvider>, 0));
+      expect(end).toBe(first);
+      // y también la que arma composeStory
+      const withHead = (id: string): TopicScene => ({ id, component: () => <TopicHeadline start={4} />, durationInFrames: 90 });
+      const { component: Story, timeline } = composeStory(s, [withHead("a"), withHead("b"), withHead("c"), withHead("d")]);
+      const inScene = pillMarkup(html(<Story />, timeline[1]!.from, 3000));
+      expect(inScene).toBe(first);
+    });
+  }
+  it("en renglón lleva la línea del tema; apilada, solo el título; el tamaño chico achica la letra", () => {
+    const inline = html(<TopicProvider spec={spec({ design: { list: "inline" } })} index={0}><TopicHeadline start={-20} /></TopicProvider>, 0);
+    expect(pillMarkup(inline)).toContain("línea del primero");
+    expect(pillMarkup(html(<TopicProvider spec={spec()} index={0}><TopicHeadline start={-20} /></TopicProvider>, 0))).not.toContain("línea del primero");
+    // props explícitas pisan al diseño
+    expect(pillMarkup(html(<TopicProvider spec={spec()} index={0}><TopicHeadline start={-20} layout="inline" subtitle="otra" /></TopicProvider>, 0))).toContain("otra");
+    const size = (m: string) => Number(/font-size:([\d.]+)px/.exec(m)![1]);
+    const md = pillMarkup(html(<TopicProvider spec={spec()} index={0}><TopicHeadline start={-20} /></TopicProvider>, 0));
+    const sm = pillMarkup(html(<TopicProvider spec={spec({ design: { headline: { size: "sm" } } })} index={0}><TopicHeadline start={-20} /></TopicProvider>, 0));
+    expect(size(sm)).toBeLessThan(size(md));
+    expect(pillMarkup(html(<TopicProvider spec={spec()} index={0}><TopicHeadline start={-20} size="sm" /></TopicProvider>, 0))).toBe(sm);
+  });
+  it("el reposo de la píldora por defecto no cambió (apilada, medio, sin degradado en movimiento)", () => {
+    const m = pillMarkup(html(<TopicProvider spec={spec()} index={1}><TopicHeadline start={-20} /></TopicProvider>, 0));
+    expect(m).toContain(">02<");
+    expect(m).toContain("background-size:100% 100%");
+  });
+  it("las filas atenuadas conservan el contraste con nubes fuertes del tema (no solo de design.clouds)", () => {
+    const strong = { ...neutral, cloud: { ...neutral.cloud, opacity: 0.35 } };
+    expect(quietOpacity(neutral, undefined, 0.75)).toBe(0.75);
+    expect(quietOpacity(dark, undefined, 0.75)).toBe(0.75);
+    const q = quietOpacity(strong, undefined, 0.75);
+    expect(q).toBeGreaterThan(0.75);
+    // design.clouds pisa al tema: con nubes tenues vuelve a la base
+    expect(quietOpacity(strong, { opacity: 0.1 }, 0.75)).toBe(0.75);
+    // la cuenta: texto atenuado a `q` sobre el peor fondo llega a 4,5
+    const out = html(<Interlude spec={spec()} done={2} />, 50, 120, strong);
+    expect(out).toContain(`opacity:${q}`);
+  });
+  it("la tarjeta por defecto del cierre tiene el número con contraste en un tema neutro, oscuro y de acentos pálidos", () => {
+    const pale = { ...neutral, color: { ...neutral.color, accent: "#ffee99", accent2: "#ffeeaa", chart: ["#ffee99", "#ffeeaa", "#ffeebb", "#ffeecc", "#ffeedd", "#ffeeee"] as typeof neutral.color.chart } };
+    for (const t of [neutral, dark, pale]) {
+      for (let i = 0; i < 4; i++) {
+        const out = html(<DefaultThumbnail index={i} name="Tema" />, 0, 60, t);
+        const m = new RegExp(`color:([^;"]+)">0${i + 1}<`).exec(out);
+        expect(m, `tema ${t.name} índice ${i}`).not.toBeNull();
+        expect(contrastRatio(m![1]!, t.color.surfaceAlt)).toBeGreaterThanOrEqual(4.5);
+      }
+    }
+  });
+  it("tema sin escena: se ve plano (atenuado, sin tilde, nunca el siguiente); con seen se tilda desde el principio", () => {
+    const s = spec();
+    const plain = html(<Interlude spec={s} done={1} skip={[1]} />, 100, 120);
+    expect(plain).not.toContain("story-check-1");
+    expect(plain).toContain("story-check-0");
+    const seen = spec({ topics: s.topics.map((t, i) => (i === 1 ? { ...t, seen: true } : t)) });
+    const ticked = html(<Interlude spec={seen} done={1} skip={[1]} />, 100, 120);
+    expect(ticked).toContain("story-check-1");
+    // el primero ya visto y el sin escena con seen: ambos tildados; el siguiente (índice 2) no
+    expect(ticked).not.toContain("story-check-2");
+    // lista parcial "01, 02 (sin escena), 03": al mostrar el 03 el 02 no queda como pendiente
+    const late = html(<Interlude spec={s} done={3} skip={[1]} />, 100, 120);
+    expect(late).toContain("story-check-0");
+    expect(late).toContain("story-check-2");
+    expect(late).not.toContain("story-check-1");
+    expect(() => validateSpec(spec({ topics: s.topics.map((t, i) => (i === 0 ? { ...t, seen: "si" as never } : t)) }))).toThrow(/seen/);
+  });
+  it("wall: chipScale, depth y dolly; el desenfoque se decide por bloque", () => {
+    const base = openingWall(spec(), 1080, 1920);
+    const big = openingWall(spec({ design: { wall: { chipScale: 1.5, depth: 0 } } }), 1080, 1920);
+    expect(big[0]!.k).toBeCloseTo(base[0]!.k * 1.5, 5);
+    expect(big.every((c) => c.z === 0)).toBe(true);
+    expect(openingWall(spec({ design: { wall: { chipScale: 1, depth: 1, dolly: 0 } } }), 1920, 1080)).toEqual(openingWall(spec(), 1920, 1080));
+    const a = html(<Opening spec={spec()} />, 60, 300), b = html(<Opening spec={spec({ design: { wall: { dolly: 600 } } })} />, 60, 300);
+    expect(b).not.toBe(a);
+    expect(html(<Opening spec={spec({ design: { wall: { dolly: 0 } } })} />, 60, 300)).toBe(a);
+    const blurOf = (o: StorySpec["design"], node: (s: StorySpec) => React.ReactNode, f: number, d: number) => /filter:blur\((?!110px)/.test(html(node(spec({ design: o })), f, d));
+    expect(blurOf({ wall: { blur: { opening: false } } }, (s) => <Opening spec={s} />, 3, 300)).toBe(false);
+    expect(blurOf({ wall: { blur: { opening: false } } }, (s) => <Closing spec={s} />, 10, 480)).toBe(true);
+    expect(blurOf({ wall: { blur: { closing: false } } }, (s) => <Closing spec={s} />, 10, 480)).toBe(false);
+    expect(blurOf({ wall: { blur: { closing: false } } }, (s) => <Opening spec={s} />, 3, 300)).toBe(true);
+    expect(() => validateSpec(spec({ design: { wall: { blur: { opening: 1 as never } } } }))).toThrow(/wall.blur/);
+    expect(() => validateSpec(spec({ design: { wall: { chipScale: 9 } } }))).toThrow(/chipScale/);
+  });
+  it("list acepta la forma corta y el objeto; underline name acorta el subrayado al nombre", () => {
+    const noFn = (L: ReturnType<typeof listLayout>) => JSON.stringify(L);
+    const row = listLayout(spec(), neutral, 1920, 1080);
+    expect(noFn(listLayout(spec({ design: { list: { layout: "stacked", underline: "row" } } }), neutral, 1920, 1080))).toBe(noFn(row));
+    expect(noFn(listLayout(spec({ design: { list: { layout: "inline" } } }), neutral, 1920, 1080))).toBe(noFn(listLayout(spec({ design: { list: "inline" } }), neutral, 1920, 1080)));
+    const byName = listLayout(spec({ design: { list: { underline: "name" } } }), neutral, 1920, 1080);
+    expect(byName.barWs.every((w, i) => w < row.barWs[i]!)).toBe(true);
+    expect(() => validateSpec(spec({ design: { list: { underline: "x" as never } } }))).toThrow(/list.underline/);
+    expect(() => validateSpec(spec({ design: { list: { otra: 1 } as never } }))).toThrow(/list.otra/);
+  });
+  it("handoff through: sin velo, nubes continuas y la escena entra por su cuenta", () => {
+    const s = spec({ design: { handoff: "through" } });
+    const end = html(<Opening spec={s} />, 299, 300);
+    expect(end).not.toContain("data-qa-veil");
+    expect(html(<Opening spec={spec()} />, 299, 300)).toContain("data-qa-veil");
+    const { component: Story, timeline } = composeStory(s, [null, scene("b"), scene("c"), null]);
+    expect(html(<Story />, timeline[1]!.from, 3000)).not.toContain("Segundo tema");
+    expect(() => validateSpec(spec({ design: { handoff: "corte" as never } }))).toThrow(/wash", "dock" o "through"|design.handoff/);
+  });
+  it("gradient.loop mueve el degradado de los textos de la historia; sin él queda quieto", () => {
+    const pos = (s: StorySpec, f: number) => [...html(<Opening spec={s} />, f, 300).matchAll(/background-position:([^;"]+)/g)].map((m) => m[1]).join("|");
+    const still = spec(), loop = spec({ design: { gradient: { loop: 40 } } });
+    expect(pos(still, 200)).toBe(pos(still, 220));
+    expect(pos(loop, 200)).not.toBe(pos(loop, 210));
+    expect(pos(loop, 200)).toBe(pos(loop, 240)); // vuelve al mismo punto cada `loop` cuadros
+    expect(() => validateSpec(spec({ design: { gradient: { loop: 1 } } }))).toThrow(/gradient.loop/);
+  });
+  it("closing.bg elige un rol del tema para el fondo de la firma; por defecto, bg", () => {
+    const wash = (s: StorySpec, t = neutral) => /background:([^;"]+);opacity:[^;"]*;z-index:500|background:([^;"]+);z-index:500/.exec(html(<Closing spec={s} />, 470, 480, t));
+    const def = wash(spec());
+    expect(def![1] ?? def![2]).toBe(neutral.color.bg);
+    const surf = wash(spec({ design: { closing: { bg: "surface" } } }));
+    expect(surf![1] ?? surf![2]).toBe(neutral.color.surface);
   });
 });

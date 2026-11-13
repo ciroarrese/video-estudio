@@ -1,12 +1,12 @@
 import React from "react";
 import { Easing, random, useFrame, useVideoConfig } from "../engine";
 import { GradientText, kf } from "../kit";
-import { useTheme, withAlpha } from "../themes";
+import { resolveColor, useTheme, withAlpha } from "../themes";
 import type { Theme } from "../themes";
 import { fade, styleKey, xform } from "../fx/core/math";
 import { PILL_OFF, closingWall, fitText, panelEntryLift, panelLayout, closingCamStart, pillBudget, pillFit, rigProject, rigTransform } from "./layout";
-import { Chip, Logo, Pill, RichText, StoryStage, scaler, useEase } from "./shared";
-import { plainRich } from "./types";
+import { Chip, Logo, Pill, RichText, StoryStage, pillNumberColor, scaler, useEase } from "./shared";
+import { plainRich, wallOptions } from "./types";
 import type { StorySpec, TopicScene } from "./types";
 
 import { CLOSING_FRAMES } from "./durations";
@@ -32,6 +32,8 @@ export function DefaultThumbnail({ index, name }: { index: number; name: string 
   const chart = theme.color.chart;
   const col = (k: number) => chart[(index + k) % chart.length]!;
   const variant = index % 4;
+  // el número va en un color con contraste garantizado sobre la barra del título (`surfaceAlt`): el del gráfico si llega a 4,5:1, si no un acento o el texto
+  const numColor = pillNumberColor(theme, theme.color.surfaceAlt, [col(0)]);
   const vals = [0, 1, 2, 3, 4].map((k) => 0.3 + seedOf(name, k) * 0.7);
   const area = { left: 28, top: 84, w: PANEL.w - 56, h: PANEL.h - 84 - 30 };
   let body: React.ReactNode;
@@ -85,7 +87,7 @@ export function DefaultThumbnail({ index, name }: { index: number; name: string 
       <div style={{ height: 52, display: "flex", alignItems: "center", gap: 12, padding: "0 24px", borderBottom: `1px solid ${theme.color.border}`, background: theme.color.surfaceAlt }}>
         <span style={{ width: 14, height: 14, borderRadius: theme.radius.pill, background: col(0), flexShrink: 0 }} />
         <span style={{ fontSize: t.size, fontWeight: theme.font.weights.semibold, color: theme.color.text, whiteSpace: "nowrap" }}>{t.text}</span>
-        <span style={{ marginLeft: "auto", fontSize: 26, fontWeight: theme.font.weights.stat, color: col(0) }}>{String(index + 1).padStart(2, "0")}</span>
+        <span style={{ marginLeft: "auto", fontSize: 26, fontWeight: theme.font.weights.stat, color: numColor }}>{String(index + 1).padStart(2, "0")}</span>
       </div>
       {body}
     </div>
@@ -157,7 +159,7 @@ export function Closing({ spec, scenes = [] }: { spec: StorySpec; scenes?: (Topi
   const flyStart = (i: number) => T.fly[0] + u(i * stagger);
   const flyOf = (i: number) => kf(f, [flyStart(i), flyStart(i) + u(40)], [0, 1], Easing.inOut);
   const bobOf = (i: number) => Math.sin(f / 28 + i * 1.7) * 10;
-  const blur = spec.design?.wall?.blur === false ? 0 : Math.round((1 - focus) * 90) / 10;
+  const blur = !wallOptions(spec.design).blurClosing ? 0 : Math.round((1 - focus) * 90) / 10;
 
   const ignore = "min-size contrast overlap covered offscreen safe-area";
   const chipFor = (c: { x: number; y: number; text: string }, i: number, faint: boolean) => {
@@ -267,7 +269,7 @@ export function Closing({ spec, scenes = [] }: { spec: StorySpec; scenes?: (Topi
 
       {/* firma: cada pieza se pinta recién cuando empieza a entrar (en reposo sin `opacity` ni `transform`) y, mientras vale 0, queda
           con `visibility: hidden`: ocupa su lugar (la columna no se corre al entrar la siguiente) pero no tapa ni cuenta como texto */}
-      {wash > 0 && <div key={wash >= 1 ? "full" : "part"} style={{ position: "absolute", inset: 0, background: theme.color.bg, opacity: fade(wash), zIndex: 500 }} />}
+      {wash > 0 && <div key={wash >= 1 ? "full" : "part"} style={{ position: "absolute", inset: 0, background: spec.design?.closing?.bg ? resolveColor(theme, spec.design.closing.bg) : theme.color.bg, opacity: fade(wash), zIndex: 500 }} />}
       <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", flexDirection: "column", gap: 40, zIndex: 600 }}>
         {signLines.slot && <div key={`slot-${styleKey({ ...fadeIn(logo), t: xform({ scale: 0.92 + logo * 0.08 }) })}`} style={{ ...fadeIn(logo), transform: xform({ scale: 0.92 + logo * 0.08 }), maxWidth: signW, display: "flex", justifyContent: "center" }}>{signLines.slot}</div>}
         {!signLines.slot && signLines.logo && (
@@ -280,7 +282,7 @@ export function Closing({ spec, scenes = [] }: { spec: StorySpec; scenes?: (Topi
             key={`text-${styleKey({ ...fadeIn(textIn), t: xform({ y: Math.round((1 - textIn) * 16) }) })}`}
             style={{ maxWidth: signW, textAlign: "center", fontSize: sf.size, lineHeight: 1.12, fontWeight: theme.font.weights.semibold, color: theme.color.text, ...fadeIn(textIn), transform: xform({ y: Math.round((1 - textIn) * 16) }) }}
           >
-            {hasMark ? <RichText text={sf.text} /> : <GradientText><RichText text={sf.text} /></GradientText>}
+            {hasMark ? <RichText text={sf.text} /> : <GradientText loop={spec.design?.gradient?.loop}><RichText text={sf.text} /></GradientText>}
           </div>
         )}
         <div style={{ width: Math.round(Math.min(signW, 420) * sign), height: 8, borderRadius: theme.radius.pill, background: theme.gradient.brand, visibility: sign <= 0 ? "hidden" : undefined, opacity: fade(sign) }} />

@@ -5,7 +5,7 @@ import { Closing, closingFrames } from "./Closing";
 import { Interlude, interludeFrames, nextTopic } from "./Interlude";
 import { InterludeCompact, interludeCompactFrames } from "./InterludeCompact";
 import { Opening, openingFrames } from "./Opening";
-import { TopicContext } from "./topic";
+import { TopicContext, headlineDefaults } from "./topic";
 import { isReservedSceneId, validateSpec } from "./types";
 import type { StorySpec, TopicScene } from "./types";
 
@@ -84,7 +84,7 @@ export function composeStory(
       <Fill>
         {timeline.map((e, k) => {
           let body: React.ReactNode;
-          if (e.kind === "opening") body = <Opening spec={spec} first={Math.max(0, first)} dock={first >= 0 && spec.design?.handoff === "dock"} />;
+          if (e.kind === "opening") body = <Opening spec={spec} first={Math.max(0, first)} dock={first >= 0 && spec.design?.handoff === "dock"} through={first >= 0 && spec.design?.handoff === "through"} />;
           else if (e.kind === "closing") body = <Closing spec={spec} scenes={scenes} />;
           else if (e.kind === "interlude") {
             const done = topicOf[k]!;
@@ -96,7 +96,7 @@ export function composeStory(
             const t = spec.topics[topic]!;
             const Scene = scenes[topic]!.component;
             body = (
-              <TopicContext.Provider value={{ index: topic, name: t.name, line: t.line, docked: topic === first && spec.design?.handoff === "dock" }}>
+              <TopicContext.Provider value={{ index: topic, name: t.name, line: t.line, docked: topic === first && spec.design?.handoff === "dock", headline: headlineDefaults(spec) }}>
                 <StoryStage cloud={spec.design?.clouds}>
                   <Scene />
                 </StoryStage>

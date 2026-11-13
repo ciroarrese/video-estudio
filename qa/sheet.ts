@@ -2,6 +2,7 @@ import { mkdirSync, writeFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { sampleFrames, type SampleSpec } from './sampling';
 import { openSession, sceneFrames } from './session';
+import { salidaPorDefecto } from '../render/dirs';
 import type { FormatName } from '../engine';
 
 export type Cell = { frame: number; x: number; y: number; w: number; h: number; labelY: number };
@@ -90,7 +91,7 @@ export async function makeSheet(o: SheetOptions): Promise<SheetResult> {
       await page.goto('about:blank');
       const compose = (page.evaluate as unknown as (e: string) => Promise<string>);
       const url = await compose.call(page, `${composeSrc}(${JSON.stringify(layout)},${JSON.stringify(thumbs)},${JSON.stringify(labels)},${fontPx})`);
-      const out = resolve(o.out ?? `out/${o.videoId}-sheet.png`);
+      const out = resolve(o.out ?? salidaPorDefecto(`${o.videoId}-sheet.png`));
       mkdirSync(dirname(out), { recursive: true });
       writeFileSync(out, Buffer.from(url.split(',')[1]!, 'base64'));
       return { out, frames, width: layout.width, height: layout.height };

@@ -1,6 +1,7 @@
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { cleanPageError, allowMissingFonts, assetDirsFor, ensureBundle, explicitAssetDirs, launchChromium, metaForFormat, newRunId, NOSTAGE_QUERY, pageQuery, resolveScene, sceneRange, serveStatic, type PwBrowser, type PwCdp, type PwContext, type PwPage, type VideoMeta as RenderMeta } from '../render/index';
+import { cacheDirPorDefecto } from '../render/dirs';
 import type { FormatName, SceneInfo } from '../engine';
 
 export const projectRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..');
@@ -49,7 +50,7 @@ export async function sceneFrames(session: Session, scene?: string): Promise<[nu
 
 /** Serves the compiled runtime and launches Chromium (render/browser.ts + render/server.ts). */
 export async function openSession(o: SessionOptions): Promise<Session> {
-  const bundleDir = o.bundleDir ?? (await ensureBundle(projectRoot, join(projectRoot, '.ve-cache'), newRunId(), o.log ?? (() => {})));
+  const bundleDir = o.bundleDir ?? (await ensureBundle(projectRoot, cacheDirPorDefecto(projectRoot), newRunId(), o.log ?? (() => {})));
   // Mismas carpetas estáticas que `render` (render/assets.ts); las del video se completan al saber su carpeta.
   const explicit = explicitAssetDirs(o.assets);
   const roots = [...assetDirsFor(projectRoot, explicit), bundleDir, join(projectRoot, 'public')];

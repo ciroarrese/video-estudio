@@ -43,6 +43,9 @@ export type TextRun = {
   color: string;
   transparentFill: boolean;
   ignore: string[];
+  /** El texto está bajo `data-qa-decor` (adorno de una interfaz recreada) y, si el valor es `main`, es el contenido principal del cuadro. */
+  decor?: boolean;
+  decorMain?: boolean;
   clips: ClipBox[];
   own: { sw: number; cw: number; sh: number; ch: number; ox: string; oy: string; ellipsis: boolean };
   /**
@@ -66,6 +69,12 @@ export type PageData = { frame: number; width: number; height: number; runs: Tex
  * muestreado que, dentro de la misma escena, se ven por encima del mínimo en otro cuadro.
  */
 export type DetailSummary = { texts: number; frames: number };
+
+/** Hallazgos que callaron `data-qa-ignore` y `data-qa-decor`, por regla (solo las reglas donde callaron algo). */
+export type SilencedSummary = Record<string, { ignore: number; decor: number }>;
+
+/** Textos de adorno (`data-qa-decor`) que quedaron fuera de `min-size` y `contrast`: cuántos textos distintos y en cuántos cuadros. */
+export type DecorSummary = { texts: number; frames: number };
 
 export type Finding = {
   rule: RuleId;

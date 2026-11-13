@@ -1,9 +1,9 @@
 import type { CloudBlob, DataCheck, ResolvedTheme, Surface, Theme } from "./types";
 import { neutral } from "./neutral";
 import { isValidColor, shiftColor } from "./color";
-import { checkTheme, contrastRatio } from "./contrast";
+import { checkTheme, contrastRatio, pairColors } from "./contrast";
 import { deepClone } from "./util";
-import { DATA_NAME, resolveTheme } from "./data";
+import { DATA_NAME, DEFAULT_TYPE_DISPLAY, resolveTheme } from "./data";
 
 export type TokenInput = string | Record<string, unknown>;
 
@@ -17,7 +17,7 @@ export interface TokenOptions {
    * Entran en `report.data` y en los avisos de contraste de `checkTheme`.
    */
   data?: Record<string, DataRoleInput>;
-  /** Pares de contraste de marca que se dan por conocidos (`["accent/bg"]`); `checkTheme` los informa como `note`. */
+  /** Pares de contraste de marca que se dan por conocidos (`["accent/bg"]`); `checkTheme` los informa como `note`, mientras los colores del par sigan siendo los aprobados. */
   acknowledge?: string[];
 }
 
@@ -313,13 +313,15 @@ export function themeFromTokensWithReport(
   }, "Opacidad de nubes", false);
   if (op) theme.cloud.opacity = op.trim().endsWith("%") ? parseFloat(op) / 100 : Number(op);
   const blobs: CloudBlob[] = [];
+  // el valor puede venir entre comillas ("x y tamaño") o sin ellas
+  const sinComillas = (x: string) => x.trim().replace(/^(["'])([\s\S]*)\1$/, "$2").trim();
   for (let i = 1; i <= 24; i++) {
     const v = pick(`cloud.blobs[${blobs.length}]`, [`cloud-blob-${i}`], (x) => {
-      const p = x.trim().split(/[\s,]+/).map(Number);
+      const p = sinComillas(x).split(/[\s,]+/).map(Number);
       return p.length >= 2 && p.length <= 3 && p.every(Number.isFinite) && p[0]! >= 0 && p[0]! <= 1 && p[1]! >= 0 && p[1]! <= 1 && (p[2] === undefined || p[2] > 0);
     }, "Mancha de nube (\"x y tamaño\", x e y entre 0 y 1)", false);
     if (v) {
-      const p = v.split(/[\s,]+/).map(Number);
+      const p = sinComillas(v).split(/[\s,]+/).map(Number);
       blobs.push({ x: p[0]!, y: p[1]!, ...(p[2] ? { size: p[2] } : {}) });
     }
   }
@@ -344,6 +346,10 @@ export function themeFromTokensWithReport(
   for (const u of UI_KEYS) {
     const v = pick(`type.ui.${u}`, [`type-ui-${u}`, `font-size-ui-${u}`, `text-ui-${u}`, `video-ui-${u}`], (x) => (toPx(x) ?? 0) > 0, "Tamaño", false);
     if (v) theme.type.ui = { ...(theme.type.ui ?? { xs: 15, sm: 20, md: 24 }), [u]: toPx(v)! };
+  }
+  for (const d of ["sm", "md", "lg"] as const) {
+    const v = pick(`type.display.${d}`, [`type-display-${d}`, `font-size-display-${d}`, `text-display-${d}`, `video-display-${d}`], (x) => (toPx(x) ?? 0) > 0, "Tamaño", false);
+    if (v) theme.type.display = { ...(theme.type.display ?? DEFAULT_TYPE_DISPLAY), [d]: toPx(v)! };
   }
 
   // Colores de datos declarados por el video
@@ -393,7 +399,19 @@ export function themeFromTokensWithReport(
     report.mapped[`data.${role}`] = source;
     if (source !== "valor") used.add(source);
   }
+  // Los reconocimientos van atados a los colores con que se aprobaron: los que vienen de `base` con los colores de `base`,
+  // los nuevos con los de este tema. Así un tema derivado con otro color en ese par no hereda un "aprobado" que no le corresponde.
+  const pins: Record<string, [string, string]> = { ...(base.acknowledgePins ?? {}) };
+  for (const n of base.acknowledge ?? []) {
+    const c = pins[n] ?? pairColors(base, n);
+    if (c) pins[n] = c;
+  }
+  for (const n of options.acknowledge ?? []) {
+    const c = pairColors(theme, n);
+    if (c) pins[n] = c;
+  }
   if (options.acknowledge?.length) theme.acknowledge = [...new Set([...(theme.acknowledge ?? []), ...options.acknowledge])];
+  if (Object.keys(pins).length) theme.acknowledgePins = pins;
 
   // Radios y sombras
   for (const r of RADIUS_KEYS) {

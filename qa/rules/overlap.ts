@@ -14,6 +14,7 @@ export const overlapRule: Rule = {
       for (let j = i + 1; j < live.length; j++) {
         const a = live[i]!;
         const b = live[j]!;
+        if (a.decor && b.decor) continue; // adorno contra adorno: no se juzga; contra texto normal, sí
         if (a.elId === b.elId || a.chain.includes(b.elId) || b.chain.includes(a.elId)) continue;
         // quick reject on the union boxes
         if (overlapRatio(a.rect, b.rect) === 0) continue;

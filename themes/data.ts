@@ -1,8 +1,10 @@
-import type { ResolvedTheme, Theme, TypeUi } from "./types";
+import type { ResolvedTheme, Theme, TypeDisplay, TypeUi } from "./types";
 import { isValidColor } from "./color";
 
 /** Escalones de `type.ui` cuando el tema no los declara. */
 export const DEFAULT_TYPE_UI: TypeUi = { xs: 15, sm: 20, md: 24 };
+/** Escalones de `type.display` cuando el tema no los declara. */
+export const DEFAULT_TYPE_DISPLAY: TypeDisplay = { sm: 48, md: 56, lg: 64 };
 
 /** Nombre válido de un color de datos: se lee con `theme.data.nombre`. */
 export const DATA_NAME = /^[A-Za-z][A-Za-z0-9]*$/;
@@ -43,18 +45,19 @@ export function strictData(map: Record<string, string>, themeName = "tema"): Rec
 const cache = new WeakMap<object, ResolvedTheme>();
 
 /**
- * Completa lo opcional del tema: `type.ui` (con los valores de `neutral`) y `data` estricto.
+ * Completa lo opcional del tema: `type.ui` y `type.display` (con los valores de `neutral`) y `data` estricto.
  * Devuelve el mismo objeto si ya está completo; si no, una copia superficial guardada en caché por tema.
  */
 export function resolveTheme(theme: Theme): ResolvedTheme {
   const hit = cache.get(theme);
   if (hit) return hit;
   const needsUi = !theme.type.ui;
+  const needsDisplay = !theme.type.display;
   const needsData = !isStrictData(theme.data);
-  if (!needsUi && !needsData) return theme as ResolvedTheme;
+  if (!needsUi && !needsDisplay && !needsData) return theme as ResolvedTheme;
   const out: ResolvedTheme = {
     ...theme,
-    type: needsUi ? { ...theme.type, ui: DEFAULT_TYPE_UI } : (theme.type as ResolvedTheme["type"]),
+    type: { ...theme.type, ui: theme.type.ui ?? DEFAULT_TYPE_UI, display: theme.type.display ?? DEFAULT_TYPE_DISPLAY },
     data: needsData ? strictData(theme.data ?? {}, theme.name) : (theme.data as Record<string, string>),
   };
   cache.set(theme, out);

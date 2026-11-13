@@ -128,6 +128,23 @@ describe.skipIf(!chromium)('qa on the qa-defects video (e2e)', () => {
     expect(errs(F.visibleCanvas)).toEqual([['covered', 'under-visible', 'visible-canvas']]);
   }, 180_000);
 
+  it('data-qa-decor: el adorno queda fuera de min-size y contrast (con resumen); clip, overlap contra texto normal y offscreen "main" siguen aplicando; data-qa-ignore se cuenta', async () => {
+    const { findings, summary } = await runQa({ videoId: 'qa-defects', frames: `${F.decorOk},${F.decorStrict},${F.decorClip},${F.decorOverlap},${F.decorOffscreen},${F.decorMainOffscreen},${F.ignoreCounted}` });
+    const errs = (f: number) => findings.filter((x) => x.frame === f && x.severity === 'error').map((x) => [x.rule, x.element.testid]).sort();
+    expect(errs(F.decorOk)).toEqual([]);
+    // contrapunto estricto: los mismos textos sin la marca
+    expect(errs(F.decorStrict)).toEqual([['contrast', 'chrome-faint'], ['min-size', 'chrome-tiny']]);
+    expect(errs(F.decorClip)).toEqual([['clip', 'chrome-clip']]);
+    expect(errs(F.decorOverlap)).toEqual([['overlap', 'normal-text']]);
+    expect(errs(F.decorOffscreen)).toEqual([]);
+    expect(errs(F.decorMainOffscreen)).toEqual([['offscreen', 'chrome-offscreen']]);
+    expect(errs(F.ignoreCounted)).toEqual([]);
+    expect(summary.decor?.frames).toBe(5);
+    expect(summary.silenced?.['contrast']).toEqual({ ignore: 1, decor: 1 });
+    expect(summary.silenced?.['min-size']).toEqual({ ignore: 0, decor: 1 });
+    expect(summary.silenced?.['offscreen']).toEqual({ ignore: 0, decor: 1 });
+  }, 180_000);
+
   it('privacy: a term and an e-mail built from one span per letter / per part are still caught', async () => {
     const r = await runPrivacy({ videoId: 'qa-defects', frames: `${F.split}`, deny: 'Acme Corp\n' });
     expect(r.findings.map((f) => `${f.kind}:${f.value}`).sort()).toEqual(['deny-joined:acme corp', 'deny-joined:acmecorp', 'email:persona@dominio-ficticio.com']);

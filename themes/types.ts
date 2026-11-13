@@ -52,6 +52,11 @@ export interface Theme {
      * Si un tema no la declara, `useTheme()` completa los valores de `neutral` (15, 20 y 24 px).
      */
     ui?: TypeUi;
+    /**
+     * Escalones intermedios entre `body` (44) y `h2` (72) para textos grandes que no son un titular: cifras de una ficha,
+     * rótulos de pantalla completa, títulos de un panel. Si un tema no los declara, `useTheme()` completa los de `neutral` (48, 56 y 64 px).
+     */
+    display?: TypeDisplay;
   };
   /** Área segura en px. */
   safe: { x: number; y: number };
@@ -75,8 +80,16 @@ export interface Theme {
    * `checkTheme` los informa como `note` en vez de aviso; el control de calidad (`qa`) sigue juzgando el texto real en pantalla.
    */
   acknowledge?: string[];
+  /**
+   * Con qué colores se aprobó cada par de `acknowledge` (`par -> [primer plano, fondo]`). `themeFromTokens` lo completa solo
+   * (también para los pares que hereda de `base`, con los colores de `base`). Si los colores actuales del par ya no son
+   * esos, el reconocimiento no vale: `checkTheme` informa el par como aviso y nombra el reconocimiento vencido.
+   * Un nombre de `acknowledge` sin pin (escrito a mano) vale mientras el par exista, sin importar sus colores.
+   */
+  acknowledgePins?: Record<string, [string, string]>;
 }
 
+export type TypeDisplay = { sm: number; md: number; lg: number };
 export type TypeUi = { xs: number; sm: number; md: number };
 export type Surface = "bg" | "surface" | "surfaceAlt";
 
@@ -109,8 +122,8 @@ export interface ThemeCloud {
   blobs?: CloudBlob[];
 }
 
-/** El tema que devuelve `useTheme()`: con `type.ui` y `data` siempre presentes. */
+/** El tema que devuelve `useTheme()`: con `type.ui`, `type.display` y `data` siempre presentes. */
 export type ResolvedTheme = Theme & {
-  type: Theme["type"] & { ui: TypeUi };
+  type: Theme["type"] & { ui: TypeUi; display: TypeDisplay };
   data: Record<string, string>;
 };

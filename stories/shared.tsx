@@ -3,7 +3,7 @@ import { asset, holdRender, releaseRender, useFrame, useVideoConfig } from "../e
 import { CloudBackground, GradientText, Stage, kf } from "../kit";
 import type { CloudOptions } from "../kit";
 import { themeEasing } from "../kit/util";
-import { contrastRatio, useTheme, withAlpha } from "../themes";
+import { contrastRatio, parseColor, resolveColor, useTheme, withAlpha } from "../themes";
 import type { Theme } from "../themes";
 import { fade, styleKey, svgScale, xform } from "../fx/core/math";
 import type { ListLayout } from "./layout";
@@ -58,10 +58,33 @@ export function Chip({ text, lit, pop, faint }: { text: string; lit: number; pop
  * Color sólido del número de una píldora: el primer rol de acento que llega a 4,5:1 sobre la superficie del tema; si ninguno llega, el
  * texto del tema. El degradado no sirve acá: sobre la superficie de la píldora su contraste queda por debajo del mínimo en algunos temas.
  */
-export function pillNumberColor(theme: Theme): string {
-  const bg = theme.color.surface;
-  for (const c of [theme.color.accent, theme.color.accent2]) if (contrastRatio(c, bg) >= 4.5) return c;
+export function pillNumberColor(theme: Theme, bg: string = theme.color.surface, prefer: string[] = []): string {
+  for (const c of [...prefer, theme.color.accent, theme.color.accent2]) if (contrastRatio(c, bg) >= 4.5) return c;
   return theme.color.text;
+}
+
+/**
+ * Opacidad de las filas ya vistas (o sin escena) de la lista: `base` (0,75, pensada para las nubes del tema neutro), subida lo necesario
+ * para que el texto atenuado (grande: el mínimo de `qa` es 3:1) conserve 3,1:1 sobre el peor fondo posible de las nubes EFECTIVAS (las de `theme.cloud` con lo que pise
+ * `design.clouds`): el color de mancha más contrastante a la opacidad efectiva sobre `theme.color.bg`. Con nubes tenues no cambia `base`.
+ */
+export function quietOpacity(theme: Theme, clouds: CloudOptions | undefined, base: number): number {
+  const eff = clouds?.opacity ?? theme.cloud.opacity;
+  const roles = [...(clouds?.colors ?? theme.cloud.colors), ...(clouds?.blobs ?? theme.cloud.blobs ?? []).flatMap((b) => (b.color ? [b.color] : []))];
+  const bg = parseColor(theme.color.bg), fg = parseColor(theme.color.textMuted);
+  if (!bg || !fg) return base;
+  const mixc = (a: { r: number; g: number; b: number }, b: { r: number; g: number; b: number }, p: number) => `rgb(${Math.round(a.r * (1 - p) + b.r * p)},${Math.round(a.g * (1 - p) + b.g * p)},${Math.round(a.b * (1 - p) + b.b * p)})`;
+  let q = base;
+  for (const role of roles) {
+    const c = parseColor(resolveColor(theme, role));
+    if (!c) continue;
+    const under$ = mixc(bg, c, eff);
+    const under = parseColor(under$)!;
+    let k = base;
+    while (k < 1 && contrastRatio(mixc(under, fg, k), under$) < 3.1) k = Math.round((k + 0.01) * 100) / 100;
+    q = Math.max(q, k);
+  }
+  return q;
 }
 
 /** Píldora con el número y el nombre del tema (cierre, ~34 px de letra). */
@@ -114,7 +137,7 @@ export function CheckMark({ p, size, id }: { p: number; size: number; id: string
  * subrayado) se emite solo mientras cambia: en reposo la fila no lleva transformaciones ni opacidades residuales.
  */
 export function HeadlineRow({
-  i, L, number, underline = 0, underlineOpacity = 1, quiet = 1, opacity = 1, style,
+  i, L, number, underline = 0, underlineOpacity = 1, quiet = 1, opacity = 1, style, gradientLoop,
 }: {
   i: number;
   L: ListLayout;
@@ -124,14 +147,16 @@ export function HeadlineRow({
   quiet?: number;
   opacity?: number;
   style?: React.CSSProperties;
+  /** Cuadros de un vaivén del degradado del número (`design.gradient.loop`); sin él, quieto. */
+  gradientLoop?: number;
 }) {
   const theme = useTheme();
   const root: React.CSSProperties = { position: "absolute", left: L.left, top: L.top + i * L.rowH, width: L.rowW, height: L.rowH, opacity: fade(opacity), ...style };
   const bar: React.CSSProperties = {
-    position: "absolute", left: L.barLeft, top: L.barTop, height: ROW_GAP.bar, borderRadius: theme.radius.pill, width: Math.round(L.barW * underline),
+    position: "absolute", left: L.barLeft, top: L.barTop, height: ROW_GAP.bar, borderRadius: theme.radius.pill, width: Math.round((L.barWs[i] ?? L.barW) * underline),
     background: theme.gradient.brand, boxShadow: underline > 0.02 ? `0 0 18px ${withAlpha(theme.color.accent, 0.5)}` : undefined, opacity: fade(underlineOpacity),
   };
-  const num = number ?? <GradientText>{String(i + 1).padStart(2, "0")}</GradientText>;
+  const num = number ?? <GradientText loop={gradientLoop}>{String(i + 1).padStart(2, "0")}</GradientText>;
   if (L.stacked) {
     const nameTop = L.blockTop + L.numH + L.numGap;
     const block: React.CSSProperties = { position: "absolute", left: 0, top: L.blockTop, width: L.rowW, opacity: fade(quiet) };
@@ -180,13 +205,13 @@ export function RichText({ text, bold }: { text: string; bold?: number }) {
 }
 
 /** Texto con el fragmento `highlight` pintado con el degradado del tema. */
-export function HighlightedTitle({ text, highlight }: { text: string; highlight?: string }) {
+export function HighlightedTitle({ text, highlight, loop }: { text: string; highlight?: string; loop?: number }) {
   const at = highlight ? text.indexOf(highlight) : -1;
   if (!highlight || at < 0) return <>{text}</>;
   return (
     <>
       {text.slice(0, at)}
-      <GradientText>{highlight}</GradientText>
+      <GradientText loop={loop}>{highlight}</GradientText>
       {text.slice(at + highlight.length)}
     </>
   );

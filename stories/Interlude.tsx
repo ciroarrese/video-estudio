@@ -3,7 +3,7 @@ import { GradientText, Wash, World, cameraAt, kf, zoomThrough } from "../kit";
 import { useTheme, withAlpha } from "../themes";
 import { fade, xform } from "../fx/core/math";
 import { listLayout } from "./layout";
-import { CheckMark, HeadlineRow, StoryStage, scaler, useEase } from "./shared";
+import { CheckMark, HeadlineRow, StoryStage, quietOpacity, scaler, useEase } from "./shared";
 import type { StorySpec } from "./types";
 
 /** Opacidad de las filas ya vistas (el resto del texto atenuado llega al contraste mínimo con ella, con las nubes del tema). */
@@ -38,8 +38,8 @@ export function Interlude({ spec, done, skip = [], next: nextProp }: { spec: Sto
   const n = spec.topics.length;
   const L = listLayout(spec, theme, width, height);
   const next = nextProp ?? nextTopic(n, done, skip);
-  // con nubes más opacas que las del tema (`design.clouds.opacity`) el fondo se oscurece y las filas vistas pierden contraste: se atenúan menos
-  const quietDone = Math.min(1, QUIET_DONE + Math.max(0, (spec.design?.clouds?.opacity ?? theme.cloud.opacity) - theme.cloud.opacity) * 1.2);
+  // con nubes más opacas (las del tema o las de `design.clouds`) el fondo se oscurece y las filas atenuadas pierden contraste: se atenúan menos
+  const quietDone = Math.min(1, Math.max(QUIET_DONE + Math.max(0, (spec.design?.clouds?.opacity ?? theme.cloud.opacity) - theme.cloud.opacity) * 1.2, quietOpacity(theme, spec.design?.clouds, QUIET_DONE)));
 
   const T = { check: [u(14), u(34)] as [number, number], next: [u(40), u(62)] as [number, number], fly: [u(66), u(112)] as [number, number] };
   const appear = kf(f, [0, u(14)], [0, 1], ease.out);
@@ -57,12 +57,16 @@ export function Interlude({ spec, done, skip = [], next: nextProp }: { spec: Sto
       <World camera={cam} width={width} height={height}>
         <div key={fade(appear * (1 - end)) === undefined ? "on" : "fade"} style={{ position: "absolute", left: 0, top: 0, opacity: fade(appear * (1 - end)) }}>
           {spec.topics.map((_, i) => {
-            const isDone = i < done && !skip.includes(i);
-            const justDone = i === done - 1;
+            // un tema sin escena (`skip`) no es "pendiente" ni "visto": se ve plano (atenuado, sin tilde) y nunca es el siguiente; con
+            // `topics[i].seen` se muestra tildado desde el principio, sin pulso
+            const skipped = skip.includes(i);
+            const seenFromStart = skipped && spec.topics[i]!.seen === true;
+            const isDone = (i < done && !skipped) || seenFromStart;
+            const justDone = i === done - 1 && !skipped;
             const isNext = i === next;
             const cp = justDone ? checkP : isDone ? 1 : 0;
             // las ya vistas quedan más tenues que la próxima, pero con el contraste del texto atenuado por encima del mínimo del control de calidad
-            const quiet = isDone ? quietDone + (1 - cp) * (1 - quietDone) : 1;
+            const quiet = isDone ? quietDone + (1 - cp) * (1 - quietDone) : skipped ? quietDone : 1;
             const rowIn = kf(f, [u(i * 3), u(i * 3 + 14)], [0, 1], ease.out);
             const pop = justDone ? kf(f, [T.check[1] - u(4), T.check[1] + u(2), T.check[1] + u(14)], [0, 1, 0]) : 0;
             const rowOpacity = rowIn * (isNext ? 1 : others) * (isNext ? 1 - kf(f, [T.fly[1] - u(16), T.fly[1] - u(10)], [0, 1]) : 1);
@@ -72,7 +76,7 @@ export function Interlude({ spec, done, skip = [], next: nextProp }: { spec: Sto
             const number = cp > 0 ? (
               <>
                 {/* el número queda oculto (no `opacity: 0`) bajo la tilde: sigue ocupando su lugar en la línea y no cuenta como texto */}
-                <span key={cp >= 1 ? "hidden" : fade(1 - cp) === undefined ? "full" : "fade"} style={{ opacity: fade(1 - cp), visibility: cp >= 1 ? "hidden" : undefined }}><GradientText>{String(i + 1).padStart(2, "0")}</GradientText></span>
+                <span key={cp >= 1 ? "hidden" : fade(1 - cp) === undefined ? "full" : "fade"} style={{ opacity: fade(1 - cp), visibility: cp >= 1 ? "hidden" : undefined }}><GradientText loop={spec.design?.gradient?.loop}>{String(i + 1).padStart(2, "0")}</GradientText></span>
                 <span style={{ position: "absolute", left: cl, top: ct, transform: xform({ scale: 1 + pop * 0.25 }) }}>
                   <CheckMark p={cp} size={cs} id={String(i)} />
                 </span>
@@ -92,6 +96,7 @@ export function Interlude({ spec, done, skip = [], next: nextProp }: { spec: Sto
                 quiet={quiet}
                 opacity={rowOpacity}
                 number={number}
+                gradientLoop={spec.design?.gradient?.loop}
                 underline={isNext ? nextP : 0}
                 underlineOpacity={isNext ? 1 : 0}
                 style={{ transform: xform({ x: (1 - rowIn) * 60 }) }}

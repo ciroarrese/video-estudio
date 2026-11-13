@@ -2,7 +2,7 @@
 
 Control de calidad automatico: revisa cuadros del video en Chromium **antes** de mostrarselo a una persona. Detecta los defectos de maquetacion que antes se encontraban a ojo: etiquetas cortadas, textos que se pisan, un titular que tapa contenido, letra chica, bajo contraste y datos privados en pantalla.
 
-Se usa desde un clon del repo (como `ve-render`); necesita Chromium de Playwright. Compila el runtime con vite la primera vez (`.ve-cache/bundles/`).
+Se usa desde un clon del repo (como `ve-render`); necesita Chromium de Playwright. Compila el runtime con vite la primera vez (`.ve-cache/bundles/`; con `VE_VIDEOS_DIR`, en `<VE_VIDEOS_DIR>/.ve-cache/`).
 
 ## Comandos
 
@@ -16,7 +16,7 @@ npx ve-sheet mi-video --count 12 --out ~/Escritorio/hoja.png   # --out acepta cu
 npx ve-qa mi-video --out ~/Escritorio/qa.json                  # informe JSON (--out o --json, igual en ve-privacy); imprime "informe: <ruta>"
 ```
 
-Sin `--out`, `ve-sheet` escribe `out/<id>-sheet.png` (con `--format`, `out/<id>-<formato>-sheet.png`; con `--scene`, también el sufijo de la escena).
+Sin `--out`, `ve-sheet` escribe `out/<id>-sheet.png` (con `VE_VIDEOS_DIR`, en `<VE_VIDEOS_DIR>/out/`, nunca dentro del clon; ver `render/README.md`) (con `--format`, `out/<id>-<formato>-sheet.png`; con `--scene`, también el sufijo de la escena).
 
 `ve-sheet`, `ve-qa` y `ve-privacy` aceptan `--assets <dir>` (repetible) y `--allow-missing-fonts`, igual que `ve-render`; los estáticos de una carpeta externa se sirven solos: `videos/<slug>/assets`, `videos/<slug>/audio` y `<VE_VIDEOS_DIR>/assets` (ver `render/README.md`, "Archivos del video"). Una fuente que no carga **falla** (nombra familia y URL) salvo con `--allow-missing-fonts`.
 
@@ -71,6 +71,27 @@ Poner `data-qa-ignore` en el elemento o en cualquier ancestro. El valor es una l
 
 En `covered` tambien vale el atributo en el elemento que tapa. Preferir ajustar el umbral con `--set` si el caso es general.
 
+**Callar se ve.** Al final, `ve-qa` imprime cuántos hallazgos callaron `data-qa-ignore` y `data-qa-decor` por regla (`callados (no cuentan arriba): contrast: 3 por data-qa-ignore, 12 por data-qa-decor; ...`); en el JSON, `summary.silenced`. Se calcula corriendo las reglas otra vez sin las marcas y comparando, así que un silencio nunca es invisible.
+
+**Texto coloreado solo como código redundante** (un número pintado por estado al lado de su rótulo, que no llega al contraste): es una decisión de diseño y `qa` no la trata aparte. La forma de aceptarla es `data-qa-ignore="contrast"` en ese elemento **con un comentario** que diga por qué (`{/* el estado también lo dice el rótulo */}`); el conteo de callados la deja a la vista.
+
+## Adorno de interfaz recreada: `data-qa-decor`
+
+Un tablero recreado trae mucho texto que es marco y no mensaje (menús, pestañas, barras, columnas que no se leen). Marcar el elemento (o un ancestro) con `data-qa-decor` en vez de poner varias familias de `data-qa-ignore`:
+
+```tsx
+<div data-qa-decor>{/* barra lateral y encabezados de la interfaz recreada */}</div>
+<div data-qa-decor="main">{/* adorno que ES el contenido principal del cuadro */}</div>
+```
+
+- **Fuera de `min-size` y `contrast`.** El texto de adorno no se juzga ahí. No desaparece: `ve-qa` imprime una línea `info` con cuántos textos de adorno quedaron afuera (`summary.decor`).
+- **Siguen aplicando** `clip` (un rótulo cortado se ve mal esté o no en un adorno) y `overlap` cuando el adorno pisa un texto que **no** es de adorno (adorno contra adorno no se juzga).
+- **`offscreen`** solo aplica si el adorno está marcado `data-qa-decor="main"`, es decir, si es el contenido principal del cuadro; un adorno que la cámara recorta no da hallazgos.
+- `safe-area` y `covered` no cambian.
+- El texto que lleva un mensaje (cifras, títulos, rótulos que la persona tiene que leer) **no** va en un adorno: ahí `min-size` y `contrast` hacen su trabajo.
+
+Los casos sembrados y sus contrapuntos estrictos están en `qa-defects` (cuadros 69 a 75).
+
 ## Privacidad (`ve-privacy`)
 
 Recolecta el texto renderizado en los cuadros y las cadenas de `--props`. Falla si aparece un termino de `--deny`, un correo, un numero tipo telefono, o un dominio que no sea `example.com/.org/.net`, `.test`, `.example`, `.invalid`, `localhost` ni este en `--allow`.
@@ -102,7 +123,7 @@ Lo que sale **solo** del texto pegado (no esta en ningun nodo entero) se informa
 - `makeSheet({videoId, frames|every|count, cols, scale, out, labels})` -> `{out, frames, width, height}`.
 - `runPrivacy({videoId?, deny, allow?, scanSource?, ...})` -> `{ok, findings, ...}` (`deny`/`allow` son el contenido de las listas).
 
-Las reglas son funciones puras sobre datos (`qa/rules/*.ts`); la recoleccion dentro de la pagina esta en `qa/collect.inpage.js` (JS plano, sin transpilar). El video `qa-defects` (`examples/qa-defects/`) siembra un defecto por cuadro: 0 limpio, 1 `clip`, 2 `offscreen`, 3 `overlap`, 4 `min-size`, 5 `contrast`, 6 `covered`, 7 correo y dominio. Los cuadros 8-14 son NO defectos que no deben dar errores: lavado a pantalla completa (se informa como `info`, 8), tarjeta volando sobre texto (9-10), texto decorativo tenue (11) y texto que sale del cuadro en movimiento (12-14). Los cuadros 19-21 son NO defectos: texto claro sobre un bloque de acento bajo un velo de cuadro completo cuya opacidad cambia de un cuadro al siguiente (0.45, 0.55, 0.65): `contrast` da `info`. Los cuadros 22-24 mantienen el MISMO velo quieto (0.55): el cuadro 23 (con vecinos identicos) es un error de `contrast` ("velo QUIETO"). Los cuadros 25-54 emparejan cada indulgencia nueva con su contraparte estricta (la misma situacion pero quieta, que sigue dando error): fundido lento al final de un easing (26) frente al mismo texto quieto al 51 % (29); texto oscuro que cruza una banda oscura (32) frente al quieto (35); dos textos que se cruzan a 6 px por cuadro (38) frente a los quietos (41); pastilla opaca que se desliza sobre un texto (44) frente a la quieta (47); rebaba de 5 px bajo una camara que se mueve (50, `info`) frente a la camara quieta (53, `offscreen` error). Los cuadros 55-56 son para la privacidad con el termino `mercado pago`: dos elementos distintos ("Supermercado" y "Pagó ...", 55: sin coincidencia) y el termino en una linea de spans (56: `deny-joined`). Los cuadros 57-62 emparejan el detalle que se lee al acercar con su contraparte estricta: el mismo texto chico en el plano general (57, `info`, con el resumen) y legible acercado (59), frente a un texto chico que nunca se lee (61, `min-size` error); 58, 60 y 62 son cuadros limpios para que los vecinos no parezcan movimiento. Los cuadros 63-65 son texto SVG en un anillo: `fill` oscuro con `color` CSS claro (63, sin hallazgo), `fill` claro sobre fondo claro con `color` oscuro (64, `contrast` error) y solo trazo (65, sin hallazgo). Los cuadros 66-68 son tapas invisibles: un `canvas` con `opacity:0` y un bloque `visibility:hidden` sobre un texto (66) y un `canvas` bajo un ancestro con `opacity:0` (67) no dan nada; el mismo `canvas` visible (68) es un `covered` error. Los cuadros 15-17 son defectos que las primeras reglas no veian y deben dar error: texto quieto al 50 % de opacidad con bajo contraste compuesto (15, `contrast`), tira con degradado sobre el costado izquierdo de una linea con el centro libre (16, `covered`) y texto quieto oculto por completo bajo una tarjeta (17, `covered`).
+Las reglas son funciones puras sobre datos (`qa/rules/*.ts`); la recoleccion dentro de la pagina esta en `qa/collect.inpage.js` (JS plano, sin transpilar). El video `qa-defects` (`examples/qa-defects/`) siembra un defecto por cuadro: 0 limpio, 1 `clip`, 2 `offscreen`, 3 `overlap`, 4 `min-size`, 5 `contrast`, 6 `covered`, 7 correo y dominio. Los cuadros 69-75 cubren `data-qa-decor` y el conteo de callados (cada uno con su contrapunto estricto). Los cuadros 8-14 son NO defectos que no deben dar errores: lavado a pantalla completa (se informa como `info`, 8), tarjeta volando sobre texto (9-10), texto decorativo tenue (11) y texto que sale del cuadro en movimiento (12-14). Los cuadros 19-21 son NO defectos: texto claro sobre un bloque de acento bajo un velo de cuadro completo cuya opacidad cambia de un cuadro al siguiente (0.45, 0.55, 0.65): `contrast` da `info`. Los cuadros 22-24 mantienen el MISMO velo quieto (0.55): el cuadro 23 (con vecinos identicos) es un error de `contrast` ("velo QUIETO"). Los cuadros 25-54 emparejan cada indulgencia nueva con su contraparte estricta (la misma situacion pero quieta, que sigue dando error): fundido lento al final de un easing (26) frente al mismo texto quieto al 51 % (29); texto oscuro que cruza una banda oscura (32) frente al quieto (35); dos textos que se cruzan a 6 px por cuadro (38) frente a los quietos (41); pastilla opaca que se desliza sobre un texto (44) frente a la quieta (47); rebaba de 5 px bajo una camara que se mueve (50, `info`) frente a la camara quieta (53, `offscreen` error). Los cuadros 55-56 son para la privacidad con el termino `mercado pago`: dos elementos distintos ("Supermercado" y "Pagó ...", 55: sin coincidencia) y el termino en una linea de spans (56: `deny-joined`). Los cuadros 57-62 emparejan el detalle que se lee al acercar con su contraparte estricta: el mismo texto chico en el plano general (57, `info`, con el resumen) y legible acercado (59), frente a un texto chico que nunca se lee (61, `min-size` error); 58, 60 y 62 son cuadros limpios para que los vecinos no parezcan movimiento. Los cuadros 63-65 son texto SVG en un anillo: `fill` oscuro con `color` CSS claro (63, sin hallazgo), `fill` claro sobre fondo claro con `color` oscuro (64, `contrast` error) y solo trazo (65, sin hallazgo). Los cuadros 66-68 son tapas invisibles: un `canvas` con `opacity:0` y un bloque `visibility:hidden` sobre un texto (66) y un `canvas` bajo un ancestro con `opacity:0` (67) no dan nada; el mismo `canvas` visible (68) es un `covered` error. Los cuadros 15-17 son defectos que las primeras reglas no veian y deben dar error: texto quieto al 50 % de opacidad con bajo contraste compuesto (15, `contrast`), tira con degradado sobre el costado izquierdo de una linea con el centro libre (16, `covered`) y texto quieto oculto por completo bajo una tarjeta (17, `covered`).
 
 ## Limitaciones conocidas
 

@@ -13,6 +13,7 @@ import { trackChild, trackCloser, trackPath, untrackPath } from './cleanup';
 import { digestFiles, ENCODER_SETTINGS, frameFile, planCheckFrames, framePattern, planSegments, planShards, segmentKey } from './plan';
 import { serveStatic } from './server';
 import { assetDirsFor, explicitAssetDirs } from './assets';
+import { cacheDirPorDefecto, salidaPorDefecto } from './dirs';
 import { cleanPageError, metaForFormat, NOSTAGE_QUERY, pageQuery, resolveScene, sceneRange, type VideoMeta } from './meta';
 import type { FormatName, SceneInfo } from '../engine';
 
@@ -136,9 +137,10 @@ export async function ensureBundle(root: string, cacheDir: string, runId: string
     throw new Error(`VE_VIDEOS_DIR apunta a "${videosDir}", que no existe o no es una carpeta. Pasá la ruta de la carpeta que contiene los videos (<carpeta>/<slug>/index.ts) o quitá la variable.`);
   }
   const skipTop = new Set(['node_modules', 'dist', 'out', 'render', 'docs']);
+  const skipExt = new Set(['out', 'node_modules']); // salidas por defecto de la carpeta externa: no son código del video
   if (videosDir) skipTop.add('videos');
   const files = walk(root, [], (name, depth) => name.startsWith('.') || (depth === 0 && skipTop.has(name)) || name.endsWith('.md'));
-  const ext = videosDir && existsSync(videosDir) ? walk(videosDir, [], (name) => name.startsWith('.') || name.endsWith('.md')) : [];
+  const ext = videosDir && existsSync(videosDir) ? walk(videosDir, [], (name, depth) => name.startsWith('.') || name.endsWith('.md') || (depth === 0 && skipExt.has(name))) : [];
   const cache = new FileHashCache(join(cacheDir, 'filehash.json'));
   const h = createHash('sha256').update(await hashFiles(root, files, cache));
   if (videosDir) h.update('videos-dir\0').update(await hashFiles(videosDir, ext, cache));
@@ -349,7 +351,7 @@ async function setup(o: RenderOptions, needAudio: boolean) {
   const scale = o.scale ?? 1;
   const props = o.props ?? {};
   const runId = newRunId();
-  const cacheDir = resolve(o.cacheDir ?? join(root, '.ve-cache'));
+  const cacheDir = resolve(o.cacheDir ?? cacheDirPorDefecto(root));
   mkdirSync(cacheDir, { recursive: true });
   const bundleDir = await ensureBundle(root, cacheDir, runId, log);
   const hashes = new FileHashCache(join(cacheDir, 'filehash.json'));
@@ -477,7 +479,7 @@ export async function renderVideo(options: RenderOptions): Promise<RenderResult>
       sceneIndex = sc.index;
       log(`escena "${sc.id}" (índice ${sc.index}): cuadros ${first}-${last}`);
     }
-    out = resolve(options.out ?? join('out', `${options.videoId}${suffixOf(options, sceneIndex)}.mp4`));
+    out = resolve(options.out ?? salidaPorDefecto(`${options.videoId}${suffixOf(options, sceneIndex)}.mp4`));
     outTmp = `${out}.${s.runId}.tmp.mp4`;
     trackPath(outTmp);
     if (last > meta.durationInFrames - 1) throw new RangeError(`--frames ${first}-${last} excede el video (0-${meta.durationInFrames - 1})`);
@@ -746,7 +748,7 @@ export type LoadErrorInfo = { folder: string; folders: string[]; ids: string[]; 
 /** Videos que el runtime descubrió (`examples/*` y `videos/*`) y los errores por carpeta (rota, `id` repetido) de las que no cargaron. */
 export async function discoverVideos(options: { root?: string; cacheDir?: string; log?: (m: string) => void } = {}): Promise<{ videos: VideoMeta[]; errors: LoadErrorInfo[] }> {
   const root = options.root ?? defaultRoot;
-  const cacheDir = resolve(options.cacheDir ?? join(root, '.ve-cache'));
+  const cacheDir = resolve(options.cacheDir ?? cacheDirPorDefecto(root));
   mkdirSync(cacheDir, { recursive: true });
   const bundleDir = await ensureBundle(root, cacheDir, newRunId(), options.log ?? (() => {}));
   const server = await serveStatic([...assetDirsFor(root, explicitAssetDirs()), bundleDir, join(root, 'public')], bundleDir);

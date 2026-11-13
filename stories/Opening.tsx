@@ -5,7 +5,8 @@ import { useTheme, withAlpha } from "../themes";
 import { fade, styleKey, xform } from "../fx/core/math";
 import { fitText, listLayout, openingWall, rigTransform } from "./layout";
 import { Chip, HeadlineRow, HighlightedTitle, StoryStage, scaler, useEase } from "./shared";
-import { TopicHeadline } from "./topic";
+import { TopicContext, TopicHeadline, headlineDefaults } from "./topic";
+import { wallOptions } from "./types";
 import type { StorySpec } from "./types";
 
 import { OPENING_FRAMES } from "./durations";
@@ -25,9 +26,11 @@ const DOCK_FRAMES = 26;
  * Se usa suelta (`<Opening spec />` dentro de un `Sequence` de `openingFrames(spec)` cuadros) o la arma `composeStory`.
  * `first` es el índice del tema que se atraviesa (o se acopla) al final: el primero que tiene escena (0 por defecto). `dock`
  * pisa a `spec.design.handoff`: con `true` la apertura no termina en un velo sino con el titular de ese tema acoplado arriba a
- * la izquierda (la píldora de `TopicHeadline`), y las nubes llegan al último cuadro en el punto donde arrancan en la escena.
+ * la izquierda (la píldora de `TopicHeadline`, la misma con el mismo diseño y tamaño que dibuja la escena), y las nubes llegan al último
+ * cuadro en el punto donde arrancan en la escena. `through` (pisa a `design.handoff: "through"`): se atraviesa el titular como en el velo
+ * pero sin velo y con las nubes continuas; la escena entra sobre el fondo.
  */
-export function Opening({ spec, first = 0, dock }: { spec: StorySpec; first?: number; dock?: boolean }) {
+export function Opening({ spec, first = 0, dock, through }: { spec: StorySpec; first?: number; dock?: boolean; through?: boolean }) {
   const theme = useTheme();
   const ease = useEase();
   const f = useFrame();
@@ -40,18 +43,20 @@ export function Opening({ spec, first = 0, dock }: { spec: StorySpec; first?: nu
   const cx = width / 2, cy = height / 2;
 
   const design = spec.design ?? {};
-  const docking = dock ?? design.handoff === "dock";
+  const docking = dock ?? (through ? false : design.handoff === "dock");
+  const flying = !docking && (through ?? (dock === undefined && design.handoff === "through"));
+  const wo = wallOptions(design);
   const glass = design.titleCard === "glass";
-  const wallBlur = design.wall?.blur !== false;
+  const wallBlur = wo.blurOpening;
   const target = Math.min(Math.max(0, first), n - 1);
   const gap = Math.min(16, 64 / n) * (dur / OPENING_FRAMES);
   // con acople la lista se queda hasta DOCK_FRAMES antes del final (la píldora termina de entrar en el último cuadro menos 8)
   const dockAt = Math.max(Math.round(u(120)), dur - DOCK_FRAMES);
-  const T = { titleOut: [u(78), u(100)] as [number, number], wallOff: [u(94), u(126)] as [number, number], heads: u(104), fly: (docking ? [dockAt, dockAt + 1] : [u(236), u(282)]) as [number, number] };
+  const T = { titleOut: [u(78), u(100)] as [number, number], wallOff: [u(94), u(126)] as [number, number], heads: u(104), fly: (docking ? [dockAt, dockAt + 1] : flying ? [u(246), u(292)] : [u(236), u(282)]) as [number, number] };
   const underStart = T.heads + (n - 1) * gap + u(20);
 
   // muro: avance lento de cámara con inclinación; al irse la lista se aleja
-  const dolly = kf(f, [0, u(130)], [0, 240], Easing.linear);
+  const dolly = kf(f, [0, u(130)], [0, 240 + wo.dolly], Easing.linear);
   const ry = kf(f, [0, u(130)], [-11, 6], Easing.linear);
   const rx = kf(f, [0, u(130)], [7, -3], Easing.linear);
   const wallFade = kf(f, T.wallOff, [1, 0.05]);
@@ -76,7 +81,7 @@ export function Opening({ spec, first = 0, dock }: { spec: StorySpec; first?: nu
   const dockOut = kf(f, [T.fly[0] - 2, T.fly[0] + 16], [0, 1]);
 
   return (
-    <StoryStage frame={docking ? f - dur : f} cloud={design.clouds}>
+    <StoryStage frame={docking || flying ? f - dur : f} cloud={design.clouds}>
       <div key={wallFade >= 0.9995 ? "on" : "fade"} style={{ position: "absolute", inset: 0, zIndex: 0, opacity: fade(wallFade) }}>
         {wall.map((c, i) => {
           const lit = kf(f, [u(c.on), u(c.on) + 3], [0, 1], Easing.linear);
@@ -116,7 +121,7 @@ export function Opening({ spec, first = 0, dock }: { spec: StorySpec; first?: nu
         return (
           <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", pointerEvents: "none", zIndex: 3 }}>
             <div key={styleKey(card)} style={card}>
-              <HighlightedTitle text={tf.text} highlight={spec.title.highlight} />
+              <HighlightedTitle text={tf.text} highlight={spec.title.highlight} loop={design.gradient?.loop} />
             </div>
           </div>
         );
@@ -138,6 +143,7 @@ export function Opening({ spec, first = 0, dock }: { spec: StorySpec; first?: nu
               i={i}
               L={L}
               opacity={a * opacity}
+              gradientLoop={design.gradient?.loop}
               underline={isTarget ? kf(f, [underStart, underStart + u(28)], [0, 1], ease.out) : 0}
               style={{ transform: xform({ x: dx, y: dy }), filter: a < 0.98 ? `blur(${((1 - a) * 8).toFixed(1)}px)` : undefined }}
             />
@@ -146,9 +152,12 @@ export function Opening({ spec, first = 0, dock }: { spec: StorySpec; first?: nu
       </World>
 
       {docking ? (
-        // la píldora que sigue en la escena (mismo componente, misma posición): termina de entrar en el último cuadro menos 8
-        <TopicHeadline title={spec.topics[target]!.name} number={target + 1} start={T.fly[0]} />
-      ) : (
+        // la píldora que sigue en la escena: el MISMO componente y las mismas props (tema, diseño y tamaño de la historia), así que el último
+        // cuadro de la apertura y el primero de la escena son idénticos en esa zona; termina de entrar en el último cuadro menos 8
+        <TopicContext.Provider value={{ index: target, name: spec.topics[target]!.name, line: spec.topics[target]!.line, headline: headlineDefaults(spec) }}>
+          <TopicHeadline start={T.fly[0]} />
+        </TopicContext.Provider>
+      ) : flying ? null : (
         <Wash range={[T.fly[1] - u(16), T.fly[1] - u(2)]} />
       )}
     </StoryStage>

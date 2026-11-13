@@ -18,6 +18,7 @@
     "qa": "tsx qa/cli.ts qa",
     "sheet": "tsx qa/cli.ts sheet",
     "privacy": "tsx qa/cli.ts privacy",
+    "clean": "tsx render/clean.ts",
     "audio": "tsx audio/cli.ts"
   },
   "dependencies": {

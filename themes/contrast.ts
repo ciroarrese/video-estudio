@@ -101,6 +101,44 @@ export function suggestShade(fg: string, bg: string, required: number): string |
   return best;
 }
 
+/**
+ * El color de texto más legible sobre un relleno cualquiera (celdas amarillas, naranjas, verdes...).
+ * Devuelve, entre los candidatos, el de mayor contraste con `bg`; en un empate gana el primero.
+ * Candidatos por defecto: `theme.color.text`, `onAccent` y `surface` (en ese orden). Un relleno translúcido se
+ * compone sobre blanco, como en `contrastRatio`. No avisa si ninguno llega a 4.5:1: para eso están `contrastRatio` y `qa`.
+ */
+export function readableOn(theme: Theme, bg: string, opts: { candidates?: string[] } = {}): string {
+  const c = theme.color;
+  const lista = opts.candidates?.length ? opts.candidates : [c.text, c.onAccent, c.surface];
+  let best = lista[0]!;
+  let bestRatio = -1;
+  for (const cand of lista) {
+    const r = contrastRatio(cand, bg);
+    if (r > bestRatio) {
+      best = cand;
+      bestRatio = r;
+    }
+  }
+  return best;
+}
+
+const mismoColor = (a: string, b: string) => a.trim().toLowerCase() === b.trim().toLowerCase();
+
+/** Colores [primer plano, fondo] de un par por nombre (`accent/bg`, `chart[0]/surface`, `data.estado/surface`), o `undefined` si no existe. */
+export function pairColors(theme: Theme, pair: string): [string, string] | undefined {
+  const [fgRef, bgRef] = pair.split("/");
+  if (!fgRef || !bgRef) return undefined;
+  const c = theme.color as unknown as Record<string, unknown>;
+  const bg = c[bgRef];
+  if (typeof bg !== "string") return undefined;
+  let fg: unknown;
+  const chart = /^chart\[(\d+)\]$/.exec(fgRef);
+  if (chart) fg = theme.color.chart[Number(chart[1])];
+  else if (fgRef.startsWith("data.")) fg = theme.data?.[fgRef.slice(5)];
+  else fg = c[fgRef];
+  return typeof fg === "string" ? [fg, bg] : undefined;
+}
+
 function usageText(role: string, onlyText: boolean): string[] {
   const u = ROLE_USAGE[role];
   if (!u) return [];
@@ -124,6 +162,8 @@ export function checkTheme(theme: Theme): ContrastWarning[] {
   const out: ContrastWarning[] = [];
   const ack = new Set(theme.acknowledge ?? []);
   const seen = new Set<string>();
+  /** reconocimientos con pin cuyos colores cambiaron: par -> descripción */
+  const vencidos = new Map<string, string>();
   const check = (pair: string, fg: string, bg: string, required = 4.5, role?: string) => {
     seen.add(pair);
     let ratio: number;
@@ -133,13 +173,22 @@ export function checkTheme(theme: Theme): ContrastWarning[] {
       out.push({ pair, ratio: 0, required, severity: "error", message: `${pair}: color inválido` });
       return;
     }
+    let acknowledged = ack.has(pair);
+    const pin = theme.acknowledgePins?.[pair];
+    if (acknowledged && pin && !(mismoColor(pin[0], fg) && mismoColor(pin[1], bg))) {
+      acknowledged = false;
+      vencidos.set(pair, `el reconocimiento de "${pair}" ya no corresponde: se aprobó con ${pin[0]} sobre ${pin[1]} y ahora es ${fg} sobre ${bg}`);
+    }
     if (ratio >= required) return;
-    const acknowledged = ack.has(pair);
     const severity = acknowledged ? "note" : ratio < 3 ? "error" : "warning";
     const usedBy = role ? usageText(role, required <= 3) : [];
     const suggestion = suggestShade(fg, bg, required);
     let message = `${pair}: contraste ${ratio.toFixed(2)}:1, mínimo ${required}:1 (${severity})`;
     if (acknowledged) message += " reconocido por el tema";
+    if (vencidos.has(pair)) {
+      message += `. Ojo: ${vencidos.get(pair)}`;
+      vencidos.delete(pair); // ya quedó dicho en este aviso
+    }
     if (usedBy.length) message += `. Se usa ${usedBy.join("; ")}`;
     if (suggestion) message += `. Tono más cercano que pasa: ${suggestion}`;
     out.push({
@@ -169,6 +218,11 @@ export function checkTheme(theme: Theme): ContrastWarning[] {
   for (const name of Object.keys(data)) {
     const spec = theme.dataChecks?.[name];
     for (const on of spec?.on ?? ["surface"]) check(`data.${name}/${on}`, data[name]!, c[on], spec?.min ?? 3);
+  }
+  for (const [pair, msg] of vencidos) {
+    const colors = pairColors(theme, pair);
+    const ratio = colors ? contrastRatio(colors[0], colors[1]) : 0;
+    out.push({ pair, ratio, required: 0, severity: "warning", message: `${pair}: ${msg} (el par hoy pasa el mínimo: quitalo de acknowledge o volvé a aprobarlo)` });
   }
   for (const pair of ack) {
     if (seen.has(pair)) continue;

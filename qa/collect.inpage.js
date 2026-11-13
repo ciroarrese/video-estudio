@@ -39,6 +39,15 @@
     }
     return out;
   }
+  // data-qa-decor en el elemento o un ancestro: texto de adorno de una interfaz recreada. "main" marca el adorno que ES el contenido principal del cuadro.
+  function decorOf(el) {
+    var decor = false, main = false;
+    for (var e = el; e; e = e.parentElement) {
+      var v = e.getAttribute && e.getAttribute('data-qa-decor');
+      if (v !== null && v !== undefined) { decor = true; if (v.split(/[\s,]+/).indexOf('main') >= 0) main = true; }
+    }
+    return { decor: decor, main: main };
+  }
   function pathOf(el) {
     var p = [];
     for (var e = el; e && e !== stage; e = e.parentElement) p.push(Array.prototype.indexOf.call(e.parentElement.children, e));
@@ -164,7 +173,7 @@
       rect: { x: x0, y: y0, w: x1 - x0, h: y1 - y0 }, lines: rects,
       opacity: opacityUp(el), fontPx: fontPx, scale: scale, transformed: transformed, screenPx: fontPx * scale, bold: weight >= 700,
       color: 'rgba(' + fill.r + ',' + fill.g + ',' + fill.b + ',' + fill.a + ')', transparentFill: fill.a < 0.05,
-      fadingBg: fadingSurface(el), ignore: ignoreOf(el), clips: clips,
+      fadingBg: fadingSurface(el), ignore: ignoreOf(el), decor: decorOf(el).decor, decorMain: decorOf(el).main, clips: clips,
       own: {
         sw: el.scrollWidth, cw: el.clientWidth, sh: el.scrollHeight, ch: el.clientHeight,
         ox: cs.overflowX, oy: cs.overflowY, ellipsis: cs.textOverflow === 'ellipsis',

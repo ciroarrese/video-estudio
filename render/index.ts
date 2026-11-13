@@ -6,3 +6,4 @@ export { launchChromium } from './browser';
 export type { PwBrowser, PwContext, PwPage, PwCdp } from './browser';
 export * from './meta';
 export { assetDirsFor, autoAssetDirs, explicitAssetDirs } from './assets';
+export { cacheDirPorDefecto, outDirPorDefecto, salidaPorDefecto, limpiar } from './dirs';

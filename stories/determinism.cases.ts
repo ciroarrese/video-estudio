@@ -36,6 +36,13 @@ export const CASES: Case[] = [
   { id: "o-acople", noScene: [0], spec: { title: { text: "Apertura que se acopla a la escena", highlight: "acopla" }, topics: T(4), labels: ["Uno", "Dos", "Tres"], signoff: { text: "Hasta pronto" }, design: { handoff: "dock", list: "inline" } } },
   { id: "o-parcial", noScene: [1, 3], formats: ["cuadrado"], spec: { title: { text: "Cuatro temas, dos escenas" }, topics: T(4), labels: ["A", "B", "C"], signoff: { text: "Cierre" }, design: { titleCard: "glass", wall: { columns: 8, rows: 4 } } } },
   { id: "o-solo-marca", slot: true, spec: { title: { text: "Firma solo con marca" }, topics: T(2), labels: ["X", "Y"], signoff: { tagline: "Solo la marca y una nota" }, design: { handoff: "dock" } } },
+  // ---- segunda migración: acople con lista en renglón, atravesado sin velo, bucle del degradado, opciones del muro, fondo del cierre ----
+  { id: "o-paso", spec: { title: { text: "Atravesamos el primer titular", highlight: "primer titular" }, topics: T(3), labels: ["Uno", "Dos", "Tres"], signoff: { text: "Fin" }, design: { handoff: "through", list: { layout: "inline", underline: "name" } } } },
+  { id: "o-paso-corto", noScene: [0], spec: { title: { text: "Hola" }, topics: T(2), labels: [], signoff: { text: "Chau" }, design: { handoff: "through" } } },
+  { id: "o-paso-largo", formats: ["vertical"], spec: { title: { text: "Un título muy largo para ver cómo se atraviesa el primer titular de una lista con nombres largos", highlight: "primer titular" }, topics: T(4, true), labels: ["A", "B"], signoff: { text: "Hasta la próxima", tagline: "Nota al pie" }, design: { handoff: "through" } } },
+  { id: "o-bucle", formats: ["vertical", "cuadrado"], spec: { title: { text: "Degradado en bucle", highlight: "bucle" }, topics: T(3), labels: ["Alfa", "Beta"], signoff: { text: "Gracias por **mirar**" }, design: { handoff: "dock", list: "inline", headline: { size: "sm" }, gradient: { loop: 45 } } } },
+  { id: "o-muro", spec: { title: { text: "Muro con opciones", highlight: "opciones" }, topics: T(3), labels: ["Alfa", "Beta", "Gamma"], signoff: { text: "Fin" }, design: { wall: { chipScale: 1.4, dolly: 500, depth: 1.6, blur: { opening: false, closing: true } }, closing: { bg: "surface" } } } },
+  { id: "o-vistos", noScene: [1], spec: { title: { text: "Tema visto sin escena" }, topics: T(3).map((t, i) => (i === 1 ? { ...t, seen: true } : t)), labels: [], signoff: { text: "Fin" } } },
   { id: "o-sin-escenas", noScene: [0, 1, 2], spec: { title: { text: "Solo apertura y cierre" }, topics: T(3), labels: [], signoff: { text: "Fin" } } },
 ];
 

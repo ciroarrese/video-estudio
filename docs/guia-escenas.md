@@ -10,7 +10,7 @@ Un video es una función del número de cuadro. Una escena:
 - devuelve React puro: sin estado que acumule, sin temporizadores, sin azar suelto (`random(seed)`), sin animaciones CSS;
 - calcula cada valor animado con `kf` (cuadros clave) o `interpolate`, nunca guardándolo.
 
-Formato por defecto: 1920×1080, 30 fps. Un tema (`useTheme()`) trae `color`, `font`, `radius`, `shadow`, `type` (tamaños en px, con la subescala `type.ui` para interfaces recreadas), `safe` (área segura), `motion`, `cloud` y `data` (colores con nombre propios del video: `useTheme().data.estado`, sin `#hex` en la escena; se declaran con `themeFromTokens(tokens, base, { data })`, ver `themes/README.md`).
+Formato por defecto: 1920×1080, 30 fps. Un tema (`useTheme()`) trae `color`, `font`, `radius`, `shadow`, `type` (tamaños en px, con `type.display` para textos grandes intermedios y la subescala `type.ui` para interfaces recreadas), `safe` (área segura), `motion`, `cloud` y `data` (colores con nombre propios del video: `useTheme().data.estado`, sin `#hex` en la escena; se declaran con `themeFromTokens(tokens, base, { data })`, ver `themes/README.md`).
 
 `theme.type` (valores de `neutral` y de `dark`; un tema armado desde tokens parte de ellos): son tamaños de letra en píxeles del cuadro, iguales en todos los formatos.
 
@@ -198,6 +198,7 @@ Una interfaz recreada necesita colores sin rol en `theme.color` (estados, severi
   <span style={{ color: t.data.estadoOk }}>Aprobado</span>
   ```
 
+- **Letra grande intermedia: `type.display`** (`sm` 48, `md` 56, `lg` 64 px), entre `body` y `h2`, para cifras de ficha, rótulos y títulos de panel. Si ningún escalón da el tamaño, se deriva de uno con un factor (`type.stat * 0.8`): válido; un literal (`58`) no. `h1` (96) y `hero` (120) cubren lo más grande.
 - **Letra: `type.ui`** (`xs` 15, `sm` 20, `md` 24 px): para tablas densas, fichas y menús que se leen con la cámara acercada. El control de calidad la trata aparte: un texto chico que, en otro cuadro de la misma escena, se ve a tamaño legible es `info` (no error), con una línea resumen por cuadro. Por eso cada escena con `type.ui` tiene que tener un acercamiento donde ese texto se lea; si en ningún cuadro llega al mínimo, `min-size` sigue siendo error. En pantalla completa usá `caption`, `body`, etc.
 - **Pares de la marca que no llegan a 4.5:1.** Si la marca aprobó una combinación (`accent` sobre `bg`, por ejemplo), la persona lo confirma y se reconoce en el tema con `acknowledge: ["accent/bg"]`: `checkTheme` la informa como `note` en vez de aviso y `report.notes` la lista aparte. No cambia lo que mide `qa`, que juzga el texto real en pantalla: si el texto es chico, el arreglo sigue siendo usar el tono sugerido (`suggestion`) solo para ese texto.
 
@@ -252,6 +253,8 @@ Durante una transición (tarjeta volando sobre otra, cámara en movimiento, fund
 - Dos elementos que se cruzan mientras uno se mueve (una tarjeta que vuela sobre otras, un texto que entra sobre un fondo que cambia): `overlap`, `covered` y `contrast` en `info`.
 - Una rebaba chica (hasta 6 px) bajo una cámara que se mueve: `info`.
 - Texto bajo un `Wash` a medio fundido: `info` (con el velo quieto sigue siendo error).
+
+**Adorno de interfaz recreada.** El texto que es marco de la interfaz (menús, pestañas, barras que no se leen) va bajo `data-qa-decor`: queda fuera de `min-size` y `contrast` (con una línea `info` con la cuenta), y `clip`, el `overlap` contra texto normal y el `offscreen` de lo marcado `data-qa-decor="main"` siguen aplicando. El texto que dice algo no es adorno. Un color usado solo como código redundante (un número pintado por estado junto a su rótulo) se acepta con `data-qa-ignore="contrast"` y un comentario; `qa` imprime cuántos hallazgos callaron las marcas por regla (ver `qa/README.md`).
 
 **Qué sigue pidiendo tu decisión**: un encuadre quieto que deja cortado un elemento (`offscreen` en aviso: `data-qa-ignore` con la condición del zoom, solo si la cámara está quieta), un velo que se queda a medias (error de `contrast`: es lo que ve la persona), un texto que se escribe mientras su contenedor se funde (ver arriba) y cualquier texto quieto tapado.
 

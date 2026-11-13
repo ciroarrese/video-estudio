@@ -69,6 +69,7 @@ Este repo es público: no puede llevar nombres de empresas, clientes o personas 
 
 - **En una carpeta fuera del repo**: `VE_VIDEOS_DIR=/ruta/absoluta/mis-videos bash templates/nuevo.sh escena <slug> <nombre>` crea ahí el video (con `tsconfig.json` y `env.d.ts` para el editor, a partir de `templates/externo/`) y los comandos `render`, `qa`, `sheet`, `privacy` y `npm run dev` lo descubren si la variable está definida (junto con los ejemplos). Sus fuentes, logos y audio van en `<carpeta>/assets` o `<carpeta>/<slug>/assets` (se sirven solos) y se referencian con `asset()` o con `import ... ?url`. Los tipos se revisan con `npm run typecheck:videos` (o con `npm run typecheck`, que también los mira si la variable está definida).
 - **O en `videos/`**, que está en `.gitignore` y no se sube nunca.
+- **La cache y las salidas también quedan afuera**: con `VE_VIDEOS_DIR` definida, el bundle compilado (con fuentes, logos y código de las escenas), los segmentos, los cuadros, los mp4 y las hojas se escriben en `<VE_VIDEOS_DIR>/.ve-cache/` y `<VE_VIDEOS_DIR>/out/`, nunca dentro del clon (se pueden mover con `VE_CACHE_DIR` y `VE_OUT_DIR`). `npm run clean` borra esas carpetas y las del clon. Así el clon público se puede comprimir o compartir sin arrastrar nada privado.
 - Nada privado va en `examples/`, `public/`, `docs/` ni en ningún otro archivo versionado. Lo que no puede aparecer en pantalla va en `prohibidos.txt` y se verifica con `ve-privacy`.
 
 ## Licencias

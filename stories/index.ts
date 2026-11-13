@@ -1,4 +1,4 @@
-export type { StorySpec, StoryTopic, StoryTiming, StoryDesign, TopicScene } from "./types";
+export type { StorySpec, StoryTopic, StoryTiming, StoryDesign, StoryListOptions, TopicScene } from "./types";
 export { validateSpec, parseRich, plainRich, MIN_TOPICS, MAX_TOPICS } from "./types";
 export { Opening, OPENING_FRAMES, openingFrames } from "./Opening";
 export { Interlude, INTERLUDE_FRAMES, interludeFrames, nextTopic } from "./Interlude";
@@ -9,12 +9,12 @@ export { composeStory } from "./compose";
 export type { ComposeOptions, TimelineEntry } from "./compose";
 export { defineStory, resolveTheme } from "./define";
 export type { StoryProps, ThemeInput } from "./define";
-export { useTopic, useTopicOrNull, TopicHeadline, TopicContext, TopicProvider } from "./topic";
+export { useTopic, useTopicOrNull, TopicHeadline, TopicContext, TopicProvider, headlineDefaults } from "./topic";
 // piezas para armar la historia a mano (ver "Armar a mano" en stories/README.md)
 export { StoryStage, scaler, useEase, Chip, Pill, CheckMark, HeadlineRow, HighlightedTitle, RichText, pillNumberColor } from "./shared";
 export { listLayout } from "./layout";
 export type { ListLayout } from "./layout";
-export type { TopicInfo } from "./topic";
+export type { TopicInfo, HeadlineDefaults } from "./topic";
 export { fitText } from "./layout";
 export { storyBudget, formatStoryBudget, budgetFromScenes, MIN_BLOCK_FRAMES } from "./budget";
 export type { StoryBudget } from "./budget";

@@ -32,6 +32,9 @@ const SPECS: Record<string, StorySpec> = {
   vidrio: { ...SPEC, design: { titleCard: "glass", wall: { columns: 4, rows: 5, blur: false } } },
   renglon: { ...SPEC, design: { list: "inline" } },
   acople: { ...SPEC, design: { handoff: "dock" } },
+  paso: { ...SPEC, design: { handoff: "through", list: { layout: "inline", underline: "name" } } },
+  bucle: { ...SPEC, design: { gradient: { loop: 45 }, headline: { size: "sm" }, handoff: "dock", list: "inline" } },
+  muro: { ...SPEC, design: { wall: { chipScale: 1.4, dolly: 500, depth: 1.6, blur: { opening: false, closing: true } }, closing: { bg: "surface" } } },
   titulo2: { ...SPEC, title: { text: "Hola" }, signoff: { text: "Chau" } },
   largo: { ...SPEC, title: { text: "Un título larguísimo que obliga a achicar la letra y a partirlo en renglones, a ver qué pasa" } },
 };
@@ -53,6 +56,7 @@ for (const [k, spec] of Object.entries(SPECS)) {
 PIECES["Interlude/1"] = { make: () => R(Interlude, { spec: SPEC, done: 1 }), frames: interludeFrames(SPEC) };
 PIECES["Interlude/3 (ultima)"] = { make: () => R(Interlude, { spec: SPEC, done: 3 }), frames: interludeFrames(SPEC) };
 PIECES["Interlude/2 con tema sin escena"] = { make: () => R(Interlude, { spec: SPEC, done: 1, skip: [1] }), frames: interludeFrames(SPEC) };
+PIECES["Interlude/2 con tema visto sin escena"] = { make: () => R(Interlude, { spec: { ...SPEC, topics: SPEC.topics.map((t, i) => (i === 1 ? { ...t, seen: true } : t)), design: { gradient: { loop: 45 } } }, done: 1, skip: [1] }), frames: interludeFrames(SPEC) };
 PIECES["Interlude/renglon"] = { make: () => R(Interlude, { spec: SPECS.renglon!, done: 2 }), frames: interludeFrames(SPEC) };
 PIECES["InterludeCompact/1"] = { make: () => R(InterludeCompact, { spec: SPEC, done: 1 }), frames: interludeCompactFrames(SPEC) };
 PIECES["InterludeCompact/3"] = { make: () => R(InterludeCompact, { spec: SPEC, done: 3 }), frames: interludeCompactFrames(SPEC) };
