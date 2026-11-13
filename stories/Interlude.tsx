@@ -44,22 +44,24 @@ export function Interlude({ spec, done }: { spec: StorySpec; done: number }) {
             const justDone = i === done - 1;
             const isNext = i === next;
             const cp = justDone ? checkP : isDone ? 1 : 0;
-            const quiet = isDone ? 0.45 + (1 - cp) * 0.55 : 1;
+            const quiet = isDone ? 0.5 + (1 - cp) * 0.5 : 1;
             const rowIn = kf(f, [u(i * 3), u(i * 3 + 14)], [0, 1], ease.out);
             const pop = justDone ? kf(f, [T.check[1] - u(4), T.check[1] + u(2), T.check[1] + u(14)], [0, 1, 0]) : 0;
             const rowOpacity = rowIn * (isNext ? 1 : others) * (isNext ? 1 - kf(f, [T.fly[1] - u(16), T.fly[1] - u(10)], [0, 1]) : 1);
-            const cs = L.numSize * 1.7;
+            const cs = Math.round(L.numSize * 1.5);
+            const cl = -Math.round(cs * 0.14);
+            const ct = Math.round(L.numSize * 0.5 - cs * 0.5);
             const number = cp > 0 ? (
               <>
                 <span style={{ opacity: 1 - cp }}><GradientText>{String(i + 1).padStart(2, "0")}</GradientText></span>
-                <span style={{ position: "absolute", left: -cs * 0.12, top: L.numSize * 0.5 - cs * 0.5, transform: `scale(${1 + pop * 0.25})` }}>
+                <span style={{ position: "absolute", left: cl, top: ct, transform: `scale(${1 + pop * 0.25})` }}>
                   <CheckMark p={cp} size={cs} id={String(i)} />
                 </span>
                 {pop > 0 && (
-                  <span style={{ position: "absolute", left: -cs * 0.12, top: L.numSize * 0.5 - cs * 0.5, width: cs, height: cs, borderRadius: theme.radius.pill, boxShadow: `0 0 ${pop * 40}px ${pop * 8}px ${withAlpha(theme.color.accent, 0.55 * pop)}` }} />
+                  <span style={{ position: "absolute", left: cl, top: ct, width: cs, height: cs, borderRadius: theme.radius.pill, boxShadow: `0 0 ${pop * 40}px ${pop * 8}px ${withAlpha(theme.color.accent, 0.55 * pop)}` }} />
                 )}
                 {pop > 0 && (
-                  <span style={{ position: "absolute", left: -cs * 0.12 - cs * 0.2, top: L.numSize * 0.5 - cs * 0.7, width: cs * 1.4, height: cs * 1.4, borderRadius: theme.radius.pill, border: `3px solid ${theme.color.accent}`, transform: `scale(${0.6 + (1 - pop) * 0.8})`, opacity: pop }} />
+                  <span style={{ position: "absolute", left: cl - Math.round(cs * 0.2), top: ct - Math.round(cs * 0.2), width: Math.round(cs * 1.4), height: Math.round(cs * 1.4), borderRadius: theme.radius.pill, border: `3px solid ${theme.color.accent}`, transform: `scale(${0.6 + (1 - pop) * 0.8})`, opacity: pop }} />
                 )}
               </>
             ) : undefined;

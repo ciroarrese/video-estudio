@@ -150,7 +150,7 @@ describe("layout", () => {
         const L = listLayout(s, neutral, 1920, 1080);
         expect(L.top).toBeGreaterThanOrEqual(neutral.safe.y);
         expect(L.top + n * L.rowH).toBeLessThanOrEqual(1080 - neutral.safe.y + 1);
-        expect(L.blockTop + L.nameH + 4 + L.lineH + 15).toBeLessThanOrEqual(L.rowH);
+        expect(L.blockTop + L.blockH).toBeLessThanOrEqual(L.rowH);
         const avail = L.rowW - L.numW;
         for (let i = 0; i < n; i++) {
           expect(L.names[i]!.length * 0.56 * L.nameSize).toBeLessThanOrEqual(avail + 1);
@@ -214,7 +214,7 @@ describe("no hard-coded colours leak (sentinel theme)", () => {
     for (const e of timeline) for (const k of [3, 40, 90, e.durationInFrames - 1]) assertThemed(html(<Story />, sentinel, e.from + Math.min(k, e.durationInFrames - 1)));
   });
   it("sentinel colours actually show up", () => {
-    const out = html(<Closing spec={specN(3)} scenes={scenesN(3)} />, sentinel, 300);
+    const out = html(<Closing spec={specN(3)} scenes={scenesN(3)} />, sentinel, 150);
     for (const needle of [C(11), C(31), C(61), C(141), "SentinelFont"]) expect(out).toContain(needle);
   });
 });

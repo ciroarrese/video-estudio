@@ -4,25 +4,25 @@ import { GradientText, kf } from "../kit";
 import { themeEasing } from "../kit/util";
 import { useTheme, withAlpha } from "../themes";
 import type { ListLayout } from "./layout";
-import { fitText } from "./layout";
+import { ROW_GAP, fitText } from "./layout";
 
 
 /** Escala los cuadros de un bloque cuando su duración se pisa con `timing`. */
 export const scaler = (dur: number, base: number) => (n: number) => (n * dur) / base;
 
-/** Pieza del muro: encendida = borde y texto con énfasis; `pop` agranda y da brillo un instante. */
+/** Pieza del muro (~30 px de letra): encendida = borde y texto con énfasis; `pop` agranda y da brillo un instante. */
 export function Chip({ text, lit, pop, faint }: { text: string; lit: number; pop: number; faint?: boolean }) {
   const theme = useTheme();
   const on = lit > 0.5;
-  const t = fitText(text, 340, theme.type.caption * 0.95, { min: theme.type.caption * 0.75, avg: 0.54 });
+  const t = fitText(text, 400, theme.type.caption * 0.94, { min: theme.type.caption * 0.75, avg: 0.54 });
   return (
     <div
       style={{
         padding: `${t.size * 0.5}px ${t.size * 0.9}px`,
         borderRadius: theme.radius.pill,
         background: theme.color.surface,
-        border: `2px solid ${on ? withAlpha(theme.color.accent, faint ? 0.3 : 0.5) : theme.color.border}`,
-        boxShadow: pop > 0.01 ? `${theme.shadow.md}, 0 0 ${10 + pop * 30}px ${withAlpha(theme.color.accent, 0.4 * pop)}` : theme.shadow.md,
+        border: `2px solid ${on ? withAlpha(theme.color.accent, faint ? 0.3 : 0.55) : theme.color.border}`,
+        boxShadow: pop > 0.01 ? `${theme.shadow.md}, 0 0 ${10 + pop * 34}px ${withAlpha(theme.color.accent, 0.45 * pop)}` : theme.shadow.md,
         fontSize: t.size,
         fontWeight: theme.font.weights.medium,
         color: on ? (faint ? theme.color.textMuted : theme.color.text) : theme.color.textMuted,
@@ -35,27 +35,27 @@ export function Chip({ text, lit, pop, faint }: { text: string; lit: number; pop
   );
 }
 
-/** Píldora con el número y el nombre del tema (cierre). */
+/** Píldora con el número y el nombre del tema (cierre, ~34 px de letra). */
 export function Pill({ index, name, scale = 1, glow = 0 }: { index: number; name: string; scale?: number; glow?: number }) {
   const theme = useTheme();
-  const t = fitText(name, 440, theme.type.caption * 1.05, { min: theme.type.caption * 0.78 });
+  const t = fitText(name, 560, theme.type.caption * 1.06, { min: theme.type.caption * 0.8 });
   return (
     <div
       style={{
         display: "flex",
         alignItems: "baseline",
-        gap: 14,
-        padding: `${t.size * 0.4}px ${t.size * 0.8}px`,
+        gap: 16,
+        padding: `${t.size * 0.42}px ${t.size * 0.9}px`,
         borderRadius: theme.radius.pill,
         background: theme.color.surface,
-        border: `2.5px solid ${withAlpha(theme.color.accent, 0.66)}`,
-        boxShadow: `${theme.shadow.lg}, 0 0 ${18 + glow * 30}px ${withAlpha(theme.color.accent, 0.25 + glow * 0.4)}`,
+        border: `3px solid ${withAlpha(theme.color.accent, 0.66)}`,
+        boxShadow: `${theme.shadow.lg}, 0 0 ${18 + glow * 34}px ${withAlpha(theme.color.accent, 0.25 + glow * 0.4)}`,
         whiteSpace: "nowrap",
-        transform: `scale(${scale})`,
+        transform: scale === 1 ? undefined : `scale(${scale})`,
         transformOrigin: "50% 50%",
       }}
     >
-      <GradientText style={{ fontSize: Math.max(24, t.size * 0.72), fontWeight: theme.font.weights.stat }}>{String(index + 1).padStart(2, "0")}</GradientText>
+      <GradientText style={{ fontSize: Math.max(26, t.size * 0.8), fontWeight: theme.font.weights.stat }}>{String(index + 1).padStart(2, "0")}</GradientText>
       <span style={{ fontSize: t.size, fontWeight: theme.font.weights.semibold, color: theme.color.text }}>{t.text}</span>
     </div>
   );
@@ -96,6 +96,7 @@ export function HeadlineRow({
   style?: React.CSSProperties;
 }) {
   const theme = useTheme();
+  const barTop = L.blockTop + L.nameH + ROW_GAP.a + L.lineH + ROW_GAP.b;
   return (
     <div style={{ position: "absolute", left: L.left, top: L.top + i * L.rowH, width: L.rowW, height: L.rowH, opacity, ...style }}>
       <div style={{ position: "absolute", left: 0, top: L.blockTop, width: L.rowW, opacity: quiet }}>
@@ -105,17 +106,18 @@ export function HeadlineRow({
           </span>
           <span style={{ fontSize: L.nameSize, lineHeight: `${L.nameH}px`, fontWeight: theme.font.weights.semibold, color: theme.color.text, letterSpacing: "-0.02em" }}>{L.names[i]}</span>
         </div>
-        <div style={{ marginLeft: L.numW, marginTop: 4, height: L.lineH, fontSize: L.lineSize, lineHeight: `${L.lineH}px`, color: theme.color.textMuted, whiteSpace: "nowrap" }}>{L.lines[i]}</div>
+        <div style={{ marginLeft: L.numW, marginTop: ROW_GAP.a, height: L.lineH, fontSize: L.lineSize, lineHeight: `${L.lineH}px`, color: theme.color.textMuted, whiteSpace: "nowrap" }}>{L.lines[i]}</div>
       </div>
       <div
         style={{
           position: "absolute",
           left: L.numW,
-          top: L.blockTop + L.nameH + 4 + L.lineH + 10,
-          height: 6,
+          top: barTop,
+          height: ROW_GAP.bar,
           borderRadius: theme.radius.pill,
-          width: L.barW * underline,
+          width: Math.round(L.barW * underline),
           background: theme.gradient.brand,
+          boxShadow: underline > 0.02 ? `0 0 18px ${withAlpha(theme.color.accent, 0.5)}` : undefined,
           opacity: underlineOpacity,
         }}
       />
