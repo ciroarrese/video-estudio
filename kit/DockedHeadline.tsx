@@ -9,7 +9,10 @@ export function hideFromScale(scale: number, threshold = 1, range = 0.08): numbe
   return clamp((scale - threshold) / range, 0, 1);
 }
 
-/** Píldora arriba a la izquierda con el titular de la escena; se aparta (fundido) cuando `hide` va de 0 a 1. */
+/**
+ * Píldora arriba a la izquierda con el titular de la escena; se aparta (fundido) cuando `hide` va de 0 a 1.
+ * `layout="stacked"` (por defecto) apila el subtítulo bajo el título; `layout="inline"` lo pone en la misma línea, en una sola píldora: "04 Nombre · línea".
+ */
 export function DockedHeadline({
   index,
   title,
@@ -17,6 +20,7 @@ export function DockedHeadline({
   frame,
   start = 0,
   hide = 0,
+  layout = "stacked",
 }: {
   index: number;
   title: string;
@@ -24,6 +28,7 @@ export function DockedHeadline({
   frame?: number;
   start?: number;
   hide?: number;
+  layout?: "stacked" | "inline";
 }) {
   const theme = useTheme();
   const f = useFrameOr(frame);
@@ -51,10 +56,22 @@ export function DockedHeadline({
   return (
     <div key={resting ? "rest" : "anim"} style={style}>
       <GradientText style={{ fontSize: theme.type.caption, fontWeight: theme.font.weights.stat }}>{String(index).padStart(2, "0")}</GradientText>
-      <div style={{ display: "flex", flexDirection: "column" }}>
-        <span style={{ fontSize: theme.type.caption, fontWeight: theme.font.weights.semibold, color: theme.color.text, lineHeight: 1.15 }}>{title}</span>
-        {subtitle && <span style={{ fontSize: theme.type.eyebrow * 0.85, color: theme.color.textMuted, lineHeight: 1.2 }}>{subtitle}</span>}
-      </div>
+      {layout === "inline" ? (
+        <div style={{ display: "flex", alignItems: "baseline", gap: theme.type.eyebrow * 0.4, whiteSpace: "nowrap" }}>
+          <span style={{ fontSize: theme.type.caption, fontWeight: theme.font.weights.semibold, color: theme.color.text, lineHeight: 1.15 }}>{title}</span>
+          {subtitle && (
+            <>
+              <span style={{ fontSize: theme.type.eyebrow, color: theme.color.textMuted, lineHeight: 1.15 }}>·</span>
+              <span style={{ fontSize: theme.type.eyebrow, color: theme.color.textMuted, lineHeight: 1.15 }}>{subtitle}</span>
+            </>
+          )}
+        </div>
+      ) : (
+        <div style={{ display: "flex", flexDirection: "column" }}>
+          <span style={{ fontSize: theme.type.caption, fontWeight: theme.font.weights.semibold, color: theme.color.text, lineHeight: 1.15 }}>{title}</span>
+          {subtitle && <span style={{ fontSize: theme.type.eyebrow * 0.85, color: theme.color.textMuted, lineHeight: 1.2 }}>{subtitle}</span>}
+        </div>
+      )}
     </div>
   );
 }

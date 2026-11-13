@@ -10,10 +10,10 @@ import { buildAudioGraph, resolveSrc, windowTracks, type Track } from './audio';
 import { launchChromium, type PwBrowser, type PwPage } from './browser';
 import { FileHashCache } from './filehash';
 import { trackChild, trackCloser, trackPath, untrackPath } from './cleanup';
-import { digestFiles, ENCODER_SETTINGS, evenFrames, frameFile, framePattern, planSegments, planShards, segmentKey } from './plan';
+import { digestFiles, ENCODER_SETTINGS, frameFile, planCheckFrames, framePattern, planSegments, planShards, segmentKey } from './plan';
 import { serveStatic } from './server';
 import { assetDirsFor, explicitAssetDirs } from './assets';
-import { metaForFormat, pageQuery, resolveScene, sceneRange, type VideoMeta } from './meta';
+import { metaForFormat, NOSTAGE_QUERY, pageQuery, resolveScene, sceneRange, type VideoMeta } from './meta';
 import type { FormatName, SceneInfo } from '../engine';
 
 export type RenderOptions = {
@@ -37,6 +37,10 @@ export type RenderOptions = {
   checkMaxDelta?: number;
   checkMaxRatio?: number;
   checkStrict?: boolean;
+  /** `--check`: cuadros repartidos parejos (12), cuadros por escena con nombre (6) o todos. Ver `planCheckFrames`. */
+  checkCount?: number;
+  checkPerScene?: number;
+  checkAll?: boolean;
   /** Extra static / audio directories (searched first). Además se sirven solas `videos/<slug>/assets|audio` y `<VE_VIDEOS_DIR>/assets` (ver render/assets.ts). */
   assets?: string[];
   /** Borrador: una fuente que no carga solo avisa en vez de fallar (también VE_ALLOW_MISSING_FONTS=1). */
@@ -356,8 +360,25 @@ async function setup(o: RenderOptions, needAudio: boolean) {
     await browser.close().catch(() => {});
     await server.close();
   };
-  // Dedicated page: metadata, determinism check and the single audio scan.
   try {
+    // Primero una página que solo registra los videos (no dibuja): da la carpeta de origen y con ella las carpetas de estáticos,
+    // que tienen que estar antes de que la página del video pida su primera fuente o imagen.
+    const probeShared: Shared = { error: null };
+    const probe = await openPage(browser, { width: 320, height: 180, scale: 1 }, `${server.url}/${NOSTAGE_QUERY}`, probeShared);
+    let metas: VideoMeta[];
+    try {
+      await callReady(probe.page).catch(() => undefined);
+      metas = (await probe.page.evaluate(() => (window as any).__ve.videos)) as VideoMeta[];
+    } finally {
+      await probe.context.close().catch(() => {});
+    }
+    const found = metas.find((m) => m.id === o.videoId);
+    if (found) {
+      assets = assetDirsFor(root, explicit, found.source);
+      roots.splice(0, roots.length - 2, ...assets);
+      if (assets.length) log(`estáticos: ${assets.join(', ')}`);
+    }
+    // Dedicated page: metadata, determinism check and the single audio scan.
     const shared: Shared = { error: null };
     const { page, context } = await openPage(browser, { width: 320, height: 180, scale: 1 }, pageUrl, shared);
     try {
@@ -365,13 +386,8 @@ async function setup(o: RenderOptions, needAudio: boolean) {
         throw new Error(`La pagina del video no arranco: ${e.message}`);
       });
       if (shared.error) throw shared.error;
-      const metas = (await page.evaluate(() => (window as any).__ve.videos)) as VideoMeta[];
-      const found = metas.find((m) => m.id === o.videoId);
       if (!found) throw new Error(`Video desconocido "${o.videoId}". Disponibles: ${metas.map((m) => m.id).join(', ')}`);
       const meta = metaForFormat(found, o.format);
-      assets = assetDirsFor(root, explicit, found.source);
-      roots.splice(0, roots.length - 2, ...assets);
-      if (assets.length) log(`estáticos: ${assets.join(', ')}`);
       const scenes = async (): Promise<SceneInfo[]> => (await page.evaluate(() => (window as any).__ve.scenes())) as SceneInfo[];
       let tracks: Track[] = [];
       if (needAudio) tracks = (await page.evaluate(() => (window as any).__ve.scanAudio())) as Track[];
@@ -621,16 +637,26 @@ export async function checkVideo(options: RenderOptions): Promise<CheckResult> {
   const s = await setup({ ...options, frameFormat: 'png' }, false);
   const { env, log } = s;
   try {
-    let total = env.meta.durationInFrames;
-    let offset = 0;
-    if (options.scene !== undefined) {
-      const sc = resolveScene(await s.scenes(), options.scene);
-      total = sc.durationInFrames;
-      offset = sc.from;
-      log(`escena "${sc.id}" (índice ${sc.index}): cuadros ${sc.from}-${sc.from + total - 1}`);
-    }
-    const frames = evenFrames(total, 12).map((n) => n + offset);
-    log(`check: cuadros ${frames.join(', ')}`);
+    const plan = await (async () => {
+      const common = { count: options.checkCount, perScene: options.checkPerScene, all: options.checkAll };
+      if (options.scene !== undefined) {
+        const sc = resolveScene(await s.scenes(), options.scene);
+        const [a, b] = sceneRange(sc);
+        log(`escena "${sc.id}" (índice ${sc.index}): cuadros ${a}-${b}`);
+        return planCheckFrames({ first: a, last: b, scenes: [sc], ...common });
+      }
+      if (options.frames) {
+        const [a, b] = options.frames;
+        if (b > env.meta.durationInFrames - 1) throw new RangeError(`--frames ${a}-${b} excede el video (0-${env.meta.durationInFrames - 1})`);
+        return planCheckFrames({ first: a, last: b, explicitRange: true, ...common });
+      }
+      // Por escena solo si no se pidió todo ni el video es enorme de escenas: leer las escenas recorre todos los cuadros una vez (solo DOM).
+      const scenes = options.checkAll ? [] : await s.scenes().catch(() => []);
+      return planCheckFrames({ first: 0, last: env.meta.durationInFrames - 1, scenes, ...common });
+    })();
+    const frames = plan.frames;
+    log(`check: ${plan.summary}`);
+    log(`check: cuadros ${frames.length > 60 ? `${frames.slice(0, 60).join(', ')}, ... (${frames.length} en total)` : frames.join(', ')}`);
     const det = (await s.page.evaluate((f: number[]) => (window as any).__ve.checkDeterminism(f), frames)) as { frame: number; ok: boolean; reordered?: boolean; error?: string; diffs?: string[] }[];
     for (const d of det) if (d.error) log(`check: cuadro ${d.frame}: ${d.error}`);
     const bad = det.filter((d) => !d.ok).map((d) => d.frame);
@@ -646,29 +672,35 @@ export async function checkVideo(options: RenderOptions): Promise<CheckResult> {
     const reordered = det.filter((d) => d.ok && d.reordered).length;
     if (reordered > 0) log(`check: nota: ${reordered} ${reordered === 1 ? 'cuadro difirió' : 'cuadros difirieron'} solo en el orden de atributos o estilos (no es un fallo)`);
 
-    const layoutA = new Map<number, Buffer>();
-    const layoutB = new Map<number, Buffer>();
-    // Layout A: 2 shards in order; layout B: reversed order in 3 shards (different pages, different history).
-    await captureFrames(env, frames, 2, (n, png) => void layoutA.set(n, png));
-    await captureFrames(env, [...frames].reverse(), 3, (n, png) => void layoutB.set(n, png));
     const tol: CheckTolerance = { maxDelta: options.checkMaxDelta ?? DEFAULT_TOLERANCE.maxDelta, maxRatio: options.checkMaxRatio ?? DEFAULT_TOLERANCE.maxRatio, strict: options.checkStrict ?? false };
     const mismatches: number[] = [];
     const diffs: Record<number, string> = {};
     let noisy = 0;
-    for (const n of frames) {
-      const stats = comparePngs(layoutA.get(n)!, layoutB.get(n)!);
-      if (stats.diffPixels === 0) continue;
-      noisy++;
-      const ok = withinTolerance(stats, tol) && !(tol.strict && !layoutA.get(n)!.equals(layoutB.get(n)!));
-      diffs[n] = formatDiff(stats);
-      log(`check: cuadro ${n} ${ok ? 'ruido tolerado' : 'DIFERENTE'}: ${diffs[n]}`);
-      if (!ok) {
-        mismatches.push(n);
-        if (stats.bbox) {
-          log(`check:   elementos en el bbox del cuadro ${n}:`);
-          for (const line of await describeBBox(s, n, stats.bbox)) log(`check:     ${line}`);
+    // De a tandas (no se guardan en memoria todos los PNG: con --check-all pueden ser miles).
+    const CHUNK = 48;
+    for (let at = 0; at < frames.length; at += CHUNK) {
+      const chunk = frames.slice(at, at + CHUNK);
+      const layoutA = new Map<number, Buffer>();
+      const layoutB = new Map<number, Buffer>();
+      // Layout A: 2 shards in order; layout B: reversed order in 3 shards (different pages, different history).
+      await captureFrames(env, chunk, 2, (n, png) => void layoutA.set(n, png));
+      await captureFrames(env, [...chunk].reverse(), 3, (n, png) => void layoutB.set(n, png));
+      for (const n of chunk) {
+        const stats = comparePngs(layoutA.get(n)!, layoutB.get(n)!);
+        if (stats.diffPixels === 0) continue;
+        noisy++;
+        const ok = withinTolerance(stats, tol) && !(tol.strict && !layoutA.get(n)!.equals(layoutB.get(n)!));
+        diffs[n] = formatDiff(stats);
+        log(`check: cuadro ${n} ${ok ? 'ruido tolerado' : 'DIFERENTE'}: ${diffs[n]}`);
+        if (!ok) {
+          mismatches.push(n);
+          if (stats.bbox) {
+            log(`check:   elementos en el bbox del cuadro ${n}:`);
+            for (const line of await describeBBox(s, n, stats.bbox)) log(`check:     ${line}`);
+          }
         }
       }
+      if (frames.length > CHUNK) log(`check: ${Math.min(at + CHUNK, frames.length)}/${frames.length} cuadros comparados`);
     }
     const mode = tol.strict ? 'estricto (byte a byte)' : `tolerante (ningun pixel con delta > ${tol.maxDelta}, <= ${(tol.maxRatio * 100).toFixed(3)}% con delta 2..${tol.maxDelta}, <= ${(DEFAULT_TOLERANCE.maxNoiseRatio * 100).toFixed(0)}% con delta 1)`;
     if (mismatches.length) {
@@ -676,6 +708,7 @@ export async function checkVideo(options: RenderOptions): Promise<CheckResult> {
       log(`check: ${CHECK_HINT}`);
     }
     else log(`check: PNG equivalentes en ambos layouts [${mode}]${noisy ? `, ${noisy} cuadros con ruido tolerado` : ', todos identicos'}`);
+    log(`check: ${frames.length} cuadros verificados`);
     return { ok: bad.length === 0 && mismatches.length === 0, frames, determinism: det, mismatches, diffs };
   } finally {
     await s.context.close().catch(() => {});
@@ -709,7 +742,7 @@ export async function discoverVideos(options: { root?: string; cacheDir?: string
   try {
     browser = await launchChromium();
     const shared: Shared = { error: null };
-    const { page, context } = await openPage(browser, { width: 320, height: 180, scale: 1 }, `${server.url}/`, shared);
+    const { page, context } = await openPage(browser, { width: 320, height: 180, scale: 1 }, `${server.url}/${NOSTAGE_QUERY}`, shared);
     try {
       // `ready` puede rechazar si el primer video es uno de los rotos: acá solo importa la lista y los errores.
       await page.evaluate(() => (window as any).__ve.ready as Promise<unknown>).catch(() => undefined);

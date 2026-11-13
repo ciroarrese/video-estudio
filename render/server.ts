@@ -2,7 +2,7 @@ import { createServer, type Server } from 'node:http';
 import { createReadStream, statSync } from 'node:fs';
 import { extname, join, normalize, sep } from 'node:path';
 
-const MIME: Record<string, string> = {
+export const MIME: Record<string, string> = {
   '.html': 'text/html; charset=utf-8',
   '.js': 'text/javascript; charset=utf-8',
   '.mjs': 'text/javascript; charset=utf-8',
@@ -23,7 +23,7 @@ const MIME: Record<string, string> = {
   '.mp4': 'video/mp4',
 };
 
-const fileIn = (root: string, urlPath: string): string | null => {
+export const fileIn = (root: string, urlPath: string): string | null => {
   const rel = normalize(decodeURIComponent(urlPath)).replace(/^[/\\]+/, '');
   const full = join(root, rel);
   if (full !== root && !full.startsWith(root + sep)) return null; // path traversal

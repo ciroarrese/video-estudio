@@ -10,7 +10,7 @@ Un video es una función del número de cuadro. Una escena:
 - devuelve React puro: sin estado que acumule, sin temporizadores, sin azar suelto (`random(seed)`), sin animaciones CSS;
 - calcula cada valor animado con `kf` (cuadros clave) o `interpolate`, nunca guardándolo.
 
-Formato por defecto: 1920×1080, 30 fps. Un tema (`useTheme()`) trae `color`, `font`, `radius`, `shadow`, `type` (tamaños en px), `safe` (área segura), `motion` y `cloud`.
+Formato por defecto: 1920×1080, 30 fps. Un tema (`useTheme()`) trae `color`, `font`, `radius`, `shadow`, `type` (tamaños en px, con la subescala `type.ui` para interfaces recreadas), `safe` (área segura), `motion`, `cloud` y `data` (colores con nombre propios del video: `useTheme().data.estado`, sin `#hex` en la escena; se declaran con `themeFromTokens(tokens, base, { data })`, ver `themes/README.md`).
 
 `theme.type` (valores de `neutral` y de `dark`; un tema armado desde tokens parte de ellos): son tamaños de letra en píxeles del cuadro, iguales en todos los formatos.
 
@@ -23,6 +23,7 @@ Formato por defecto: 1920×1080, 30 fps. Un tema (`useTheme()`) trae `color`, `f
 | `caption` | 32 | filas, botones, titular fijo; es el escalón "grande" de una interfaz recreada |
 | `eyebrow` | 26 | rótulos chicos, encabezados de columna; el piso para algo que no se acerca |
 | `stat` | 180 | cifra de un indicador (se usa multiplicada: `type.stat * 0.6` en una tarjeta) |
+| `ui.md` / `ui.sm` / `ui.xs` | 24 / 20 / 15 | **solo** texto de una interfaz recreada que se lee con la cámara acercada (tablas densas, fichas, menús); en pantalla completa usá los escalones de arriba |
 
 `theme.safe` es `{ x: 140, y: 110 }`: el margen seguro es la mitad por lado (70 px a los costados y 55 arriba y abajo); `DockedHeadline` se apoya justo en ese margen.
 
@@ -66,7 +67,9 @@ const cam = cameraAt(f, KEYS);            // { x, y, scale, rx, ry, blur }
 | Número que cuenta | `CountUp` (`start`, `duration`, `format?`) |
 | Texto con el degradado del tema | `GradientText` |
 | Titular que se aparta | `DockedHeadline` con `title` (o `TopicHeadline`, que dentro de una historia lee el tema y fuera de ella necesita `title`) |
-| Oscurecer los bordes al acercar | `Vignette amount={0..1}` |
+| Oscurecer los bordes al acercar | `Vignette amount={0..1}` (`color="bg"` y `strength` bajo si la escena es oscura y no querés teñirla de acento) |
+| Un panel que llega volando en profundidad | `style={{ ...flyInZ(progreso, { from: 800 }) }}` en el propio elemento (nunca `preserve-3d` ni perspectiva en un ancestro) |
+| Nubes propias de la escena | `Stage cloud={{ colors, count, blobs, opacity }}` |
 | Salida de escena | `zoomThrough` + `Wash` |
 | Mezclar escenas con tiempos | `Sequence`, `Series` (motor) |
 | Audio | `Audio` (motor) o `defineStory({ audio })` |

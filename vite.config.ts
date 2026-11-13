@@ -2,7 +2,11 @@ import { defineConfig, type Plugin } from 'vite';
 import react from '@vitejs/plugin-react';
 import { existsSync, readdirSync } from 'node:fs';
 import { relative, resolve, dirname, join, sep } from 'node:path';
+import { createReadStream } from 'node:fs';
+import { extname } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { assetDirsFor, explicitAssetDirs } from './render/assets';
+import { fileIn, MIME } from './render/server';
 
 const __dirname = fileURLToPath(new URL('.', import.meta.url));
 
@@ -125,6 +129,38 @@ function veDeps(): Plugin {
   };
 }
 
+/**
+ * Servidor de desarrollo (`npm run dev`): sirve las mismas carpetas de estáticos que render/qa/sheet/privacy
+ * (`VE_ASSETS`, `videos/<slug>/assets|audio`, `<VE_VIDEOS_DIR>/assets`; ver render/assets.ts), así `asset("x")` y las fuentes
+ * de una carpeta de afuera no dan 404. Solo actúa en `vite` (dev); el build no lo usa.
+ */
+function veAssets(): Plugin {
+  return {
+    name: 've-assets',
+    configureServer(server) {
+      server.middlewares.use((req, res, next) => {
+        if (req.method !== 'GET' && req.method !== 'HEAD') return next();
+        let pathname: string;
+        try {
+          pathname = new URL(req.url ?? '/', 'http://x').pathname;
+        } catch {
+          return next();
+        }
+        if (pathname === '/' || pathname.startsWith('/@') || pathname.endsWith('/index.html')) return next();
+        for (const root of assetDirsFor(__dirname, explicitAssetDirs())) {
+          const f = fileIn(root, pathname);
+          if (!f || f.endsWith('index.html')) continue;
+          res.writeHead(200, { 'content-type': MIME[extname(f).toLowerCase()] ?? 'application/octet-stream', 'cache-control': 'no-store' });
+          if (req.method === 'HEAD') res.end();
+          else createReadStream(f).pipe(res);
+          return;
+        }
+        next();
+      });
+    },
+  };
+}
+
 // Runtime page: engine/runtime/index.html. Static assets for asset() live in /public.
 export default defineConfig({
   root: resolve(__dirname, 'engine/runtime'),
@@ -135,7 +171,7 @@ export default defineConfig({
     alias: [{ find: /^video-estudio\/(.+)$/, replacement: resolve(__dirname, '$1') }],
     dedupe: ['react', 'react-dom'],
   },
-  plugins: [veVideosDir(), react(), veDeps()],
+  plugins: [veVideosDir(), veAssets(), react(), veDeps()],
   build: { outDir: resolve(__dirname, 'dist'), emptyOutDir: true },
   server: { fs: { allow: [resolve(__dirname), ...(extVideos ? [extVideos] : [])] } },
 });

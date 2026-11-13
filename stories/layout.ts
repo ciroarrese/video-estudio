@@ -97,6 +97,8 @@ export type ListLayout = {
   /** Arriba y a la izquierda del subrayado dentro de la fila. */
   barTop: number;
   barLeft: number;
+  /** Fila en un solo renglón (`01 Nombre · línea`); en `lines` va la línea ya ajustada y `lineSize` es su tamaño. */
+  inline?: boolean;
 };
 
 /** Parte un texto en renglones de a lo sumo `maxW` px (estimado sin medir); si pasa de `maxLines`, corta el último con "…". */
@@ -167,6 +169,53 @@ function stackedLayout(spec: StorySpec, theme: Theme, width: number, height: num
   };
 }
 
+/** Separador entre el nombre y la línea de una fila en un renglón. */
+export const INLINE_SEP = "·";
+
+/**
+ * Lista en un renglón por tema (`design.list: "inline"`, formatos anchos): `01 Nombre · línea`. El nombre va en negrita grande y la línea
+ * más chica y atenuada, en la misma línea de base. Todo cabe en el ancho seguro: primero se achican los dos (la línea hasta el 70 % del
+ * nombre) y, si aun así no entra, se corta la línea con "…". Las filas son más bajas que las apiladas y la lista queda centrada.
+ */
+function inlineLayout(spec: StorySpec, theme: Theme, width: number, height: number): ListLayout {
+  const n = spec.topics.length;
+  const region = Math.max(600, width - 2 * theme.safe.x);
+  const H = Math.max(300, height - 2 * theme.safe.y - 20);
+  const nameBase = theme.type.h1 * 0.8;
+  const rowH = Math.floor(Math.min(nameBase * 1.1 + ROW_GAP.b + ROW_GAP.bar + 70, H / n));
+  const sc = Math.min(1, (rowH - 40) / (nameBase * 1.1 + ROW_GAP.b + ROW_GAP.bar));
+  const base = nameBase * sc;
+  const numSize = Math.max(26, Math.round(base * 0.6));
+  const numW = Math.round(Math.max(base * 1.45, numSize * 2.2));
+  const avail = region - numW;
+  const sepW = (size: number) => textWidth(` ${INLINE_SEP} `, size, AVG_REG);
+  // un solo tamaño de nombre para todas: el que necesita el par más largo con la línea al 70 % del nombre
+  const ratio = 0.7;
+  const need = (t: { name: string; line: string }, size: number) => textWidth(t.name, size, AVG_BOLD) + sepW(size * ratio) + textWidth(t.line, size * ratio, AVG_REG);
+  const floor = Math.min(base, Math.max(40, base * 0.6));
+  let nameSize = base;
+  for (const t of spec.topics) {
+    const w = need(t, base);
+    if (w > avail) nameSize = Math.min(nameSize, base * (avail / w));
+  }
+  nameSize = Math.round(Math.max(floor, nameSize));
+  const lineSize = Math.round(Math.max(24, nameSize * ratio));
+  const names = spec.topics.map((t) => fitText(t.name, avail - sepW(lineSize) - lineSize * 3, nameSize, { min: nameSize }).text);
+  const lines = spec.topics.map((t, i) => fitText(t.line, Math.max(120, avail - textWidth(names[i]!, nameSize, AVG_BOLD) - sepW(lineSize)), lineSize, { min: lineSize, avg: AVG_REG }).text);
+  const nameH = Math.round(nameSize * 1.1);
+  const blockH = nameH + ROW_GAP.b + ROW_GAP.bar;
+  const blockTop = Math.floor((rowH - blockH) / 2);
+  const top = Math.round((height - n * rowH) / 2);
+  const rowText = Math.max(...names.map((s, i) => textWidth(s, nameSize, AVG_BOLD) + sepW(lineSize) + textWidth(lines[i]!, lineSize, AVG_REG)));
+  const rowW = Math.round(Math.min(region, Math.max(numW + rowText, region * 0.78)));
+  const left = Math.round((width - rowW) / 2);
+  return {
+    left, top, rowW, rowH, nameSize, lineSize, numSize, numW, nameH, lineH: nameH, blockTop, blockH, barW: rowW - numW, names, lines,
+    target: (i) => ({ x: left + numW + nameSize * 0.3, y: top + i * rowH + blockTop + nameH / 2 }),
+    stacked: false, numH: nameH, numGap: 0, lineRows: [], barTop: blockTop + nameH + ROW_GAP.b, barLeft: numW, inline: true,
+  };
+}
+
 /**
  * Lista de titulares: es lo más grande de la pantalla. Nombre ~0.8 × h1 y línea ~0.9 × body con filas de ~170 px hasta
  * 4 temas; con 5 o 6 todo se escala parejo (el nombre nunca baja de ~44 px). Todo en enteros: las posiciones
@@ -174,6 +223,7 @@ function stackedLayout(spec: StorySpec, theme: Theme, width: number, height: num
  */
 export function listLayout(spec: StorySpec, theme: Theme, width: number, height: number): ListLayout {
   if (height / width > 1.3) return stackedLayout(spec, theme, width, height);
+  if (spec.design?.list === "inline" && width / height >= 1.3) return inlineLayout(spec, theme, width, height);
   const n = spec.topics.length;
   const region = Math.max(600, width - 2 * theme.safe.x);
   const H = Math.max(300, height - 2 * theme.safe.y - 20);
@@ -222,22 +272,28 @@ export type WallChip = { x: number; y: number; text: string };
 /** Formato alto: el muro de la apertura es más denso y con piezas más grandes. */
 export const isTall = (width: number, height: number) => height / width > 1.3;
 
-/** Muro de la apertura: 6 columnas × 6 filas en ladrillo; el azar solo mueve un poco cada pieza y le da su profundidad. */
+/**
+ * Muro de la apertura: `columns` × `rows` piezas (6 × 6 en horizontal, 3 × 12 en vertical por defecto, `spec.design.wall`) en ladrillo;
+ * el azar solo mueve un poco cada pieza y le da su profundidad. Con los valores por defecto el reparto es el de siempre.
+ */
 export function openingWall(spec: StorySpec, height = 1080, width = 1920): (WallChip & { z: number; on: number; k: number })[] {
   const fallback = spec.topics.map((t) => t.name);
   // En formatos altos las filas se separan más (el muro llena el alto); el ancho se corta solo (las piezas de afuera no se ven).
   const ky = height / 1080 > 1.2 ? height / 1080 : 1;
   const out: (WallChip & { z: number; on: number; k: number })[] = [];
   const tall = isTall(width, height);
-  for (let i = 0; i < 36; i++) {
-    const col = tall ? i % 3 : i % 6;
-    const row = tall ? Math.floor(i / 3) : Math.floor(i / 6);
+  const w = spec.design?.wall;
+  const cols = w?.columns ?? (tall ? 3 : 6);
+  const rows = w?.rows ?? (tall ? 12 : 6);
+  for (let i = 0; i < cols * rows; i++) {
+    const col = i % cols;
+    const row = Math.floor(i / cols);
     if (tall) {
-      // 3 columnas × 12 filas en ladrillo, piezas a escala 1,15 que cubren el alto del cuadro
+      // piezas a escala 1,15 que cubren el alto del cuadro (3 columnas separadas 410 px y 12 filas, por defecto)
       out.push({
         text: labelAt(spec.labels, i, fallback),
-        x: Math.round((col - 1) * 410 + (row % 2 ? 100 : -100) + (random(`x${i}`) - 0.5) * 30),
-        y: Math.round((row - 5.5) * (height / 12.2) + (random(`y${i}`) - 0.5) * 20),
+        x: Math.round((col - (cols - 1) / 2) * (1230 / cols) + (row % 2 ? 100 : -100) + (random(`x${i}`) - 0.5) * 30),
+        y: Math.round((row - (rows - 1) / 2) * ((height / 12.2) * (12 / rows)) + (random(`y${i}`) - 0.5) * 20),
         z: Math.round(-250 + random(`z${i}`) * 360),
         on: 10 + random(`on${i}`) * 60,
         k: 1.15,
@@ -246,8 +302,8 @@ export function openingWall(spec: StorySpec, height = 1080, width = 1920): (Wall
     }
     out.push({
       text: labelAt(spec.labels, i, fallback),
-      x: Math.round((col - 2.5) * 400 + (row % 2) * 200 - 100 + (random(`x${i}`) - 0.5) * 40),
-      y: Math.round((-420 + row * 168) * ky + (random(`y${i}`) - 0.5) * 24),
+      x: Math.round((col - (cols - 1) / 2) * (2400 / cols) + (row % 2) * 200 - 100 + (random(`x${i}`) - 0.5) * 40),
+      y: Math.round((-420 + row * (840 / (rows - 1))) * ky + (random(`y${i}`) - 0.5) * 24),
       z: Math.round(-300 + random(`z${i}`) * 440),
       on: 10 + random(`on${i}`) * 60,
       k: 1,

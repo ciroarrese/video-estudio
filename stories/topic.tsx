@@ -2,7 +2,16 @@ import { createContext, useContext } from "react";
 import { DockedHeadline } from "../kit";
 import { fitText } from "./layout";
 
-export type TopicInfo = { index: number; name: string; line: string };
+export type TopicInfo = {
+  index: number;
+  name: string;
+  line: string;
+  /** La apertura terminó acoplando el titular de este tema (`design.handoff: "dock"`): `TopicHeadline` arranca ya puesto, sin volver a entrar. */
+  docked?: boolean;
+};
+
+/** Cuadros que tarda en entrar la píldora del titular (los de `DockedHeadline`). */
+const DOCK_IN = 18;
 
 export const TopicContext = createContext<TopicInfo | null>(null);
 
@@ -31,7 +40,8 @@ function warnOnce(msg: string) {
 
 /**
  * Titular del tema (píldora arriba a la izquierda) ya armado con el nombre y la línea del tema.
- * La escena decide cuándo mostrarlo (`start`) y cuándo apartarlo (`hide`, 0..1, p. ej. `hideFromScale(cam.scale)`).
+ * La escena decide cuándo mostrarlo (`start`) y cuándo apartarlo (`hide`, 0..1, p. ej. `hideFromScale(cam.scale)`). Si la apertura
+ * terminó acoplando este titular (`design.handoff: "dock"`) ya está puesto en el cuadro 0 y `start` no se usa.
  *
  * Fuera de una historia (escena renderizada sola) no hay tema: usa `title` y `number` (1 por defecto) si los pasás; si no pasás
  * `title`, no dibuja nada y avisa una vez en la consola. Dentro de una historia, `title`/`number` pisan al tema.
@@ -43,5 +53,7 @@ export function TopicHeadline({ start = 0, hide = 0, frame, title, number }: { s
     warnOnce("TopicHeadline: no hay tema (la escena se renderiza fuera de una historia) y falta la prop `title`; no se dibuja el titular. Pasá title=\"...\" para verla sola.");
     return null;
   }
-  return <DockedHeadline index={number ?? (t ? t.index + 1 : 1)} title={fitText(name, 760, 32, { min: 22 }).text} start={start} hide={hide} frame={frame} />;
+  // con la apertura acoplada la píldora ya está puesta desde el cuadro 0 de la escena: su entrada ocurrió al final de la apertura
+  const at = t?.docked && title === undefined ? Math.min(start, -DOCK_IN) : start;
+  return <DockedHeadline index={number ?? (t ? t.index + 1 : 1)} title={fitText(name, 760, 32, { min: 22 }).text} start={at} hide={hide} frame={frame} />;
 }

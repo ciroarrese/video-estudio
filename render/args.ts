@@ -52,11 +52,17 @@ export const USAGE = `Uso: ve-render <videoId> [opciones]
   --keep-frames          Conservar los PNG junto a la salida
   --frame-format png|jpeg  Formato de captura (png sin perdida, por defecto; jpeg mas rapido)
   --jpeg-quality N       Calidad JPEG 1-100 (por defecto 95)
-  --assets <dir>         Directorio extra con archivos estaticos y de audio (repetible)
+  --assets <dir>         Directorio extra con archivos estaticos y de audio (repetible; también VE_ASSETS).
+                         Se sirven solas videos/<slug>/assets, videos/<slug>/audio y <VE_VIDEOS_DIR>/assets
   --check                Verificar determinismo en vez de codificar (tolerante por defecto)
   --check-max-delta N    Con --check: maxima diferencia por canal tolerada (por defecto 2)
   --check-max-ratio R    Con --check: fraccion maxima de pixeles distintos (por defecto 0.001 = 0.1%)
   --check-strict         Con --check: comparacion byte a byte
+  --check-count N        Con --check: cuadros repartidos parejos en el rango (por defecto 12)
+  --check-per-scene N    Con --check: cuadros por escena con nombre, varios cerca del inicio (por defecto 6)
+  --check-all            Con --check: todos los cuadros del rango (lento)
+                         (con --frames a-b se verifica dentro del rango; con --scene, dentro de la escena)
+  --allow-missing-fonts  Borrador: una fuente que no carga avisa en vez de fallar (también VE_ALLOW_MISSING_FONTS=1)
   -h, --help             Esta ayuda
 `;
 
@@ -90,6 +96,10 @@ export function parseCliArgs(argv: string[]): CliOptions {
         'check-max-delta': { type: 'string' },
         'check-max-ratio': { type: 'string' },
         'check-strict': { type: 'boolean' },
+        'check-count': { type: 'string' },
+        'check-per-scene': { type: 'string' },
+        'check-all': { type: 'boolean' },
+        'allow-missing-fonts': { type: 'boolean' },
         assets: { type: 'string', multiple: true },
         format: { type: 'string' },
         scene: { type: 'string' },
@@ -110,6 +120,7 @@ export function parseCliArgs(argv: string[]): CliOptions {
     return { videoId: '', props: {}, scale: 1, crf: 18, segment: 150, audio: true, cache: true, keepFrames: false, frameFormat: 'png', jpegQuality: 95, check: false, checkMaxDelta: 2, checkMaxRatio: 0.001, checkStrict: false, assets: [], allowMissingFonts: false, checkAll: false, list: true, listScenes: false, help: false };
   }
   if (positionals.length !== 1) throw new Error('Falta <videoId> (o sobran argumentos posicionales)');
+  if ((v['check-count'] !== undefined || v['check-per-scene'] !== undefined || v['check-all']) && !v.check && !v['check-strict']) throw new Error('--check-count, --check-per-scene y --check-all van con --check');
 
   const format = parseFormat(v.format);
   if (v.scene !== undefined && v.scene === '') throw new Error('--scene necesita un id o un índice');
@@ -174,6 +185,10 @@ export function parseCliArgs(argv: string[]): CliOptions {
     checkMaxDelta,
     checkMaxRatio,
     checkStrict: !!v['check-strict'],
+    checkCount: v['check-count'] === undefined ? undefined : int('--check-count', v['check-count'], 1),
+    checkPerScene: v['check-per-scene'] === undefined ? undefined : int('--check-per-scene', v['check-per-scene'], 1),
+    checkAll: !!v['check-all'],
+    allowMissingFonts: !!v['allow-missing-fonts'],
     assets: v.assets ?? [],
     format,
     scene: v.scene,

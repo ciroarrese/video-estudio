@@ -1,4 +1,4 @@
-import type { ResolvedTheme, Theme } from "./types";
+import type { ResolvedTheme } from "./types";
 import { resolveTheme } from "./data";
 import { neutral } from "./neutral";
 import { deepClone, deepFreeze } from "./util";

@@ -36,6 +36,9 @@ export function metaForFormat(meta: VideoMeta, format?: FormatName): VideoMeta &
   return { ...meta, width: size.width, height: size.height, format };
 }
 
+/** URL de la página runtime que solo registra los videos (lista, carpeta de origen, errores de carga) sin dibujar ninguno. */
+export const NOSTAGE_QUERY = '?nostage=1';
+
 /** Parámetros de la URL de la página runtime. */
 export function pageQuery(videoId: string, props: Record<string, unknown>, format?: FormatName, opts: { allowMissingFonts?: boolean } = {}): string {
   return `?video=${encodeURIComponent(videoId)}${Object.keys(props).length ? `&props=${encodeURIComponent(JSON.stringify(props))}` : ''}${format ? `&format=${format}` : ''}${opts.allowMissingFonts ? '&fonts=warn' : ''}`;

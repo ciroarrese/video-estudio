@@ -1,5 +1,5 @@
 import React, { useLayoutEffect, useState } from "react";
-import { holdRender, releaseRender } from "../engine";
+import { holdRender, releaseRender, reportFontFailure } from "../engine";
 import { ThemeProvider } from "../themes";
 import type { Theme } from "../themes";
 import { firstFamily, fontFaceCss } from "./fonts";
@@ -32,9 +32,31 @@ export function useThemeFonts(theme: Theme): number {
         setLoaded((n) => n + 1);
         releaseRender(id);
       };
+      const spec = `${f.weight} 16px ${JSON.stringify(face)}`;
+      const url = (() => {
+        try {
+          return new URL(f.src, document.baseURI).href;
+        } catch {
+          return f.src;
+        }
+      })();
+      // Una fuente que no carga NO puede pasar callada: el navegador cae a la siguiente de la pila y el video sale con otra
+      // tipografía. Se informa (engine/fontCheck.ts) y el runtime lo convierte en un error de render (o un aviso, en borradores).
+      const fail = (reason: string) => reportFontFailure({ family: face, url, weight: f.weight, reason });
       try {
-        api.load(`${f.weight} 16px ${JSON.stringify(face)}`).then(done, done);
-      } catch {
+        api.load(spec).then(
+          (faces) => {
+            if (!Array.isArray(faces) || faces.length === 0) fail("el @font-face no se aplicó a ninguna cara (¿peso o familia que no coinciden?)");
+            else if (!api.check(spec)) fail("document.fonts.check dice que no quedó cargada");
+            done();
+          },
+          (e: unknown) => {
+            fail(`no se pudo descargar o leer el archivo (${e instanceof Error ? e.message : String(e)}; ¿404 o archivo dañado?)`);
+            done();
+          },
+        );
+      } catch (e) {
+        fail(String(e));
         done();
       }
     }

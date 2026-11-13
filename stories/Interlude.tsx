@@ -1,6 +1,7 @@
 import { Easing, useFrame, useVideoConfig } from "../engine";
 import { GradientText, Wash, World, cameraAt, kf, zoomThrough } from "../kit";
 import { useTheme, withAlpha } from "../themes";
+import { fade, styleKey, xform } from "../fx/core/math";
 import { listLayout } from "./layout";
 import { CheckMark, HeadlineRow, StoryStage, scaler, useEase } from "./shared";
 import type { StorySpec } from "./types";
@@ -13,11 +14,21 @@ export { INTERLUDE_FRAMES };
 export const interludeFrames = (spec: StorySpec) => spec.timing?.interlude ?? INTERLUDE_FRAMES;
 
 /**
+ * Siguiente tema que tiene escena después de los `done` primeros (índice), o -1 si no queda ninguno.
+ * `skip` son los índices de los temas sin escena (listados en la apertura y el cierre, salteados en el medio).
+ */
+export function nextTopic(n: number, done: number, skip: number[] = []): number {
+  for (let i = done; i < n; i++) if (!skip.includes(i)) return i;
+  return -1;
+}
+
+/**
  * Vuelta a la lista entre un tema y otro. `done` = cuántos temas ya se mostraron (1..n):
  * el último ganó su tilde con un pulso y se atenúa, el subrayado pasa al siguiente y se lo atraviesa.
- * Con `done === n` no hay siguiente: quedan todos tildados y la lista se desvanece.
+ * Con `done === n` (o sin más temas con escena) no hay siguiente: quedan todos tildados y la lista se desvanece.
+ * `skip` (índices de temas sin escena) los deja en la lista sin tilde y sin atravesarlos; `next` fuerza el siguiente (-1: ninguno).
  */
-export function Interlude({ spec, done }: { spec: StorySpec; done: number }) {
+export function Interlude({ spec, done, skip = [], next: nextProp }: { spec: StorySpec; done: number; skip?: number[]; next?: number }) {
   const theme = useTheme();
   const ease = useEase();
   const f = useFrame();
@@ -26,7 +37,7 @@ export function Interlude({ spec, done }: { spec: StorySpec; done: number }) {
   const u = scaler(dur, INTERLUDE_FRAMES);
   const n = spec.topics.length;
   const L = listLayout(spec, theme, width, height);
-  const next = done < n ? done : -1;
+  const next = nextProp ?? nextTopic(n, done, skip);
 
   const T = { check: [u(14), u(34)] as [number, number], next: [u(40), u(62)] as [number, number], fly: [u(66), u(112)] as [number, number] };
   const appear = kf(f, [0, u(14)], [0, 1], ease.out);
@@ -40,11 +51,11 @@ export function Interlude({ spec, done }: { spec: StorySpec; done: number }) {
   const others = next >= 0 ? 1 - kf(f, [T.fly[0] - u(6), T.fly[0] + u(12)], [0, 1]) : 1;
 
   return (
-    <StoryStage frame={f}>
+    <StoryStage frame={f} cloud={spec.design?.clouds}>
       <World camera={cam} width={width} height={height}>
-        <div style={{ position: "absolute", left: 0, top: 0, opacity: appear * (1 - end) }}>
+        <div key={fade(appear * (1 - end)) === undefined ? "on" : "fade"} style={{ position: "absolute", left: 0, top: 0, opacity: fade(appear * (1 - end)) }}>
           {spec.topics.map((_, i) => {
-            const isDone = i < done;
+            const isDone = i < done && !skip.includes(i);
             const justDone = i === done - 1;
             const isNext = i === next;
             const cp = justDone ? checkP : isDone ? 1 : 0;
@@ -58,8 +69,8 @@ export function Interlude({ spec, done }: { spec: StorySpec; done: number }) {
             const ct = Math.round(L.numSize * 0.5 - cs * 0.5);
             const number = cp > 0 ? (
               <>
-                <span style={{ opacity: 1 - cp }}><GradientText>{String(i + 1).padStart(2, "0")}</GradientText></span>
-                <span style={{ position: "absolute", left: cl, top: ct, transform: `scale(${1 + pop * 0.25})` }}>
+                {cp < 1 && <span style={{ opacity: fade(1 - cp) }}><GradientText>{String(i + 1).padStart(2, "0")}</GradientText></span>}
+                <span style={{ position: "absolute", left: cl, top: ct, transform: xform({ scale: 1 + pop * 0.25 }) }}>
                   <CheckMark p={cp} size={cs} id={String(i)} />
                 </span>
                 {pop > 0 && (
@@ -80,7 +91,7 @@ export function Interlude({ spec, done }: { spec: StorySpec; done: number }) {
                 number={number}
                 underline={isNext ? nextP : 0}
                 underlineOpacity={isNext ? 1 : 0}
-                style={{ transform: `translateX(${(1 - rowIn) * 60}px)` }}
+                style={{ transform: xform({ x: (1 - rowIn) * 60 }) }}
               />
             );
           })}
