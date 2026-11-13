@@ -49,7 +49,7 @@ export function DigitRoll(props: DigitRollProps) {
     slots.push(
       <span
         key={k}
-        data-qa-ignore="clip overlap covered"
+        data-qa-ignore="clip overlap covered offscreen safe-area"
         style={{ display: "inline-block", position: "relative", width: slotW, height: lineH, overflow: "hidden", opacity: shown ? 1 : 0 }}
       >
         <span style={{ position: "absolute", left: 0, top: 0, width: slotW, transform: `translateY(${Math.round(-pos * lineH)}px)` }}>

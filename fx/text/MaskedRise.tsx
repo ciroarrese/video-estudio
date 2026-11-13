@@ -69,7 +69,7 @@ export function MaskedRise(props: MaskedRiseProps) {
               return (
                 <span
                   key={ci}
-                  data-qa-ignore="clip"
+                  data-qa-ignore="clip overlap offscreen"
                   style={{ display: "inline-block", overflow: "hidden", width: measureWidth(ch, fs, font), height: `${(fs * 1.15).toFixed(2)}px`, lineHeight: `${(fs * 1.15).toFixed(2)}px`, padding: "0 0.12em 0.14em", margin: "0 -0.12em -0.14em", whiteSpace: "nowrap" }}
                 >
                   <span

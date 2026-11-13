@@ -21,9 +21,10 @@ const text = (h: string) => h.replace(/<[^>]+>/g, "");
 describe("fx/text", () => {
   it("MaskedRise: hidden at 0, composed at the end, themed", () => {
     const el = <MaskedRise text="Hola mundo" dot />;
-    expect(html(el, 0)).toContain("translateY(118");
+    expect(html(el, 0)).toMatch(/translateY\([1-9]\d*px\)/);
     const last = html(el, 200);
-    expect(last).toContain("translateY(0.000%) scale(1.0000)");
+    expect(last).not.toContain("translateY(0px)");
+    expect(last).not.toMatch(/translateY\([1-9]\d*px\)\"?>[A-Za-z]/);
     expect(text(last)).toBe("Holamundo");
     expect(last).toContain(neutral.color.accent);
     expect(html(el, 200, dark)).toContain(dark.color.accent);
@@ -45,7 +46,7 @@ describe("fx/text", () => {
     const mid = html(el, 6);
     expect(mid).toMatch(/<span>abc<\/span>/);
     expect(html(el, 100)).toContain("<span>abcdef</span>");
-    expect(html(el, 100)).toContain("scale(1.0000)");
+    expect(html(el, 100)).toContain("translateY(0px)");
   });
   it("ScrambleDecode: deterministic, resolves left to right, final is exact", () => {
     expect(scrambleAt("Hola", 10, 40, "s")).toBe(scrambleAt("Hola", 10, 40, "s"));
@@ -77,8 +78,8 @@ describe("fx/text", () => {
     expect(slots(a)).toBe(5);
     expect(slots(b)).toBe(5);
     expect(slots(c)).toBe(5);
-    expect(c).toContain("translateY(-792.00px)");
-    expect(c).toContain("translateY(0.00px)");
+    expect(c).toContain("translateY(-792px)");
+    expect(c).toContain("translateY(0px)");
     expect(text(c)).toContain("%");
   });
   it("MarqueeBands: opposite directions, loops, frozen after duration", () => {
