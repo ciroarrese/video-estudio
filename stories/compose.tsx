@@ -1,9 +1,9 @@
 import React from "react";
 import { Audio, Fill, Sequence } from "../engine";
+import { StoryStage } from "./shared";
 import { Closing, closingFrames } from "./Closing";
 import { Interlude, interludeFrames } from "./Interlude";
 import { Opening, openingFrames } from "./Opening";
-import { StoryStage } from "./shared";
 import { TopicContext } from "./topic";
 import { isReservedSceneId, validateSpec } from "./types";
 import type { StorySpec, TopicScene } from "./types";

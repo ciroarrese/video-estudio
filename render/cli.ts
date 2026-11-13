@@ -1,6 +1,7 @@
 import { parseCliArgs, USAGE } from './args';
 import { installSignalHandlers, isInterrupted } from './cleanup';
 import { checkVideo, discoverVideos, listScenes, renderVideo } from './render';
+import { budgetFromScenes, formatStoryBudget } from '../stories/budget';
 import { formatLoadErrors, formatSceneList, formatVideoList } from './meta';
 
 installSignalHandlers();
@@ -32,6 +33,9 @@ async function main(): Promise<number> {
     if (o.listScenes) {
       const r = await listScenes(base);
       console.log(formatSceneList(r.meta.id, r.scenes, r.meta.fps));
+      // si es una historia (defineStory), el presupuesto de cuadros por bloque (igual que `qa`)
+      const budget = budgetFromScenes(r.scenes, r.meta.fps);
+      if (budget) console.log(`\n${formatStoryBudget(budget)}`);
       return 0;
     }
     if (o.check || o.checkStrict) {

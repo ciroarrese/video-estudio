@@ -49,7 +49,7 @@ export type RenderOptions = {
 };
 
 export type RenderResult = { out: string; frames: number; seconds: number; renderedSegments: number; cachedSegments: number };
-export type CheckResult = { ok: boolean; frames: number[]; determinism: { frame: number; ok: boolean }[]; mismatches: number[]; diffs: Record<number, string> };
+export type CheckResult = { ok: boolean; frames: number[]; determinism: { frame: number; ok: boolean; reordered?: boolean }[]; mismatches: number[]; diffs: Record<number, string> };
 
 export const defaultRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 export const defaultConcurrency = () => Math.max(1, Math.min(cpus().length, 6));
@@ -615,7 +615,7 @@ export async function checkVideo(options: RenderOptions): Promise<CheckResult> {
     }
     const frames = evenFrames(total, 12).map((n) => n + offset);
     log(`check: cuadros ${frames.join(', ')}`);
-    const det = (await s.page.evaluate((f: number[]) => (window as any).__ve.checkDeterminism(f), frames)) as { frame: number; ok: boolean; error?: string; diffs?: string[] }[];
+    const det = (await s.page.evaluate((f: number[]) => (window as any).__ve.checkDeterminism(f), frames)) as { frame: number; ok: boolean; reordered?: boolean; error?: string; diffs?: string[] }[];
     for (const d of det) if (d.error) log(`check: cuadro ${d.frame}: ${d.error}`);
     const bad = det.filter((d) => !d.ok).map((d) => d.frame);
     if (bad.length) {
@@ -626,6 +626,9 @@ export async function checkVideo(options: RenderOptions): Promise<CheckResult> {
       }
       log(`check: ${CHECK_HINT}`);
     } else log('check: checkDeterminism ok');
+    // Nota discreta (no es un fallo): cuadros cuyo HTML solo difirió en el orden de atributos o de propiedades de style.
+    const reordered = det.filter((d) => d.ok && d.reordered).length;
+    if (reordered > 0) log(`check: nota: ${reordered} ${reordered === 1 ? 'cuadro difirió' : 'cuadros difirieron'} solo en el orden de atributos o estilos (no es un fallo)`);
 
     const layoutA = new Map<number, Buffer>();
     const layoutB = new Map<number, Buffer>();
