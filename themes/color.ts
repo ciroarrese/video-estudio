@@ -101,3 +101,23 @@ export function shiftColor(color: string, hueShift: number, lightShift = 0): str
   const [h, s, l] = rgbToHsl(c);
   return fromHsl(h + hueShift, s, l + lightShift);
 }
+
+/** Aplica opacidad (0..1) a un color hex, rgb(a) o hsl(a); devuelve rgba(). Un color inválido se devuelve igual. */
+export function withAlpha(color: string, alpha: number): string {
+  const c = parseColor(color);
+  if (!c) return color;
+  const a = Math.min(1, Math.max(0, alpha));
+  return `rgba(${c.r}, ${c.g}, ${c.b}, ${+a.toFixed(4)})`;
+}
+
+/**
+ * Mezcla `a` hacia `b` en `t` (0..1) y devuelve hex (el alfa de los colores se ignora). Si alguno no es válido, devuelve `a`.
+ * Sirve para superficies teñidas y para calcular el peor fondo bajo una superficie translúcida.
+ */
+export function mixColors(a: string, b: string, t: number): string {
+  const ca = parseColor(a);
+  const cb = parseColor(b);
+  if (!ca || !cb) return a;
+  const k = Math.min(1, Math.max(0, t));
+  return toHex({ r: ca.r + (cb.r - ca.r) * k, g: ca.g + (cb.g - ca.g) * k, b: ca.b + (cb.b - ca.b) * k });
+}

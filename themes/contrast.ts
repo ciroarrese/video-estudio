@@ -1,5 +1,6 @@
 import type { Theme } from "./types";
 import { parseColor, rgbToHsl, fromHsl } from "./color";
+import { styleWarnings } from "./styleCheck";
 
 function lin(c: number): number {
   const s = c / 255;
@@ -154,6 +155,8 @@ function usageText(role: string, onlyText: boolean): string[] {
  * sobre bg/surface/surfaceAlt (estado) y bg/surface (acentos), la serie `chart` sobre surface (>= 3)
  * y los colores de `theme.data` sobre las superficies que declaran en `dataChecks` (por defecto `surface`, mínimo 3).
  *
+ * También revisa `theme.style` (valores inválidos y combinaciones que dañan la lectura: ver `styleWarnings`).
+ *
  * Cada aviso trae `usedBy` (dónde usan las piezas de kit/fx/stories ese color) y `suggestion` (el tono más cercano que pasa).
  * Los pares de `theme.acknowledge` (p. ej. `"accent/bg"`) salen con severidad `note`: es una marca aprobada que se conoce;
  * `qa` sigue juzgando el texto real en pantalla.
@@ -219,13 +222,14 @@ export function checkTheme(theme: Theme): ContrastWarning[] {
     const spec = theme.dataChecks?.[name];
     for (const on of spec?.on ?? ["surface"]) check(`data.${name}/${on}`, data[name]!, c[on], spec?.min ?? 3);
   }
+  out.push(...styleWarnings(theme, contrastRatio));
   for (const [pair, msg] of vencidos) {
     const colors = pairColors(theme, pair);
     const ratio = colors ? contrastRatio(colors[0], colors[1]) : 0;
     out.push({ pair, ratio, required: 0, severity: "warning", message: `${pair}: ${msg} (el par hoy pasa el mínimo: quitalo de acknowledge o volvé a aprobarlo)` });
   }
   for (const pair of ack) {
-    if (seen.has(pair)) continue;
+    if (seen.has(pair) || pair.startsWith("style.")) continue;
     out.push({
       pair,
       ratio: 0,

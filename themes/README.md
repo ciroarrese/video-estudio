@@ -4,6 +4,7 @@ Capa que permite renderizar el mismo kit con cualquier design system. Solo depen
 
 - `neutral`: tema por defecto (claro, sistema de fuentes, azul/violeta).
 - `dark`: variante oscura.
+- `editorial`, `neon`, `papel`: tres design systems de ejemplo, inventados y genéricos, cada uno con estética propia (no solo otra paleta). Ver "Estilo".
 - `themeFromTokens(input, base = neutral)`: crea un `Theme` desde tokens.
 - `themeFromTokensWithReport(input, base)`: igual, y devuelve `{ theme, report }` con `mapped` (roles tomados de los tokens), `fallback` (roles que quedaron con el valor del tema base), `derived` (calculados, p. ej. `onAccent`) y `warnings` (colores inválidos ignorados y fallas de contraste).
 - `ThemeProvider`, `useTheme()` (devuelve `neutral` sin proveedor) y `withAlpha(color, alpha)`.
@@ -102,3 +103,59 @@ import { dark } from "./themes";
 - `themes/` no importa nada de `engine/`, por eso `ThemeScope` vive en `kit/`.
 
 Ejemplo: `examples/theme-scope`.
+
+## Estilo: `theme.style`
+
+Un design system no es solo una paleta: cambia la forma de las esquinas, el tipo de superficie, el tratamiento de los números y de la palabra resaltada, el fondo, el movimiento y la decoración. Todo eso vive en `theme.style`: opcional y parcial en el tema, **completo** en `useTheme().style` (los valores por defecto reproducen el aspecto de siempre, así que un tema sin `style` no cambia). Un valor inválido lanza un error que lista lo que se acepta (`checkTheme` lo informa como error sin lanzar). El contrato para las piezas (qué pieza cumple qué campo y cómo) está en `docs/estilo.md`.
+
+| Grupo | Campos (valores; el primero es el por defecto salvo que se indique) |
+|---|---|
+| `shape` | `corners` `pill`/`rounded`/`sharp`; `border` 0 a 6 px (1); `outlined` `true`/`false` |
+| `surface` | `kind` `solid`/`glass`/`outline`/`tinted`; `elevation` `shadow`/`flat`/`border`/`glow`; `opacity` 0,3 a 1 (0,74, del vidrio) |
+| `type` | `titleWeight` y `labelWeight` `regular`/`medium`/`semibold`/`stat` (`semibold` y `medium`); `titleTracking` -0,1 a 0,2 em (0); `eyebrowCase` `as-is`/`upper`; `eyebrowTracking` 0 a 0,4 em (0); `numerals` `gradient`/`solid`/`outline`/`muted`; `highlight` `gradient`/`underline`/`marker`/`accent` |
+| `background` | `kind` `clouds`/`plain`/`grid`/`dots`/`gradient`/`noise`; `intensity` 0 a 1 (1) |
+| `motion` | `entrance` `auto`/`rise`/`fade`/`scale`/`slide`/`wipe`; `overshoot` 0 a 0,3 (0); `stagger` 0 a 12 cuadros (4); `cameraBlur` `true`/`false`; `cameraTilt` 0 a 3 (1); `transition` `wash`/`through`/`cut`/`wipe` |
+| `decor` | `doodles` `true`/`false`; `doodleStroke` `hand`/`geometric`; `vignette` 0 a 2 (1); `accent` `bar`/`underline`/`dot`/`none`; `gradientLoop` 0 o entero >= 2 (0 = quieto) |
+| `story` | `titleCard` `solid`/`glass`; `listLayout` `stacked`/`inline`; `listUnderline` `row`/`name`; `handoff` `wash`/`dock`/`through`; `headlineSize` `md`/`sm`; `closingBg` rol de color (`bg`); `signoffBar` `true`/`false`; `wallColumns` y `wallRows` 2 a 12 o vacío (según el formato); `wallChipScale` 0,5 a 3 (1); `wallDolly` -240 a 2000 (0); `wallDepth` 0 a 3 (1); `wallBlurOpening` y `wallBlurClosing` `true`/`false` |
+| `chart` | `barRadius` `none`/`sm`/`md`/`lg`/`pill` (`md`); `lineWidth` 1 a 12 px (5); `grid` `auto`/`on`/`off`; `fill` `solid`/`gradient`/`hatched` |
+
+`STYLE_FIELDS` lista todos los campos con su valor por defecto y su descripción; `DEFAULT_STYLE` es el estilo por defecto.
+
+### Tokens
+
+Cada campo se puede declarar como token `--style-<grupo>-<campo>` en kebab (`--style-shape-corners`, `--style-surface-kind`, `--style-type-title-weight`, `--style-type-eyebrow-case`, `--style-motion-camera-blur`, `--style-decor-gradient-loop`, `--style-story-wall-chip-scale`, `--style-chart-bar-radius`...), en CSS o en JSON (`{ style: { shape: { corners: "sharp" } } }` o plano `style-shape-corners`). Los booleanos aceptan `true`/`false`/`on`/`off`/`sí`/`no`; los números, `0.8`, `80%` (donde el máximo es 1) o `2px`; `auto` o vacío en `wallColumns`/`wallRows`. Forma compacta, que pisa a los tokens:
+
+```ts
+const { theme, report } = themeFromTokensWithReport(tokens, neutral, {
+  style: { shape: { corners: "sharp" }, surface: { kind: "outline", elevation: "flat" } },
+});
+report.style.mapped;   // { "shape.corners": "options.style", "type.eyebrowCase": "style-type-eyebrow-case", ... } campo -> token de origen
+report.style.fallback; // campos que quedaron con el valor de la base
+report.style.invalid;  // [{ path, source, value, accepted }]: ignorados, con los valores que acepta el campo
+```
+
+Un valor inválido (o un `--style-...` que no existe) no lanza: se ignora, queda en `report.style.invalid` y en `report.warnings`. Un tema derivado (`themeFromTokens(tokens, base)`) hereda el estilo de su base y solo cambia lo que dicen los tokens.
+
+### Ayudas para las piezas
+
+Las piezas no leen cadenas de `theme.style`: llaman a estas ayudas (puras, deterministas, sin valores identidad en el estilo que devuelven): `cornerRadius`, `borderWidth`, `surfaceStyle`, `textStyle`, `numeralStyle`, `highlightStyle`, `backgroundLayer`, `entrance`, `settle`, `staggerFrames`, `staggerScale`, `transitionVeil`, `cameraOptions`, `doodleStyle`, `vignetteStrength`, `accentMark`, `chartStyle`, `chartFill`, `storyDefaults`, `withStoryDefaults`. Cuál usa cada pieza: `docs/estilo.md`.
+
+### `checkTheme` y el estilo
+
+Además de los colores, `checkTheme` revisa el estilo: valores inválidos (error) y las combinaciones que dañan la lectura, como un vidrio tenue sobre un fondo cargado con texto atenuado, una superficie teñida, un marcador o un patrón de fondo que bajan el contraste del texto, números atenuados, o tarjetas sin borde ni sombra que se pierden contra el fondo. Los pares se pueden reconocer en `acknowledge` con nombres como `style.surface.glass/textMuted`.
+
+## Cómo traer tu design system
+
+1. **Tokens.** Pasá los tokens (CSS con variables o JSON) a `themeFromTokensWithReport(tokens, neutral)`. Colores, fuentes, radios y sombras usan los alias de arriba; el estilo, `--style-*`. Un design system con otros nombres: renombrá los tokens o pasá `{ style: {...} }` y `{ data: {...} }`.
+2. **Adaptador e informe.** Leé `report.mapped` (qué token fue a qué rol), `report.fallback` y `report.style.fallback` (qué quedó con el valor de la base: ahí se nota qué le falta al design system), `report.style.invalid` y `report.warnings`. Un `fallback` en un color de marca es casi siempre un token mal nombrado.
+3. **Decisiones de estilo.** Para cada grupo de `style`, elegí el carácter: ¿esquinas rectas o píldoras? ¿tarjetas sólidas, de contorno, de vidrio o teñidas? ¿sombra, filo o halo? ¿el número en degradado o sólido? ¿resalte con subrayado o marcador? ¿qué fondo, qué movimiento, con o sin garabatos? Empezá por `editorial`, `neon` o `papel` como referencia (`themes/editorial.ts`, `neon.ts`, `papel.ts`: un tema entero, de 60 líneas).
+4. **Revisión.** `checkTheme(theme)` tiene que dar `[]` sin reconocimientos; si trae avisos, `suggestion` dice el tono más cercano que pasa y los de `style.*` dicen qué valor subir o bajar. Si una marca aprobada incumple un par, reconocelo con `acknowledge`.
+5. **Un video en cada formato.** Probá el design system con un video real (o `examples/design-systems`, cuando exista) en los tres formatos que el video admita: `npm run render -- <id> --check` con `--format horizontal`, `--format vertical` y `--format cuadrado`, `npm run qa -- <id> --count 40` y la hoja de cuadros (`npm run sheet -- <id> --count 12`) mirada de verdad: un estilo se ve mal antes de medirse mal.
+
+```tsx
+import { themeFromTokensWithReport, checkTheme, ThemeProvider } from "./themes";
+
+const { theme, report } = themeFromTokensWithReport(tokens, neutral, { style: { shape: { corners: "rounded" }, background: { kind: "grid" } } });
+console.log(report.style.invalid, checkTheme(theme));
+<ThemeProvider theme={theme}>{/* escenas */}</ThemeProvider>;
+```
