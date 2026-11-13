@@ -5,6 +5,7 @@ import type { Theme } from "../../themes";
 import { Cursor, Stage } from "../../kit";
 import { BarsGrow, Bars3D, DonutRing, FlowSteps, LineDraw, RadarMorph } from "../../fx/data";
 import { BeforeAfter, CardFan, ChatThread, CommandPalette, NotificationStack, PhoneScroll, TileDone, TileGrid } from "../../fx/ui";
+import { wipeFraction } from "../../fx/art";
 import { BlueprintDraw, DotWipe, HalftoneWave, LiquidBlob, LogoLand, MarkerDraw, PaperCollage, PixelBuild, RibbonTwist, SealSpin, ShapeMorph } from "../../fx/art";
 
 /** `theme`: "neutral" | "dark" (por defecto neutral); tambien acepta un objeto Theme (para pruebas). */
@@ -41,11 +42,11 @@ const entries: Entry[] = [
   { group: "art", name: "BlueprintDraw", w: 900, h: 560, render: (f, w, h) => <BlueprintDraw frame={f} width={w} height={h} duration={D} /> },
   {
     group: "art", name: "MarkerDraw", w: 560, h: 520,
-    render: (f, w, h) => (
+    render: (f, w) => (
       <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
-        <MarkerDraw frame={f} width={w} height={h} duration={30} kind="highlight" text="resaltar" />
-        <MarkerDraw frame={f - 20} width={w} height={h} duration={30} kind="underline" text="subrayar" />
-        <MarkerDraw frame={f - 40} width={w} height={h} duration={30} kind="circle" text="encerrar" />
+        <MarkerDraw frame={f} width={w} height={160} duration={30} kind="highlight" text="resaltar" />
+        <MarkerDraw frame={f - 20} width={w} height={160} duration={30} kind="underline" text="subrayar" />
+        <MarkerDraw frame={f - 40} width={w} height={160} duration={30} kind="circle" text="encerrar" />
       </div>
     ),
   },
@@ -70,7 +71,7 @@ function DotWipeDemo({ f, w, h }: { f: number; w: number; h: number }) {
   const scene = f < (ANIM - 5) * 0.5 ? "Escena A" : "Escena B";
   return (
     <div style={{ position: "relative", width: w, height: h }}>
-      <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", fontSize: theme.type.h1, fontWeight: theme.font.weights.stat, color: theme.color.text }}>{scene}</div>
+      <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", fontSize: theme.type.h1, fontWeight: theme.font.weights.stat, color: wipeFraction("inout", f / (ANIM - 5)) > 0.6 ? theme.color.onAccent : theme.color.text }}>{scene}</div>
       <DotWipe frame={f} width={w} height={h} duration={ANIM - 5} mode="inout" />
     </div>
   );

@@ -32,7 +32,7 @@ export function PhoneScroll(p: PhoneScrollProps) {
   const fs = theme.type.eyebrow;
   return (
     <PhoneFrame {...p} width={w} height={h}>
-      <div style={{ position: "absolute", left: 0, top: 0, width: scr.width, height: contentH, transform: `translateY(${(-s.offset).toFixed(2)}px)` }}>
+      <div data-qa-ignore="offscreen covered" style={{ position: "absolute", left: 0, top: 0, width: scr.width, height: contentH, transform: `translateY(${(-s.offset).toFixed(2)}px)` }}>
         {p.children ?? (
           <div>
             <div style={{ padding: "64px 26px 14px", fontSize: fs * 1.4, fontWeight: theme.font.weights.stat, color: theme.color.text }}>Actividad</div>

@@ -1,6 +1,7 @@
 import { Easing } from "../../engine";
 import { fxBox, progress, roleColor, stagger, useFx } from "../core";
 import type { ColorRole } from "../core";
+import { measureWidth } from "./measure";
 import { baseText } from "./shared";
 import type { TextFxProps } from "./shared";
 
@@ -40,6 +41,7 @@ export function MaskedRise(props: MaskedRiseProps) {
   const plan = maskedRisePlan(text, { by, duration: props.duration, dot });
   const words = text.split(/\s+/).filter(Boolean);
   const fs = props.fontSize ?? theme.type.h1;
+  const font = { family: theme.font.family, weight: props.weight ?? theme.font.weights.semibold };
   let idx = 0;
   const lastWord = words.length - 1;
   const dotP = progress(local, plan.total - 16, 16, Easing.lands);
@@ -68,11 +70,13 @@ export function MaskedRise(props: MaskedRiseProps) {
                 <span
                   key={ci}
                   data-qa-ignore="clip"
-                  style={{ display: "inline-block", overflow: "hidden", lineHeight: 1.15, padding: "0 0.02em 0.14em", margin: "0 -0.02em -0.14em" }}
+                  style={{ display: "inline-block", overflow: "hidden", width: measureWidth(ch, fs, font), height: `${(fs * 1.15).toFixed(2)}px`, lineHeight: `${(fs * 1.15).toFixed(2)}px`, padding: "0 0.12em 0.14em", margin: "0 -0.12em -0.14em", whiteSpace: "nowrap" }}
                 >
                   <span
                     style={{
-                      display: "inline-block",
+                      display: "block",
+                      // El asentado 108% -> 100% se hace con el tamano de letra (no con `scale`): una escala deja el texto rasterizado segun el historial de cuadros.
+                      fontSize: p >= 1 ? undefined : `${(fs * (1 + 0.08 * (1 - p))).toFixed(1)}px`,
                       transform: p >= 1 ? undefined : `translateY(${Math.round((1 - p) * fs * 1.36)}px)`,
                       transformOrigin: "0% 100%",
                     }}

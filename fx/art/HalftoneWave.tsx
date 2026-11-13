@@ -1,4 +1,3 @@
-import { useId } from "react";
 import { Easing } from "../../engine";
 import { fxBox, progress, useFx } from "../core";
 import type { FxProps } from "../core";
@@ -18,7 +17,7 @@ export function HalftoneWave(p: HalftoneWaveProps) {
   const dur = p.duration ?? 80;
   const sp = p.spacing ?? 28;
   const angle = p.angle ?? 0.5;
-  const uid = useId().replace(/\W/g, "");
+  const uid = `ht${w}x${h}`;
   const amp = Easing.out(progress(local, 0, dur * 0.25));
   const phase = Easing.out(progress(local, 0, dur)) * Math.PI * 2 * 3;
   const cols = Math.floor(w / sp), rows = Math.floor(h / sp);

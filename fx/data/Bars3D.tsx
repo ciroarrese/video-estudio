@@ -57,7 +57,7 @@ export function Bars3D(p: Bars3DProps) {
         const top = P(iso((x0 + x1) / 2, D / 2, z));
         const lab = P(iso((x0 + x1) / 2, D + 34, 0));
         return (
-          <g key={i}>
+          <g key={i} data-qa-ignore="offscreen">
             {z > 0.5 && (
               <>
                 <path d={poly(f.front)} fill={base} />

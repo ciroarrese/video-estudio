@@ -48,7 +48,7 @@ export function CommandPalette(p: CommandPaletteProps) {
       <div style={{ position: "absolute", left: 0, right: 0, top: 20, boxSizing: "border-box", transform: `translateY(${((1 - open) * -24).toFixed(2)}px) scale(${(0.95 + 0.05 * open).toFixed(4)})`, opacity: open, background: theme.color.surface, border: `1px solid ${theme.color.border}`, borderRadius: theme.radius.lg, boxShadow: theme.shadow.lg, overflow: "hidden" }}>
         <div style={{ display: "flex", alignItems: "center", gap: 18, padding: "0 28px", height: 92, borderBottom: `1px solid ${theme.color.border}` }}>
           <svg width={32} height={32} viewBox="0 0 32 32"><circle cx={14} cy={14} r={9} fill="none" stroke={theme.color.textMuted} strokeWidth={3} /><line x1={21} y1={21} x2={28} y2={28} stroke={theme.color.textMuted} strokeWidth={3} strokeLinecap="round" /></svg>
-          <span style={{ fontSize: fs * 1.1, color: shown ? theme.color.text : theme.color.textMuted, whiteSpace: "pre" }}>{shown || "Buscar comandos"}</span>
+          <span style={{ fontSize: fs * 1.1, color: shown ? theme.color.text : theme.color.textMuted }}>{shown || "Buscar comandos"}</span>
           <span style={{ width: 3, height: fs * 1.1, background: theme.color.accent, opacity: caret ? 1 : 0, marginLeft: -14 }} />
         </div>
         <div style={{ padding: 14, minHeight: rowH * 3 + 28 }}>

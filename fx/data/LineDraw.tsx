@@ -1,4 +1,3 @@
-import { useId } from "react";
 import { withAlpha } from "../../themes";
 import { Easing } from "../../engine";
 import { fxBox, progress, roleColor, useFx } from "../core";
@@ -37,7 +36,7 @@ export function LineDraw(p: LineDrawProps) {
   const labels = p.labels ?? data.map((_, i) => String(i + 1));
   const dur = p.duration ?? 60;
   const color = roleColor(theme, p.color ?? "accent");
-  const uid = useId().replace(/\W/g, "");
+  const uid = `ld${p.color ?? "accent"}`;
   const L = lineLayout(data, w, h);
   const tAxes = progress(local, 0, dur * 0.3, Easing.out);
   const draw = progress(local, dur * 0.1, dur * 0.8, Easing.inOut);

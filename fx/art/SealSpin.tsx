@@ -1,4 +1,3 @@
-import { useId } from "react";
 import { withAlpha } from "../../themes";
 import { Easing } from "../../engine";
 import { fxBox, progress, useFx } from "../core";
@@ -23,7 +22,7 @@ export function SealSpin(p: SealSpinProps) {
   const { local, theme } = useFx(p);
   const { width: w, height: h } = fxBox(p, { width: 520, height: 520 });
   const dur = p.duration ?? 75;
-  const uid = useId().replace(/\W/g, "");
+  const uid = `sp${w}x${h}`;
   const t = progress(local, 0, dur);
   const cx = w / 2, cy = h / 2, R = Math.min(w, h) / 2 - 16;
   const rt = R * 0.8;

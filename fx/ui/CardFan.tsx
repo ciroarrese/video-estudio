@@ -50,7 +50,7 @@ export function CardFan(p: CardFanProps) {
         const stackY = (i - (n - 1) / 2) * -3 * (1 - t);
         const enter = gT;
         return (
-          <div key={i} style={{ position: "absolute", left: (w - cw) / 2, top: h - ch - 40, width: cw, height: ch, boxSizing: "border-box", transformOrigin: "50% 130%", transform: `translate(${x.toFixed(2)}px, ${(stackY + (1 - enter) * 30).toFixed(2)}px) rotate(${a.toFixed(3)}deg)`, opacity: enter, zIndex: i, background: theme.color.surface, border: `1px solid ${theme.color.border}`, borderRadius: theme.radius.lg, boxShadow: theme.shadow.md, padding: 22, overflow: "hidden" }}>
+          <div key={i} data-qa-ignore="overlap covered" style={{ position: "absolute", left: (w - cw) / 2, top: h - ch - 40, width: cw, height: ch, boxSizing: "border-box", transformOrigin: "50% 130%", transform: `translate(${x.toFixed(2)}px, ${(stackY + (1 - enter) * 30).toFixed(2)}px) rotate(${a.toFixed(3)}deg)`, opacity: enter, zIndex: i, background: theme.color.surface, border: `1px solid ${theme.color.border}`, borderRadius: theme.radius.lg, boxShadow: theme.shadow.md, padding: 22, overflow: "hidden" }}>
             {kids ? kids[i] : (
               <>
                 <div style={{ width: 44, height: 44, borderRadius: theme.radius.pill, background: chartColor(theme, i) }} />

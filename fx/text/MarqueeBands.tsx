@@ -52,7 +52,7 @@ export function MarqueeBands(props: MarqueeBandsProps) {
           const y = box.height / 2 + (j - (n - 1) / 2) * (bh + 12) - bh / 2;
           return (
             <div key={j} style={{ position: "absolute", left: -(span - box.width) / 2, top: y, width: span, height: bh, background: roleColor(theme, pair.bg), color: roleColor(theme, pair.fg), overflow: "visible" }}>
-              <div style={{ position: "absolute", left: 0, top: 0, height: bh, width: span, display: "flex", alignItems: "center", transform: `translateX(${x.toFixed(2)}px)`, fontFamily: theme.font.family, fontWeight: font.weight, fontSize: fs, whiteSpace: "nowrap" }}>
+              <div style={{ position: "absolute", left: 0, top: 0, height: bh, width: span, display: "flex", alignItems: "center", transform: `translateX(${Math.round(x)}px)`, fontFamily: theme.font.family, fontWeight: font.weight, fontSize: fs, whiteSpace: "nowrap" }}>
                 {Array.from({ length: reps }, (_, r) => (
                   <span key={r} style={{ display: "inline-block", flex: "none", width: unit, paddingLeft: gap, boxSizing: "border-box" }}>
                     {line}

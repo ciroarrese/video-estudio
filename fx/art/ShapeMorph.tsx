@@ -1,4 +1,3 @@
-import { useId } from "react";
 import { Easing } from "../../engine";
 import { fxBox, progress, useFx } from "../core";
 import type { FxProps } from "../core";
@@ -55,7 +54,7 @@ export function ShapeMorph(p: ShapeMorphProps) {
   const { width: w, height: h } = fxBox(p, { width: 520, height: 520 });
   const shapes = p.shapes ?? ["circle", "square", "star", "hexagon", "circle"];
   const dur = p.duration ?? 80;
-  const uid = useId().replace(/\W/g, "");
+  const uid = "sm";
   const r = Math.min(w, h) * 0.36;
   const lists = shapes.map((s) => shapePoints(s, r, p.count ?? POINTS));
   const segs = lists.length - 1;

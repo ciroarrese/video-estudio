@@ -79,8 +79,8 @@ export function DigitRoll(props: DigitRollProps) {
             marginLeft: fs * 0.08,
             color: roleColor(theme, suffixColor),
             opacity: sufP > 0 ? 1 : 0,
-            transform: `translateY(${((1 - sufP) * fs * 0.5).toFixed(2)}px) scale(${(0.6 + 0.4 * sufP).toFixed(4)})`,
-            transformOrigin: "0% 100%",
+            fontSize: sufP >= 1 ? undefined : `${(fs * (0.6 + 0.4 * sufP)).toFixed(1)}px`,
+            transform: `translateY(${Math.round((1 - sufP) * fs * 0.5)}px)`,
           }}
         >
           {suffix}

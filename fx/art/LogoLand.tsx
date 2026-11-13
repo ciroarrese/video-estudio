@@ -1,4 +1,4 @@
-import { useId, useMemo } from "react";
+import { useMemo } from "react";
 import { withAlpha } from "../../themes";
 import { Easing } from "../../engine";
 import { fxBox, progress, useFx } from "../core";
@@ -32,8 +32,8 @@ export function LogoLand(p: LogoLandProps) {
   const { local, theme } = useFx(p);
   const { width: w, height: h } = fxBox(p, { width: 520, height: 520 });
   const dur = p.duration ?? 80;
-  const uid = useId().replace(/\W/g, "");
   const paths = p.paths ?? MARK;
+  const uid = `ll${Math.round(Math.min(Math.max(local, 0), dur) * 10)}n${paths.length}`;
   const dot = p.dot ?? DOT;
   const sw = p.strokeWidth ?? 24;
   const ph = landPhases(progress(local, 0, dur));

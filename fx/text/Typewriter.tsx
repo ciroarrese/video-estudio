@@ -44,7 +44,7 @@ export function Typewriter(props: TypewriterProps) {
         <span style={{ visibility: "hidden" }}>{chars.slice(count).join("")}</span>
       </span>
       {after !== undefined && (
-        <span style={{ display: "inline-block", opacity: afterP > 0 ? 1 : 0, transform: `scale(${(0.5 + 0.5 * afterP).toFixed(4)})`, transformOrigin: "0% 50%" }}>
+        <span style={{ display: "inline-block", opacity: afterP > 0 ? 1 : 0, transform: `translateY(${Math.round((1 - afterP) * fs * 0.5)}px)` }}>
           {after}
         </span>
       )}

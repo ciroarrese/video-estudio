@@ -41,13 +41,13 @@ export function NotificationStack(p: NotificationStackProps) {
         const y = offs[i]! + (1 - land[i]!) * -50;
         return (
           <div key={i} style={{ position: "absolute", left: 0, top: 0, width: w, height: ch, boxSizing: "border-box", transform: `translateY(${y.toFixed(2)}px)`, opacity: Math.min(1, a * 1.8), background: theme.color.surface, border: `1px solid ${theme.color.border}`, borderRadius: theme.radius.lg, boxShadow: theme.shadow.md, display: "flex", alignItems: "center", gap: 20, padding: "0 26px", zIndex: i }}>
-            <div style={{ width: 56, height: 56, flex: "none", borderRadius: theme.radius.pill, background: withAlpha(chartColor(theme, i), 0.18), color: chartColor(theme, i), display: "flex", alignItems: "center", justifyContent: "center", fontSize: fs * 1.2, fontWeight: theme.font.weights.stat }}>{it.title.charAt(0)}</div>
+            <div style={{ width: 56, height: 56, flex: "none", borderRadius: theme.radius.pill, background: withAlpha(chartColor(theme, i), 0.18), color: theme.color.text, display: "flex", alignItems: "center", justifyContent: "center", fontSize: fs * 1.2, fontWeight: theme.font.weights.stat }}>{it.title.charAt(0)}</div>
             <div style={{ flex: 1, minWidth: 0 }}>
               <div style={{ display: "flex", justifyContent: "space-between", gap: 12 }}>
-                <span style={{ fontSize: fs * 1.15, fontWeight: theme.font.weights.semibold, color: theme.color.text, whiteSpace: "nowrap" }}>{it.title}</span>
-                <span style={{ fontSize: fs * 0.8, color: theme.color.textMuted, whiteSpace: "nowrap" }}>{it.time}</span>
+                <span style={{ fontSize: fs * 1.15, fontWeight: theme.font.weights.semibold, color: theme.color.text }}>{it.title}</span>
+                <span style={{ fontSize: fs * 0.8, color: theme.color.textMuted }}>{it.time}</span>
               </div>
-              {it.body && <div style={{ marginTop: 6, fontSize: fs * 0.9, color: theme.color.textMuted, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{it.body}</div>}
+              {it.body && <div style={{ marginTop: 6, fontSize: fs * 0.9, color: theme.color.textMuted, maxHeight: fs * 1.3, overflow: "hidden" }}>{it.body}</div>}
             </div>
           </div>
         );
