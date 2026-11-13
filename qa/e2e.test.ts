@@ -4,6 +4,7 @@ import { launchChromium } from '../render/browser';
 import { QA_DEFECT_FRAMES as F } from '../examples/qa-defects/QaDefects';
 import { runQa } from './run';
 import { runPrivacy } from './privacy';
+import { canonicalReport, diffReports } from './repeat';
 
 const chromium = await launchChromium().then(
   (b) => b.close().then(() => true),
@@ -168,4 +169,17 @@ describe.skipIf(!chromium)('qa on the qa-defects video (e2e)', () => {
     const allowed = await runPrivacy({ videoId: 'qa-defects', frames: `${F.privacy}`, deny: '', allow: 'dominio-ficticio.com' });
     expect(allowed.ok).toBe(true);
   }, 180_000);
+
+  // Reproducibilidad: el control es una función determinista del video y las opciones. Antes el muestreo de fondos corría en el canvas de
+  // la página y devolvía colores distintos para el mismo PNG: el contraste saltaba entre corridas (fx-in-scene con neon, cuadros 184/192/222).
+  it('reproducible: dos corridas del mismo control dan informes idénticos (hallazgos y medidas), con paralelismo y con vecinos', async () => {
+    const a = await runQa({ videoId: 'qa-defects', frames: '0-24', concurrency: 3 });
+    const b = await runQa({ videoId: 'qa-defects', frames: '0-24', concurrency: 3 });
+    expect(diffReports(a, b)).toEqual([]);
+    expect(canonicalReport(a)).toBe(canonicalReport(b));
+    const o = { videoId: 'fx-in-scene', props: { theme: 'neon' }, frames: [169, 184, 192, 222, 253], concurrency: 3 };
+    const c = await runQa(o);
+    const d = await runQa(o);
+    expect(diffReports(c, d)).toEqual([]);
+  }, 300_000);
 });

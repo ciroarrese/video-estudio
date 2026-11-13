@@ -110,7 +110,8 @@ export async function runQa(o: QaOptions): Promise<QaResult> {
         warnings: findings.filter((f) => f.severity === 'warn').length,
         infos: findings.filter((f) => f.severity === 'info').length,
         byRule, ...(detail ? { detailSmallText: detail } : {}),
-        ...(Object.keys(silenced).length ? { silenced } : {}),
+        // Las claves de `silenced` se insertan en el orden en que terminan los cuadros (según el paralelismo): se ordenan para que el informe sea idéntico entre corridas.
+        ...(Object.keys(silenced).length ? { silenced: Object.fromEntries(Object.entries(silenced).sort(([a], [b]) => a.localeCompare(b))) } : {}),
         ...(decorTexts.size ? { decor: { texts: decorTexts.size, frames: decorFrames.size } } : {}), seconds: Math.round((Date.now() - t0) / 100) / 10,
       },
     };

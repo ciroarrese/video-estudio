@@ -10,6 +10,7 @@ import { salidaPorDefecto } from '../render/dirs';
 import { runPrivacy } from './privacy';
 import { failsAt, runQa } from './run';
 import { RULES } from './rules';
+import { diffReports } from './repeat';
 import { parseOverrides } from './thresholds';
 import { ALL_RULES, type Finding, type RuleId } from './types';
 
@@ -17,7 +18,7 @@ const USAGE = {
   sheet: `Uso: ve-sheet <videoId> [--frames 0,60,120 | --every N | --count 12] [--props json] [--format horizontal|vertical|cuadrado] [--scene id|índice] [--list-scenes]
              [--assets dir]... [--allow-missing-fonts] [--cols 4] [--scale 0.25] [--out out/<id>[-<formato>]-sheet.png] [--no-labels]   (--out acepta cualquier ruta, se crean las carpetas)`,
   qa: `Uso: ve-qa <videoId> [--frames 0,60,120 | --every N | --count 24] [--props json] [--format horizontal|vertical|cuadrado] [--scene id|índice] [--list-scenes] [--json salida.json | --out salida.json] [--fail-on error|warn] [--verbose] [--max 40]
-             [--assets dir]... [--allow-missing-fonts] [--rules clip,overlap,...] [--skip regla,...] [--set regla.umbral=valor]... [--concurrency N]
+             [--assets dir]... [--allow-missing-fonts] [--rules clip,overlap,...] [--skip regla,...] [--set regla.umbral=valor]... [--concurrency N] [--repeat N]
 Reglas: ${ALL_RULES.join(', ')}  (silenciar: data-qa-ignore="regla" en el elemento o un ancestro; adorno de interfaz: data-qa-decor)`,
   privacy: `Uso: ve-privacy [<videoId>] --deny lista.txt [--allow lista.txt] [--frames … | --every N | --count 24] [--props json] [--format …] [--scene id|índice] [--scan-source dir]... [--assets dir]... [--allow-missing-fonts] [--json salida.json | --out salida.json]`,
 };
@@ -126,10 +127,26 @@ async function main(cmd: string, argv: string[]): Promise<number> {
     for (const r of [...(only ?? []), ...skip]) if (!ALL_RULES.includes(r)) throw new Error(`Regla desconocida: ${r}`);
     const failOn = one(p, 'fail-on') ?? 'error';
     if (failOn !== 'error' && failOn !== 'warn') throw new Error('--fail-on debe ser error o warn');
-    const r = await runQa({
+    const repeat = num(p, 'repeat') ?? 1;
+    if (!Number.isInteger(repeat) || repeat < 1) throw new Error('--repeat debe ser un entero >= 1');
+    const qaOpts = {
       videoId: id, props, format, scene, ...sample(p), rules: (only ?? ALL_RULES).filter((x) => !skip.includes(x)),
       thresholds: parseOverrides(p.flags.get('set') ?? []), concurrency: num(p, 'concurrency'), ...common(p), log,
-    });
+    };
+    const r = await runQa(qaOpts);
+    // --repeat N: autocomprobación. Corre el mismo control N veces; si algún informe difiere del primero, imprime qué hallazgos
+    // cambian y falla (código 3): el control tiene que ser determinista. Sin diferencias, sigue como siempre con el primer informe.
+    let unstable = false;
+    for (let i = 2; i <= repeat; i++) {
+      const again = await runQa(qaOpts);
+      const diff = diffReports(r, again);
+      if (diff.length) {
+        unstable = true;
+        console.log(`\nREPETICION ${i}/${repeat}: el informe difiere de la primera corrida (${diff.length} ${diff.length === 1 ? 'diferencia' : 'diferencias'}):`);
+        for (const d of diff.slice(0, 40)) console.log(`  ${d}`);
+        if (diff.length > 40) console.log(`  … ${diff.length - 40} más`);
+      }
+    }
     printQa(r.findings, r.summary.frames, { verbose: p.bools.has('verbose'), max: p.bools.has('verbose') && one(p, 'max') === undefined ? Infinity : num(p, 'max') ?? 40 });
     const s = r.summary;
     if (s.detailSmallText) console.log(`\ninfo: ${s.detailSmallText.texts} ${s.detailSmallText.texts === 1 ? 'texto' : 'textos'} por debajo del mínimo en el plano general ${s.detailSmallText.texts === 1 ? 'se lee' : 'se leen'} al acercar dentro de su escena (detalle, no es error; ${s.detailSmallText.frames} ${s.detailSmallText.frames === 1 ? 'cuadro afectado' : 'cuadros afectados'}; --verbose lo muestra por cuadro)`);
@@ -141,6 +158,8 @@ async function main(cmd: string, argv: string[]): Promise<number> {
     const per = Object.entries(s.byRule).map(([k, v]) => `${k}=${v}`).join(' ') || 'ninguno';
     console.log(`\n${id}: ${s.frames.length} cuadros revisados en ${s.seconds}s; ${s.errors} errores, ${s.warnings} avisos, ${s.infos} info${p.bools.has('verbose') ? '' : ' (ocultos; --verbose)'} (${per})`);
     writeReport(one(p, 'out') ?? one(p, 'json'), r);
+    if (repeat > 1) console.log(unstable ? `\nrepeticiones: NO reproducible (algún informe de ${repeat} difiere del primero)` : `\nrepeticiones: ${repeat} corridas con informes idénticos (salvo el tiempo)`);
+    if (unstable) return 3;
     return failsAt(r, failOn) ? 1 : 0;
   }
 
