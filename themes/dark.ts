@@ -1,8 +1,9 @@
-import type { Theme } from "./types";
+import type { ResolvedTheme, Theme } from "./types";
+import { resolveTheme } from "./data";
 import { neutral } from "./neutral";
 import { deepClone, deepFreeze } from "./util";
 
-export const dark: Theme = deepFreeze<Theme>({
+export const dark: ResolvedTheme = deepFreeze(resolveTheme({
   ...deepClone(neutral),
   name: "dark",
   color: {
@@ -27,4 +28,4 @@ export const dark: Theme = deepFreeze<Theme>({
     lg: "0 12px 32px rgba(0,0,0,.6)",
   },
   cloud: { colors: ["#4c63d9", "#7a55e0", "#1d8ea0"], opacity: 0.28 },
-});
+}));

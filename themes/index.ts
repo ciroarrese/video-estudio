@@ -6,3 +6,4 @@ export * from "./ThemeProvider";
 export * from "./contrast";
 export { parseColor, isValidColor, shiftColor } from "./color";
 export type { RGBA } from "./color";
+export { resolveTheme, resolveColor, strictData, DEFAULT_TYPE_UI } from "./data";

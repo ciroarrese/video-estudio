@@ -21,6 +21,10 @@ export type CliOptions = {
   checkMaxRatio: number;
   checkStrict: boolean;
   assets: string[];
+  allowMissingFonts: boolean;
+  checkCount?: number;
+  checkPerScene?: number;
+  checkAll: boolean;
   format?: FormatName;
   scene?: string;
   list: boolean;
@@ -99,11 +103,11 @@ export function parseCliArgs(argv: string[]): CliOptions {
   }
   const { values: v, positionals } = parsed;
   if (v.help) {
-    return { videoId: '', props: {}, scale: 1, crf: 18, segment: 150, audio: true, cache: true, keepFrames: false, frameFormat: 'png', jpegQuality: 95, check: false, checkMaxDelta: 2, checkMaxRatio: 0.001, checkStrict: false, assets: [], list: false, listScenes: false, help: true };
+    return { videoId: '', props: {}, scale: 1, crf: 18, segment: 150, audio: true, cache: true, keepFrames: false, frameFormat: 'png', jpegQuality: 95, check: false, checkMaxDelta: 2, checkMaxRatio: 0.001, checkStrict: false, assets: [], allowMissingFonts: false, checkAll: false, list: false, listScenes: false, help: true };
   }
   if (v.list) {
     if (positionals.length) throw new Error('--list no lleva <videoId>');
-    return { videoId: '', props: {}, scale: 1, crf: 18, segment: 150, audio: true, cache: true, keepFrames: false, frameFormat: 'png', jpegQuality: 95, check: false, checkMaxDelta: 2, checkMaxRatio: 0.001, checkStrict: false, assets: [], list: true, listScenes: false, help: false };
+    return { videoId: '', props: {}, scale: 1, crf: 18, segment: 150, audio: true, cache: true, keepFrames: false, frameFormat: 'png', jpegQuality: 95, check: false, checkMaxDelta: 2, checkMaxRatio: 0.001, checkStrict: false, assets: [], allowMissingFonts: false, checkAll: false, list: true, listScenes: false, help: false };
   }
   if (positionals.length !== 1) throw new Error('Falta <videoId> (o sobran argumentos posicionales)');
 

@@ -43,6 +43,10 @@ export type SheetOptions = SampleSpec & {
   scale?: number;
   out?: string;
   labels?: boolean;
+  /** Carpetas extra de estáticos (`--assets`), como en `render`. */
+  assets?: string[];
+  /** Borrador: una fuente que no carga solo avisa. */
+  allowMissingFonts?: boolean;
   log?: (m: string) => void;
 };
 export type SheetResult = { out: string; frames: number[]; width: number; height: number };
@@ -61,7 +65,7 @@ const composeSrc = `(async function(layout, thumbs, labels, fontPx){
 })`;
 
 export async function makeSheet(o: SheetOptions): Promise<SheetResult> {
-  const session = await openSession({ videoId: o.videoId, props: o.props, format: o.format, log: o.log });
+  const session = await openSession({ videoId: o.videoId, props: o.props, format: o.format, assets: o.assets, allowMissingFonts: o.allowMissingFonts, log: o.log });
   try {
     const { meta } = session;
     const frames = sampleFrames(o, meta.durationInFrames, 12, await sceneFrames(session, o.scene));

@@ -14,12 +14,15 @@ import { ALL_RULES, type Finding, type RuleId } from './types';
 
 const USAGE = {
   sheet: `Uso: ve-sheet <videoId> [--frames 0,60,120 | --every N | --count 12] [--props json] [--format horizontal|vertical|cuadrado] [--scene id|índice] [--list-scenes]
-             [--cols 4] [--scale 0.25] [--out out/<id>[-<formato>]-sheet.png] [--no-labels]   (--out acepta cualquier ruta, se crean las carpetas)`,
+             [--assets dir]... [--allow-missing-fonts] [--cols 4] [--scale 0.25] [--out out/<id>[-<formato>]-sheet.png] [--no-labels]   (--out acepta cualquier ruta, se crean las carpetas)`,
   qa: `Uso: ve-qa <videoId> [--frames 0,60,120 | --every N | --count 24] [--props json] [--format horizontal|vertical|cuadrado] [--scene id|índice] [--list-scenes] [--json salida.json | --out salida.json] [--fail-on error|warn] [--verbose] [--max 40]
-             [--rules clip,overlap,...] [--skip regla,...] [--set regla.umbral=valor]... [--concurrency N]
+             [--assets dir]... [--allow-missing-fonts] [--rules clip,overlap,...] [--skip regla,...] [--set regla.umbral=valor]... [--concurrency N]
 Reglas: ${ALL_RULES.join(', ')}  (silenciar: data-qa-ignore="regla" en el elemento o un ancestro)`,
-  privacy: `Uso: ve-privacy [<videoId>] --deny lista.txt [--allow lista.txt] [--frames … | --every N | --count 24] [--props json] [--format …] [--scene id|índice] [--scan-source dir]... [--json salida.json | --out salida.json]`,
+  privacy: `Uso: ve-privacy [<videoId>] --deny lista.txt [--allow lista.txt] [--frames … | --every N | --count 24] [--props json] [--format …] [--scene id|índice] [--scan-source dir]... [--assets dir]... [--allow-missing-fonts] [--json salida.json | --out salida.json]`,
 };
+
+/** Opciones comunes de estáticos y fuentes (`--assets`, `--allow-missing-fonts`) que entienden sheet, qa y privacy. */
+const common = (p: Parsed) => ({ assets: p.flags.get('assets'), allowMissingFonts: p.bools.has('allow-missing-fonts') || undefined });
 
 const sample = (p: Parsed) => ({ frames: one(p, 'frames'), every: num(p, 'every'), count: num(p, 'count') });
 
@@ -95,7 +98,7 @@ async function main(cmd: string, argv: string[]): Promise<number> {
 
   if (p.bools.has('list-scenes')) {
     if (!id) throw new Error('Falta <videoId>');
-    const session = await openSession({ videoId: id, props, format, log });
+    const session = await openSession({ videoId: id, props, format, ...common(p), log });
     try {
       const scenes = await session.scenes();
       console.log(formatSceneList(id, scenes, session.meta.fps));
@@ -110,7 +113,7 @@ async function main(cmd: string, argv: string[]): Promise<number> {
 
   if (cmd === 'sheet') {
     if (!id) throw new Error('Falta <videoId>');
-    const r = await makeSheet({ videoId: id, props, format, scene, ...sample(p), cols: num(p, 'cols'), scale: num(p, 'scale'), out: one(p, 'out') ?? `out/${id}${suffixOf({ format, scene })}-sheet.png`, labels: !p.bools.has('no-labels'), log });
+    const r = await makeSheet({ videoId: id, props, format, scene, ...sample(p), cols: num(p, 'cols'), scale: num(p, 'scale'), out: one(p, 'out') ?? `out/${id}${suffixOf({ format, scene })}-sheet.png`, labels: !p.bools.has('no-labels'), ...common(p), log });
     console.log(`hoja: ${r.out} (${r.width}x${r.height}, ${r.frames.length} cuadros: ${r.frames.join(',')})`);
     return 0;
   }
@@ -124,7 +127,7 @@ async function main(cmd: string, argv: string[]): Promise<number> {
     if (failOn !== 'error' && failOn !== 'warn') throw new Error('--fail-on debe ser error o warn');
     const r = await runQa({
       videoId: id, props, format, scene, ...sample(p), rules: (only ?? ALL_RULES).filter((x) => !skip.includes(x)),
-      thresholds: parseOverrides(p.flags.get('set') ?? []), concurrency: num(p, 'concurrency'), log,
+      thresholds: parseOverrides(p.flags.get('set') ?? []), concurrency: num(p, 'concurrency'), ...common(p), log,
     });
     printQa(r.findings, r.summary.frames, { verbose: p.bools.has('verbose'), max: p.bools.has('verbose') && one(p, 'max') === undefined ? Infinity : num(p, 'max') ?? 40 });
     const s = r.summary;
@@ -141,7 +144,7 @@ async function main(cmd: string, argv: string[]): Promise<number> {
   if (!id && !dirs.length) throw new Error('Indica un <videoId> y/o --scan-source <dir>');
   const allowFile = one(p, 'allow');
   const r = await runPrivacy({
-    videoId: id, props, format, scene, ...sample(p), deny: readFileSync(denyFile, 'utf8'), allow: allowFile ? readFileSync(allowFile, 'utf8') : '', scanSource: dirs, skipFiles: [denyFile, ...(allowFile ? [allowFile] : [])], log,
+    videoId: id, props, format, scene, ...sample(p), deny: readFileSync(denyFile, 'utf8'), allow: allowFile ? readFileSync(allowFile, 'utf8') : '', scanSource: dirs, skipFiles: [denyFile, ...(allowFile ? [allowFile] : [])], ...common(p), log,
   });
   for (const f of r.findings) {
     console.log(`${f.kind.toUpperCase().padEnd(11)} "${f.value}"${f.term ? ` (termino: ${f.term})` : ''}  en ${f.where}${f.frames ? ` cuadros ${f.frames.join(',')}` : ''}\n       ...${f.context}...`);

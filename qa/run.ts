@@ -19,6 +19,10 @@ export type QaOptions = SampleSpec & {
   thresholds?: ThresholdOverrides;
   /** Pages in parallel (default min(cpus, 3)). */
   concurrency?: number;
+  /** Carpetas extra de estáticos (`--assets`), como en `render`. */
+  assets?: string[];
+  /** Borrador: una fuente que no carga solo avisa. */
+  allowMissingFonts?: boolean;
   log?: (m: string) => void;
 };
 
@@ -38,7 +42,7 @@ export async function runQa(o: QaOptions): Promise<QaResult> {
   const t0 = Date.now();
   const thresholds = mergeThresholds(o.thresholds);
   const rules = o.rules ?? ALL_RULES;
-  const session = await openSession({ videoId: o.videoId, props: o.props, format: o.format, log: o.log });
+  const session = await openSession({ videoId: o.videoId, props: o.props, format: o.format, assets: o.assets, allowMissingFonts: o.allowMissingFonts, log: o.log });
   try {
     const { meta } = session;
     const frames = sampleFrames(o, meta.durationInFrames, 24, await sceneFrames(session, o.scene));

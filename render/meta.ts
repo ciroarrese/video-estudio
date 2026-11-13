@@ -37,8 +37,8 @@ export function metaForFormat(meta: VideoMeta, format?: FormatName): VideoMeta &
 }
 
 /** Parámetros de la URL de la página runtime. */
-export function pageQuery(videoId: string, props: Record<string, unknown>, format?: FormatName): string {
-  return `?video=${encodeURIComponent(videoId)}${Object.keys(props).length ? `&props=${encodeURIComponent(JSON.stringify(props))}` : ''}${format ? `&format=${format}` : ''}`;
+export function pageQuery(videoId: string, props: Record<string, unknown>, format?: FormatName, opts: { allowMissingFonts?: boolean } = {}): string {
+  return `?video=${encodeURIComponent(videoId)}${Object.keys(props).length ? `&props=${encodeURIComponent(JSON.stringify(props))}` : ''}${format ? `&format=${format}` : ''}${opts.allowMissingFonts ? '&fonts=warn' : ''}`;
 }
 
 /**

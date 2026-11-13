@@ -1,6 +1,6 @@
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { ensureBundle, launchChromium, metaForFormat, newRunId, pageQuery, resolveScene, sceneRange, serveStatic, type PwBrowser, type PwCdp, type PwContext, type PwPage, type VideoMeta as RenderMeta } from '../render/index';
+import { allowMissingFonts, assetDirsFor, ensureBundle, explicitAssetDirs, launchChromium, metaForFormat, newRunId, pageQuery, resolveScene, sceneRange, serveStatic, type PwBrowser, type PwCdp, type PwContext, type PwPage, type VideoMeta as RenderMeta } from '../render/index';
 import type { FormatName, SceneInfo } from '../engine';
 
 export const projectRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..');
@@ -28,7 +28,17 @@ export type VideoPage = {
   close(): Promise<void>;
 };
 
-export type SessionOptions = { videoId: string; props?: Record<string, unknown>; format?: FormatName; bundleDir?: string; log?: (m: string) => void };
+export type SessionOptions = {
+  videoId: string;
+  props?: Record<string, unknown>;
+  format?: FormatName;
+  bundleDir?: string;
+  /** Carpetas extra de estáticos (`--assets`); además se sirven solas `videos/<slug>/assets|audio` y `<VE_VIDEOS_DIR>/assets`. */
+  assets?: string[];
+  /** Borrador: una fuente que no carga solo avisa en vez de fallar. */
+  allowMissingFonts?: boolean;
+  log?: (m: string) => void;
+};
 
 /** Rango de cuadros de `--scene` (o todo el video si no se pidió escena). */
 export async function sceneFrames(session: Session, scene?: string): Promise<[number, number] | undefined> {
@@ -40,7 +50,10 @@ export async function sceneFrames(session: Session, scene?: string): Promise<[nu
 /** Serves the compiled runtime and launches Chromium (render/browser.ts + render/server.ts). */
 export async function openSession(o: SessionOptions): Promise<Session> {
   const bundleDir = o.bundleDir ?? (await ensureBundle(projectRoot, join(projectRoot, '.ve-cache'), newRunId(), o.log ?? (() => {})));
-  const server = await serveStatic([bundleDir, join(projectRoot, 'public')], bundleDir);
+  // Mismas carpetas estáticas que `render` (render/assets.ts); las del video se completan al saber su carpeta.
+  const explicit = explicitAssetDirs(o.assets);
+  const roots = [...assetDirsFor(projectRoot, explicit), bundleDir, join(projectRoot, 'public')];
+  const server = await serveStatic(roots, bundleDir);
   let browser: PwBrowser;
   try {
     browser = await launchChromium();
@@ -49,7 +62,7 @@ export async function openSession(o: SessionOptions): Promise<Session> {
     throw e;
   }
   const props = o.props ?? {};
-  const pageUrl = `${server.url}/${pageQuery(o.videoId, props, o.format)}`;
+  const pageUrl = `${server.url}/${pageQuery(o.videoId, props, o.format, { allowMissingFonts: allowMissingFonts(o) })}`;
   const pages: VideoPage[] = [];
   const open = async (width: number, height: number): Promise<VideoPage> => {
     const context = await browser.newContext({ viewport: { width, height }, deviceScaleFactor: 1 });
@@ -90,6 +103,7 @@ export async function openSession(o: SessionOptions): Promise<Session> {
       const m = metas.find((x) => x.id === o.videoId);
       if (!m) throw new Error(`Video desconocido "${o.videoId}". Disponibles: ${metas.map((x) => x.id).join(', ')}`);
       meta = metaForFormat(m, o.format);
+      roots.splice(0, roots.length - 2, ...assetDirsFor(projectRoot, explicit, m.source));
     } catch (e) {
       await context.close().catch(() => {});
       await browser.close().catch(() => {});

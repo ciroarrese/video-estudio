@@ -12,6 +12,7 @@ import { FileHashCache } from './filehash';
 import { trackChild, trackCloser, trackPath, untrackPath } from './cleanup';
 import { digestFiles, ENCODER_SETTINGS, evenFrames, frameFile, framePattern, planSegments, planShards, segmentKey } from './plan';
 import { serveStatic } from './server';
+import { assetDirsFor, explicitAssetDirs } from './assets';
 import { metaForFormat, pageQuery, resolveScene, sceneRange, type VideoMeta } from './meta';
 import type { FormatName, SceneInfo } from '../engine';
 
@@ -36,8 +37,10 @@ export type RenderOptions = {
   checkMaxDelta?: number;
   checkMaxRatio?: number;
   checkStrict?: boolean;
-  /** Extra static / audio directories (searched first). */
+  /** Extra static / audio directories (searched first). Además se sirven solas `videos/<slug>/assets|audio` y `<VE_VIDEOS_DIR>/assets` (ver render/assets.ts). */
   assets?: string[];
+  /** Borrador: una fuente que no carga solo avisa en vez de fallar (también VE_ALLOW_MISSING_FONTS=1). */
+  allowMissingFonts?: boolean;
   /** Formato de pantalla (`horizontal`, `vertical`, `cuadrado`); sin esto, el formato base del video. */
   format?: FormatName;
   /** Renderiza solo esta escena (id/nombre o índice desde 0; ver `listScenes`). No se combina con `frames`. */
@@ -50,6 +53,9 @@ export type RenderOptions = {
 
 export type RenderResult = { out: string; frames: number; seconds: number; renderedSegments: number; cachedSegments: number };
 export type CheckResult = { ok: boolean; frames: number[]; determinism: { frame: number; ok: boolean; reordered?: boolean }[]; mismatches: number[]; diffs: Record<number, string> };
+
+/** `--allow-missing-fonts` o `VE_ALLOW_MISSING_FONTS=1`: una fuente que no carga avisa y sigue en vez de fallar. */
+export const allowMissingFonts = (o: { allowMissingFonts?: boolean }): boolean => o.allowMissingFonts ?? /^(1|true|si|sí|yes)$/i.test(process.env.VE_ALLOW_MISSING_FONTS ?? '');
 
 export const defaultRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 export const defaultConcurrency = () => Math.max(1, Math.min(cpus().length, 6));
@@ -333,13 +339,17 @@ async function setup(o: RenderOptions, needAudio: boolean) {
   mkdirSync(cacheDir, { recursive: true });
   const bundleDir = await ensureBundle(root, cacheDir, runId, log);
   const hashes = new FileHashCache(join(cacheDir, 'filehash.json'));
-  const assets = (o.assets ?? []).map((a) => resolve(a));
-  const server = await serveStatic([...assets, bundleDir, join(root, 'public')], bundleDir);
+  // Carpetas estáticas: `--assets`/VE_ASSETS primero; las del propio video y `<VE_VIDEOS_DIR>/assets` se agregan en cuanto se sabe
+  // de qué carpeta es el video (la lista se lee en cada pedido, así que alcanza con completarla). Ver render/assets.ts.
+  const explicit = explicitAssetDirs(o.assets);
+  let assets = assetDirsFor(root, explicit, undefined).filter((d) => explicit.includes(d));
+  const roots = [...assets, bundleDir, join(root, 'public')];
+  const server = await serveStatic(roots, bundleDir);
   const browser = await launchChromium().catch(async (e) => {
     await server.close();
     throw e;
   });
-  const pageUrl = `${server.url}/${pageQuery(o.videoId, props, o.format)}`;
+  const pageUrl = `${server.url}/${pageQuery(o.videoId, props, o.format, { allowMissingFonts: allowMissingFonts(o) })}`;
   const untrack = trackCloser(() => browser.close());
   const cleanup = async () => {
     untrack();
@@ -359,6 +369,9 @@ async function setup(o: RenderOptions, needAudio: boolean) {
       const found = metas.find((m) => m.id === o.videoId);
       if (!found) throw new Error(`Video desconocido "${o.videoId}". Disponibles: ${metas.map((m) => m.id).join(', ')}`);
       const meta = metaForFormat(found, o.format);
+      assets = assetDirsFor(root, explicit, found.source);
+      roots.splice(0, roots.length - 2, ...assets);
+      if (assets.length) log(`estáticos: ${assets.join(', ')}`);
       const scenes = async (): Promise<SceneInfo[]> => (await page.evaluate(() => (window as any).__ve.scenes())) as SceneInfo[];
       let tracks: Track[] = [];
       if (needAudio) tracks = (await page.evaluate(() => (window as any).__ve.scanAudio())) as Track[];
@@ -691,7 +704,7 @@ export async function discoverVideos(options: { root?: string; cacheDir?: string
   const cacheDir = resolve(options.cacheDir ?? join(root, '.ve-cache'));
   mkdirSync(cacheDir, { recursive: true });
   const bundleDir = await ensureBundle(root, cacheDir, newRunId(), options.log ?? (() => {}));
-  const server = await serveStatic([bundleDir, join(root, 'public')], bundleDir);
+  const server = await serveStatic([...assetDirsFor(root, explicitAssetDirs()), bundleDir, join(root, 'public')], bundleDir);
   let browser: PwBrowser | undefined;
   try {
     browser = await launchChromium();
