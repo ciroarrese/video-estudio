@@ -50,10 +50,13 @@ export const excerpt = (s: string, n = 40) => {
   return t.length > n ? `${t.slice(0, n - 1)}…` : t;
 };
 
-export const describe = (r: TextRun): ElementInfo => ({ tag: r.tag, testid: r.testid, text: excerpt(r.text), rect: roundRect(r.rect) });
+export const pathOfKey = (key: string) => key.split('|')[0] ?? '';
 
+export const describe = (r: TextRun): ElementInfo => ({ tag: r.tag, testid: r.testid, text: excerpt(r.text), rect: roundRect(r.rect), path: pathOfKey(r.key) });
+
+/** `"text" [testid]` or `"text" [div@0.2.1]` (DOM path) when there is no test id. */
 export const formatElement = (e: ElementInfo) =>
-  `<${e.tag}${e.testid ? ` data-testid="${e.testid}"` : ''}> "${e.text}" [${e.rect.x},${e.rect.y} ${e.rect.w}x${e.rect.h}]`;
+  `"${e.text}" [${e.testid ?? `${e.tag}${e.path ? `@${e.path}` : ''}`}]`;
 
 /** True when the run (or an ancestor) opted out of `rule` through data-qa-ignore. */
 export const ignored = (r: { ignore: string[] }, rule: string) => r.ignore.includes(rule) || r.ignore.includes('all');

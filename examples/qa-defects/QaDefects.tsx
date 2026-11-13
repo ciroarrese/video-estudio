@@ -6,9 +6,10 @@ import { Fill, useFrame } from '../../engine';
  * Frame 0 clean | 1 clipped label | 2 off-screen text | 3 overlapping text | 4 tiny text |
  * 5 low contrast | 6 covered text | 7 e-mail and real-looking domain. All names are invented.
  * Frames 8-11 are NON-defects that must stay free of errors: a full-frame wash over fading text (8), a card
- * flying over text (9-10, moving 60 px per frame) and faint decorative text (11).
+ * flying over text (9-10, moving 60 px per frame), faint decorative text (11) and a label leaving the frame
+ * while clearly moving (12-14, 60 px per frame).
  */
-export const QA_DEFECT_FRAMES = { clean: 0, clip: 1, offscreen: 2, overlap: 3, tiny: 4, contrast: 5, covered: 6, privacy: 7, wash: 8, flyingA: 9, flyingB: 10, faint: 11 } as const;
+export const QA_DEFECT_FRAMES = { clean: 0, clip: 1, offscreen: 2, overlap: 3, tiny: 4, contrast: 5, covered: 6, privacy: 7, wash: 8, flyingA: 9, flyingB: 10, faint: 11, leavingA: 12, leavingB: 13, leavingC: 14 } as const;
 
 const font: CSSProperties = { fontFamily: 'Arial, Helvetica, sans-serif', color: '#1b1f2a' };
 const abs = (left: number, top: number, extra: CSSProperties = {}): CSSProperties => ({ position: 'absolute', left, top, margin: 0, whiteSpace: 'nowrap', ...font, ...extra });
@@ -95,6 +96,11 @@ export function QaDefects() {
       break;
     case 11:
       body = <p data-testid="decorative-text" style={abs(96, 250, { fontSize: 48, fontWeight: 700, opacity: 0.25 })}>Marca decorativa</p>;
+      break;
+    case 12:
+    case 13:
+    case 14:
+      body = <p data-testid="leaving-text" style={abs(1060 + (f - 12) * 60, 300, { fontSize: 40, fontWeight: 600 })}>Facturación total</p>;
       break;
     default:
       body = (

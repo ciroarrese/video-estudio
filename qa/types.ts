@@ -6,7 +6,7 @@ export type RuleId = 'clip' | 'offscreen' | 'safe-area' | 'overlap' | 'min-size'
 export const ALL_RULES: RuleId[] = ['clip', 'offscreen', 'safe-area', 'overlap', 'min-size', 'contrast', 'covered'];
 
 /** Short, serialisable description of an element (tag, test id, text excerpt, on-screen box). */
-export type ElementInfo = { tag: string; testid: string | null; text: string; rect: Rect };
+export type ElementInfo = { tag: string; testid: string | null; text: string; rect: Rect; /** DOM child-index path from the stage ("0.2.1"), a fallback id when there is no test id. */ path?: string };
 
 export type ClipBox = { id: number; tag: string; testid: string | null; rect: Rect; ox: boolean; oy: boolean };
 
@@ -66,7 +66,7 @@ export type Thresholds = {
   overlap: { ratio: number; minOpacity: number; inkHeight: number; maxFrames: number };
   'min-size': { minPx1080: number; minOpacity: number; tolerancePx: number };
   contrast: { error: number; warn: number; largePx1080: number; minOpacity: number };
-  covered: { minOpacity: number; maxCoverFraction: number };
+  covered: { minOpacity: number; maxCoverFraction: number; hiddenFully: number };
   motion: { px: number };
 };
 

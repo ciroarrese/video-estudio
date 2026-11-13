@@ -63,11 +63,10 @@ function printQa(findings: Finding[], sampled: number[], o: { verbose: boolean; 
     groups.forEach(({ first: f, severity, frames }, i) => {
       if (i >= room) { more++; return; }
       lines++;
-      console.log(`  ${severity === 'error' ? 'ERROR' : severity === 'warn' ? 'warn ' : 'info '} ${frameRanges(frames, sampled).padEnd(14)} ${formatElement(f.element)}`);
-      console.log(`        ${f.message}${f.other ? `; con ${formatElement(f.other)}` : ''}`);
+      console.log(`  ${severity === 'error' ? 'ERROR' : severity === 'warn' ? 'warn ' : 'info '} ${frameRanges(frames, sampled)}  ${formatElement(f.element)}: ${f.message}${f.other ? ` | con ${formatElement(f.other)}` : ''}`);
     });
   }
-  if (more) console.log(`\n… ${more} mas (usa --max N o --verbose)`);
+  if (more) console.log(`\n… ${more} más (--max N o --verbose)`);
 }
 
 async function main(cmd: string, argv: string[]): Promise<number> {

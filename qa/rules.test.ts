@@ -100,6 +100,11 @@ describe('rules on plain data', () => {
     const f720 = runRules({ frame: 0, width: 1280, height: 720, runs: [run({ screenPx: 12.2 })], thresholds: DEFAULT_THRESHOLDS }, ['min-size']);
     expect(f720).toEqual([]);
   });
+  it('min-size: text under 0.35 effective opacity (mid-fade, decorative) is info, not an error', () => {
+    const faint = run({ screenPx: 12, opacity: 0.2 });
+    const solid = run({ screenPx: 12, opacity: 0.8 });
+    expect(check([faint, solid], ['min-size']).map((x) => [x.element.testid, x.severity])).toEqual([[faint.testid, 'info'], [solid.testid, 'error']]);
+  });
   it('covered: reports the covering element, honours ignore on either side', () => {
     const cover = { id: 9, key: 'c', tag: 'div', testid: 'pill', text: '', rect: { x: 1, y: 2, w: 3, h: 4 }, ignore: [] as string[] };
     const a = run({ cover });
@@ -120,6 +125,16 @@ describe('rules on plain data', () => {
     expect(check([run({ cover, opacity: 0.1 })], ['covered'])).toEqual([]);
     expect(check([run({ cover: { ...cover, motion: 60 } })], ['covered'])[0]!.severity).toBe('info');
     expect(check([run({ cover, motion: 60 })], ['covered'])[0]!.severity).toBe('info');
+  });
+  it('covered: text hidden entirely by a card is info; a partial cover stays an error; text under a full-frame layer is skipped by every rule', () => {
+    const t = { x: 400, y: 400, w: 300, h: 40 };
+    const card = { id: 9, key: 'c', tag: 'div', testid: 'card', text: '', rect: { x: 380, y: 380, w: 400, h: 100 }, ignore: [] as string[] };
+    expect(check([run({ cover: card, rect: t })], ['covered'])[0]!.severity).toBe('info');
+    expect(check([run({ cover: { ...card, rect: { x: 500, y: 380, w: 400, h: 100 } }, rect: t })], ['covered'])[0]!.severity).toBe('error');
+    const layer = { ...card, id: 10, rect: { x: 0, y: 0, w: W, h: H } };
+    const a = run({ cover: layer, rect: { x: 100, y: 100, w: 300, h: 40 }, screenPx: 9 });
+    const b = run({ cover: layer, rect: { x: 120, y: 105, w: 300, h: 40 } });
+    expect(check([a, b], ['overlap', 'min-size', 'covered'])).toEqual([]);
   });
   it('motion downgrades offscreen and overlap to info', () => {
     const o = run({ rect: { x: W - 100, y: 300, w: 300, h: 40 }, motion: 30 });

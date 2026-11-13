@@ -38,12 +38,15 @@ describe.skipIf(!chromium)('qa on the qa-defects video (e2e)', () => {
     expect(summary.errors).toBe(6);
   }, 180_000);
 
-  it('seeded NON-defects (wash over fading text, card flying over text, faint decorative text) give no errors', async () => {
-    const { findings } = await runQa({ videoId: 'qa-defects', frames: '8-11' });
+  it('seeded NON-defects (wash over fading text, card flying over text, faint decorative text, text leaving while moving) give no errors', async () => {
+    const { findings } = await runQa({ videoId: 'qa-defects', frames: '8-14' });
     expect(findings.filter((f) => f.severity === 'error'), JSON.stringify(findings.filter((f) => f.severity === 'error'))).toEqual([]);
     expect(findings.filter((f) => f.severity === 'warn' && f.frame >= 8)).toEqual([]);
     expect(findings.filter((f) => f.rule === 'covered').map((f) => [f.frame, f.severity])).toEqual([[9, 'info'], [10, 'info']]);
     expect(findings.some((f) => f.rule === 'contrast' && f.frame === 11 && f.severity === 'info')).toBe(true);
+    // the label leaving the frame is still noticed, but as info because it moves 60 px per frame
+    expect(findings.filter((f) => f.rule === 'offscreen').map((f) => [f.frame, f.severity])).toEqual([[12, 'info'], [13, 'info'], [14, 'info']]);
+    expect(findings.filter((f) => f.frame === 8 && f.severity !== 'info')).toEqual([]);
   }, 180_000);
 
   it('privacy: e-mail and real-looking domain are caught, example.com is not; a deny term fails', async () => {

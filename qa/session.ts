@@ -1,7 +1,8 @@
-import { join } from 'node:path';
-import { launchChromium, type PwBrowser, type PwCdp, type PwContext, type PwPage } from '../render/browser';
-import { serveStatic } from '../render/server';
-import { ensureQaBundle, projectRoot } from './bundle';
+import { dirname, join, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { ensureBundle, launchChromium, newRunId, serveStatic, type PwBrowser, type PwCdp, type PwContext, type PwPage } from '../render/index';
+
+export const projectRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 
 export type VideoMeta = { id: string; fps: number; width: number; height: number; durationInFrames: number };
 
@@ -28,7 +29,7 @@ export type SessionOptions = { videoId: string; props?: Record<string, unknown>;
 
 /** Serves the compiled runtime and launches Chromium (render/browser.ts + render/server.ts). */
 export async function openSession(o: SessionOptions): Promise<Session> {
-  const bundleDir = o.bundleDir ?? (await ensureQaBundle(projectRoot, o.log));
+  const bundleDir = o.bundleDir ?? (await ensureBundle(projectRoot, join(projectRoot, '.ve-cache'), newRunId(), o.log ?? (() => {})));
   const server = await serveStatic([bundleDir, join(projectRoot, 'public')], bundleDir);
   let browser: PwBrowser;
   try {
