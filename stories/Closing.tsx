@@ -166,7 +166,7 @@ export function Closing({ spec, scenes }: { spec: StorySpec; scenes: TopicScene[
             key={`f${i}`}
             style={{
               position: "absolute", left: 0, top: 0, transformOrigin: "0 0", zIndex: 300,
-              transform: `translate(${x.toFixed(2)}px, ${y.toFixed(2)}px) perspective(2000px) rotateX(${mix(from.rx, to.rx, p).toFixed(3)}deg) rotateY(${mix(from.ry, to.ry, p).toFixed(3)}deg) scale(${sc.toFixed(4)}) translate(-50%, -50%)`,
+              transform: `translate(${Math.round(x)}px, ${Math.round(y)}px) perspective(2000px) rotateX(${mix(from.rx, to.rx, p).toFixed(3)}deg) rotateY(${mix(from.ry, to.ry, p).toFixed(3)}deg) scale(${sc.toFixed(4)}) translate(-50%, -50%)`,
             }}
           >
             <Pill index={i} name={spec.topics[i]!.name} glow={arc} />

@@ -129,26 +129,48 @@
       cover: null,
     };
 
-    // covered: is the centre of the widest line under an opaque element that is neither an ancestor nor a descendant?
-    var big = rects.reduce(function (p, c) { return c.w * c.h > p.w * p.h ? c : p; });
-    var cx = big.x + big.w / 2, cy = big.y + big.h / 2;
-    if (cx >= 0 && cy >= 0 && cx < W && cy < H && run.opacity >= 0.05) {
-      var stack = document.elementsFromPoint(cx, cy);
-      var at = stack.indexOf(el);
-      for (var j = 0; j < at; j++) {
-        var c = stack[j];
-        if (el.contains(c) || c.contains(el)) continue;
-        var ccs = getComputedStyle(c);
-        if (ccs.visibility !== 'visible') continue;
-        var bg = parseRgba(ccs.backgroundColor);
-        var solid = (bg.a * opacityUp(c) >= 0.9 && ccs.backgroundColor !== 'rgba(0, 0, 0, 0)') || c.tagName === 'IMG' || c.tagName === 'VIDEO' || c.tagName === 'CANVAS';
-        if (!solid) continue;
-        var info = infoOf(c);
-        info.id = idOf(c);
-        info.key = keyOf(c);
-        info.ignore = ignoreOf(c);
+    // covered: se muestrean hasta 5 puntos por linea (10/30/50/70/90 % del ancho, al medio de la altura) y se mira con elementsFromPoint
+    // si hay encima un elemento solido que no es ancestro ni descendiente. Gana el que tapa mas puntos; `frac` = puntos tapados / muestreados.
+    if (run.opacity >= 0.05) {
+      var counts = new Map();
+      var order = [];
+      var total = 0;
+      var maxLines = Math.min(rects.length, 8);
+      for (var li = 0; li < maxLines; li++) {
+        var ln = rects[li];
+        for (var pi = 0; pi < 5; pi++) {
+          var px = ln.x + ln.w * (0.1 + 0.2 * pi), py = ln.y + ln.h / 2;
+          if (px < 0 || py < 0 || px >= W || py >= H) continue;
+          total++;
+          var stack = document.elementsFromPoint(px, py);
+          var at = stack.indexOf(el);
+          for (var j = 0; j < at; j++) {
+            var c = stack[j];
+            if (el.contains(c) || c.contains(el)) continue;
+            var ccs = getComputedStyle(c);
+            if (ccs.visibility !== 'visible') continue;
+            var bg = parseRgba(ccs.backgroundColor);
+            var op = opacityUp(c);
+            var solidColor = bg.a * op >= 0.9 && ccs.backgroundColor !== 'rgba(0, 0, 0, 0)';
+            // una imagen o un degradado de fondo tambien tapan (se asume opaco: con opacidad propia >= 0.9)
+            var solidImage = ccs.backgroundImage !== 'none' && op >= 0.9;
+            var solid = solidColor || solidImage || c.tagName === 'IMG' || c.tagName === 'VIDEO' || c.tagName === 'CANVAS';
+            if (!solid) continue;
+            if (!counts.has(c)) { counts.set(c, 0); order.push(c); }
+            counts.set(c, counts.get(c) + 1);
+            break;
+          }
+        }
+      }
+      var bestEl = null, bestN = 0;
+      for (var oi = 0; oi < order.length; oi++) { if (counts.get(order[oi]) > bestN) { bestN = counts.get(order[oi]); bestEl = order[oi]; } }
+      if (bestEl) {
+        var info = infoOf(bestEl);
+        info.id = idOf(bestEl);
+        info.key = keyOf(bestEl);
+        info.ignore = ignoreOf(bestEl);
+        info.frac = total ? bestN / total : 1;
         run.cover = info;
-        break;
       }
     }
     runs.push(run);

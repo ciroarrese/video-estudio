@@ -1,9 +1,26 @@
 /** Pure pieces of the privacy check: deny-list parsing/matching, e-mail / domain / phone detection. */
 
-/** Lower case, no accents/diacritics (NFD without combining marks). */
-export const fold = (s: string): string => s.normalize('NFD').replace(/\p{M}+/gu, '').toLowerCase();
+/** Letras que NFKD no descompone y que se usan para esquivar una lista (ø, đ, ł, ß...). */
+const LETTER_MAP: Record<string, string> = { 'ø': 'o', 'đ': 'd', 'ð': 'd', 'ł': 'l', 'ß': 'ss', 'æ': 'ae', 'œ': 'oe', 'þ': 'th', 'ı': 'i', 'ħ': 'h', 'ŧ': 't' };
+const LETTER_RE = /[øđðłßæœþıħŧ]/g;
 
-export type Term = { raw: string; kind: 'term' | 'regex'; re: RegExp };
+/**
+ * Forma canonica para comparar: NFKD (letras de ancho completo, ligaduras, superindices), sin marcas combinantes,
+ * sin caracteres de formato invisibles (\p{Cf}: ancho cero, joiners, bidi, BOM) ni guion blando (U+00AD), en minusculas,
+ * y con ø/đ/ł/ß... llevadas a su equivalente ASCII.
+ */
+export const fold = (s: string): string =>
+  s.normalize('NFKD').replace(/[\p{Cf}\u00AD]+/gu, '').replace(/\p{M}+/gu, '').toLowerCase().replace(LETTER_RE, (c) => LETTER_MAP[c] ?? c);
+
+/** `word`: palabra entera; `substring`: aparece en cualquier parte (CamelCase, identificadores); `auto`: substring salvo terminos cortos. */
+export type MatchMode = 'word' | 'substring' | 'auto';
+/** En modo `auto`, los terminos de menos letras que esto se buscan como palabra entera (evita `ana` en `banana`). */
+export const AUTO_MIN_SUBSTRING = 4;
+
+export type Term = { raw: string; kind: 'term' | 'regex'; re: RegExp; /** Termino plegado y sin espacios (solo `term`). */ squashed?: string };
+
+/** Largo maximo de texto que se le da de una vez a una regex del usuario (acota el costo de una regex patologica). */
+export const REGEX_WINDOW = 10_000;
 
 const escapeRe = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 const WORD_L = '(?<![\\p{L}\\p{N}_])';
@@ -11,42 +28,71 @@ const WORD_R = '(?![\\p{L}\\p{N}_])';
 
 /**
  * Deny/allow list: one term or /regex/flags per line, `#` starts a comment (whole line or after a term).
- * Terms are accent- and case-insensitive and match whole words; regexes run on the folded text.
+ * Terms are accent- and case-insensitive; `mode` decides word-boundary vs substring matching (default: whole words).
+ * Regexes run on the folded text with the `u` flag always on (so `\p{L}` works); an invalid pattern is an error, never a silent literal.
  */
-export function parseTermList(text: string): Term[] {
+export function parseTermList(text: string, mode: MatchMode = 'word'): Term[] {
   const out: Term[] = [];
   for (const line0 of text.split(/\r?\n/)) {
     const line = line0.trim();
     if (!line || line.startsWith('#')) continue;
     const rx = /^\/(.+)\/([a-z]*)$/.exec(line);
     if (rx) {
-      const flags = [...new Set(`${rx[2]}gi`.split('').filter((c) => c !== 'u' && c !== 'y'))].join('');
+      const flags = [...new Set(`${rx[2]}giu`.split('').filter((c) => c !== 'y'))].join('');
       try {
         out.push({ raw: line, kind: 'regex', re: new RegExp(rx[1]!, flags) });
       } catch (e) {
-        throw new Error(`Regex invalida en la lista: ${line} (${(e as Error).message})`);
+        throw new Error(`Regex invalida en la lista: ${line} (${(e as Error).message}). Se evalua siempre con la bandera u (modo unicode): revisa los escapes (p. ej. \\- no es valido).`);
       }
       continue;
     }
     const term = fold(line.replace(/\s+#.*$/, '').trim());
     if (!term) continue;
     const body = term.split(/\s+/).map(escapeRe).join('\\s+');
-    out.push({ raw: line.replace(/\s+#.*$/, '').trim(), kind: 'term', re: new RegExp(`${WORD_L}${body}${WORD_R}`, 'gu') });
+    const whole = mode === 'word' || (mode === 'auto' && term.replace(/\s+/g, '').length < AUTO_MIN_SUBSTRING);
+    out.push({
+      raw: line.replace(/\s+#.*$/, '').trim(), kind: 'term', squashed: term.replace(/\s+/g, ''),
+      re: new RegExp(whole ? `${WORD_L}${body}${WORD_R}` : body, 'gu'),
+    });
   }
   return out;
 }
 
 export type Match = { term: string; match: string; index: number };
 
-/** All hits of the terms in `text` (index refers to the folded text). */
-export function matchTerms(text: string, terms: Term[]): Match[] {
+/** Cada ventana de una regex del usuario: textos largos se miran por tramos con solape (acota el backtracking). */
+function* windows(f: string): Generator<[string, number]> {
+  if (f.length <= REGEX_WINDOW) { yield [f, 0]; return; }
+  const step = REGEX_WINDOW - 256;
+  for (let i = 0; i < f.length; i += step) yield [f.slice(i, i + REGEX_WINDOW), i];
+}
+
+/** Largo minimo (sin espacios) de un termino para buscarlo en texto sin espacios (letras sueltas en spans). */
+export const SQUASH_MIN = 4;
+
+/**
+ * All hits of the terms in `text` (index refers to the folded text).
+ * `squash`: el texto se compara sin ningun espacio contra el termino sin espacios (texto armado con un span por letra o por palabra);
+ * solo terminos (no regex) de >= SQUASH_MIN caracteres.
+ */
+export function matchTerms(text: string, terms: Term[], opts: { squash?: boolean } = {}): Match[] {
   const f = fold(text);
   const out: Match[] = [];
+  if (opts.squash) {
+    const g = f.replace(/\s+/g, '');
+    for (const t of terms) {
+      if (t.kind !== 'term' || !t.squashed || t.squashed.length < SQUASH_MIN) continue;
+      for (let i = g.indexOf(t.squashed); i >= 0; i = g.indexOf(t.squashed, i + t.squashed.length)) out.push({ term: t.raw, match: t.squashed, index: i });
+    }
+    return out;
+  }
   for (const t of terms) {
-    t.re.lastIndex = 0;
-    for (let m = t.re.exec(f); m; m = t.re.exec(f)) {
-      if (m[0] === '') { t.re.lastIndex++; continue; }
-      out.push({ term: t.raw, match: m[0], index: m.index });
+    for (const [chunk, off] of t.kind === 'regex' ? windows(f) : ([[f, 0]] as [string, number][])) {
+      t.re.lastIndex = 0;
+      for (let m = t.re.exec(chunk); m; m = t.re.exec(chunk)) {
+        if (m[0] === '') { t.re.lastIndex++; continue; }
+        out.push({ term: t.raw, match: m[0], index: m.index + off });
+      }
     }
   }
   return out;
@@ -109,18 +155,20 @@ const allowed = (value: string, allow: Term[]): boolean =>
   });
 
 /** Scans one text: deny terms, plus e-mails / domains / phone-like numbers not covered by the allow-list or example domains. */
-export function scanText(text: string, deny: Term[], allow: Term[] = [], opts: { phones?: boolean; domains?: boolean } = {}): Hit[] {
+export function scanText(text: string, deny: Term[], allow: Term[] = [], opts: { phones?: boolean; domains?: boolean; squash?: boolean } = {}): Hit[] {
   const hits: Hit[] = [];
-  for (const m of matchTerms(text, deny)) hits.push({ kind: 'deny', value: m.match, term: m.term });
-  for (const e of detectEmails(text)) {
+  for (const m of matchTerms(text, deny, { squash: opts.squash })) hits.push({ kind: 'deny', value: m.match, term: m.term });
+  if (opts.squash) return hits; // la version sin espacios solo sirve para terminos
+  const f = fold(text); // mismos recortes que en los terminos: ancho cero, ancho completo, guion blando
+  for (const e of detectEmails(f)) {
     const dom = e.slice(e.lastIndexOf('@') + 1);
     if (!isSafeDomain(dom) && !allowed(e, allow)) hits.push({ kind: 'email', value: e });
   }
   if (opts.domains !== false) {
-    for (const d of detectDomains(text)) if (!isSafeDomain(d) && !allowed(d, allow)) hits.push({ kind: 'domain', value: d });
+    for (const d of detectDomains(f)) if (!isSafeDomain(d) && !allowed(d, allow)) hits.push({ kind: 'domain', value: d });
   }
   if (opts.phones !== false) {
-    for (const p of detectPhones(text)) if (!allowed(p, allow)) hits.push({ kind: 'phone', value: p });
+    for (const p of detectPhones(f)) if (!allowed(p, allow)) hits.push({ kind: 'phone', value: p });
   }
   return hits;
 }

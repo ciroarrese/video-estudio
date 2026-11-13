@@ -21,7 +21,7 @@ export type FrameCanvasProps = {
  *
  * Determinismo: es la unica excepcion (junto con `holdRender`) a "sin efectos". El dibujo se hace en un
  * `useLayoutEffect` sin dependencias (corre en cada commit, tambien dentro de `flushSync`, asi que
- * `__ve.setFrame(n)` captura el cuadro ya dibujado). Cada vez se resetea la transformacion, se limpia
+ * `__ve.setFrame(n)` captura el cuadro ya dibujado). Cada vez se reinicia el contexto por completo (`reset()` o reasignar el ancho), se limpia
  * todo y se dibuja desde cero: no queda nada del cuadro anterior. `draw` debe ser pura (sin `Math.random`,
  * sin estado entre llamadas).
  */
@@ -41,14 +41,23 @@ export function FrameCanvas({ width, height, draw, frame, pixelRatio, style }: F
     if (canvas.height !== ph) canvas.height = ph;
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
+    // Reinicio total: descarta cualquier estado que haya dejado un dibujo anterior (save() sin restore(),
+    // clip, estilos, transformaciones), tambien si ese dibujo lanzo un error. `reset()` si existe;
+    // si no, reasignar el ancho limpia el lienzo y todo su estado.
+    const resettable = ctx as CanvasRenderingContext2D & { reset?: () => void };
+    if (typeof resettable.reset === 'function') resettable.reset();
+    else canvas.width = pw;
     ctx.setTransform(1, 0, 0, 1, 0, 0);
     ctx.globalAlpha = 1;
     ctx.globalCompositeOperation = 'source-over';
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     ctx.save();
-    ctx.scale(pw / width, ph / height);
-    draw(ctx, f, { width, height });
-    ctx.restore();
+    try {
+      ctx.scale(pw / width, ph / height);
+      draw(ctx, f, { width, height });
+    } finally {
+      ctx.restore();
+    }
   });
 
   return (

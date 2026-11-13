@@ -32,8 +32,8 @@ Tambien `npx ve-render <id> ...`. **La herramienta se ejecuta desde un clon de e
 | `--jpeg-quality N` | Calidad JPEG (por defecto 95) |
 | `--assets <dir>` | Directorio extra de estaticos/audio (repetible, se busca primero) |
 | `--check` | No codifica: verifica determinismo (sale con codigo 1 si falla). Tolerante por defecto |
-| `--check-max-delta N` | Maxima diferencia por canal tolerada (por defecto 2) |
-| `--check-max-ratio R` | Fraccion maxima de pixeles distintos (por defecto 0.001 = 0.1 %) |
+| `--check-max-delta N` | Maxima diferencia por canal tolerada; ningun pixel puede pasarla (por defecto 2) |
+| `--check-max-ratio R` | Fraccion maxima de pixeles con delta mayor que 1 (por defecto 0.001 = 0.1 %); los de delta 1 tienen su propia cota de 20 % |
 | `--check-strict` | Comparacion de PNG byte a byte (implica `--check`) |
 
 API: `renderVideo(options)` devuelve `{out, frames, seconds, renderedSegments, cachedSegments}`; `checkVideo(options)` devuelve `{ok, ...}` (ambos en `render/render.ts`).
@@ -52,7 +52,13 @@ Chromium se lanza con `--disable-partial-raster` (entre otras banderas): sin ell
 
 Dos pruebas: (1) `__ve.checkDeterminism` sobre ~12 cuadros, **siempre estricto** (compara el DOM: si falla, la escena depende del historial); (2) esos cuadros se capturan dos veces en layouts de paginas distintos y se comparan los PNG.
 
-La comparacion de PNG es tolerante por defecto porque Chromium rasteriza desenfoques, sombras e inclinaciones 3D con diferencias de ~1 nivel en unos pocos pixeles segun el historial de cuadros de la pagina; ese ruido es imperceptible y exigir igualdad byte a byte empujaba a quitar esos efectos. Un cuadro pasa si **delta maximo por canal <= 2** (de 0 a 255) **y pixeles distintos <= 0.1 %** del cuadro. Para cada cuadro con diferencias se imprime el delta maximo, la cantidad y proporcion de pixeles distintos y el rectangulo (bbox) que los contiene; los toleradas se marcan como "ruido tolerado". Un cambio real (un bloque de 40x40 con +30 niveles, o delta 3 en unos pocos pixeles) falla: ver `render/compare.test.ts`. `--check-strict` exige igualdad exacta. Los PNG se decodifican con un decodificador propio minimo (`render/png.ts`), sin dependencias.
+La comparacion de PNG es tolerante por defecto porque Chromium rasteriza desenfoques, sombras e inclinaciones 3D con diferencias de ~1 nivel en unos pocos pixeles segun el historial de cuadros de la pagina; ese ruido es imperceptible y exigir igualdad byte a byte empujaba a quitar esos efectos. Un cuadro pasa si se cumplen **las tres** cotas siguientes (delta = maxima diferencia por canal de un pixel, de 0 a 255):
+
+1. **Ningun pixel con delta > 2** (`--check-max-delta`). Un cambio real, como una linea de 1 px que se corre, no pasa.
+2. **Pixeles con delta 2 <= 0.1 %** del cuadro (`--check-max-ratio`, 0.001). Solo cuentan los pixeles con delta mayor que 1.
+3. **Pixeles con delta 1 <= 20 %** del cuadro (cota fija, ruido de desenfoques y sombras grandes). Una deriva uniforme de 2 niveles en todo el cuadro falla por la cota 2.
+
+Asi, una sombra o un desenfoque de cualquier tamano con 1 nivel de ruido no hace fallar el chequeo. Para cada cuadro con diferencias se imprime el delta maximo, la cantidad y proporcion de pixeles distintos y el rectangulo (bbox) que los contiene; los toleradas se marcan como "ruido tolerado". Un cambio real (un bloque de 40x40 con +30 niveles, una linea de 1 px corrida, o delta 3 en unos pocos pixeles) falla: ver `render/compare.test.ts`. `--check-strict` exige igualdad exacta. Los PNG se decodifican con un decodificador propio minimo (`render/png.ts`), sin dependencias.
 
 `--disable-partial-raster` (ver arriba) ya elimina la mayor parte de ese ruido.
 

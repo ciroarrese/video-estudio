@@ -50,13 +50,8 @@ export function createStage(host: HTMLElement, def: VideoDefinition<any>, inputP
     html: () => host.innerHTML,
     canvasData: () =>
       Array.from(host.querySelectorAll('canvas'))
-        .map((c) => {
-          try {
-            return c.toDataURL();
-          } catch {
-            return '';
-          }
-        })
+        // Si un canvas no se puede leer (por ejemplo, contaminado), `toDataURL` lanza: checkDeterminism lo informa como falla.
+        .map((c) => c.toDataURL())
         .join('|'),
     destroy() {
       root.unmount();

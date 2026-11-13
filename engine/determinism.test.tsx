@@ -36,6 +36,12 @@ describe('checkDeterminism', () => {
     const res = await checkDeterminism(stage, [0, 1, 20, 44, 45, 89]);
     expect(res.every((r) => r.ok)).toBe(true);
   });
+  it('reports an unreadable canvas as a failure instead of counting it equal', async () => {
+    const stage = mk(hello);
+    stage.canvasData = () => { throw new Error('tainted'); };
+    const res = await checkDeterminism(stage, [0, 5]);
+    expect(res.every((r) => !r.ok && /tainted/.test(r.error ?? ''))).toBe(true);
+  });
   it('validates frames and restores the previous frame', async () => {
     const stage = mk(hello);
     stage.render(7);

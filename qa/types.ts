@@ -17,6 +17,8 @@ export type TextRun = {
   key: string;
   /** Largest edge displacement (px) of this text between this frame and its neighbours; 0 when not matched. */
   motion?: number;
+  /** Largest change of the effective opacity of this text between this frame and its neighbours (0 when not matched): > 0 means mid-fade. */
+  fade?: number;
   /** Id of the element that owns the text node, and of every element up to (excluding) the stage. */
   elId: number;
   chain: number[];
@@ -41,7 +43,11 @@ export type TextRun = {
   ignore: string[];
   clips: ClipBox[];
   own: { sw: number; cw: number; sh: number; ch: number; ox: string; oy: string; ellipsis: boolean };
-  cover: (ElementInfo & { ignore: string[]; id: number; key: string; motion?: number }) | null;
+  /**
+   * Opaque element over the text, found by sampling 5 points along each line (elementsFromPoint). `frac` is the share
+   * of the sampled points it covers (1 = all, 0.4 = two of five). Solid = opaque background colour, background image/gradient, img, video, canvas.
+   */
+  cover: (ElementInfo & { ignore: string[]; id: number; key: string; motion?: number; frac?: number }) | null;
   /** Background under the text box (text hidden), filled by the runner when the contrast rule is on. */
   bg?: { r: number; g: number; b: number; samples: number } | null;
 };

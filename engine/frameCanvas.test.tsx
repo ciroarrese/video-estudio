@@ -1,6 +1,7 @@
 import { render } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { FrameCanvas, FrameProvider } from './index';
+import { quiet } from './testUtils';
 
 const config = { fps: 30, width: 100, height: 50, durationInFrames: 10 };
 
@@ -38,6 +39,26 @@ describe('FrameCanvas', () => {
   it('tolerates a missing 2d context', () => {
     const spy = vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue(null);
     expect(() => render(<FrameProvider frame={0} config={config}><FrameCanvas width={10} height={10} draw={() => {}} /></FrameProvider>)).not.toThrow();
+    spy.mockRestore();
+  });
+  it('resets the context before every draw, even after a draw that threw or left save() unbalanced', () => {
+    const { ctx, calls } = fakeCtx();
+    const spy = vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue(ctx as unknown as CanvasRenderingContext2D);
+    const el = (f: number, draw: () => void) => (
+      <FrameProvider frame={f} config={config}>
+        <FrameCanvas width={100} height={50} draw={draw} />
+      </FrameProvider>
+    );
+    quiet(() => {
+      expect(() => render(el(1, () => { (ctx as unknown as CanvasRenderingContext2D).save(); throw new Error('boom'); }))).toThrow('boom');
+    });
+    // el restore() del try/finally corre aunque el dibujo haya lanzado
+    expect(calls.filter((c) => c.startsWith('restore')).length).toBe(1);
+    calls.length = 0;
+    render(el(2, () => { (ctx as unknown as CanvasRenderingContext2D).save(); (ctx as unknown as CanvasRenderingContext2D).save(); }));
+    const first = calls.findIndex((c) => c.startsWith('reset'));
+    expect(first).toBe(0);
+    expect(calls.findIndex((c) => c.startsWith('clearRect'))).toBeGreaterThan(first);
     spy.mockRestore();
   });
 });

@@ -20,5 +20,9 @@ describe('defineVideo', () => {
   it('validates config', () => {
     expect(() => defineVideo({ id: 'bad', ...base, fps: 0 })).toThrow(/fps/);
     expect(() => defineVideo({ id: '', ...base })).toThrow(/id/);
+    expect(() => defineVideo({ id: 'bad', ...base, durationInFrames: 10.5 })).toThrow(/durationInFrames tiene que ser un entero positivo/);
+    expect(() => defineVideo({ id: 'bad', ...base, width: NaN })).toThrow(/width/);
+    expect(() => defineVideo({ id: 'bad', ...base, height: -2 })).toThrow(/height/);
+    expect(() => defineVideo({ id: 'bad', ...base, fps: 29.97 })).not.toThrow();
   });
 });

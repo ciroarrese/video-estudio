@@ -27,7 +27,7 @@ if [[ "$modo" == "escena" ]]; then
   dest="$base/$nombre"
   [[ ! -e "$dest" ]] || { echo "Ya existe $dest" >&2; exit 1; }
   cp -r templates/scene "$dest"
-  sed -i -E 's#"\.\./\.\./(engine|kit|themes|stories|fx)#"../../../\1#g' "$dest"/*.ts "$dest"/*.tsx
+  sed -i -E 's#"\.\./\.\./(engine|kit|themes|stories|fx|qa)#"../../../\1#g' "$dest"/*.ts "$dest"/*.tsx
   sed -i "s#\"plantilla-escena\"#\"$slug-$nombre\"#" "$dest/index.ts"
   echo "creado $dest (id de video: $slug-$nombre)"
   echo "falta: import \"../../videos/$slug/$nombre\"; en engine/runtime/videos.ts"
@@ -36,7 +36,7 @@ else
   [[ ! -e "$dest" ]] || { echo "Ya existe $dest" >&2; exit 1; }
   [[ -d "$base/$nombre" ]] || { echo "Primero crea la escena: bash templates/nuevo.sh escena $slug $nombre" >&2; exit 1; }
   cp -r templates/story "$dest"
-  sed -i -E 's#"\.\./\.\./(engine|kit|themes|stories)#"../../../\1#g' "$dest"/*.ts
+  sed -i -E 's#"\.\./\.\./(engine|kit|themes|stories|fx|qa)#"../../../\1#g' "$dest"/*.ts
   sed -i "s#\"\.\./scene/Scene\"#\"../$nombre/Scene\"#; s#\"plantilla-historia\"#\"$slug\"#" "$dest/index.ts"
   echo "creado $dest (id de video: $slug)"
   echo "falta: reemplazar las dos escenas de ejemplo por las reales y agregar import \"../../videos/$slug/historia\"; en engine/runtime/videos.ts"

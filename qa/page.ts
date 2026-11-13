@@ -34,14 +34,36 @@ export async function sampleBackgrounds(vp: VideoPage, runs: TextRun[]): Promise
   need.forEach((r, i) => (r.bg = res[i] ?? null));
 }
 
-/** Every string the page renders: text nodes plus alt/title/aria-label/placeholder/value attributes. */
-export async function collectAllText(vp: VideoPage): Promise<string[]> {
-  return evalStr<string[]>(
+export type PageText = {
+  /** Un texto por nodo de texto, mas alt/title/aria-label/placeholder/value. */
+  nodes: string[];
+  /** Textos de bloque (textContent de cada elemento que no es en linea, y de todo el escenario) y `innerText` del escenario, con espacios colapsados. */
+  joined: string[];
+  /** Los mismos textos de bloque con TODO el espacio en blanco quitado (para texto armado con un span por letra o por palabra). */
+  squashed: string[];
+};
+
+/**
+ * Todo lo que la pagina muestra. Ademas de cada nodo suelto devuelve el texto por bloque y el del escenario completo:
+ * un termino o un correo armado con spans (letra por letra, palabra por palabra) no aparece en ningun nodo, pero si en el bloque.
+ */
+export async function collectAllText(vp: VideoPage): Promise<PageText> {
+  return evalStr<PageText>(
     vp,
-    `(()=>{const root=document.getElementById('stage')||document.body;const out=[];
+    `(()=>{const root=document.getElementById('stage')||document.body;
+      const nodes=[];const joined=new Set();const squashed=new Set();
+      const norm=s=>s.replace(/\\s+/g,' ').trim();
+      const add=s=>{const t=norm(s||'');if(!t)return;joined.add(t);const q=t.replace(/\\s+/g,'');if(q)squashed.add(q);};
       const w=document.createTreeWalker(root,NodeFilter.SHOW_TEXT);let n;
-      while((n=w.nextNode())){const t=n.data.trim();if(t)out.push(t);}
-      root.querySelectorAll('[alt],[title],[aria-label],[placeholder],[value]').forEach(e=>{for(const a of ['alt','title','aria-label','placeholder','value']){const v=e.getAttribute(a);if(v&&v.trim())out.push(v.trim());}});
-      return out;})()`,
+      while((n=w.nextNode())){const t=n.data.trim();if(t)nodes.push(t);}
+      const els=root.querySelectorAll('*');
+      els.forEach(e=>{
+        for(const a of ['alt','title','aria-label','placeholder','value']){const v=e.getAttribute(a);if(v&&v.trim())nodes.push(v.trim());}
+        if(e.tagName==='SCRIPT'||e.tagName==='STYLE')return;
+        const d=getComputedStyle(e).display;
+        if(d!=='inline'&&d!=='contents'&&d!=='none')add(e.textContent);
+      });
+      add(root.textContent);add(root.innerText);
+      return {nodes,joined:[...joined],squashed:[...squashed]};})()`,
   );
 }

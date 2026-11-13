@@ -9,7 +9,7 @@ import {
   CLOSING_FRAMES, Closing, INTERLUDE_FRAMES, Interlude, OPENING_FRAMES, Opening, composeStory, fitText, useTopic, validateSpec,
 } from "./index";
 import type { StorySpec, TopicScene } from "./index";
-import { closingWall, listLayout, panelLayout, reservedSlots } from "./layout";
+import { closingWall, labelAt, listLayout, panelLayout, reservedSlots, textWidth } from "./layout";
 
 const config = { fps: 30, width: 1920, height: 1080, durationInFrames: 1000 };
 const html = (node: React.ReactNode, theme: Theme, frame: number) =>
@@ -216,5 +216,63 @@ describe("no hard-coded colours leak (sentinel theme)", () => {
   it("sentinel colours actually show up", () => {
     const out = html(<Closing spec={specN(3)} scenes={scenesN(3)} />, sentinel, 150);
     for (const needle of [C(11), C(31), C(61), C(141), "SentinelFont"]) expect(out).toContain(needle);
+  });
+});
+
+describe("validación de la configuración y de las escenas", () => {
+  const scenes = (...ids: string[]): TopicScene[] => ids.map((id) => ({ id, component: () => <div />, durationInFrames: 100 }));
+  it("rechaza ids de escena repetidos", () => {
+    expect(() => composeStory(specN(2), scenes("a", "a"))).toThrow(/repetido/);
+  });
+  it("rechaza ids reservados (opening, closing, interlude-N)", () => {
+    for (const id of ["opening", "closing", "interlude-3", "interlude"]) {
+      expect(() => composeStory(specN(2), scenes(id, "ok")), id).toThrow(/reservado/);
+    }
+  });
+  it("rechaza duraciones no enteras o no positivas", () => {
+    for (const d of [90.5, 0, -10, NaN, Infinity]) {
+      const sc = scenes("a", "b");
+      sc[0]!.durationInFrames = d;
+      expect(() => composeStory(specN(2), sc), String(d)).toThrow(/entero > 0/);
+    }
+  });
+  it("rechaza timing no entero, menor a 60 o con claves desconocidas", () => {
+    expect(() => validateSpec(specN(2, { timing: { opening: 90.5 } }))).toThrow(/entero/);
+    expect(() => validateSpec(specN(2, { timing: { closing: 30 } }))).toThrow(/>= 60/);
+    expect(() => validateSpec(specN(2, { timing: { openning: 100 } as never }))).toThrow(/timing\.openning no existe/);
+  });
+  it("labels: ausente o vacío usa los nombres de los temas; mal formado se rechaza", () => {
+    const sin = { ...specN(2) } as Partial<StorySpec>;
+    delete sin.labels;
+    expect(() => validateSpec(sin as StorySpec)).not.toThrow();
+    expect(() => html(<Opening spec={sin as StorySpec} />, neutral, 20)).not.toThrow();
+    expect(() => composeStory(sin as StorySpec, scenesN(2))).not.toThrow();
+    expect(labelAt(undefined, 0, ["x", "y"])).toBe("x");
+    expect(() => validateSpec(specN(2, { labels: "uno" as never }))).toThrow(/lista de textos/);
+    expect(() => validateSpec(specN(2, { labels: ["ok", ""] }))).toThrow(/labels\[1\]/);
+    expect(() => validateSpec(specN(2, { labels: ["ok", 3 as never] }))).toThrow(/labels\[1\]/);
+  });
+  it("el contador de las vueltas al listado sale del índice, no del id", () => {
+    const { timeline, component: Story } = composeStory(specN(3), scenes("interludes", "opening2", "x-1"));
+    expect(timeline.filter((e) => e.kind === "interlude").map((e) => e.id)).toEqual(["interlude-1", "interlude-2", "interlude-3"]);
+    for (const e of timeline) expect(html(<Story />, neutral, e.from + 5)).not.toContain("NaN");
+  });
+});
+
+describe("labelAt y fitText", () => {
+  it("no repite vecinas (i con i+1, y con i+6 si hay 3 o más) para n = 2..12", () => {
+    for (let n = 2; n <= 12; n++) {
+      const pool = Array.from({ length: n }, (_, k) => `e${k}`);
+      for (let i = 0; i < 200; i++) {
+        expect(labelAt(pool, i, []), `n=${n} i=${i} (al lado)`).not.toBe(labelAt(pool, i + 1, []));
+        if (n >= 3) expect(labelAt(pool, i, []), `n=${n} i=${i} (abajo)`).not.toBe(labelAt(pool, i + 6, []));
+      }
+    }
+  });
+  it("cuenta caracteres, no unidades UTF-16", () => {
+    const emoji = "😀".repeat(10);
+    expect(textWidth(emoji, 10)).toBeCloseTo(10 * 0.56 * 10);
+    const r = fitText(emoji, 60, 40, { min: 40 });
+    expect(Array.from(r.text).every((c) => c === "😀" || c === "…")).toBe(true);
   });
 });

@@ -32,6 +32,7 @@ export function decodePng(buf: Uint8Array): Pixels {
   if (depth !== 8 || interlace !== 0 || !ch) throw new Error(`decodePng: unsupported PNG (depth ${depth}, color type ${ctype}, interlace ${interlace})`);
   const raw = inflateSync(Buffer.concat(idat));
   const stride = width * ch;
+  if (raw.length < height * (stride + 1)) throw new Error(`decodePng: datos truncados (hay ${raw.length} bytes y hacen falta ${height * (stride + 1)})`);
   const out = new Uint8Array(width * height * 4);
   let prev = new Uint8Array(stride);
   let cur = new Uint8Array(stride);

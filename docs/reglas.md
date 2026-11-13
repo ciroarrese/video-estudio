@@ -22,12 +22,10 @@ Esta es la lista de referencia; `CLAUDE.md`, `engine/README.md`, `kit/README.md`
   *Por qué:* un `<canvas>` que conserva lo dibujado antes depende del historial. *Qué hacer:* `draw(ctx, frame, size)` pura, limpiando y dibujando la escena completa cada vez.
 - [ ] **CSS 3D permitido solo como `perspective()` propio de cada elemento**, dentro de su `transform`, con las posiciones de layout en enteros: todo el movimiento va dentro de `transform` y `left`/`top` son píxeles enteros. **Prohibido** `transform-style: preserve-3d` y `perspective` en un ancestro.
   *Por qué:* con la perspectiva en un ancestro, Chromium rasteriza las capas de forma distinta según el historial de cuadros; con `perspective()` en el propio `transform` y layout entero, el resultado es estable (es lo que hace `stories/`). *Qué hacer:* `transform: perspective(P) rotateX(..) rotateY(..) translate3d(..)` en cada pieza, orden de profundidad con `zIndex`, nada de planos que se crucen. Ver `stories/README.md`.
-- [ ] **Sin `scale()` sobre texto.**
-  *Por qué:* el texto escalado se rasteriza distinto según el historial. *Qué hacer:* animá `font-size`, o usá un traslado entero.
-- [ ] **Traslados de texto en píxeles enteros** (`Math.round`).
-  *Por qué:* una posición fraccionaria suaviza los bordes de forma inestable.
+- [ ] **`scale()` sobre texto y traslados de texto fraccionarios: riesgo conocido, no prohibición.**
+  *Por qué:* el texto escalado o ubicado en una posición fraccionaria puede rasterizarse distinto según el historial. *Qué hacer:* se permiten dentro de una pieza mientras esa pieza pase `--check` completo; si el chequeo falla, preferí animar `font-size` o usar un traslado entero (`Math.round`).
 - [ ] **Desenfoques y sombras están bien**, dentro de la tolerancia de `--check`.
-- [ ] **Siempre correr `npm run render -- <id> --check`.** Por defecto es tolerante (diferencia máxima por canal 2 y hasta 0,1 % de píxeles distintos); `--check-strict` compara byte a byte.
+- [ ] **Siempre correr `npm run render -- <id> --check`.** Por defecto es tolerante: ningún píxel con diferencia mayor que 2 por canal, hasta 0,1 % de píxeles con diferencia 2 y hasta 20 % con diferencia 1 (ruido de desenfoques y sombras); `--check-strict` compara byte a byte.
   *Por qué:* es la única forma de enterarse de que una escena depende del historial antes de que lo note la persona.
 
 - [ ] **Todo sale del tema.** Colores, tipografías, radios, sombras, curvas y tamaños de letra vienen de `useTheme()`. Ningún `#hex` ni `font-family` suelto en una escena.

@@ -45,10 +45,29 @@ describe('tolerant comparison', () => {
   });
   it('small deltas over too many pixels fail on the ratio; thresholds are configurable', () => {
     const b = clone(blank());
-    for (let i = 0; i < 200; i++) poke(b, i, 0, 1); // 0.2%
+    for (let i = 0; i < 200; i++) poke(b, i, 0, 2); // 0.2% con delta 2
     const s = comparePixels(blank(), b);
     expect(withinTolerance(s)).toBe(false);
     expect(withinTolerance(s, { ...DEFAULT_TOLERANCE, maxRatio: 0.01 })).toBe(true);
+  });
+  it('1-level noise over a big blurred area (30% of the frame) fails only past the loose noise bound', () => {
+    const a = blank();
+    const ok = clone(a);
+    for (let i = 0; i < W * H * 0.15; i++) ok.data[i * 4]! += 1; // 15% con delta 1
+    expect(withinTolerance(comparePixels(a, ok))).toBe(true);
+    const bad = clone(a);
+    for (let i = 0; i < W * H * 0.3; i++) bad.data[i * 4]! += 1; // 30% con delta 1
+    expect(withinTolerance(comparePixels(a, bad))).toBe(false);
+  });
+  it('a uniform 2-level drift over the whole frame fails', () => {
+    const b = clone(blank());
+    for (let i = 0; i < W * H; i++) b.data[i * 4]! += 2;
+    expect(withinTolerance(comparePixels(blank(), b))).toBe(false);
+  });
+  it('a 1-px line that shifts fails (large delta)', () => {
+    const b = clone(blank());
+    for (let y = 0; y < H; y++) poke(b, 200, y, 60);
+    expect(withinTolerance(comparePixels(blank(), b))).toBe(false);
   });
   it('different sizes never pass', () => {
     expect(withinTolerance(comparePixels(blank(), { width: 2, height: 2, data: new Uint8Array(16) }))).toBe(false);
@@ -88,6 +107,37 @@ describe('decodePng', () => {
     expect(Buffer.from(d.data).equals(Buffer.from(a.data))).toBe(true);
     const s = comparePngs(encodePng(a), encodePng(b));
     expect(s).toMatchObject({ maxDelta: 40, diffPixels: 1, bbox: [5, 5, 5, 5] });
+  });
+  it('decodes filters 2, 3 and 4 (and 1) and matches the original pixels', () => {
+    const w = 7, h = 6, ch = 4;
+    const px = new Uint8Array(w * h * ch).map((_, i) => (i * 37 + ((i * i) >> 3)) & 255);
+    const stride = w * ch;
+    const rows: Buffer[] = [];
+    for (let y = 0; y < h; y++) {
+      const f = [2, 3, 4, 1, 2, 4][y]!;
+      const row = Buffer.alloc(stride);
+      for (let i = 0; i < stride; i++) {
+        const cur = px[y * stride + i]!;
+        const a = i >= ch ? px[y * stride + i - ch]! : 0;
+        const b = y > 0 ? px[(y - 1) * stride + i]! : 0;
+        const c = i >= ch && y > 0 ? px[(y - 1) * stride + i - ch]! : 0;
+        let pred = 0;
+        if (f === 1) pred = a;
+        else if (f === 2) pred = b;
+        else if (f === 3) pred = (a + b) >> 1;
+        else { const p = a + b - c, pa = Math.abs(p - a), pb = Math.abs(p - b), pc = Math.abs(p - c); pred = pa <= pb && pa <= pc ? a : pb <= pc ? b : c; }
+        row[i] = (cur - pred) & 255;
+      }
+      rows.push(Buffer.concat([Buffer.from([f]), row]));
+    }
+    const ihdr = Buffer.alloc(13); ihdr.writeUInt32BE(w, 0); ihdr.writeUInt32BE(h, 4); ihdr[8] = 8; ihdr[9] = 6;
+    const png = Buffer.concat([Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]), chunk('IHDR', ihdr), chunk('IDAT', deflateSync(Buffer.concat(rows))), chunk('IEND', Buffer.alloc(0))]);
+    expect(Buffer.from(decodePng(png).data).equals(Buffer.from(px))).toBe(true);
+  });
+  it('throws on truncated pixel data instead of returning zeros', () => {
+    const ihdr = Buffer.alloc(13); ihdr.writeUInt32BE(4, 0); ihdr.writeUInt32BE(4, 4); ihdr[8] = 8; ihdr[9] = 6;
+    const png = Buffer.concat([Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]), chunk('IHDR', ihdr), chunk('IDAT', deflateSync(Buffer.alloc(17 * 2))), chunk('IEND', Buffer.alloc(0))]);
+    expect(() => decodePng(png)).toThrow(/truncados/);
   });
   it('rejects non-PNG input', () => {
     expect(() => decodePng(new Uint8Array([1, 2, 3, 4, 5, 6, 7, 8, 9]))).toThrow(/not a PNG/);

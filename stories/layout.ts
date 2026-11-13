@@ -14,22 +14,53 @@ export type FitOptions = { min?: number; avg?: number; lines?: number };
  */
 export function fitText(text: string, maxWidth: number, size: number, { min = size * 0.55, avg = AVG_BOLD, lines = 1 }: FitOptions = {}): { text: string; size: number } {
   const room = Math.max(40, maxWidth) * lines * (lines > 1 ? 0.88 : 1);
-  const len = Math.max(1, text.length);
+  const chars = Array.from(text);
+  const len = Math.max(1, chars.length);
   if (len * avg * size <= room) return { text, size };
   const s = room / (len * avg);
   if (s >= min) return { text, size: s };
   const maxChars = Math.max(1, Math.floor(room / (avg * min)));
-  return { text: text.slice(0, Math.max(0, maxChars - 1)).trimEnd() + "…", size: min };
+  return { text: chars.slice(0, Math.max(0, maxChars - 1)).join("").trimEnd() + "…", size: min };
 }
 
 /** Ancho estimado de un texto (px). */
-export const textWidth = (text: string, size: number, avg = AVG_BOLD) => text.length * avg * size;
+export const textWidth = (text: string, size: number, avg = AVG_BOLD) => Array.from(text).length * avg * size;
 
-/** Etiqueta `i` del muro: se repiten las dadas con un corrimiento por vuelta (sin repetir vecinas); sin etiquetas usa `fallback`. */
-export function labelAt(labels: string[], i: number, fallback: string[]): string {
-  const pool = labels.length ? labels : fallback.length ? fallback : ["·"];
+/** Cuántos lugares separan a dos etiquetas vecinas en vertical en el muro (6 columnas). */
+const WALL_COLS = 6;
+const shiftCache = new Map<number, number>();
+
+/**
+ * Corrimiento por vuelta para `n` etiquetas: el más chico que evita repetir la vecina de al lado (`i`, `i+1`, también en
+ * el borde entre vueltas) y la de la fila de abajo (`i`, `i+6`). Con n = 2 la de abajo es imposible (con dos etiquetas
+ * alternando, `i+6` siempre cae igual): ahí se garantiza solo la de al lado.
+ */
+function lapShift(n: number): number {
+  const hit = shiftCache.get(n);
+  if (hit !== undefined) return hit;
+  const f = (j: number, s: number) => (j + Math.floor(j / n) * s) % n;
+  let pick = 0;
+  for (let s = 0; s < n; s++) {
+    let ok = true;
+    // la coincidencia depende solo de i módulo n: alcanza con mirar una vuelta
+    for (let i = 0; i < n * 2 && ok; i++) {
+      if (f(i, s) === f(i + 1, s)) ok = false;
+      if (n > 2 && f(i, s) === f(i + WALL_COLS, s)) ok = false;
+    }
+    if (ok) { pick = s; break; }
+  }
+  shiftCache.set(n, pick);
+  return pick;
+}
+
+/**
+ * Etiqueta `i` del muro: se repiten las dadas con un corrimiento por vuelta; sin etiquetas usa `fallback`.
+ * Las vecinas (`i` con `i+1`, y con `i+6` si hay 3 o más etiquetas) nunca coinciden; con una sola etiqueta no hay alternativa.
+ */
+export function labelAt(labels: string[] | undefined, i: number, fallback: string[]): string {
+  const pool = labels?.length ? labels : fallback.length ? fallback : ["·"];
   const n = pool.length;
-  return pool[(i + Math.floor(i / n) * 3) % n]!;
+  return pool[(i + Math.floor(i / n) * lapShift(n)) % n]!;
 }
 
 export type Pt = { x: number; y: number };

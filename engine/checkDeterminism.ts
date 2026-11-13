@@ -1,17 +1,16 @@
 import type { Stage } from './stage';
 
-/** Firma de un cuadro: el HTML mas el contenido de los `<canvas>` (si el stage los expone). */
-const signature = (stage: Stage): string => {
-  let c = '';
+/** Firma de un cuadro: el HTML mas el contenido de los `<canvas>` (si el stage los expone). `unreadable` avisa de un lienzo ilegible. */
+const signature = (stage: Stage): { sig: string; unreadable?: string } => {
   try {
-    c = stage.canvasData?.() ?? '';
-  } catch {
-    c = '';
+    return { sig: stage.html() + (stage.canvasData?.() ?? '') };
+  } catch (e) {
+    return { sig: stage.html(), unreadable: e instanceof Error ? e.message : String(e) };
   }
-  return stage.html() + c;
 };
 
-export type DeterminismResult = { frame: number; ok: boolean };
+/** `ok` es false si las firmas difieren o si algun `<canvas>` no se pudo leer (en ese caso `error` dice por que). */
+export type DeterminismResult = { frame: number; ok: boolean; error?: string };
 
 /**
  * For each frame f: render it after frame 0 and again after a different frame, then compare the
@@ -38,7 +37,10 @@ export async function checkDeterminism(
     const a = signature(stage);
     await show(f === last ? Math.max(0, last - 1) : last);
     await show(f);
-    out.push({ frame: f, ok: a === signature(stage) });
+    const b = signature(stage);
+    const unreadable = a.unreadable ?? b.unreadable;
+    if (unreadable !== undefined) out.push({ frame: f, ok: false, error: `no se pudo leer un canvas, no se puede verificar el cuadro: ${unreadable}` });
+    else out.push({ frame: f, ok: a.sig === b.sig });
   }
   if (prev !== null) await show(prev);
   return out;

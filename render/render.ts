@@ -419,7 +419,8 @@ export async function checkVideo(options: RenderOptions): Promise<CheckResult> {
     const total = env.meta.durationInFrames;
     const frames = evenFrames(total, 12);
     log(`check: cuadros ${frames.join(', ')}`);
-    const det = (await s.page.evaluate((f: number[]) => (window as any).__ve.checkDeterminism(f), frames)) as { frame: number; ok: boolean }[];
+    const det = (await s.page.evaluate((f: number[]) => (window as any).__ve.checkDeterminism(f), frames)) as { frame: number; ok: boolean; error?: string }[];
+    for (const d of det) if (d.error) log(`check: cuadro ${d.frame}: ${d.error}`);
     const bad = det.filter((d) => !d.ok).map((d) => d.frame);
     if (bad.length) log(`check: checkDeterminism FALLA en cuadros ${bad.join(', ')}`);
     else log('check: checkDeterminism ok');
@@ -442,7 +443,7 @@ export async function checkVideo(options: RenderOptions): Promise<CheckResult> {
       log(`check: cuadro ${n} ${ok ? 'ruido tolerado' : 'DIFERENTE'}: ${diffs[n]}`);
       if (!ok) mismatches.push(n);
     }
-    const mode = tol.strict ? 'estricto (byte a byte)' : `tolerante (delta <= ${tol.maxDelta}, <= ${(tol.maxRatio * 100).toFixed(3)}% de pixeles)`;
+    const mode = tol.strict ? 'estricto (byte a byte)' : `tolerante (ningun pixel con delta > ${tol.maxDelta}, <= ${(tol.maxRatio * 100).toFixed(3)}% con delta 2..${tol.maxDelta}, <= ${(DEFAULT_TOLERANCE.maxNoiseRatio * 100).toFixed(0)}% con delta 1)`;
     if (mismatches.length) log(`check: PNG distintos entre layouts en cuadros ${mismatches.join(', ')} [${mode}]`);
     else log(`check: PNG equivalentes en ambos layouts [${mode}]${noisy ? `, ${noisy} cuadros con ruido tolerado` : ', todos identicos'}`);
     return { ok: bad.length === 0 && mismatches.length === 0, frames, determinism: det, mismatches, diffs };

@@ -24,7 +24,7 @@ Cada pieza es una función pura del cuadro (de `useFrame()` o de una prop `frame
 - Casos degenerados que NO fallan: `Cursor` con una sola clave (fijo) o `show` corto (el fundido se acorta); `CountUp` con `duration` 0 (salta a `to`); `Wash`, `flight` y `zoomThrough` con inicio = fin (escalón).
 - `Doodle*`: `id` único por garabato (se sanea para el degradado: solo letras, números, `_` y `-`).
 - `Stage` declara `@font-face` con el primer nombre de `theme.font.family` (sin comillas) para los archivos de `theme.font.files`.
-- `World` usa transformación 2D cuando no hay inclinación (`rx = ry = 0`); con inclinación, 3D con perspectiva. Esto evita capturas no idénticas según el historial de cuadros.
+- `World` usa transformación 2D cuando no hay inclinación (`rx = ry = 0`); con inclinación, agrega `perspective(P) rotateX() rotateY()` dentro del `transform` del propio elemento (sin `perspective` ni `preserve-3d` en un ancestro, con `left`/`top` enteros y todo el movimiento en el `transform`; el mismo patrón que `rigTransform` de `stories/`). El mundo se inclina como un plano, así que los hijos no se cruzan en profundidad. Esto evita capturas no idénticas según el historial de cuadros (ver `docs/reglas.md`).
 
 ## Uso mínimo
 
