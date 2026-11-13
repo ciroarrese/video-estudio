@@ -119,10 +119,12 @@ function Scene({ frame }: { frame: number }) {
           </div>
         </Panel>
 
-        {frame >= T.flight[0] && (
+        {frame >= T.flight[0] && frame < T.through[0] + 16 && (
+          <div style={{ opacity: kf(frame, [T.through[0], T.through[0] + 14], [1, 0]) }}>
           <FlyingCard frame={frame} range={T.flight} from={cardCenter(PICK)} to={LANDING} arc={110} width={CARD.w} height={CARD.h}>
             <StatCard i={PICK} frame={frame} selected />
           </FlyingCard>
+          </div>
         )}
 
         <DoodleCircle frame={frame} start={96} end={140} id="kd-circle" cx={pos.x + 110} cy={pos.y + 112} rx={130} ry={46} />

@@ -39,6 +39,8 @@ export function CarouselRing(p: CarouselRingProps) {
         return (
           <div
             key={c.i}
+            // Oclusión intencional: las tarjetas de atrás quedan tapadas por la de adelante
+            data-qa-ignore={c.front < 0.85 ? "covered" : undefined}
             style={{
               position: "absolute",
               left: Math.round(width / 2 + c.pr.x - cw / 2),
