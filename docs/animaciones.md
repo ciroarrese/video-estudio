@@ -18,8 +18,9 @@ Tres galerías, un efecto por tramo de 90 cuadros (75 de animación y 15 de paus
 | `fx-text` | los 8 efectos de texto | `npm run dev` y `/?video=fx-text` | `npm run sheet -- fx-text --count 16` |
 | `fx-3d` | los 16 efectos 3D (17 tramos: `PhoneOrbit` con y sin pantalla) | `/?video=fx-3d` | `npm run sheet -- fx-3d --count 17` |
 | `fx-data-ui-art` | datos, interfaz y arte (25 tramos) | `/?video=fx-data-ui-art` | `npm run sheet -- fx-data-ui-art --count 25` |
+| `fx-in-scene` | ejemplo de regresión: efectos montados desde el cuadro 0 dentro de una escena real, antes de su `start` y después de terminar | `/?video=fx-in-scene` | `npm run sheet -- fx-in-scene --count 12` |
 
-Todas admiten `&props={"theme":"dark"}`. Para ver un solo efecto: el tramo `i` (desde 0, en el orden de las tablas de abajo, o el de la etiqueta) ocupa los cuadros `i*90` a `i*90+89`: `npm run render -- fx-3d --frames 270-359 --scale 0.5 --crf 23` (`CubeFold`, el cuarto de `fx-3d`, es el tramo 3). En `fx-data-ui-art` el orden es datos (0 a 5), interfaz (6 a 13, con `TileDone` en el 13), arte (14 a 24).
+Las tres galerías admiten `&props={"theme":"dark"}`; `fx-in-scene` no es una galería de efectos: es la prueba de que un efecto puede quedar montado todo el tiempo sin ensuciar el render (ver "Efectos montados"). Para ver un solo efecto: el tramo `i` (desde 0, en el orden de las tablas de abajo, o el de la etiqueta) ocupa los cuadros `i*90` a `i*90+89`: `npm run render -- fx-3d --frames 270-359 --scale 0.5 --crf 23` (`CubeFold`, el cuarto de `fx-3d`, es el tramo 3). En `fx-data-ui-art` el orden es datos (0 a 5), interfaz (6 a 13, con `TileDone` en el 13), arte (14 a 24).
 
 ## Cómo elegir
 
@@ -96,7 +97,7 @@ SVG puros; colores, tipografía y radios del tema.
 | `BarsGrow` | Barras comunes que crecen escalonadas, con valores. | Comparar categorías de forma clara. | `data`, `labels`, `singleColor`, `format` |
 | `FlowSteps` | Pasos en escalera unidos por un conector que se dibuja. | Un proceso en pasos. | `steps` (`{title, caption?, state?}`), `activeIndex` |
 
-Nota: `DonutRing` muestra siempre el número animado `value` (no el porcentaje de `max`) seguido de `unit`, que por defecto es `%`, y debajo `label`, que por defecto es "Avance". Con otro `max` o una unidad distinta, pasá `unit` (y `label`) a propósito; con `unit=""` o `label=""` se apagan. Nota: `Bars3D` ocupa casi todo el cuadro que le das (barras más anchas y altas, rótulos del tamaño `eyebrow`); aun así la proyección isométrica de una fila deja aire a los lados: usá `BarsGrow` si necesitás lectura de valores a distancia.
+Nota: `DonutRing` sin `unit` muestra en el centro el porcentaje de `max` (`value=4, max=4` da "100%"); con `unit` muestra el valor absoluto seguido de la unidad (`unit=" tareas"` da "4 tareas"; `unit=""` da "4"). Debajo va `label`, que por defecto es "Avance" (con `label=""` se apaga). Para dimensionarlo: `DONUT_SIZE` y `donutGeometry`. Nota: `Bars3D` ocupa casi todo el cuadro que le das (barras más anchas y altas, rótulos del tamaño `eyebrow`); aun así la proyección isométrica de una fila deja aire a los lados: usá `BarsGrow` si necesitás lectura de valores a distancia.
 
 ## Interfaz (`fx/ui`, galería `fx-data-ui-art`)
 
@@ -114,7 +115,7 @@ Interfaces recreadas con el tema (no capturas). Se pueden poner dentro de `World
 | `TileGrid` | Baldosas que se dan vuelta y se encienden con escalonado sembrado. | Progreso de muchas cosas a la vez. | `cols`, `rows`, `lit`, `seed` |
 | `TileDone` | Baldosa que pasa a "hecha" con onda en `start`. | Marcar una tarea como completada junto a un `Cursor`. | `label`, `pendingText`, `doneText` |
 
-Ayudas de tamaño de la interfaz (se importan de `fx/`): `phoneScreen(width, height, bezel?)` da la caja `{ x, y, width, height }` de la pantalla de un `PhoneFrame` (para dimensionar tu contenido: el marco no lo hace por vos); `stackOffsets(arrivals, pitch)` da el desplazamiento vertical de cada tarjeta de `NotificationStack`. En vertical, calculá el `width`/`height` del teléfono para que llene el cuadro (ver "Para que no parezca un borrador" en `docs/guia-escenas.md`).
+Ayudas de tamaño de la interfaz (se importan de `fx/`): `phoneScreen(width, height, bezel?)` da la caja `{ x, y, width, height }` de la pantalla de un `PhoneFrame` (para dimensionar tu contenido: el marco no lo hace por vos); `phoneScreenRadius(theme)` y las constantes `PHONE_SIZE` y `PHONE_BEZEL` (tamaño y marco por defecto) completan el cálculo. De `NotificationStack`: `NOTIFICATION_SIZE` (caja por defecto), `NOTIFICATION_CARD_HEIGHT`, `notificationPitch(height, count)` (distancia entre tarjetas) y `stackOffsets(arrivals, pitch)` (desplazamiento vertical de cada tarjeta). En vertical, calculá el `width`/`height` del teléfono para que llene el cuadro (ver "Para que no parezca un borrador" en `docs/guia-escenas.md`).
 
 ## Arte y transiciones (`fx/art`, galería `fx-data-ui-art`)
 
@@ -143,11 +144,12 @@ Notas: **`PixelBuild` muestrea la cobertura de los glifos en un canvas fuera de 
 3. **Corte seco entre palabras** (`KineticWords`): el movimiento ocurre dentro de cada palabra, no entre ellas.
 4. **El último cuadro es un still.** Todo efecto termina compuesto y legible; se puede congelar para una miniatura o como primera imagen de la escena siguiente.
 5. **Oclusión pintando de lejos a cerca** y **profundidad con opacidad y grosor**: lo lejano se desvanece y se afina; lo cercano es más grande y más opaco. En `fx/three` la perspectiva se proyecta a mano.
-6. **Si `--check` falla con un efecto, montalo cuando empieza** (no desde el cuadro 0) y seguí `docs/reglas.md`, sección "Qué hacer cuando --check falla".
+6. **Efectos montados: pueden estar desde el cuadro 0.** Antes de `start` y una vez terminados, los efectos no emiten `transform`, `filter` ni `opacity` (en reposo no queda `scale(1)` ni `opacity: 1`), así que montarlos de más no ensucia el render; `examples/fx-in-scene` es el ejemplo de regresión. Si `--check` falla con un efecto, seguí `docs/reglas.md`, sección "Qué hacer cuando --check falla".
 7. **Raster estable.** Para que el render sea idéntico según el historial de cuadros, ver la lista única en `docs/reglas.md` (traslados enteros, `scale()` sobre texto solo si la pieza pasa `--check` completo, CSS 3D solo como `perspective()` propio de cada elemento, sin sombras bajo `rotate()`).
 
 ## Base común
 
 - `engine`: `Easing.back`, `Easing.lands`, `FrameCanvas`, `random`.
 - `fx/core`: `stagger`, `staggerBy`, `progress`, `phases`, `clip`, `sub`, `seededShuffle`, `lerp`, `clamp`, `mix`, `Clip`, `FxProps`, `useFx`, `roleColor`, `chartColor`.
+- Para quien escribe un efecto nuevo (que en reposo no deje residuos): `xform({ x, y, scale, rotate, round })` arma un `transform` solo con las partes que no son identidad (`undefined` si todas lo son), `fade(opacidad)` devuelve la opacidad a emitir (`undefined` si es casi 1, así no queda `opacity: 0.999`), `svgScale(cx, cy, s)` es el equivalente SVG de una escala alrededor de un punto (`undefined` con escala 1) y `styleKey(obj)` da la lista de propiedades presentes de un estilo (queda como `key` opcional: la comparación de `--check` ya ignora el orden de las propiedades, así que no hace falta para eso). Ver sus comentarios en `fx/core/math.ts`.
 - Cómo combinarlos con cámara, cursor y garabatos del kit: `docs/guia-escenas.md`, sección 9.

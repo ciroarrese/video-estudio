@@ -41,7 +41,7 @@ const cam = cameraAt(f, KEYS);            // { x, y, scale, rx, ry, blur }
 
 | Necesitás | Pieza |
 |---|---|
-| Fondo, tipografía y color de texto de la escena | `Stage` (`clouds={false}` para un fondo liso; `CloudBackground` si querés las manchas del tema) |
+| Fondo, tipografía y color de texto de la escena | `Stage` (`clouds={false}` para un fondo liso; `CloudBackground` si querés las manchas del tema; las nubes siguen el tamaño del cuadro en todos los formatos) |
 | Mover la cámara sobre un mundo | `World` + `cameraAt` |
 | Valor que cambia entre cuadros clave | `kf(f, [f0, f1, ...], [v0, v1, ...], easing?)` |
 | Trayecto 2D por paradas | `track(f, [[f, x, y], ...])` |
@@ -51,7 +51,7 @@ const cam = cameraAt(f, KEYS);            // { x, y, scale, rx, ry, blur }
 | Una tarjeta que viaja de un lugar a otro | `FlyingCard` con `range`, `from`, `to`, `arc` |
 | Número que cuenta | `CountUp` (`start`, `duration`, `format?`) |
 | Texto con el degradado del tema | `GradientText` |
-| Titular que se aparta | `DockedHeadline` (o `TopicHeadline` dentro de una historia) |
+| Titular que se aparta | `DockedHeadline` con `title` (o `TopicHeadline`, que dentro de una historia lee el tema y fuera de ella necesita `title`) |
 | Oscurecer los bordes al acercar | `Vignette amount={0..1}` |
 | Salida de escena | `zoomThrough` + `Wash` |
 | Mezclar escenas con tiempos | `Sequence`, `Series` (motor) |
@@ -203,11 +203,11 @@ Un video puede pasar todas las herramientas y seguir pareciendo un borrador. Reg
 Con 2 a 6 temas usá `defineStory` (ver `stories/README.md` y `templates/story/`): arma la apertura, las vueltas al listado y el cierre desde un `StorySpec`. Cada escena de tema:
 
 - es un componente sin `Stage` (la historia ya lo pone) y de duración fija (`durationInFrames`);
-- puede usar `useTopic()` y `<TopicHeadline start hide />` para el titular con el nombre del tema, pero esos dos solo funcionan dentro de la historia: si la escena también se prueba sola (lo recomendado), pasale el titular por prop y usá `DockedHeadline`, como `templates/scene/Scene.tsx`;
+- puede usar `useTopic()` y `<TopicHeadline start hide />` para el titular con el nombre del tema. Para que la escena se renderice también sola (lo recomendado) hay dos caminos: pasarle el titular por prop y usar `DockedHeadline`, como `templates/scene/Scene.tsx`, o dejar `TopicHeadline` con `title` y `number` (`<TopicHeadline title="Panel de ventas" number={1} />`; dentro de la historia pisan al tema, y sin `title` ni historia no dibuja nada y avisa una vez en la consola) y `useTopic({ name: "Panel de ventas" })` con valor de reserva (`useTopicOrNull()` devuelve `null` fuera de la historia). El contenido no debe depender de `StoryStage` ni de `composeStory`;
 - termina con `Wash` o atravesando algo;
 - puede pasar un `thumbnail` (lienzo de 560×340) para el cierre.
 
-Probá cada escena sola (su propio `defineVideo`, como en `templates/scene/index.ts`) y recién después en la historia.
+Probá cada escena sola (su propio `defineVideo`, como en `templates/scene/index.ts`) y recién después en la historia. `defineStory` publica por defecto solo el formato base: los formatos extra se piden con `formats: ["vertical"]` y cada escena de tema tiene que tener su disposición. El presupuesto de cuadros de la historia entera se ve con `npm run qa -- <id> --list-scenes`.
 
 ## 9. Combinar el kit con efectos de `fx/`
 
@@ -280,7 +280,7 @@ Ejemplo completo: `examples/theme-scope` (`/?video=theme-scope`).
 
 ## 11. Vertical y cuadrado
 
-El mismo video puede salir en 16:9 (1920×1080), vertical (1080×1920) y cuadrado (1080×1080). Se habilita con `formats` en `defineVideo` (`formats: ["vertical", "cuadrado"]`; con el base 1920×1080 los tamaños se derivan solos) y se elige con `--format horizontal|vertical|cuadrado` en `render`, `qa` y `sheet` (en el navegador, `&format=vertical`).
+El mismo video puede salir en 16:9 (1920×1080), vertical (1080×1920) y cuadrado (1080×1080). Se habilita con `formats` en `defineVideo` o `defineStory` (sin `formats` solo existe el formato base): `formats: ["vertical", "cuadrado"]`; con el base 1920×1080 los tamaños se derivan solos, y todos los lados tienen que ser pares y se elige con `--format horizontal|vertical|cuadrado` en `render`, `qa` y `sheet` (en el navegador, `&format=vertical`).
 
 - El tamaño del escenario sale de `useVideoConfig()` (`width`, `height`): no supongas 1920×1080 ni escribas `960`/`540` a mano; usá `width / 2`, `height / 2`.
 - `useFormat()` da `{ format, width, height, pick }`. `pick({ horizontal: 4, vertical: 2, cuadrado: 3 })` elige un valor según el formato (lo que falta usa el de `horizontal`). Con eso se cambian columnas, tamaños y posiciones: tarjetas en fila en horizontal y apiladas en vertical, tamaño de punto, zoom de cámara.
@@ -290,4 +290,4 @@ El mismo video puede salir en 16:9 (1920×1080), vertical (1080×1920) y cuadrad
 
 ## 12. Probar una escena sola
 
-`npm run render -- <id> --list-scenes` (también en `qa` y `sheet`) lista las escenas con nombre: las `<Series.Item name="...">` / `<Sequence name="...">`, las que declara `defineVideo({ scenes })` y, en una historia, la apertura, cada tema, las vueltas al listado y el cierre. Con `--scene <id|índice>` (índice desde 0) `render`, `qa` y `sheet` trabajan solo sobre el rango de cuadros de esa escena: `npm run sheet -- mi-video --scene ventas --count 8`.
+`npm run qa -- <id> --list-scenes` (también `sheet` y `render`) lista las escenas con nombre: las `<Series.Item name="...">` / `<Sequence name="...">`, las que declara `defineVideo({ scenes })` y, en una historia, la apertura, cada tema, las vueltas al listado y el cierre; las versiones de `qa` y `sheet` agregan, en una historia, el presupuesto de cuadros por bloque (la de `render` no). Con `--scene <id|índice>` (índice desde 0) `render`, `qa` y `sheet` trabajan solo sobre el rango de cuadros de esa escena: `npm run sheet -- mi-video --scene ventas --count 8`.

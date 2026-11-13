@@ -85,10 +85,10 @@ function Scene() {
           <Slot c={0} r={1}><LineDraw start={156} width={900} height={520} /></Slot>
 
           <Slot c={0} r={2}><Typewriter text="Escribiendo una idea." start={180} fontSize={theme.type.h2} duration={40} /></Slot>
-          <Slot c={0} r={2} y={100}><ScrambleDecode text="Texto descifrado" start={184} fontSize={theme.type.h2} /></Slot>
-          <Slot c={0} r={2} y={200}><SplitFlap text="LISTO" start={188} fontSize={theme.type.h2} /></Slot>
-          <Slot c={0} r={2} y={330}><TileDone start={196} width={420} height={150} /></Slot>
-          <Slot c={0} r={2} y={330} x={460}><MarkerDraw text="Resaltado" start={198} width={420} height={120} /></Slot>
+          <Slot c={0} r={2} y={140}><ScrambleDecode text="Texto descifrado" start={184} fontSize={theme.type.h2} /></Slot>
+          <Slot c={0} r={2} y={270}><SplitFlap text="LISTO" start={188} fontSize={theme.type.h2} /></Slot>
+          <Slot c={0} r={2} y={390}><TileDone start={196} width={420} height={150} /></Slot>
+          <Slot c={0} r={2} y={400} x={460}><MarkerDraw text="Resaltado" start={198} width={420} height={120} /></Slot>
 
           <Slot c={1} r={2}><FlowSteps start={206} width={900} height={500} /></Slot>
 
