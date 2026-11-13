@@ -1,0 +1,74 @@
+import { flushSync } from 'react-dom';
+import { createRoot } from 'react-dom/client';
+import { FrameProvider } from './FrameProvider';
+import { clearAudio, collectAudio, type AudioTrack } from './Audio';
+import type { VideoDefinition } from './defineVideo';
+
+export type Stage = {
+  def: VideoDefinition<any>;
+  /** Synchronously render frame n (reuses the same React root). */
+  render(n: number): void;
+  /** Unmount everything (root renders null). */
+  blank(): void;
+  /** Frame currently shown, or null when blank / nothing rendered yet. */
+  current(): number | null;
+  html(): string;
+  destroy(): void;
+};
+
+export function createStage(host: HTMLElement, def: VideoDefinition<any>, inputProps: object = {}): Stage {
+  const config = { fps: def.fps, width: def.width, height: def.height, durationInFrames: def.durationInFrames };
+  Object.assign(host.style, {
+    position: 'relative',
+    width: `${def.width}px`,
+    height: `${def.height}px`,
+    overflow: 'hidden',
+  });
+  const root = createRoot(host);
+  const Comp = def.component;
+  const props = { ...(def.defaultProps ?? {}), ...inputProps };
+  let cur: number | null = null;
+  return {
+    def,
+    render(n) {
+      flushSync(() => {
+        root.render(
+          <FrameProvider frame={n} config={config}>
+            <Comp {...props} />
+          </FrameProvider>,
+        );
+      });
+      cur = n;
+    },
+    blank() {
+      flushSync(() => root.render(null));
+      cur = null;
+    },
+    current: () => cur,
+    html: () => host.innerHTML,
+    destroy() {
+      root.unmount();
+      cur = null;
+    },
+  };
+}
+
+const scanCache = new WeakMap<Stage, AudioTrack[]>();
+
+/**
+ * Render every frame once and return all audio tracks. Cached per stage (a stage is tied to one
+ * video + props, so a new stage invalidates it). Restores the frame that was shown before.
+ */
+export function scanAudio(stage: Stage): AudioTrack[] {
+  const cached = scanCache.get(stage);
+  if (cached) return cached;
+  const prev = stage.current();
+  stage.blank();
+  clearAudio();
+  for (let n = 0; n < stage.def.durationInFrames; n++) stage.render(n);
+  const result = collectAudio();
+  scanCache.set(stage, result);
+  stage.blank();
+  if (prev !== null) stage.render(prev);
+  return result;
+}
