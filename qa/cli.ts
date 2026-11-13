@@ -131,7 +131,7 @@ async function main(cmd: string, argv: string[]): Promise<number> {
   if (!id && !dirs.length) throw new Error('Indica un <videoId> y/o --scan-source <dir>');
   const allowFile = one(p, 'allow');
   const r = await runPrivacy({
-    videoId: id, props, format, scene, ...sample(p), deny: readFileSync(denyFile, 'utf8'), allow: allowFile ? readFileSync(allowFile, 'utf8') : '', scanSource: dirs, log,
+    videoId: id, props, format, scene, ...sample(p), deny: readFileSync(denyFile, 'utf8'), allow: allowFile ? readFileSync(allowFile, 'utf8') : '', scanSource: dirs, skipFiles: [denyFile, ...(allowFile ? [allowFile] : [])], log,
   });
   for (const f of r.findings) {
     console.log(`${f.kind.toUpperCase().padEnd(6)} "${f.value}"${f.term ? ` (termino: ${f.term})` : ''}  en ${f.where}${f.frames ? ` cuadros ${f.frames.join(',')}` : ''}\n       ...${f.context}...`);

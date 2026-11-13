@@ -1,4 +1,4 @@
-import { readdirSync, readFileSync, statSync } from 'node:fs';
+import { readdirSync, readFileSync, realpathSync, statSync } from 'node:fs';
 import { basename, extname, join, relative } from 'node:path';
 import { collectAllText } from './page';
 import { collectStrings, parseTermList, scanText, type Hit, type Term } from './privacyCore';
@@ -18,6 +18,8 @@ export type PrivacyOptions = Partial<SampleSpec> & {
   allow?: string;
   /** Directories to grep for the same terms (deny list, e-mails, URL hosts). */
   scanSource?: string[];
+  /** Archivos que el escaneo del codigo salta (rutas): las listas `--deny`/`--allow` contienen los terminos a proposito. */
+  skipFiles?: string[];
   log?: (m: string) => void;
 };
 export type PrivacyResult = { ok: boolean; findings: PrivacyFinding[]; frames: number[]; scannedTexts: number; scannedFiles: number };
@@ -34,12 +36,16 @@ export const isSourceFile = (name: string): boolean => {
 };
 const SKIP_DIR = new Set(['node_modules', 'dist', 'out', '.git', '.ve-cache']);
 
-function* walkSource(dir: string): Generator<string> {
+/** Los archivos de listas se llaman `prohibidos.txt` por convencion: nunca se escanean. */
+export const DENY_LIST_NAME = 'prohibidos.txt';
+const realOr = (p: string) => { try { return realpathSync(p); } catch { return p; } };
+
+function* walkSource(dir: string, skip: Set<string>): Generator<string> {
   for (const e of readdirSync(dir, { withFileTypes: true })) {
     if (SKIP_DIR.has(e.name)) continue;
     const p = join(dir, e.name);
-    if (e.isDirectory()) yield* walkSource(p);
-    else if (e.isFile() && isSourceFile(e.name) && statSync(p).size < 2_000_000) yield p;
+    if (e.isDirectory()) yield* walkSource(p, skip);
+    else if (e.isFile() && e.name !== DENY_LIST_NAME && isSourceFile(e.name) && !skip.has(realOr(p)) && statSync(p).size < 2_000_000) yield p;
   }
 }
 
@@ -96,8 +102,9 @@ export async function runPrivacy(o: PrivacyOptions): Promise<PrivacyResult> {
       await session.close();
     }
   }
+  const skip = new Set((o.skipFiles ?? []).map(realOr));
   for (const dir of o.scanSource ?? []) {
-    for (const file of walkSource(dir)) {
+    for (const file of walkSource(dir, skip)) {
       scannedFiles++;
       const lines = readFileSync(file, 'utf8').split('\n');
       lines.forEach((line, i) => {
