@@ -71,7 +71,8 @@ export function Interlude({ spec, done, skip = [], next: nextProp }: { spec: Sto
             const ct = Math.round(L.numSize * 0.5 - cs * 0.5);
             const number = cp > 0 ? (
               <>
-                {cp < 1 && <span style={{ opacity: fade(1 - cp) }}><GradientText>{String(i + 1).padStart(2, "0")}</GradientText></span>}
+                {/* el número queda oculto (no `opacity: 0`) bajo la tilde: sigue ocupando su lugar en la línea y no cuenta como texto */}
+                <span key={cp >= 1 ? "hidden" : fade(1 - cp) === undefined ? "full" : "fade"} style={{ opacity: fade(1 - cp), visibility: cp >= 1 ? "hidden" : undefined }}><GradientText>{String(i + 1).padStart(2, "0")}</GradientText></span>
                 <span style={{ position: "absolute", left: cl, top: ct, transform: xform({ scale: 1 + pop * 0.25 }) }}>
                   <CheckMark p={cp} size={cs} id={String(i)} />
                 </span>
