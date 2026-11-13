@@ -5,7 +5,7 @@ import type { CloudOptions } from "../kit";
 import { themeEasing } from "../kit/util";
 import { contrastRatio, useTheme, withAlpha } from "../themes";
 import type { Theme } from "../themes";
-import { fade, styleKey, xform } from "../fx/core/math";
+import { fade, styleKey, svgScale, xform } from "../fx/core/math";
 import type { ListLayout } from "./layout";
 import { INLINE_SEP, ROW_GAP, fitText, pillFit } from "./layout";
 import { parseRich } from "./types";
@@ -102,7 +102,7 @@ export function CheckMark({ p, size, id }: { p: number; size: number; id: string
           <stop offset="1" stopColor={theme.color.accent2} />
         </linearGradient>
       </defs>
-      <circle cx={23} cy={23} r={21} fill={`url(#story-check-${id})`} opacity={c} transform={`translate(23 23) scale(${0.6 + c * 0.4}) translate(-23 -23)`} />
+      <circle cx={23} cy={23} r={21} fill={`url(#story-check-${id})`} opacity={c} transform={svgScale(23, 23, 0.6 + c * 0.4)} />
       <path d="M13 24l7 7 13-15" fill="none" stroke={theme.color.onAccent} strokeWidth={4.2} strokeLinecap="round" strokeLinejoin="round" strokeDasharray={34} strokeDashoffset={34 * (1 - Math.max(0, p * 2 - 1))} />
     </svg>
   );
@@ -137,21 +137,21 @@ export function HeadlineRow({
     const block: React.CSSProperties = { position: "absolute", left: 0, top: L.blockTop, width: L.rowW, opacity: fade(quiet) };
     return (
       <div key={styleKey(root)} style={root}>
-        <div key={styleKey(block)} style={block}>
+        <div key={`block-${styleKey(block)}`} style={block}>
           <div style={{ height: L.numH, lineHeight: `${L.numH}px`, fontSize: L.numSize, fontWeight: theme.font.weights.stat, position: "relative", whiteSpace: "nowrap" }}>{num}</div>
           <div style={{ position: "absolute", left: 0, top: nameTop - L.blockTop, fontSize: L.nameSize, lineHeight: `${L.nameH}px`, height: L.nameH, fontWeight: theme.font.weights.semibold, color: theme.color.text, letterSpacing: "-0.02em", whiteSpace: "nowrap" }}>{L.names[i]}</div>
           <div style={{ position: "absolute", left: 0, top: nameTop - L.blockTop + L.nameH + ROW_GAP.a, fontSize: L.lineSize, lineHeight: `${L.lineH}px`, color: theme.color.textMuted, whiteSpace: "nowrap" }}>
             {L.lineRows[i]!.map((r, k) => <div key={k}>{r}</div>)}
           </div>
         </div>
-        <div key={styleKey(bar)} style={bar} />
+        <div key={`bar-${styleKey(bar)}`} style={bar} />
       </div>
     );
   }
   const block: React.CSSProperties = { position: "absolute", left: 0, top: L.blockTop, width: L.rowW, opacity: fade(quiet) };
   return (
     <div key={styleKey(root)} style={root}>
-      <div key={styleKey(block)} style={block}>
+      <div key={`block-${styleKey(block)}`} style={block}>
         <div style={{ display: "flex", alignItems: "baseline", height: L.nameH, whiteSpace: "nowrap" }}>
           <span style={{ width: L.numW, flexShrink: 0, fontSize: L.numSize, fontWeight: theme.font.weights.stat, position: "relative" }}>{num}</span>
           <span style={{ fontSize: L.nameSize, lineHeight: `${L.nameH}px`, fontWeight: theme.font.weights.semibold, color: theme.color.text, letterSpacing: "-0.02em" }}>{L.names[i]}</span>
@@ -164,17 +164,17 @@ export function HeadlineRow({
         </div>
         {!L.inline && <div style={{ marginLeft: L.numW, marginTop: ROW_GAP.a, height: L.lineH, fontSize: L.lineSize, lineHeight: `${L.lineH}px`, color: theme.color.textMuted, whiteSpace: "nowrap" }}>{L.lines[i]}</div>}
       </div>
-      <div key={styleKey(bar)} style={bar} />
+      <div key={`bar-${styleKey(bar)}`} style={bar} />
     </div>
   );
 }
 
-/** Texto con `**negrita**` (ver `parseRich`) para la firma: el fragmento en negrita sube un peso. */
+/** Texto con `**negrita**` (ver `parseRich`) para la firma: el fragmento en negrita sube un peso. Cada fragmento va en su propio elemento (los textos sueltos contiguos se parten distinto según el historial). */
 export function RichText({ text, bold }: { text: string; bold?: number }) {
   const theme = useTheme();
   return (
     <>
-      {parseRich(text).map((p, i) => (p.bold ? <strong key={i} style={{ fontWeight: bold ?? theme.font.weights.stat }}>{p.text}</strong> : <React.Fragment key={i}>{p.text}</React.Fragment>))}
+      {parseRich(text).map((p, i) => (p.bold ? <strong key={i} style={{ fontWeight: bold ?? theme.font.weights.stat }}>{p.text}</strong> : <span key={i}>{p.text}</span>))}
     </>
   );
 }

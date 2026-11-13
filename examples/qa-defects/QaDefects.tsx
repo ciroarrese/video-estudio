@@ -21,9 +21,15 @@ import { Fill, useFrame } from '../../engine';
  * 49-51 a 5 px sliver past the right edge under a camera that moves (info at 50) vs 52-54 the same sliver with the camera still (error at 53, offscreen).
  * Frames 55-56 are for the privacy check with the deny term `mercado pago`: 55 has two DIFFERENT elements ("Supermercado" and "Pagó ...") that
  * only look like the term when their texts are glued (no match); 56 writes the term in ONE line with a span per word (a `deny-joined` match).
+ * Frames 57-68 cover the false positives fixed in the QA rules, each next to its STRICT counterpart:
+ * 57 + 59 the SAME text small in an overview (57, 8.8 px) and readable zoomed in (59, 26 px) within the scene: a "detalle que se lee al acercar" (info, not an error);
+ * 61 a small text that is never shown at a readable size (error, `min-size`). 58, 60 and 62 are clean spacers so a neighbour never looks like motion.
+ * 63 SVG text whose CSS `color` equals the card background but whose `fill` is dark (no finding: the glyphs are painted with `fill`); 64 the same with a pale `fill` over
+ * a dark `color` (error, `contrast`); 65 stroke-only text (fill none, dark stroke): no finding.
+ * 66 an `opacity: 0` canvas and a `visibility: hidden` block over a text (no finding); 67 a canvas under an ancestor with `opacity: 0` (no finding); 68 the same canvas visible (error, `covered`).
  * Frame 18 builds a term and an e-mail out of one span per letter / per part: only the privacy check cares (block-level scan).
  */
-export const QA_DEFECT_FRAMES = { clean: 0, clip: 1, offscreen: 2, overlap: 3, tiny: 4, contrast: 5, covered: 6, privacy: 7, wash: 8, flyingA: 9, flyingB: 10, faint: 11, leavingA: 12, leavingB: 13, leavingC: 14, stillFaint: 15, sideCover: 16, hiddenStatic: 17, split: 18, veilCrossA: 19, veilCrossB: 20, veilCrossC: 21, veilStaticA: 22, veilStaticB: 23, veilStaticC: 24, slowFadeA: 25, slowFadeB: 26, slowFadeC: 27, slowStaticA: 28, slowStaticB: 29, slowStaticC: 30, crossMoveA: 31, crossMoveB: 32, crossMoveC: 33, crossStillA: 34, crossStillB: 35, crossStillC: 36, overlapMoveA: 37, overlapMoveB: 38, overlapMoveC: 39, overlapStillA: 40, overlapStillB: 41, overlapStillC: 42, coverMoveA: 43, coverMoveB: 44, coverMoveC: 45, coverStillA: 46, coverStillB: 47, coverStillC: 48, camMoveA: 49, camMoveB: 50, camMoveC: 51, camStillA: 52, camStillB: 53, camStillC: 54, splitBlocks: 55, splitLine: 56 } as const;
+export const QA_DEFECT_FRAMES = { clean: 0, clip: 1, offscreen: 2, overlap: 3, tiny: 4, contrast: 5, covered: 6, privacy: 7, wash: 8, flyingA: 9, flyingB: 10, faint: 11, leavingA: 12, leavingB: 13, leavingC: 14, stillFaint: 15, sideCover: 16, hiddenStatic: 17, split: 18, veilCrossA: 19, veilCrossB: 20, veilCrossC: 21, veilStaticA: 22, veilStaticB: 23, veilStaticC: 24, slowFadeA: 25, slowFadeB: 26, slowFadeC: 27, slowStaticA: 28, slowStaticB: 29, slowStaticC: 30, crossMoveA: 31, crossMoveB: 32, crossMoveC: 33, crossStillA: 34, crossStillB: 35, crossStillC: 36, overlapMoveA: 37, overlapMoveB: 38, overlapMoveC: 39, overlapStillA: 40, overlapStillB: 41, overlapStillC: 42, coverMoveA: 43, coverMoveB: 44, coverMoveC: 45, coverStillA: 46, coverStillB: 47, coverStillC: 48, camMoveA: 49, camMoveB: 50, camMoveC: 51, camStillA: 52, camStillB: 53, camStillC: 54, splitBlocks: 55, splitLine: 56, zoomOut: 57, zoomIn: 59, neverReadable: 61, svgFillDark: 63, svgFillPale: 64, svgStroke: 65, hiddenCovers: 66, inheritedHidden: 67, visibleCanvas: 68 } as const;
 
 const font: CSSProperties = { fontFamily: 'Arial, Helvetica, sans-serif', color: '#1b1f2a' };
 const abs = (left: number, top: number, extra: CSSProperties = {}): CSSProperties => ({ position: 'absolute', left, top, margin: 0, whiteSpace: 'nowrap', ...font, ...extra });
@@ -249,6 +255,68 @@ export function QaDefects() {
           <p data-testid="line-spans" style={abs(40, 70, { fontSize: 28 })}>
             Cuenta <span>Mercado</span> <span>Pago</span> activa
           </p>
+        </Card>
+      );
+      break;
+    case 57:
+    case 59: {
+      // el mismo texto (mismo elemento) visto en el plano general (chico) y acercado (legible); entre medio, un cuadro limpio
+      const k = f === 57 ? 0.4 : 1.2;
+      body = (
+        <div style={{ position: 'absolute', left: 96, top: 160, transformOrigin: '0 0', transform: `scale(${k})` }}>
+          <p data-testid="board-detail" style={abs(0, 0, { fontSize: 22 })}>Detalle del tablero</p>
+        </div>
+      );
+      break;
+    }
+    case 61:
+      body = (
+        <div style={{ position: 'absolute', left: 96, top: 160, transformOrigin: '0 0', transform: 'scale(0.4)' }}>
+          <p data-testid="never-readable" style={abs(0, 0, { fontSize: 22 })}>Nota que nunca se acerca</p>
+        </div>
+      );
+      break;
+    case 63:
+    case 64:
+    case 65: {
+      // texto SVG dentro de un anillo: lo que lo pinta es `fill` (o `stroke`), no el `color` CSS de los ancestros
+      const [testid, fill, stroke] = f === 63 ? ['donut-centre', '#1b1f2a', 'none'] : f === 64 ? ['donut-faint', '#d2d2d2', 'none'] : ['donut-outline', 'none', '#1b1f2a'];
+      body = (
+        <Card>
+          <div style={{ color: f === 64 ? '#1b1f2a' : '#eef1f6', position: 'absolute', left: 40, top: 30 }}>
+            <svg width={240} height={240} viewBox="0 0 120 120">
+              <circle cx={60} cy={60} r={50} fill="none" stroke="#c9d0dc" strokeWidth={12} />
+              <text data-testid={testid} x={60} y={68} textAnchor="middle" fontSize={26} fontWeight={700} fontFamily="Arial, Helvetica, sans-serif" fill={fill} stroke={stroke} strokeWidth={stroke === 'none' ? 0 : 0.8}>72%</text>
+            </svg>
+          </div>
+        </Card>
+      );
+      break;
+    }
+    case 66:
+      body = (
+        <Card>
+          <p data-testid="under-invisible" style={abs(40, 120, { fontSize: 36, fontWeight: 600 })}>Total pendiente</p>
+          <canvas data-testid="invisible-canvas" width={300} height={72} style={{ position: 'absolute', left: 20, top: 100, width: 300, height: 72, opacity: 0 }} />
+          <div data-testid="hidden-block" style={{ position: 'absolute', left: 20, top: 100, width: 300, height: 72, background: '#d7dbe6', visibility: 'hidden' }} />
+        </Card>
+      );
+      break;
+    case 67:
+      body = (
+        <Card>
+          <p data-testid="under-inherited" style={abs(40, 120, { fontSize: 36, fontWeight: 600 })}>Total pendiente</p>
+          <div style={{ opacity: 0 }}>
+            <canvas data-testid="inherited-canvas" width={300} height={72} style={{ position: 'absolute', left: 20, top: 100, width: 300, height: 72 }} />
+          </div>
+        </Card>
+      );
+      break;
+    case 68:
+      body = (
+        <Card>
+          <p data-testid="under-visible" style={abs(40, 120, { fontSize: 36, fontWeight: 600 })}>Total pendiente</p>
+          <canvas data-testid="visible-canvas" width={300} height={72} style={{ position: 'absolute', left: 20, top: 100, width: 300, height: 72 }} />
         </Card>
       );
       break;

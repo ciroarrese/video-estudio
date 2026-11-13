@@ -50,9 +50,9 @@ Todos corren desde la raíz del repo. Los `<id>` son ids de video registrados.
 
 | Para qué | Comando |
 |---|---|
-| Tipos | `npm run typecheck` |
+| Tipos | `npm run typecheck` (con `VE_VIDEOS_DIR` definida revisa también esa carpeta de afuera con su `tsconfig.json`; `npm run typecheck:videos` solo esa) |
 | Pruebas del repo | `npm test` |
-| Determinismo | `npm run render -- <id> --check` |
+| Determinismo | `npm run render -- <id> --check` (con escenas con nombre mira 12 cuadros repartidos + 6 por escena; `--frames a-b` lo limita al rango, `--check-count N`, `--check-per-scene N`, `--check-all`) |
 | Control de calidad | `npm run qa -- <id> --count 40` (`--frames 0,60,120`, `--every N`, `--fail-on warn`, `--json out/qa.json`) |
 | Privacidad | `npm run privacy -- <id> --deny videos/<slug>/prohibidos.txt --scan-source videos/<slug>` (`--allow permitidos.txt`) |
 | Hoja de cuadros | `npm run sheet -- <id> --count 12` (sin `--format`: `out/<id>-sheet.png`; con `--format vertical`: `out/<id>-vertical-sheet.png`; `--frames`, `--cols`, `--scale`, `--out`) |
@@ -64,12 +64,12 @@ Todos corren desde la raíz del repo. Los `<id>` son ids de video registrados.
 | MP4 de borrador | `npm run render -- <id> --scale 0.5 --crf 23` (`out/<id>.mp4`) |
 | MP4 final | `npm run render -- <id> --out out/<slug>.mp4` |
 | Videos y escenas | `npm run render -- --list` (videos descubiertos y, al final, las carpetas que no cargaron), `npm run qa -- <id> --list-scenes` (escenas y, en una historia, el presupuesto de cuadros por bloque; también `sheet`; `render -- <id> --list-scenes` lista las escenas pero no el presupuesto) |
-| Otros ajustes | `--frames a-b`, `--props '<json>'`, `--no-audio`, `--assets videos/<slug>/audio` (audio y estáticos fuera de `public/`; obligatorio si la mezcla vive ahí), `--no-cache`, `--concurrency N`, `--keep-frames` (deja los cuadros en `out/<id>[-formato][-escena]-frames/`) |
+| Otros ajustes | `--frames a-b`, `--props '<json>'`, `--no-audio`, `--assets videos/<slug>/audio` (carpeta extra de estáticos; `videos/<slug>/assets`, `videos/<slug>/audio` y `<VE_VIDEOS_DIR>/assets` ya se sirven solas en `render`, `qa`, `sheet` y `privacy`), `--allow-missing-fonts` (borrador: una fuente que no carga avisa en vez de fallar), `--no-cache`, `--concurrency N`, `--keep-frames` (deja los cuadros en `out/<id>[-formato][-escena]-frames/`) |
 | Vista en navegador | `npm run dev` y abrir `/?video=<id>` |
 
 **Salidas.** Cada comando escribe en `out/` (que no se versiona) con un nombre armado con el id, el formato y la escena: el MP4 es `out/<id>[-formato][-escena].mp4` y la hoja `out/<id>[-formato][-escena]-sheet.png`. Sin `--format` no hay sufijo de formato (`out/<id>-sheet.png`); con `--format vertical` sale `out/<id>-vertical-sheet.png`; con `--format horizontal` explícito también agrega el sufijo (`-horizontal-`), así que no lo mezcles con el otro. Para mandar el resultado a otra carpeta o nombre: `--out <ruta>` en `render` (MP4), en `sheet` (PNG) y en `audio` (los WAV y JSON); `qa` y `privacy` usan `--json <ruta>` para el informe. Con `--out` el nombre es el que escribís (no se agrega el sufijo de formato): si hacés dos formatos, ponele el sufijo vos.
 
-**Comandos largos.** Un render completo tarda unos 2 minutos por formato y `npm test` también es largo (casi todo es Chromium y ffmpeg). Lanzalos en segundo plano (`run_in_background`) o con un timeout de 10 minutos, y no los des por colgados antes: mientras tanto seguí con otra cosa (la hoja, el guion). El `--check`, el `qa` y la hoja de una escena sola, en cambio, tardan segundos. Con el render a mitad de tamaño (`--scale 0.5 --crf 23`) alcanza para los borradores.
+**Comandos largos.** Un render completo tarda lo que cuestan los cuadros en CPU: unos 0.07 s por cuadro en una escena sencilla y 0.2 s o más con 3D, desenfoques y mucho DOM (a 1080p), repartidos entre los núcleos libres. Un video de 60 s (1800 cuadros) pesado son ~4 a 6 min de CPU: ~2 min con 4 núcleos libres y 5 a 8 min en una máquina ocupada o chica (medido: 53 s de `story-demo` en 7.6 min con la máquina cargada) (`render` imprime el `tiempo por etapa`; detalle en `render/README.md`, "Velocidad de render"). `npm test` también es largo (casi todo es Chromium y ffmpeg). Lanzalos en segundo plano (`run_in_background`) o con un timeout de 10 minutos, y no los des por colgados antes: mientras tanto seguí con otra cosa (la hoja, el guion). El `--check`, el `qa` y la hoja de una escena sola, en cambio, tardan segundos. Con el render a mitad de tamaño (`--scale 0.5 --crf 23`) alcanza para los borradores.
 
 Requisitos: Node 22, ffmpeg y ffprobe en el PATH, Playwright con Chromium (`npx playwright install chromium`; otro ejecutable con `VE_CHROMIUM=/ruta`). Si falta algo, decile a la persona qué instalar; no inventes alternativas.
 
@@ -195,7 +195,7 @@ Antes de empezar: todas las escenas aprobadas, cada una con `--check`, `qa` y `p
    - **Cues**: `videos/<slug>/cues.json` con `[{"frame": 45, "sfx": "clic"}, ...]`; cada cuadro sale del guion (clic = cuadro del clic, tilde cuando se tilda, barrido en el atravesado). Los cuadros se miden en el tiempo del video, sumando el desplazamiento de cada escena en la historia (`timeline` de `composeStory`).
    - **Música** (opcional): `tempo` y `empalme` para que arranque en la percusión y caiga en el compás; confirmá su licencia para el lugar de exhibición. Nunca va al repo.
    - **Mezcla**: `npm run audio -- mezcla --cues videos/<slug>/cues.json --sfx videos/<slug>/audio/sfx --fps 30 --frames <total> --out videos/<slug>/audio/audio-<slug>.wav` (más `--musica` si hay). La salida va a `videos/<slug>/audio/`, nunca a `public/`.
-   - **En el video**: `defineStory({ ..., audio: { src: "audio-<slug>.wav" } })` (o `<Audio src={asset("audio-<slug>.wav")} />` en una escena suelta) y se renderiza con `--assets videos/<slug>/audio`. La vista del navegador no reproduce audio: se oye en el MP4.
+   - **En el video**: `defineStory({ ..., audio: { src: "audio-<slug>.wav" } })` (o `<Audio src={asset("audio-<slug>.wav")} />` en una escena suelta) y `videos/<slug>/audio` se sirve solo (no hace falta `--assets`). La vista del navegador no reproduce audio: se oye en el MP4.
 3. Verificación completa sobre el video final, sin saltear nada:
    ```bash
    npm run typecheck && npm test
@@ -204,7 +204,7 @@ Antes de empezar: todas las escenas aprobadas, cada una con `--check`, `qa` y `p
    npm run privacy -- <slug> --deny videos/<slug>/prohibidos.txt --scan-source videos/<slug> --every 15
    npm run sheet -- <slug> --count 16        # una hoja por formato
    ```
-4. Render final: `npm run render -- <slug> --out out/<slug>.mp4` (con `--assets videos/<slug>/audio` si hay sonido; con `--format vertical --out out/<slug>-vertical.mp4` para cada formato extra). Mostrá las rutas, la duración y el peso de cada archivo.
+4. Render final: `npm run render -- <slug> --out out/<slug>.mp4` (el audio de `videos/<slug>/audio` se sirve solo; con `--format vertical --out out/<slug>-vertical.mp4` para cada formato extra). Mostrá las rutas, la duración y el peso de cada archivo.
 5. Actualizá `videos/<slug>/guion.md` para que coincida con lo producido (tiempos reales, textos finales, cifras emuladas usadas).
 6. Cerrá con: ruta del MP4, ruta del guion, pendientes de licencia (fuentes, música, marcas) y qué hacer para volver a renderizar.
 
@@ -220,11 +220,13 @@ Si piden agregar, editar o corregir una escena: leé su carpeta y el guion, prop
 - La escena sola se ve bien pero en la historia el video sale solo en horizontal, o `--format vertical` dice que el video no lo admite: faltó `formats: ["vertical"]` en `defineVideo` o en `defineStory` (por defecto solo el formato base).
 - `qa` marca `offscreen` con severidades distintas, o `contrast` en un texto bajo un `Wash`: el criterio (info / aviso / error según movimiento, cámara y fundido; velo en transición contra velo quieto) está en `qa/README.md`, secciones "`offscreen`: por qué error, aviso o info" y la fila de `contrast` en "Reglas de `ve-qa`"; resumen en `docs/reglas.md`. Se silencia solo a propósito, con `data-qa-ignore`.
 - `privacy` imprime resultados de más o falla leyendo la lista: el comando documentado (`--deny videos/<slug>/prohibidos.txt --scan-source videos/<slug>`) ya omite del escaneo los archivos de `--deny` y `--allow` y cualquier archivo llamado `prohibidos.txt`; la lista vive en `videos/<slug>/`.
-- `setFrame(n) fallo: ... holds pendientes` (timeout de 30 s): una fuente o imagen no carga. Revisá que el archivo exista en `public/` y que `theme.font.files`/`asset()` apunten bien.
+- `setFrame(n) fallo: ... holds pendientes` (timeout de 30 s): una fuente o imagen no carga. Revisá que el archivo exista (en `public/`, en `videos/<slug>/assets`, en `<VE_VIDEOS_DIR>/assets` o en una carpeta de `--assets`) y que `theme.font.files`/`asset()` apunten bien.
+- `No cargó una fuente; el video saldría con otra tipografía: "Marca" ... desde <url>`: la fuente del tema no se pudo leer (404 o archivo dañado). Corregí la ruta (`asset("fonts/x.otf")` busca en las carpetas de estáticos; `import f from "../assets/x.otf?url"` lo resuelve vite). Solo para un borrador: `--allow-missing-fonts`.
+- Videos en una carpeta fuera del repo (`VE_VIDEOS_DIR`): `VE_VIDEOS_DIR=<carpeta> bash templates/nuevo.sh escena <slug> <nombre>` escribe ahí con imports `video-estudio/...` y deja `tsconfig.json` y `env.d.ts` (modelos en `templates/externo/`); `npm run typecheck` los revisa.
 - `--check` falla: seguí `docs/reglas.md`, sección **"Qué hacer cuando --check falla"**. El error imprime el cuadro, el rectángulo (bbox) y los elementos que caen ahí, más las escenas con nombre activas y una línea `pista:`; con eso se acota la pieza, se bisecan las piezas del bbox y se aplica la causa habitual. La comparación de HTML ignora el orden de atributos, clases y propiedades de `style`; solo cuentan valores, hijos y texto. Si `checkDeterminism` da `ok: false`, la escena depende del historial: buscá `useState`/`useRef` que acumulan, `Date.now()`, `Math.random()` (usá `random(seed)`), animaciones CSS, `setTimeout`, `useId`. `--check` tolera el ruido chico de desenfoques y sombras (detalle en `docs/reglas.md`); un cambio real no pasa y `--check-strict` compara byte a byte.
 - `No se pudo cargar "playwright"` / `No se pudo lanzar Chromium`: `npm i -D playwright` y `npx playwright install chromium`, o `VE_CHROMIUM=/ruta/a/chrome`.
 - ffmpeg o ffprobe no encontrado: instalalo y comprobá con `ffmpeg -version`.
-- `Audio file ... not found`: poné el archivo en `public/` o pasá `--assets <dir>`.
+- `Audio file ... not found`: poné el archivo en `public/`, en `videos/<slug>/audio` (se sirve solo) o pasá `--assets <dir>`.
 - No encuentra el video (`id` desconocido): corré `npm run render -- --list` y fijate si aparece; la carpeta tiene que tener `index.ts(x)` con un `defineVideo` y estar en `videos/<slug>/` o `videos/<slug>/<carpeta>/`. Dos videos con el mismo `id` fallan con un error que nombra las dos carpetas.
 - Salió algo viejo: `--no-cache` o borrá `.ve-cache/`.
 - `cameraAt`/`kf`/`interpolate` lanzan error: los cuadros clave tienen que ser estrictamente crecientes.

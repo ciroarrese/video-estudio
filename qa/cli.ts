@@ -131,6 +131,7 @@ async function main(cmd: string, argv: string[]): Promise<number> {
     });
     printQa(r.findings, r.summary.frames, { verbose: p.bools.has('verbose'), max: p.bools.has('verbose') && one(p, 'max') === undefined ? Infinity : num(p, 'max') ?? 40 });
     const s = r.summary;
+    if (s.detailSmallText) console.log(`\ninfo: ${s.detailSmallText.texts} ${s.detailSmallText.texts === 1 ? 'texto' : 'textos'} por debajo del mínimo en el plano general ${s.detailSmallText.texts === 1 ? 'se lee' : 'se leen'} al acercar dentro de su escena (detalle, no es error; ${s.detailSmallText.frames} ${s.detailSmallText.frames === 1 ? 'cuadro afectado' : 'cuadros afectados'}; --verbose lo muestra por cuadro)`);
     const per = Object.entries(s.byRule).map(([k, v]) => `${k}=${v}`).join(' ') || 'ninguno';
     console.log(`\n${id}: ${s.frames.length} cuadros revisados en ${s.seconds}s; ${s.errors} errores, ${s.warnings} avisos, ${s.infos} info${p.bools.has('verbose') ? '' : ' (ocultos; --verbose)'} (${per})`);
     writeReport(one(p, 'out') ?? one(p, 'json'), r);

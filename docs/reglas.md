@@ -30,8 +30,8 @@ Esta es la lista de referencia; `CLAUDE.md`, `engine/README.md`, `kit/README.md`
 
 - [ ] **Todo sale del tema.** Colores, tipografías, radios, sombras, curvas y tamaños de letra vienen de `useTheme()`. Ningún `#hex` ni `font-family` suelto en una escena.
   *Por qué:* el mismo video tiene que poder rehacerse con otro design system cambiando solo el tema. Con un color fijo, esa escena queda desentonando.
-- [ ] **Los recursos externos se esperan.** Fuentes e imágenes se cargan con `asset()` y `holdRender`/`releaseRender` (las piezas del kit ya lo hacen).
-  *Por qué:* un cuadro capturado antes de que cargue la imagen sale vacío, y no lo ves hasta el final.
+- [ ] **Los recursos externos se esperan.** Fuentes e imágenes se cargan con `asset()` (o con un `import x from "./y.png?url"`) y `holdRender`/`releaseRender` (las piezas del kit ya lo hacen). Dos maneras de referenciar un archivo: `asset("fonts/Marca.otf")`, que se busca en `--assets`, en `videos/<slug>/assets|audio`, en `<VE_VIDEOS_DIR>/assets` y en `public/` (las carpetas `assets/` y `audio/` del video se sirven solas en `render`, `qa`, `sheet`, `privacy` y `dev`); o `import marca from "../assets/Marca.otf?url"`, que vite copia al bundle. Ejemplos con fuente y logo en `render/README.md`, "Archivos del video".
+  *Por qué:* un cuadro capturado antes de que cargue la imagen sale vacío, y no lo ves hasta el final. Una **fuente** que no carga (404, archivo dañado) hace **fallar** el render y nombra la familia y la URL; solo en un borrador se tolera con `--allow-missing-fonts`.
 - [ ] **Cada garabato tiene un `id` único.** *Por qué:* el `id` es también la semilla del temblor y el nombre del degradado SVG; dos iguales se pisan.
 - [ ] **Los cuadros clave de cámara, de `kf` y de `interpolate` son estrictamente crecientes.** *Por qué:* si no, lanzan un error que nombra los cuadros.
 
@@ -48,8 +48,8 @@ Esta es la lista de referencia; `CLAUDE.md`, `engine/README.md`, `kit/README.md`
    - **Efectos de `fx/` montados antes de su `start` o después de terminar:** los efectos del catálogo pueden quedar montados todo el tiempo (`fx-in-scene` lo prueba): antes de `start` y una vez terminados no emiten `transform`, `filter` ni `opacity`. Si tu propio efecto deja residuos, aplicá lo de "Residuos" arriba; como último recurso montalo solo mientras corre (`f >= start && <Efecto start={start} />`).
    - **Elementos visibles durante `zoomThrough`:** al atravesar, la escala llega a 40 y todo lo que sigue visible se rasteriza enorme. *Arreglo:* ocultá (no montes) lo que sobra desde el cuadro en que empieza el atravesado.
    - **Escalas pesadas anidadas:** un contenedor con `scale()` dentro de un mundo que ya hace zoom multiplica el error. *Arreglo:* hacé el zoom con la cámara (`cameraAt`) y no escales además el contenedor.
-   - **Fuentes sin cargar:** el cuadro se captura con la tipografía de reserva. *Arreglo:* declarala en `theme.font.files` o con `asset()` para que el motor espere; confirmá que el archivo existe.
-4. **Verificá en todos los formatos** que el video admite y con `--check` completo (no solo el rango): un arreglo en vertical puede mover la causa en horizontal.
+   - **Fuentes sin cargar:** el cuadro se captura con la tipografía de reserva. Con `theme.font.files` el render ya falla con un mensaje que nombra la familia y la URL (no pasa en silencio); una fuente declarada a mano con `@font-face` sin `holdRender` puede cargar tarde. *Arreglo:* declarala en `theme.font.files` (con `asset()` o `?url`) para que el motor espere; confirmá que el archivo existe y que la carpeta está en `--assets` o en `assets/` junto a los videos.
+4. **Verificá en todos los formatos** que el video admite y con `--check` completo (no solo el rango; sin `--frames` mira 12 cuadros repartidos más 6 por escena con nombre, y con `--frames a-b` se queda dentro del rango; `--check-all` mira todos): un arreglo en vertical puede mover la causa en horizontal.
 5. Solo después de eso, y si el diferencial es desenfoque o sombra legítimos, ver la tolerancia de `--check` (no la subas para tapar un defecto real).
 
 Ver también el catálogo (`docs/animaciones.md`): los efectos de `fx/` ya cumplen estas reglas.

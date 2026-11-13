@@ -6,7 +6,17 @@ const root = resolve(__dirname, '..');
 const storiesDir = join(root, 'stories');
 
 type Topic = { id: string; name: string; line: string };
-type Case = { id: string; spec: Record<string, unknown>; storyOpts?: Record<string, unknown> };
+export type Case = {
+  id: string;
+  spec: Record<string, any>;
+  storyOpts?: Record<string, unknown>;
+  /** Índices de temas sin escena (`null` en la lista de escenas). */
+  noScene?: number[];
+  /** Pone un `signoff.slot` propio (un nodo no se puede guardar en el JSON del spec). */
+  slot?: boolean;
+  /** Formatos extra que se verifican además del horizontal. */
+  formats?: ("vertical" | "cuadrado")[];
+};
 
 const T = (n: number, long = false): Topic[] =>
   Array.from({ length: n }, (_, i) => ({ id: `t${i + 1}`, name: long ? `Un nombre de tema bastante largo número ${i + 1} del recorrido` : `Tema ${i + 1}`, line: long ? "una línea descriptiva que también es larga, para forzar el ajuste del texto" : `línea del tema ${i + 1}` }));
@@ -19,6 +29,14 @@ export const CASES: Case[] = [
   { id: "d-acentos", spec: { title: { text: "¿Qué hicimos esta semana? Ñandú, óptica y más", highlight: "Ñandú" }, topics: T(3, true), labels: ["Año nuevo", "Ñoquis", "Canción", "Pingüino", "Éxito", "Último"], signoff: { text: "¡Gracias!" } } },
   { id: "d-una-palabra", spec: { title: { text: "Resumen" }, topics: T(5), labels: ["Etiqueta con bastante texto para ajustar el ancho de la pieza del muro"], signoff: { text: "Listo", tagline: "Fin" } } },
   { id: "d-timing", spec: { title: { text: "Tiempos propios del recorrido", highlight: "propios" }, topics: T(3), labels: ["x", "y", "z"], signoff: { text: "Cierre" }, timing: { opening: 150, interlude: 70, closing: 200 } } },
+  // ---- opciones de diseño (cartel de vidrio, lista en un renglón, acople, muro, nubes, temas sin escena, firma solo con marca) ----
+  { id: "o-vidrio", formats: ["vertical", "cuadrado"], spec: { title: { text: "Cartel de vidrio sobre el muro", highlight: "vidrio" }, topics: T(3), labels: ["Alfa", "Beta", "Gamma", "Delta", "Épsilon"], signoff: { text: "Gracias por **mirar**", tagline: "Con una nota **destacada** al pie" },
+      design: { titleCard: "glass", wall: { columns: 4, rows: 5, blur: false }, clouds: { colors: ["accent", "chart[2]"], opacity: 0.3, blobs: [{ x: 0.2, y: 0.3, size: 800 }, { x: 0.8, y: 0.7, size: 900, color: "accent2" }] } } } },
+  { id: "o-renglon", formats: ["vertical"], storyOpts: { interludes: "compact" }, spec: { title: { text: "Lista en un renglón" }, topics: T(4, true), labels: [], signoff: { text: "Fin" }, design: { list: "inline" } } },
+  { id: "o-acople", noScene: [0], spec: { title: { text: "Apertura que se acopla a la escena", highlight: "acopla" }, topics: T(4), labels: ["Uno", "Dos", "Tres"], signoff: { text: "Hasta pronto" }, design: { handoff: "dock", list: "inline" } } },
+  { id: "o-parcial", noScene: [1, 3], formats: ["cuadrado"], spec: { title: { text: "Cuatro temas, dos escenas" }, topics: T(4), labels: ["A", "B", "C"], signoff: { text: "Cierre" }, design: { titleCard: "glass", wall: { columns: 8, rows: 4 } } } },
+  { id: "o-solo-marca", slot: true, spec: { title: { text: "Firma solo con marca" }, topics: T(2), labels: ["X", "Y"], signoff: { tagline: "Solo la marca y una nota" }, design: { handoff: "dock" } } },
+  { id: "o-sin-escenas", noScene: [0, 1, 2], spec: { title: { text: "Solo apertura y cierre" }, topics: T(3), labels: [], signoff: { text: "Fin" } } },
 ];
 
 const sceneSource = `
@@ -30,13 +48,21 @@ const Scene = () => {
 };`;
 
 export function videoFile(c: Case): string {
+  const spec = { ...c.spec, signoff: { ...c.spec.signoff } };
   return `import React from "react";
 import { useFrame } from ${JSON.stringify(engineDir)};
 import { defineStory, TopicHeadline } from ${JSON.stringify(storiesDir)};
 ${sceneSource}
-const spec = ${JSON.stringify(c.spec)};
-const scenes = spec.topics.map((t) => ({ id: t.id, component: Scene, durationInFrames: 60 }));
-export default defineStory({ id: ${JSON.stringify(c.id)}, spec, scenes, ...${JSON.stringify(c.storyOpts ?? {})} });
+const spec = ${JSON.stringify(spec)};
+${c.slot ? 'spec.signoff.slot = React.createElement("div", { style: { width: 220, height: 220, borderRadius: 40, background: "#3b5bdb" } });' : ""}
+const none = ${JSON.stringify(c.noScene ?? [])};
+const scenes = spec.topics.map((t, i) => (none.includes(i) ? null : { id: t.id, component: Scene, durationInFrames: 60 }));
+export default defineStory({ id: ${JSON.stringify(c.id)}, spec, scenes, ${c.formats ? `formats: ${JSON.stringify(c.formats)}, ` : ""}...${JSON.stringify(c.storyOpts ?? {})} });
 `;
 }
 
+/** Escenas generadas que se verifican de cada caso: apertura, primera vuelta (si hay alguna escena de tema) y cierre. */
+export function scenesToCheck(c: Case): string[] {
+  const hasScenes = (c.noScene?.length ?? 0) < c.spec.topics.length;
+  return ["opening", ...(hasScenes ? ["interlude-1"] : []), "closing"];
+}

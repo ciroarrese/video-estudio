@@ -18,10 +18,10 @@ export const resolveTheme = (t: ThemeInput | undefined): Theme => (typeof t === 
  */
 export function defineStory({
   id, spec, scenes, fps = 30, width = 1920, height = 1080, theme = "neutral", formats, ...opts
-}: { id: string; spec: StorySpec; scenes: TopicScene[]; fps?: number; width?: number; height?: number; theme?: ThemeInput; formats?: FormatsOption } & ComposeOptions) {
+}: { id: string; spec: StorySpec; scenes: (TopicScene | null)[]; fps?: number; width?: number; height?: number; theme?: ThemeInput; formats?: FormatsOption } & ComposeOptions) {
   const { component: Story, durationInFrames, timeline } = composeStory(spec, scenes, opts);
   // Cada bloque (apertura, temas, vueltas, cierre) es una escena: `--scene <id|índice>` y `--list-scenes`.
-  const sceneList = timeline.map((e) => ({ id: e.id, name: e.kind === "topic" ? spec.topics.find((t) => t.id === e.id)?.name : undefined, from: e.from, durationInFrames: e.durationInFrames }));
+  const sceneList = timeline.map((e) => ({ id: e.id, name: e.kind === "topic" && e.topic !== undefined ? spec.topics[e.topic]?.name : undefined, from: e.from, durationInFrames: e.durationInFrames }));
   const Video: React.FC<StoryProps> = ({ theme: t }) => (
     <ThemeProvider theme={resolveTheme(t ?? theme)}>
       <Story />

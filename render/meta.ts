@@ -80,3 +80,7 @@ export function formatVideoList(metas: VideoMeta[]): string {
 export function formatLoadErrors(errors: { folder: string; message: string }[]): string {
   return `Atención: ${errors.length === 1 ? 'una carpeta no cargó' : `${errors.length} carpetas no cargaron`} (los demás videos siguen disponibles):\n${errors.map((e) => `  - ${e.message.split('\n').join('\n    ')}`).join('\n')}`;
 }
+
+/** Mensaje de un error de la página sin el rastro de pila del navegador (`    at f (http://127.0.0.1:1234/assets/index-xyz.js:3:678)`), que solo estorba. */
+export const cleanPageError = (message: string): string =>
+  message.split('\n').filter((l) => !/^\s+at .*(https?:|<anonymous>|\(.*:\d+:\d+\))/.test(l)).join('\n').replace(/^page\.evaluate: Error: /, '').trim();

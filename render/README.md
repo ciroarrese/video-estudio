@@ -38,13 +38,17 @@ Tambien `npx ve-render <id> ...`. **La herramienta se ejecuta desde un clon de e
 | `--keep-frames` | Deja los cuadros en `<carpeta de salida>/<id>[-formato][-escena]-frames/` (el mismo sufijo que el nombre de salida por defecto, así formatos y escenas distintos no se pisan) |
 | `--frame-format png\|jpeg` | Captura sin perdida (por defecto) o JPEG (algo mas rapido, con perdida) |
 | `--jpeg-quality N` | Calidad JPEG (por defecto 95) |
-| `--assets <dir>` | Directorio extra de estaticos/audio (repetible, se busca primero) |
+| `--assets <dir>` | Directorio extra de estaticos/audio (repetible, se busca primero; también `VE_ASSETS`, rutas separadas por `:`). Lo aceptan `render`, `qa`, `sheet`, `privacy` y el servidor de desarrollo (por `VE_ASSETS`). Además se sirven solas, sin pasar nada, `videos/<slug>/assets`, `videos/<slug>/audio` y `<VE_VIDEOS_DIR>/assets` (ver "Archivos del video") |
+| `--allow-missing-fonts` | Borrador: una fuente que no carga avisa en vez de fallar el render (también `VE_ALLOW_MISSING_FONTS=1`; en `qa`, `sheet` y `privacy` también). Ver "Fuentes que no cargan" |
 | `--check` | No codifica: verifica determinismo (sale con codigo 1 si falla). Tolerante por defecto |
+| `--check-count N` | Con `--check`: cuadros repartidos parejos en el rango (por defecto 12) |
+| `--check-per-scene N` | Con `--check`: cuadros por escena con nombre, varios cerca del inicio (por defecto 6) |
+| `--check-all` | Con `--check`: todos los cuadros del rango (lento; se compara de a 48 cuadros para no llenar la memoria) |
 | `--check-max-delta N` | Maxima diferencia por canal tolerada; ningun pixel puede pasarla (por defecto 2) |
 | `--check-max-ratio R` | Fraccion maxima de pixeles con delta mayor que 1 (por defecto 0.001 = 0.1 %); los de delta 1 tienen su propia cota de 20 % |
 | `--check-strict` | Comparacion de PNG byte a byte (implica `--check`) |
 
-API: `renderVideo(options)` (con `format` y `scene`) devuelve `{out, frames, seconds, renderedSegments, cachedSegments}`; `checkVideo(options)` devuelve `{ok, ...}`, `listScenes(options)` y `listVideos()` (todos en `render/render.ts`).
+API: `renderVideo(options)` (con `format`, `scene`, `assets` y `allowMissingFonts`) devuelve `{out, frames, seconds, renderedSegments, cachedSegments}`; `checkVideo(options)` devuelve `{ok, ...}`, `listScenes(options)` y `listVideos()` (todos en `render/render.ts`).
 
 ## Como funciona
 
@@ -56,9 +60,19 @@ API: `renderVideo(options)` (con `format` y `scene`) devuelve `{out, frames, sec
 
 Chromium se lanza con `--disable-partial-raster` (entre otras banderas): sin ella, el rasterizado parcial reutiliza teselas del cuadro anterior y algunos cuadros salen con diferencias de 1 nivel segun el historial. Se puede agregar mas banderas con `VE_CHROMIUM_ARGS`.
 
+## `--check`: que cuadros mira
+
+- **Video completo con escenas con nombre** (declaradas con `scenes`, `<Sequence name>`, `composeStory`...): 12 cuadros repartidos parejos **más 6 por escena** (`--check-per-scene`), 3 de ellos cerca del inicio de cada escena (cuadros 2, 10 y 24 de la escena) porque ahí ocurren las entradas, y el resto repartido hasta el final. Antes eran 12 cuadros parejos en todo el video y una falla en la apertura de una historia larga se escapaba (`--scene apertura` la encontraba).
+- **Sin escenas con nombre:** 12 repartidos (`--check-count N` los cambia).
+- **`--frames a-b`:** se verifica **dentro del rango** (12 repartidos, o todos si el rango tiene 12 o menos), sin agregar cuadros por escena. Antes `--check` ignoraba `--frames` sin avisar.
+- **`--scene x`:** los repartidos más los de la escena (el rango de la escena).
+- **`--check-all`:** todos los cuadros del rango (video, escena o `--frames`); lento (cada cuadro se dibuja y captura cuatro veces).
+
+La salida dice cuántos cuadros se verificaron y por qué (`check: 78 cuadros (12 repartidos + hasta 6 por escena en 11 escenas, ...)`, y al final `check: OK (determinista; N cuadros verificados)`). Para ver las escenas el runtime dibuja todos los cuadros una vez (solo el DOM, unos segundos en un video largo).
+
 ## `--check`: que compara y por que es tolerante
 
-Dos pruebas: (1) `__ve.checkDeterminism` sobre ~12 cuadros, **siempre estricto** (compara el DOM ignorando el orden de atributos, clases y propiedades de `style`, que no cambia píxeles: si falla, la escena depende del historial); (2) esos cuadros se capturan dos veces en layouts de paginas distintos y se comparan los PNG: la comparación de HTML ignora el orden, la de PNG atrapa cualquier diferencia visual.
+Dos pruebas: (1) `__ve.checkDeterminism` sobre esos cuadros, **siempre estricto** (compara el DOM ignorando el orden de atributos, clases y propiedades de `style`, que no cambia píxeles: si falla, la escena depende del historial); (2) esos cuadros se capturan dos veces en layouts de paginas distintos y se comparan los PNG: la comparación de HTML ignora el orden, la de PNG atrapa cualquier diferencia visual.
 
 La comparacion de PNG es tolerante por defecto porque Chromium rasteriza desenfoques, sombras e inclinaciones 3D con diferencias de ~1 nivel en unos pocos pixeles segun el historial de cuadros de la pagina; ese ruido es imperceptible y exigir igualdad byte a byte empujaba a quitar esos efectos. Un cuadro pasa si se cumplen **las tres** cotas siguientes (delta = maxima diferencia por canal de un pixel, de 0 a 255):
 
@@ -76,7 +90,7 @@ Asi, una sombra o un desenfoque de cualquier tamano con 1 nivel de ruido no hace
 
 ## Cache por partes
 
-Clave de cada parte = hash de: huella del código **de ese video** (ver abajo; si no se puede calcular, el hash de todo el bundle), id, props, rango de cuadros, escala, crf, version de ffmpeg, version de Chromium, `VE_CHROMIUM`/`VE_CHROMIUM_ARGS`, fps, dimensiones y formato del video, ajustes del codificador (preset, bframes, pix_fmt), formato de captura y un resumen (ruta+tamano+mtime) de cada directorio `--assets`. Una segunda corrida sin cambios no renderiza nada.
+Clave de cada parte = hash de: huella del código **de ese video** (ver abajo; si no se puede calcular, el hash de todo el bundle), id, props, rango de cuadros, escala, crf, version de ffmpeg, version de Chromium, `VE_CHROMIUM`/`VE_CHROMIUM_ARGS`, fps, dimensiones y formato del video, ajustes del codificador (preset, bframes, pix_fmt), formato de captura y un resumen (ruta+tamano+mtime) de cada directorio `--assets`. Una segunda corrida sin cambios no renderiza nada. Las carpetas de estáticos (las de `--assets` y las que se sirven solas) entran por el resumen de sus archivos.
 
 Las partes se alinean a multiplos de `--segment`. Con `--frames a-b` solo se comparten con un render completo las partes que quedan **enteras** dentro del rango; las de los bordes son parciales (su rango es distinto) y tienen su propia clave.
 
@@ -93,13 +107,15 @@ Un video en construcción no tiene que dejar inservibles a los demás:
 
 ## Pruebas independientes de `videos/`
 
-Las pruebas que necesitan videos propios usan `withTempVideos` (`render/testing.ts`): una carpeta temporal bajo `out/` con `VE_VIDEOS_DIR` apuntando ahí. El `videos/` real queda fuera del bundle y del hash (no importa si hay un video en construcción con errores de tipos, y las carpetas temporales no se filtran a otros bundles). Los videos temporales importan el motor con ruta absoluta (`engineDir`). `stories/nuevo-sh.test.ts` arma un proyecto mínimo temporal (enlaces a `engine/`, `kit/`..., copia de `templates/`) y hace el typecheck solo de lo generado con un `tsconfig` propio. `withVideosDir` (cerrojo sobre el `videos/` real) queda para quien de verdad lo necesite; el cerrojo guarda el pid y se rompe solo si su dueño murió o tiene más de 15 minutos.
+Las pruebas que necesitan videos propios usan `withTempVideos` (`render/testing.ts`): una carpeta temporal bajo `out/` (con `writeVideoFiles` para escribir sus archivos) con `VE_VIDEOS_DIR` apuntando ahí. El `videos/` real queda fuera del bundle y del hash (no importa si hay un video en construcción con errores de tipos, y las carpetas temporales no se filtran a otros bundles). Los videos temporales importan el motor con ruta absoluta (`engineDir`). `stories/nuevo-sh.test.ts` arma un proyecto mínimo temporal (enlaces a `engine/`, `kit/`..., copia de `templates/`) y hace el typecheck solo de lo generado con un `tsconfig` propio. `withVideosDir` (cerrojo sobre el `videos/` real) queda para quien de verdad lo necesite; el cerrojo guarda el pid y se rompe solo si su dueño murió o tiene más de 15 minutos.
 
 ## Videos fuera del repo (`VE_VIDEOS_DIR`)
 
-`VE_VIDEOS_DIR=/ruta/absoluta/mis-videos npm run render -- --list` (también render, `--check`, `qa` y `sheet`) carga los videos de esa carpeta (`<slug>/index.ts(x)` y `<slug>/<carpeta>/index.ts(x)`; se ignoran las carpetas que empiezan con punto) **además de los ejemplos**, y los muestra como `videos/<slug>`. Sirve para dejar los videos fuera del repo y para pruebas con videos temporales. Si la ruta no existe o no es una carpeta, el CLI falla con un mensaje en español (no lista vacío). Una carpeta sin videos es válida y no da error.
+`VE_VIDEOS_DIR=/ruta/absoluta/mis-videos npm run render -- --list` (también render, `--check`, `qa`, `sheet`, `privacy` y `npm run dev`) carga los videos de esa carpeta (`<slug>/index.ts(x)` y `<slug>/<carpeta>/index.ts(x)`; se ignoran las carpetas que empiezan con punto) **además de los ejemplos**, y los muestra como `videos/<slug>`. Sirve para dejar los videos fuera del repo y para pruebas con videos temporales. Si la ruta no existe o no es una carpeta, el CLI falla con un mensaje en español (no lista vacío). Una carpeta sin videos es válida y no da error.
 
 Causa del listado vacío que había: `import.meta.glob` de vite con una ruta relativa que sale del proyecto (`../../../../tmp/...`) devuelve un mapa vacío, y se llevaba también los ejemplos. Ahora `vite.config.ts` saca los patrones de `videos/` y agrega imports dinámicos con ruta absoluta de lo que encuentra en la carpeta (se escanea al compilar; al agregar una carpeta nueva el hash del bundle cambia solo).
+
+**Armar la carpeta.** `VE_VIDEOS_DIR=/ruta/mis-videos bash templates/nuevo.sh escena <slug> <nombre>` escribe ahí (en vez de en `videos/`) con los imports por alias (`video-estudio/engine`, ...) y crea `tsconfig.json` y `env.d.ts` si faltan (`... nuevo.sh externo` solo prepara esos dos). Los modelos están en `templates/externo/` (`tsconfig.json` con `paths` a este clon, sin `baseUrl` porque TypeScript 7 lo rechaza; `types: []` porque `vite/client` no se resuelve desde afuera; `env.d.ts` declara `*?url`, `*?raw`, imágenes, fuentes y audio; `react` y `react-dom` se resuelven a los tipos del clon). `npm run typecheck` revisa también esa carpeta cuando `VE_VIDEOS_DIR` está definida; `npm run typecheck:videos` la exige. `templates/tema-informe.ts` lee el tema de `<VE_VIDEOS_DIR>/<slug>/theme.ts` (o de una ruta a un `.ts`) con el mismo vite del proyecto, así que resuelve el alias y tolera los imports `?url`.
 
 Cómo importar el motor desde un video de afuera: con el alias `video-estudio/<carpeta>`, que apunta a la carpeta del repo.
 
@@ -111,7 +127,55 @@ import { Stage } from "video-estudio/kit";
 import { Typewriter } from "video-estudio/fx";               // y "video-estudio/fx/three"
 ```
 
-También sirve la ruta absoluta al repo (`/clon/engine`). Los imports relativos entre archivos del propio video funcionan igual. Para que el editor y `tsc` entiendan el alias, la carpeta de afuera necesita un `tsconfig.json` con `"paths": { "video-estudio/*": ["/ruta/al/clon/*"] }` (`moduleResolution: Bundler`); el render no lo necesita. `npm run typecheck` del repo no revisa los videos de afuera. Los archivos de la carpeta entran en el hash del bundle como los de `videos/`.
+También sirve la ruta absoluta al repo (`/clon/engine`). Los imports relativos entre archivos del propio video funcionan igual. El render no necesita el `tsconfig.json`; es para el editor y `tsc`. Los archivos de la carpeta entran en el hash del bundle como los de `videos/`.
+
+## Archivos del video (fuentes, logos, audio): dos maneras
+
+1. **`asset("ruta")`** resuelve una URL que sirve el servidor del render, buscando en este orden: `--assets <dir>` / `VE_ASSETS`, la carpeta del propio video (`videos/<slug>/assets` y `videos/<slug>/audio`), `<VE_VIDEOS_DIR>/assets`, el bundle y `public/`. Sin pasar nada, una carpeta `assets/` al lado de los videos externos o dentro de `videos/<slug>/` se sirve sola en `render`, `qa`, `sheet`, `privacy` y `npm run dev` (en el servidor de desarrollo, con las de todos los videos). Es lo que usan `Audio`, imágenes y `theme.font.files`.
+
+   ```ts
+   // fuente de marca en <VE_VIDEOS_DIR>/assets/fonts/Marca-Bold.otf
+   font: { ...neutral.font, family: '"Marca", sans-serif', files: [{ weight: 700, src: asset("fonts/Marca-Bold.otf") }] }
+   // logo en <VE_VIDEOS_DIR>/assets/brand/logo.png
+   <img src={asset("brand/logo.png")} alt="" />
+   ```
+
+2. **`import url from "./x.otf?url"`** (o `"../assets/brand/logo.png"` a secas) lo resuelve vite: copia el archivo al bundle con un nombre con hash y devuelve su URL. Funciona igual en `render`, `qa`, `sheet`, `privacy` y `dev`, sin carpeta extra ni flag; el hash del bundle incluye el archivo. Con TypeScript hace falta la declaración de `*?url` (en el repo, `vite/client`; en una carpeta de afuera, el `env.d.ts` de `templates/externo/`).
+
+   ```ts
+   import marcaBold from "../assets/fonts/Marca-Bold.otf?url";
+   import logo from "../assets/brand/logo.png?url";
+   const tema = { ...neutral, font: { ...neutral.font, family: '"Marca", sans-serif', files: [{ weight: 700, src: marcaBold }] } };
+   ```
+
+Con `import` el archivo viaja con el código (no hay nada que olvidarse de pasar); con `asset()` el archivo queda fuera del bundle (conviene para audio pesado y para lo que se cambia sin recompilar). La clave de la cache de partes incluye el resumen (ruta, tamaño, mtime) de **todas** las carpetas de estáticos que se sirven, las pasadas y las automáticas.
+
+## Fuentes que no cargan
+
+Una fuente que falla (404, archivo dañado, familia sin `@font-face`) no rompe nada a la vista: el navegador cae a la siguiente de la pila y el video sale con otra tipografía, sin aviso. Por eso `ThemeScope` verifica cada archivo de `theme.font.files` después de `document.fonts.load` (el resultado no vacío y `document.fonts.check`) e informa la falla al motor (`reportFontFailure`, `engine/fontCheck.ts`); el runtime, al terminar de esperar los recursos de cada cuadro, revisa también `document.fonts` (cualquier `@font-face` en estado `error`). **El render falla** con un mensaje que nombra la familia, el peso y la URL:
+
+```
+No cargó una fuente; el video saldría con otra tipografía:
+  - "Marca" (peso 700) desde http://127.0.0.1:41233/fonts/Marca-Bold.otf: no se pudo descargar o leer el archivo (...; ¿404 o archivo dañado?)
+```
+
+Lo mismo en `qa`, `sheet` y `privacy` (todos dibujan con el mismo runtime). Para un borrador: `--allow-missing-fonts` (o `VE_ALLOW_MISSING_FONTS=1`), que solo avisa por consola. La prueba usa un video temporal con una URL que da 404 (`render/fuentes.test.ts`, con `withTempVideos`/`writeVideoFiles` de `render/testing.ts`).
+
+## Velocidad de render: dónde se va el tiempo
+
+El costo es de CPU en Chromium, no de codificación ni de disco. `render` imprime, además del total, `tiempo por etapa`: dibujar el cuadro (React + esperas: segundos), captura de pantalla (la rasterización y composición del cuadro ocurren acá, es casi todo) y escritura del PNG; x264 se solapa con la captura y pesa ~10 %. Medido en este entorno (4 núcleos compartidos, 1920x1080, `--no-cache --no-audio`, 60 cuadros por muestra):
+
+| Muestra | CPU por cuadro | Notas |
+|---|---|---|
+| `hello` (escena sencilla) | ~0.07 s | |
+| `story-demo`, apertura / temas | 0.18 a 0.24 s | 3D, desenfoques, mucho DOM |
+| `story-demo --scale 0.5` | ~0.09 s | la rasterización crece con los píxeles |
+| `--frame-format jpeg` | casi igual | cambia la codificación, no la rasterización |
+| `--disable-gpu`, `--disable-gpu-compositing`, `--num-raster-threads`, GPU raster | sin mejora (mismo CPU) | además cambiarían la clave de cache |
+
+Render completo de `story-demo` (1590 cuadros, 53 s, 1920x1080, con 3D y desenfoques, `--no-cache`) medido mientras la máquina estaba ocupada por otras tareas (promedio de carga 8 sobre 4 núcleos): **7.6 min de reloj, 4 min de CPU** (5.4 fps al principio, 4 fps al final), con 4 páginas: dibujar los cuadros 233 s, captura 1390 s, escritura 24 s (sumas entre las 4 páginas). Con la máquina libre, esos 4 min de CPU son ~1 a 1.5 min de reloj.
+
+**Regla práctica:** tiempo de un render completo ≈ `cuadros × (0.07 a 0.25 s de CPU) / núcleos libres` más ~15 s fijos (compilar el bundle la primera vez, abrir las páginas, concatenar). `--concurrency` solo ayuda hasta la cantidad de núcleos libres: con más páginas que núcleos todo se enlentece. Un video de 60 s (1800 cuadros) con 3D y desenfoques son ~4 a 6 min de CPU: ~1.5 a 2 min con 4 núcleos libres, 5 a 8 min si la máquina está ocupada o tiene 1 o 2 núcleos (ahí se ven 4 a 6 cuadros por segundo, que es lo que se reportó con 5.5 min). El `--scale 0.5` para borradores es el atajo que más rinde (~2x). No se encontró un ajuste seguro que acelere más sin cambiar píxeles.
 
 ## Cache de hashes de archivos
 
@@ -141,6 +205,7 @@ Una sonda (un `div` de layout entero bajo un `scale(1.15 + 0.0173·f)` sobre una
 
 - `No se pudo cargar "playwright"`: instalalo o exporta `NODE_PATH` hacia una instalacion global.
 - `No se pudo lanzar Chromium`: revisa `VE_CHROMIUM` o `playwright install chromium`.
-- `Audio file ... not found`: poner el archivo en `public/` o pasar `--assets`.
+- `Audio file ... not found`: poner el archivo en `public/`, en `videos/<slug>/audio` (se sirve solo) o pasar `--assets`.
+- `No cargó una fuente ...`: la URL o el archivo de la fuente no se pudo leer (ver "Fuentes que no cargan").
 - `setFrame(n) fallo: ... holds pendientes`: un recurso (fuente/imagen) no cargo en 30 s.
 - `--check` falla: la escena depende del historial de cuadros (ver regla de determinismo en `engine/README.md`).

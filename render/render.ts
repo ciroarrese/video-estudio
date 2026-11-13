@@ -13,7 +13,7 @@ import { trackChild, trackCloser, trackPath, untrackPath } from './cleanup';
 import { digestFiles, ENCODER_SETTINGS, frameFile, planCheckFrames, framePattern, planSegments, planShards, segmentKey } from './plan';
 import { serveStatic } from './server';
 import { assetDirsFor, explicitAssetDirs } from './assets';
-import { metaForFormat, NOSTAGE_QUERY, pageQuery, resolveScene, sceneRange, type VideoMeta } from './meta';
+import { cleanPageError, metaForFormat, NOSTAGE_QUERY, pageQuery, resolveScene, sceneRange, type VideoMeta } from './meta';
 import type { FormatName, SceneInfo } from '../engine';
 
 export type RenderOptions = {
@@ -260,8 +260,12 @@ async function openPage(browser: PwBrowser, ctxOpts: { width: number; height: nu
 
 const callReady = (page: PwPage) => page.evaluate(() => (window as any).__ve.ready as Promise<unknown>).then(() => undefined);
 
+/** Segundos acumulados (sumando todas las páginas en paralelo) de cada etapa de la captura: sirve para ver dónde se va el tiempo. */
+export type CaptureTiming = { setFrame: number; screenshot: number; write: number };
+
 type Env = {
   browser: PwBrowser;
+  timing: CaptureTiming;
   baseUrl: string;
   pageUrl: string;
   meta: VideoMeta;
@@ -294,19 +298,25 @@ async function captureFrames(
         for (let i = sh.start; i < sh.end; i++) {
           if (shared.error) return;
           const n = frames[i]!;
+          const t0 = performance.now();
           try {
             await page.evaluate((f: number) => (window as any).__ve.setFrame(f), n);
           } catch (e) {
             throw new Error(`setFrame(${n}) fallo: ${(e as Error).message}`);
           }
           if (shared.error) return;
+          const t1 = performance.now();
           // CDP capture: optimizeForSpeed (fast zlib, same pixels) is ~40% faster than page.screenshot for PNG.
           const r = await cdp.send('Page.captureScreenshot', {
             format: env.shot.format,
             ...(env.shot.format === 'jpeg' ? { quality: env.shot.quality } : { optimizeForSpeed: true }),
             clip: { x: 0, y: 0, width, height, scale: env.scale },
           });
+          const t2 = performance.now();
           await onFrame(n, Buffer.from(r.data as string, 'base64'));
+          env.timing.setFrame += (t1 - t0) / 1000;
+          env.timing.screenshot += (t2 - t1) / 1000;
+          env.timing.write += (performance.now() - t2) / 1000;
           done++;
           progressLabel?.(done, frames.length);
         }
@@ -383,7 +393,7 @@ async function setup(o: RenderOptions, needAudio: boolean) {
     const { page, context } = await openPage(browser, { width: 320, height: 180, scale: 1 }, pageUrl, shared);
     try {
       await callReady(page).catch((e: Error) => {
-        throw new Error(`La pagina del video no arranco: ${e.message}`);
+        throw new Error(`La pagina del video no arranco: ${cleanPageError(e.message)}`);
       });
       if (shared.error) throw shared.error;
       if (!found) throw new Error(`Video desconocido "${o.videoId}". Disponibles: ${metas.map((m) => m.id).join(', ')}`);
@@ -393,7 +403,7 @@ async function setup(o: RenderOptions, needAudio: boolean) {
       if (needAudio) tracks = (await page.evaluate(() => (window as any).__ve.scanAudio())) as Track[];
       const ffmpegVersion = (await run('ffmpeg', ['-version'])).split('\n')[0]!;
       const shot = { format: o.frameFormat ?? 'png', quality: o.jpegQuality ?? 95 } as const;
-      const env: Env = { browser, baseUrl: server.url, pageUrl, meta, scale, shot };
+      const env: Env = { browser, timing: { setFrame: 0, screenshot: 0, write: 0 }, baseUrl: server.url, pageUrl, meta, scale, shot };
       // Everything besides bundle/props/range/scale/crf that can change a segment's pixels.
       const keyEnv = {
         ffmpeg: ffmpegVersion,
@@ -549,7 +559,9 @@ export async function renderVideo(options: RenderOptions): Promise<RenderResult>
         await encodeChain;
       }
       if (encodeError) throw encodeError;
+      const tm = env.timing;
       log(`captura+codificacion: ${((Date.now() - tCap) / 1000).toFixed(1)} s (x264 acumulado ${encodeTime.toFixed(1)} s, solapado con la captura)`);
+      log(`tiempo por etapa (suma de las ${Math.min(concurrency, list.length)} páginas): dibujar el cuadro ${tm.setFrame.toFixed(1)} s, captura de pantalla ${tm.screenshot.toFixed(1)} s, escritura del PNG ${tm.write.toFixed(1)} s`);
       if (!options.keepFrames) rmSync(framesRoot, { recursive: true, force: true });
     }
 

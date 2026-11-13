@@ -1,12 +1,12 @@
 import { Easing, useFrame, useVideoConfig } from "../engine";
 import { GradientText, Wash, World, cameraAt, kf, zoomThrough } from "../kit";
 import { useTheme, withAlpha } from "../themes";
-import { fade, styleKey, xform } from "../fx/core/math";
+import { fade, xform } from "../fx/core/math";
 import { listLayout } from "./layout";
 import { CheckMark, HeadlineRow, StoryStage, scaler, useEase } from "./shared";
 import type { StorySpec } from "./types";
 
-/** Opacidad de las filas ya vistas (el resto del texto atenuado llega al contraste mínimo con ella). */
+/** Opacidad de las filas ya vistas (el resto del texto atenuado llega al contraste mínimo con ella, con las nubes del tema). */
 const QUIET_DONE = 0.75;
 
 import { INTERLUDE_FRAMES } from "./durations";
@@ -38,6 +38,8 @@ export function Interlude({ spec, done, skip = [], next: nextProp }: { spec: Sto
   const n = spec.topics.length;
   const L = listLayout(spec, theme, width, height);
   const next = nextProp ?? nextTopic(n, done, skip);
+  // con nubes más opacas que las del tema (`design.clouds.opacity`) el fondo se oscurece y las filas vistas pierden contraste: se atenúan menos
+  const quietDone = Math.min(1, QUIET_DONE + Math.max(0, (spec.design?.clouds?.opacity ?? theme.cloud.opacity) - theme.cloud.opacity) * 1.2);
 
   const T = { check: [u(14), u(34)] as [number, number], next: [u(40), u(62)] as [number, number], fly: [u(66), u(112)] as [number, number] };
   const appear = kf(f, [0, u(14)], [0, 1], ease.out);
@@ -60,7 +62,7 @@ export function Interlude({ spec, done, skip = [], next: nextProp }: { spec: Sto
             const isNext = i === next;
             const cp = justDone ? checkP : isDone ? 1 : 0;
             // las ya vistas quedan más tenues que la próxima, pero con el contraste del texto atenuado por encima del mínimo del control de calidad
-            const quiet = isDone ? QUIET_DONE + (1 - cp) * (1 - QUIET_DONE) : 1;
+            const quiet = isDone ? quietDone + (1 - cp) * (1 - quietDone) : 1;
             const rowIn = kf(f, [u(i * 3), u(i * 3 + 14)], [0, 1], ease.out);
             const pop = justDone ? kf(f, [T.check[1] - u(4), T.check[1] + u(2), T.check[1] + u(14)], [0, 1, 0]) : 0;
             const rowOpacity = rowIn * (isNext ? 1 : others) * (isNext ? 1 - kf(f, [T.fly[1] - u(16), T.fly[1] - u(10)], [0, 1]) : 1);

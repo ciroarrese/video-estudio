@@ -92,6 +92,42 @@ describe.skipIf(!chromium)('qa on the qa-defects video (e2e)', () => {
     for (const fr of [F.slowFadeB, F.crossMoveB, F.overlapMoveB, F.coverMoveB, F.camMoveB]) expect(findings.filter((f) => f.frame === fr && f.severity === 'error'), `frame ${fr}`).toEqual([]);
   }, 180_000);
 
+  it('min-size: un texto chico en el plano general que se lee al acercar es info (resumen con cuenta); uno que nunca se lee a tamaño legible sigue siendo error', async () => {
+    const { findings, summary } = await runQa({ videoId: 'qa-defects', frames: `${F.zoomOut},${F.zoomIn},${F.neverReadable}` });
+    const at = (f: number) => findings.filter((x) => x.frame === f && x.rule === 'min-size');
+    // 57: 8.8 px en el plano general, 26 px en el cuadro 59 (misma escena = todo el video): detalle, info
+    expect(at(F.zoomOut).map((x) => [x.severity, x.data?.detail, x.data?.count])).toEqual([['info', true, 1]]);
+    expect(at(F.zoomOut)[0]!.message).toMatch(/se lee al acercar/);
+    expect(at(F.zoomOut)[0]!.message).toMatch(/cuadro 59/);
+    // 59: legible, sin hallazgo
+    expect(at(F.zoomIn)).toEqual([]);
+    // 61: el contrapunto estricto, mismo tamaño chico pero nunca legible: error
+    expect(at(F.neverReadable).map((x) => [x.severity, x.element.testid])).toEqual([['error', 'never-readable']]);
+    expect(summary.detailSmallText).toEqual({ texts: 1, frames: 1 });
+    expect(summary.errors).toBe(1);
+  }, 180_000);
+
+  it('min-size con probeFrames=0 apaga la regla del detalle: el mismo texto chico vuelve a ser error', async () => {
+    const { findings } = await runQa({ videoId: 'qa-defects', frames: `${F.zoomOut},${F.zoomIn}`, thresholds: { 'min-size': { probeFrames: 0 } } });
+    expect(findings.filter((x) => x.rule === 'min-size').map((x) => [x.frame, x.severity])).toEqual([[F.zoomOut, 'error']]);
+  }, 180_000);
+
+  it('contrast juzga el texto SVG por su fill (o su trazo si no tiene relleno), no por el color CSS; covered ignora tapas invisibles', async () => {
+    const { findings } = await runQa({ videoId: 'qa-defects', frames: `${F.svgFillDark},${F.svgFillPale},${F.svgStroke},${F.hiddenCovers},${F.inheritedHidden},${F.visibleCanvas}` });
+    const errs = (f: number) => findings.filter((x) => x.frame === f && x.severity === 'error').map((x) => [x.rule, x.element.testid, x.other?.testid]);
+    // fill oscuro con color CSS clarito (antes daba 1.01:1): sin errores
+    expect(errs(F.svgFillDark)).toEqual([]);
+    expect(errs(F.svgStroke)).toEqual([]);
+    // contrapunto estricto: fill claro sobre fondo claro con color CSS oscuro: error de contraste
+    expect(errs(F.svgFillPale)).toEqual([['contrast', 'donut-faint', undefined]]);
+    // canvas con opacity 0, bloque con visibility:hidden y canvas bajo un ancestro con opacity 0: no tapan
+    expect(errs(F.hiddenCovers)).toEqual([]);
+    expect(errs(F.inheritedHidden)).toEqual([]);
+    expect(findings.filter((x) => ([F.hiddenCovers, F.inheritedHidden] as number[]).includes(x.frame) && x.rule === 'covered')).toEqual([]);
+    // contrapunto estricto: el mismo canvas visible tapa el texto
+    expect(errs(F.visibleCanvas)).toEqual([['covered', 'under-visible', 'visible-canvas']]);
+  }, 180_000);
+
   it('privacy: a term and an e-mail built from one span per letter / per part are still caught', async () => {
     const r = await runPrivacy({ videoId: 'qa-defects', frames: `${F.split}`, deny: 'Acme Corp\n' });
     expect(r.findings.map((f) => `${f.kind}:${f.value}`).sort()).toEqual(['deny-joined:acme corp', 'deny-joined:acmecorp', 'email:persona@dominio-ficticio.com']);

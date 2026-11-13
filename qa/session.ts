@@ -1,6 +1,6 @@
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { allowMissingFonts, assetDirsFor, ensureBundle, explicitAssetDirs, launchChromium, metaForFormat, newRunId, NOSTAGE_QUERY, pageQuery, resolveScene, sceneRange, serveStatic, type PwBrowser, type PwCdp, type PwContext, type PwPage, type VideoMeta as RenderMeta } from '../render/index';
+import { cleanPageError, allowMissingFonts, assetDirsFor, ensureBundle, explicitAssetDirs, launchChromium, metaForFormat, newRunId, NOSTAGE_QUERY, pageQuery, resolveScene, sceneRange, serveStatic, type PwBrowser, type PwCdp, type PwContext, type PwPage, type VideoMeta as RenderMeta } from '../render/index';
 import type { FormatName, SceneInfo } from '../engine';
 
 export const projectRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..');
@@ -71,7 +71,7 @@ export async function openSession(o: SessionOptions): Promise<Session> {
     page.on('pageerror', (e: Error) => (err ??= new Error(`Error en la pagina: ${e.message}`)));
     await page.goto(pageUrl, { waitUntil: 'load' });
     await page.evaluate(() => (window as any).__ve.ready as Promise<unknown>).then(() => undefined, (e: Error) => {
-      throw new Error(`La pagina del video no arranco: ${e.message}`);
+      throw new Error(`La pagina del video no arranco: ${cleanPageError(e.message)}`);
     });
     const cdp = await context.newCDPSession(page);
     const vp: VideoPage = {
@@ -100,7 +100,7 @@ export async function openSession(o: SessionOptions): Promise<Session> {
       // Página que solo registra los videos (no dibuja): da la carpeta de origen antes de que se pida ninguna fuente o imagen.
       await page.goto(`${server.url}/${NOSTAGE_QUERY}`, { waitUntil: 'load' });
       await page.evaluate(() => (window as any).__ve.ready as Promise<unknown>).then(() => undefined).catch((e: Error) => {
-        throw new Error(`La pagina del video no arranco: ${e.message}`);
+        throw new Error(`La pagina del video no arranco: ${cleanPageError(e.message)}`);
       });
       const metas = (await page.evaluate(() => (window as any).__ve.videos)) as VideoMeta[];
       const m = metas.find((x) => x.id === o.videoId);

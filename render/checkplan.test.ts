@@ -53,3 +53,11 @@ describe('planCheckFrames', () => {
     expect(p.frames.every((f) => f >= 100 && f <= 299)).toBe(true);
   });
 });
+
+import { cleanPageError } from './meta';
+describe('cleanPageError', () => {
+  it('quita el rastro de pila del navegador y deja el mensaje', () => {
+    const m = 'page.evaluate: Error: No cargó una fuente\n  - "X" desde /x.otf: ...\n    at xe (http://127.0.0.1:39747/assets/index-a.js:3:678)\n    at async http://127.0.0.1:39747/assets/index-a.js:13:81';
+    expect(cleanPageError(m)).toBe('No cargó una fuente\n  - "X" desde /x.otf: ...');
+  });
+});

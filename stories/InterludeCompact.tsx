@@ -1,7 +1,8 @@
 import { Easing, useFrame, useVideoConfig } from "../engine";
 import { kf } from "../kit";
 import { useTheme } from "../themes";
-import { fade, xform } from "../fx/core/math";
+import { fade, styleKey, xform } from "../fx/core/math";
+import type React from "react";
 import { INTERLUDE_COMPACT_FRAMES } from "./durations";
 import { fitText } from "./layout";
 import { nextTopic } from "./Interlude";
@@ -47,10 +48,16 @@ export function InterludeCompact({ spec, done, skip = [], next: nextProp }: { sp
   const nextFit = next ? fitText(next.name, maxW, theme.type.h2 * 0.62, { min: theme.type.body * 0.8, avg: 0.55 }) : null;
   const cs = Math.round(theme.type.h2 * 0.95);
 
+  // propiedades que se emiten solo mientras se animan (React agrega al final las que reaparecen): la clave remonta el elemento al cambiar el conjunto
+  const col: React.CSSProperties = { position: "absolute", inset: 0, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: Math.round(theme.type.h2 * 0.55), opacity: fade(out) };
+  const strip: React.CSSProperties = { display: "flex", gap, width: barW, opacity: fade(appear) };
+  const nameRow: React.CSSProperties = { display: "flex", alignItems: "center", gap: Math.round(cs * 0.4), maxWidth: maxW, opacity: fade(appear), transform: xform({ y: Math.round((1 - appear) * 18) }) };
+  const nextBox: React.CSSProperties = { textAlign: "center", opacity: fade(nextIn), transform: xform({ y: Math.round((1 - nextIn) * 14) }), color: theme.color.textMuted, fontSize: theme.type.body };
+
   return (
     <StoryStage frame={f} cloud={spec.design?.clouds}>
-      <div style={{ position: "absolute", inset: 0, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: Math.round(theme.type.h2 * 0.55), opacity: fade(out) }}>
-        <div style={{ display: "flex", gap, width: barW, opacity: fade(appear) }}>
+      <div key={styleKey(col)} style={col}>
+        <div key={`strip-${styleKey(strip)}`} style={strip}>
           {shown.map((_, i) => {
             const p = i < pos ? 1 : i === pos ? fill : 0;
             return (
@@ -60,11 +67,11 @@ export function InterludeCompact({ spec, done, skip = [], next: nextProp }: { sp
             );
           })}
         </div>
-        <div style={{ display: "flex", alignItems: "center", gap: Math.round(cs * 0.4), maxWidth: maxW, opacity: fade(appear), transform: xform({ y: Math.round((1 - appear) * 18) }) }}>
+        <div key={`name-${styleKey(nameRow)}`} style={nameRow}>
           <div style={{ flexShrink: 0, width: cs, height: cs }}>{check > 0 && <CheckMark p={check} size={cs} id={`c${done}`} />}</div>
           <div style={{ fontSize: nameFit.size, fontWeight: theme.font.weights.semibold, color: theme.color.text, letterSpacing: "-0.02em", whiteSpace: "nowrap" }}>{nameFit.text}</div>
         </div>
-        <div style={{ textAlign: "center", opacity: fade(nextIn), transform: xform({ y: Math.round((1 - nextIn) * 14) }), color: theme.color.textMuted, fontSize: theme.type.body }}>
+        <div key={`next-${styleKey(nextBox)}`} style={nextBox}>
           {nextFit ? (
             <>
               <div style={{ fontSize: theme.type.caption * 0.9, letterSpacing: "0.08em", textTransform: "uppercase", fontWeight: theme.font.weights.medium }}>{`Sigue · ${pos + 2} de ${m}`}</div>

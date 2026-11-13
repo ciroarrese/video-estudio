@@ -1,6 +1,7 @@
-import { createContext, useContext } from "react";
+import React, { createContext, useContext } from "react";
 import { DockedHeadline } from "../kit";
 import { fitText } from "./layout";
+import type { StorySpec } from "./types";
 
 export type TopicInfo = {
   index: number;
@@ -14,6 +15,16 @@ export type TopicInfo = {
 const DOCK_IN = 18;
 
 export const TopicContext = createContext<TopicInfo | null>(null);
+
+/**
+ * Da el tema `index` de `spec` a lo que va dentro (`useTopic()`, `<TopicHeadline />`): es lo que hace `composeStory` con cada escena, para
+ * quien arma la historia a mano con `Sequence`. `docked`: la apertura terminó acoplando este titular (ver `StoryDesign.handoff`).
+ */
+export function TopicProvider({ spec, index, docked, children }: { spec: StorySpec; index: number; docked?: boolean; children?: React.ReactNode }) {
+  const t = spec.topics[index];
+  if (!t) throw new Error(`TopicProvider: el tema ${index} no existe (hay ${spec.topics.length})`);
+  return <TopicContext.Provider value={{ index, name: t.name, line: t.line, docked }}>{children}</TopicContext.Provider>;
+}
 
 /**
  * Tema que se está mostrando (`index` desde 0): lo da la historia armada por `composeStory`.

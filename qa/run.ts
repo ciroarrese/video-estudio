@@ -1,12 +1,13 @@
 import { cpus } from 'node:os';
 import { applyMotion, coverKeys } from './motion';
 import { collectRuns, sampleBackgrounds } from './page';
-import { ALL_RULES, type Finding, type RuleId, type Severity } from './types';
+import { ALL_RULES, type DetailSummary, type Finding, type RuleId, type Severity } from './types';
 import { runRules } from './rules';
 import { sampleFrames, type SampleSpec } from './sampling';
 import { openSession, sceneFrames } from './session';
 import type { FormatName } from '../engine';
 import { mergeThresholds, type ThresholdOverrides } from './thresholds';
+import { candidatesOf, probeReadable, reclassifyDetail } from './zoom';
 
 export type QaOptions = SampleSpec & {
   videoId: string;
@@ -34,6 +35,8 @@ export type QaSummary = {
   warnings: number;
   infos: number;
   byRule: Record<string, number>;
+  /** Textos chicos que se leen al acercar (info) dentro de su escena: cuántos textos distintos y en cuántos cuadros (ver qa/zoom.ts). */
+  detailSmallText?: DetailSummary;
   seconds: number;
 };
 export type QaResult = { findings: Finding[]; summary: QaSummary };
@@ -69,6 +72,19 @@ export async function runQa(o: QaOptions): Promise<QaResult> {
         }
       }),
     );
+    // Detalle que se lee al acercar: un texto chico en el plano general que dentro de la misma escena se ve por encima del mínimo
+    // en otro cuadro deja de ser error (ver qa/zoom.ts). Solo si hubo errores de tamaño y no se apagó con probeFrames=0.
+    let detail: DetailSummary | null = null;
+    const candidates = rules.includes('min-size') && thresholds['min-size'].probeFrames > 0 ? candidatesOf(findings) : [];
+    if (candidates.length) {
+      const scenes = await session.scenes().catch(() => []);
+      const dims = { width: meta.width, height: meta.height, duration: meta.durationInFrames };
+      const readable = await probeReadable(session, candidates, scenes, frames, thresholds, dims);
+      const r = reclassifyDetail(findings, readable, scenes, thresholds, dims);
+      findings.length = 0;
+      findings.push(...r.findings);
+      detail = r.detail;
+    }
     findings.sort((a, b) => a.frame - b.frame || a.rule.localeCompare(b.rule));
     const byRule: Record<string, number> = {};
     for (const f of findings) byRule[f.rule] = (byRule[f.rule] ?? 0) + 1;
@@ -79,7 +95,7 @@ export async function runQa(o: QaOptions): Promise<QaResult> {
         errors: findings.filter((f) => f.severity === 'error').length,
         warnings: findings.filter((f) => f.severity === 'warn').length,
         infos: findings.filter((f) => f.severity === 'info').length,
-        byRule, seconds: Math.round((Date.now() - t0) / 100) / 10,
+        byRule, ...(detail ? { detailSmallText: detail } : {}), seconds: Math.round((Date.now() - t0) / 100) / 10,
       },
     };
   } finally {

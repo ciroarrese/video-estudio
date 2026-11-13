@@ -2,7 +2,10 @@ import { describe, ignored } from '../geometry';
 import type { Finding, Rule } from '../types';
 
 /**
- * Text drawn smaller than `minPx1080` (scaled by the frame's short side / 1080: height in horizontal, width in vertical), measured on screen: CSS size x transform scale. */
+ * Text drawn smaller than `minPx1080` (scaled by the frame's short side / 1080: height in horizontal, width in vertical), measured on screen: CSS size x transform scale.
+ * Esta regla juzga un cuadro por vez. Después, `qa/zoom.ts` baja a info (resumen por cuadro) los textos chicos que dentro de la
+ * misma escena se ven por encima del mínimo en otro cuadro (un tablero que se muestra entero y luego se acerca): ver `reclassifyDetail`.
+ */
 export const minSizeRule: Rule = {
   id: 'min-size',
   description: 'Texto demasiado chico en pantalla',

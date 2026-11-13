@@ -3,8 +3,10 @@ import { Easing, random, useFrame, useVideoConfig } from "../engine";
 import { GradientText, kf } from "../kit";
 import { useTheme, withAlpha } from "../themes";
 import type { Theme } from "../themes";
+import { fade, styleKey, xform } from "../fx/core/math";
 import { PILL_OFF, closingWall, fitText, panelEntryLift, panelLayout, closingCamStart, pillBudget, pillFit, rigProject, rigTransform } from "./layout";
-import { Chip, Logo, Pill, StoryStage, scaler, useEase } from "./shared";
+import { Chip, Logo, Pill, RichText, StoryStage, scaler, useEase } from "./shared";
+import { plainRich } from "./types";
 import type { StorySpec, TopicScene } from "./types";
 
 import { CLOSING_FRAMES } from "./durations";
@@ -100,13 +102,26 @@ const wallPillMaxW = (theme: Theme, name: string, width: number): number | undef
 /** Valor que sigue entre dos puntos. */
 const mix = (a: number, b: number, p: number) => a + (b - a) * p;
 
+/** Texto con `**negrita**` ajustado a un ancho: si entra tal cual conserva las marcas; si hay que cortarlo con "…" queda en texto plano. */
+function fitRich(text: string, maxWidth: number, size: number, o: Parameters<typeof fitText>[3]): { text: string; size: number } {
+  const plain = plainRich(text);
+  const t = fitText(plain, maxWidth, size, o);
+  return t.text === plain ? { text, size: t.size } : t;
+}
+
+/** Estilo de un elemento que entra con fundido: sin `opacity` en reposo y `visibility: hidden` (no se pinta ni lo mira `qa`) mientras vale 0. */
+const fadeIn = (o: number): React.CSSProperties => ({ opacity: fade(o), visibility: o <= 0 ? "hidden" : undefined });
+
 /**
  * Cierre: paneles flotantes (grandes, con inclinación, sombra y profundidad) con el título de cada tema sobre su
  * borde; detrás, el muro de etiquetas desenfocado. Los paneles se pliegan, los títulos viajan en profundidad (cambian
  * de escala) hasta sus lugares reservados en el centro del muro, que entra en foco, se enciende y se aleja hasta
  * mostrar todo; después, fundido a la firma.
+ *
+ * Se usa suelta (`<Closing spec />` dentro de un `Sequence` de `closingFrames(spec)` cuadros): `scenes` es opcional y, parejo a los temas,
+ * admite `null` (o faltar) para un tema sin escena; el panel de ese tema usa `spec.topics[i].thumbnail` o la tarjeta por defecto.
  */
-export function Closing({ spec, scenes }: { spec: StorySpec; scenes: TopicScene[] }) {
+export function Closing({ spec, scenes = [] }: { spec: StorySpec; scenes?: (TopicScene | null)[] }) {
   const theme = useTheme();
   const ease = useEase();
   const f = useFrame();
@@ -142,7 +157,7 @@ export function Closing({ spec, scenes }: { spec: StorySpec; scenes: TopicScene[
   const flyStart = (i: number) => T.fly[0] + u(i * stagger);
   const flyOf = (i: number) => kf(f, [flyStart(i), flyStart(i) + u(40)], [0, 1], Easing.inOut);
   const bobOf = (i: number) => Math.sin(f / 28 + i * 1.7) * 10;
-  const blur = Math.round((1 - focus) * 90) / 10;
+  const blur = spec.design?.wall?.blur === false ? 0 : Math.round((1 - focus) * 90) / 10;
 
   const ignore = "min-size contrast overlap covered offscreen safe-area";
   const chipFor = (c: { x: number; y: number; text: string }, i: number, faint: boolean) => {
@@ -164,14 +179,16 @@ export function Closing({ spec, scenes }: { spec: StorySpec; scenes: TopicScene[
   const signW = Math.min(1560, width - 2 * theme.safe.x);
   const hasMark = !!(signLines.logo || signLines.slot);
   // sin marca propia la despedida es lo más grande del cierre (h1); con marca baja a h2 para que la marca mande
-  const sf = fitText(signLines.text, signW, hasMark ? theme.type.h2 : theme.type.h1, { min: theme.type.body, lines: 2, avg: 0.55 });
-  const tagline = signLines.tagline ? fitText(signLines.tagline, Math.min(1500, signW), theme.type.body, { min: theme.type.caption, avg: 0.5, lines: 2 }) : null;
+  const sf = signLines.text ? fitRich(signLines.text, signW, hasMark ? theme.type.h2 : theme.type.h1, { min: theme.type.body, lines: 2, avg: 0.55 }) : null;
+  const tagline = signLines.tagline ? fitRich(signLines.tagline, Math.min(1500, signW), theme.type.body, { min: theme.type.caption, avg: 0.5, lines: 2 }) : null;
+  // sin texto de despedida la marca entra sola y la barra y la nota la siguen
+  const textIn = hasMark ? sign : logo;
 
   return (
-    <StoryStage frame={f}>
+    <StoryStage frame={f} cloud={spec.design?.clouds}>
       {/* muro: desenfocado hasta que llegan las píldoras; con el lavado de la firma ya opaco se desmonta en vez de quedar debajo */}
       {wash < 1 && (
-        <div style={{ position: "absolute", inset: 0, zIndex: 0, opacity: wallIn * (0.55 + focus * 0.45), filter: blur > 0 ? `blur(${blur}px)` : undefined }}>
+        <div key={styleKey({ o: fade(wallIn * (0.55 + focus * 0.45)), b: blur > 0 })} style={{ position: "absolute", inset: 0, zIndex: 0, opacity: fade(wallIn * (0.55 + focus * 0.45)), filter: blur > 0 ? `blur(${blur}px)` : undefined }}>
           {inner.map((c, i) => chipFor(c, i, false))}
           {outer.map((c, i) => chipFor(c, i, true))}
           {slots.map((s, i) => {
@@ -194,18 +211,16 @@ export function Closing({ spec, scenes }: { spec: StorySpec; scenes: TopicScene[
           const W = Math.round(PANEL.w * c.k);
           const H = Math.round(PANEL.h * c.k);
           const z = c.z + (1 - a) * lifts[i]!;
-          const Thumb = scenes[i]?.thumbnail;
+          const Thumb = scenes[i]?.thumbnail ?? spec.topics[i]!.thumbnail;
           const titleGone = f >= flyStart(i);
+          const card: React.CSSProperties = {
+            position: "absolute", left: 0, top: 0, width: W, height: H, transformOrigin: "0 0",
+            transform: rigTransform((c.x - cx) * cam.s, (c.y - cy + bobOf(i)) * cam.s, z * cam.s, { dz: 0, rx: cam.rx, ry: cam.ry }, CARD_P, cx, cy, ` scale(${cam.s.toFixed(4)}) translate(${-W / 2}px, ${-H / 2}px)`),
+            zIndex: 100 + Math.round(c.z), opacity: fade(a * (1 - fold)),
+          };
           return (
-            <div
-              key={i}
-              style={{
-                position: "absolute", left: 0, top: 0, width: W, height: H, transformOrigin: "0 0",
-                transform: rigTransform((c.x - cx) * cam.s, (c.y - cy + bobOf(i)) * cam.s, z * cam.s, { dz: 0, rx: cam.rx, ry: cam.ry }, CARD_P, cx, cy, ` scale(${cam.s.toFixed(4)}) translate(${-W / 2}px, ${-H / 2}px)`),
-                zIndex: 100 + Math.round(c.z), opacity: a * (1 - fold),
-              }}
-            >
-              <div style={{ width: PANEL.w, height: PANEL.h, transform: `scale(${c.k}, ${Math.max(0.001, c.k * (1 - fold)).toFixed(4)})`, transformOrigin: "0 0" }}>
+            <div key={`${i}-${styleKey(card)}`} style={card}>
+              <div style={{ width: PANEL.w, height: PANEL.h, transform: xform({ scaleX: c.k, scaleY: Math.max(0.001, c.k * (1 - fold)) }), transformOrigin: "0 0" }}>
                 <div data-qa-ignore="min-size" style={{ width: PANEL.w, height: PANEL.h, borderRadius: theme.radius.lg, boxShadow: `0 44px 80px -28px ${withAlpha(theme.color.text, 0.42)}` }}>
                   {Thumb ? <Thumb /> : <DefaultThumbnail index={i} name={spec.topics[i]!.name} />}
                 </div>
@@ -250,18 +265,31 @@ export function Closing({ spec, scenes }: { spec: StorySpec; scenes: TopicScene[
         );
       })}
 
-      {/* firma */}
-      <div style={{ position: "absolute", inset: 0, background: theme.color.bg, opacity: wash, zIndex: 500 }} />
+      {/* firma: cada pieza se pinta recién cuando empieza a entrar (en reposo sin `opacity` ni `transform`) y, mientras vale 0, queda
+          con `visibility: hidden`: ocupa su lugar (la columna no se corre al entrar la siguiente) pero no tapa ni cuenta como texto */}
+      {wash > 0 && <div key={wash >= 1 ? "full" : "part"} style={{ position: "absolute", inset: 0, background: theme.color.bg, opacity: fade(wash), zIndex: 500 }} />}
       <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", flexDirection: "column", gap: 40, zIndex: 600 }}>
-        {signLines.slot && <div style={{ opacity: logo, transform: `scale(${0.92 + logo * 0.08})`, maxWidth: signW, display: "flex", justifyContent: "center" }}>{signLines.slot}</div>}
-        {!signLines.slot && signLines.logo && <Logo src={signLines.logo} style={{ maxWidth: Math.min(1000, width - 2 * theme.safe.x), maxHeight: 360, objectFit: "contain", opacity: logo, transform: `scale(${0.92 + logo * 0.08})` }} />}
-        <div style={{ maxWidth: signW, textAlign: "center", fontSize: sf.size, lineHeight: 1.12, fontWeight: theme.font.weights.semibold, color: theme.color.text, opacity: hasMark ? sign : logo, transform: `translateY(${Math.round((1 - (hasMark ? sign : logo)) * 16)}px)` }}>
-          {hasMark ? sf.text : <GradientText>{sf.text}</GradientText>}
-        </div>
-        <div style={{ width: Math.round(Math.min(signW, 420) * sign), height: 8, borderRadius: theme.radius.pill, background: theme.gradient.brand, opacity: sign }} />
+        {signLines.slot && <div key={`slot-${styleKey({ ...fadeIn(logo), t: xform({ scale: 0.92 + logo * 0.08 }) })}`} style={{ ...fadeIn(logo), transform: xform({ scale: 0.92 + logo * 0.08 }), maxWidth: signW, display: "flex", justifyContent: "center" }}>{signLines.slot}</div>}
+        {!signLines.slot && signLines.logo && (
+          <div key={`logo-${styleKey({ ...fadeIn(logo), t: xform({ scale: 0.92 + logo * 0.08 }) })}`} style={{ ...fadeIn(logo), transform: xform({ scale: 0.92 + logo * 0.08 }), display: "flex" }}>
+            <Logo src={signLines.logo} style={{ maxWidth: Math.min(1000, width - 2 * theme.safe.x), maxHeight: 360, objectFit: "contain" }} />
+          </div>
+        )}
+        {sf && (
+          <div
+            key={`text-${styleKey({ ...fadeIn(textIn), t: xform({ y: Math.round((1 - textIn) * 16) }) })}`}
+            style={{ maxWidth: signW, textAlign: "center", fontSize: sf.size, lineHeight: 1.12, fontWeight: theme.font.weights.semibold, color: theme.color.text, ...fadeIn(textIn), transform: xform({ y: Math.round((1 - textIn) * 16) }) }}
+          >
+            {hasMark ? <RichText text={sf.text} /> : <GradientText><RichText text={sf.text} /></GradientText>}
+          </div>
+        )}
+        <div style={{ width: Math.round(Math.min(signW, 420) * sign), height: 8, borderRadius: theme.radius.pill, background: theme.gradient.brand, visibility: sign <= 0 ? "hidden" : undefined, opacity: fade(sign) }} />
         {tagline && (
-          <div style={{ maxWidth: Math.min(1500, signW), textAlign: "center", fontSize: tagline.size, fontWeight: theme.font.weights.medium, color: theme.color.textMuted, opacity: sign, transform: `translateY(${Math.round((1 - sign) * 16)}px)` }}>
-            {tagline.text}
+          <div
+            key={`tagline-${styleKey({ ...fadeIn(sign), t: xform({ y: Math.round((1 - sign) * 16) }) })}`}
+            style={{ maxWidth: Math.min(1500, signW), textAlign: "center", fontSize: tagline.size, fontWeight: theme.font.weights.medium, color: theme.color.textMuted, ...fadeIn(sign), transform: xform({ y: Math.round((1 - sign) * 16) }) }}
+          >
+            <RichText text={tagline.text} />
           </div>
         )}
       </div>

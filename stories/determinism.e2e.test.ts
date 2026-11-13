@@ -9,7 +9,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { withTempVideos } from '../render/testing';
-import { CASES, videoFile } from './determinism.cases';
+import { CASES, scenesToCheck, videoFile } from './determinism.cases';
 
 const has = (cmd: string, args: string[]) => {
   try {
@@ -41,10 +41,12 @@ describe.skipIf(!ready)('historias: --check por escena (apertura, vuelta, cierre
         }
         const failures: string[] = [];
         for (const c of CASES) {
-          for (const scene of ['opening', 'interlude-1', 'closing']) {
-            const logs: string[] = [];
-            const r = await checkVideo({ videoId: c.id, scene, cacheDir: join(out, 'cache'), log: (m) => logs.push(m) });
-            if (!r.ok) failures.push(`${c.id} / ${scene}\n${logs.filter((l) => /FALLA|DIFERENTE|cambian|elementos|style/.test(l)).slice(0, 8).join('\n')}`);
+          for (const format of [undefined, ...(c.formats ?? [])]) {
+            for (const scene of scenesToCheck(c)) {
+              const logs: string[] = [];
+              const r = await checkVideo({ videoId: c.id, scene, format, cacheDir: join(out, 'cache'), log: (m) => logs.push(m) });
+              if (!r.ok) failures.push(`${c.id} ${format ?? 'horizontal'} / ${scene}\n${logs.filter((l) => /FALLA|DIFERENTE|cambian|elementos|style/.test(l)).slice(0, 8).join('\n')}`);
+            }
           }
         }
         expect(failures, failures.join('\n---\n')).toEqual([]);

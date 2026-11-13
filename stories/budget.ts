@@ -29,14 +29,16 @@ export const DEFAULT_BLOCK_FRAMES = { opening: OPENING_FRAMES, interlude: INTERL
  * defecto (apertura 300, vuelta 120, cierre 480) solo los bloques generados de una historia de 3 temas suman 1140 cuadros (38 s a 30 fps);
  * para una pieza más corta hay que bajar `timing`.
  */
-export function storyBudget(spec: StorySpec, scenes: (number | { durationInFrames: number })[] = [], opts: { interludes?: boolean | "compact"; fps?: number } = {}): StoryBudget {
+export function storyBudget(spec: StorySpec, scenes?: (number | { durationInFrames: number } | null)[], opts: { interludes?: boolean | "compact"; fps?: number } = {}): StoryBudget {
   const n = spec.topics.length;
-  const count = (opts.interludes ?? true) ? n : 0;
+  // una vuelta por escena de tema: sin la lista de escenas se supone una por tema; los temas sin escena (`null`) no tienen vuelta
+  const present = scenes === undefined ? n : scenes.filter((s) => s !== null && s !== undefined).length;
+  const count = (opts.interludes ?? true) ? present : 0;
   const compact = opts.interludes === "compact";
   const imin = compact ? MIN_COMPACT_FRAMES : MIN_BLOCK_FRAMES;
   const t = spec.timing ?? {};
   const opening = t.opening ?? OPENING_FRAMES, interlude = compact ? (t.interludeCompact ?? INTERLUDE_COMPACT_FRAMES) : (t.interlude ?? INTERLUDE_FRAMES), closing = t.closing ?? CLOSING_FRAMES;
-  const each = scenes.map((s) => (typeof s === "number" ? s : s.durationInFrames));
+  const each = (scenes ?? []).filter((s): s is number | { durationInFrames: number } => s !== null && s !== undefined).map((s) => (typeof s === "number" ? s : s.durationInFrames));
   const sceneFrames = each.reduce((a, b) => a + b, 0);
   const generated = opening + interlude * count + closing;
   return {
