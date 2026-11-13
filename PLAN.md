@@ -1,6 +1,6 @@
 # video-estudio: plan
 
-Herramienta propia para generar videos animados de nivel profesional a partir de un cuestionario, con el design system como variable. Nace del video "Proyectos con IA" (repo `g2o-cs-onboarding`, carpeta `video/`).
+Herramienta propia para generar videos animados de nivel profesional a partir de un cuestionario, con el design system como variable. Nace de la experiencia de producir un video anterior, hecho a mano escena por escena.
 
 ## Principios
 
@@ -94,6 +94,6 @@ Orden de la etapa 1: Motor y Temas en paralelo → Render y Kit (dependen del Mo
 
 ## Decisiones tomadas
 
-- Confirmado: acá van solo el motor, el kit y un ejemplo genérico; las escenas de Grow2on quedan en `g2o-cs-onboarding`.
+- Acá van solo el motor, el kit y ejemplos genéricos; las escenas de proyectos concretos viven en sus propios repos.
 - El repo es público: solo se incluyen fuentes, sonidos e imágenes con licencia que permita redistribuirlos. Nada de datos, capturas ni escenas de sistemas internos.
 - Licencias de fuentes y música de cada tema.
