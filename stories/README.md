@@ -99,7 +99,7 @@ npm run render -- <id> --check --scene interlude-1    # (si tiene vueltas)
 npm run render -- <id> --check --scene closing
 ```
 
-Las piezas de `stories/` emiten `transform`, `opacity` y `filter` solo mientras animan (en reposo ninguna lleva `translateY(0px) scale(1)`, `blur(0)` ni opacidad casi 1: un residual compone el elemento en una capa propia que se rasteriza según el historial) y remontan el elemento cuando cambia el conjunto de propiedades (`styleKey`). Lo comprueban `stories/rest.test.tsx` (marcado independiente del historial y sin residuos, para cada pieza y cada opción) y `stories/determinism.e2e.test.ts` (`--check` por escena de varias historias con títulos y opciones distintos). Si agregás una pieza o una opción, sumala a `PIECES` en `rest.test.tsx` y un caso a `determinism.cases.ts`.
+Las piezas de `stories/` emiten `transform`, `opacity` y `filter` solo mientras animan (en reposo ninguna lleva `translateY(0px) scale(1)`, `blur(0)` ni opacidad casi 1: un residual compone el elemento en una capa propia que se rasteriza según el historial) y remontan el elemento cuando cambia el conjunto de propiedades (`styleKey`). Lo comprueban `stories/rest.test.tsx` (marcado independiente del historial y sin residuos, para cada pieza y cada opción) y `stories/determinism.e2e.test.ts` (`--check` por escena de varias historias con títulos y opciones distintos; es lenta, ~10 min, y corre aparte con `npm run test:e2e`: `npm test` no la incluye). Si agregás una pieza o una opción, sumala a `PIECES` en `rest.test.tsx` y un caso a `determinism.cases.ts`.
 
 ## Línea de tiempo
 
@@ -149,4 +149,4 @@ Cada píldora va sobre el borde superior de su panel. El diseño (`panelLayout`)
 - Regla para no romper el determinismo: en una capa 3D todo el movimiento va dentro del `transform`; un `left`/`top` fraccionario (p. ej. un vaivén con `Math.sin` sumado a `top`) se rasteriza distinto según el historial de cuadros y `render --check` lo detecta. Las posiciones de layout van en enteros.
 - Si `timing` cambia una duración, los tiempos internos del bloque se escalan en proporción.
 
-Ejemplo: `examples/story-demo` (`/?video=story-demo&props={"theme":"dark"}`). Pruebas: `stories/stories.test.tsx`, `stories/opciones.test.tsx` (temas sin escena y opciones), `stories/rest.test.tsx` (reposo e historial), `stories/determinism.e2e.test.ts` (`--check` por escena).
+Ejemplo: `examples/story-demo` (`/?video=story-demo&props={"theme":"dark"}`). Pruebas: `stories/stories.test.tsx`, `stories/opciones.test.tsx` (temas sin escena y opciones), `stories/rest.test.tsx` (reposo e historial), `stories/determinism.e2e.test.ts` (`--check` por escena; solo con `npm run test:e2e`).

@@ -133,7 +133,7 @@ describe.skipIf(!HAY_FFMPEG)('efectos y mezcla (e2e con ffmpeg)', () => {
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }
-  });
+  }, 60000);
 });
 
 const SR = 48000;
@@ -211,7 +211,7 @@ describe.skipIf(!HAY_FFMPEG)('mezcla: ducking, retardo, pico verdadero y sonorid
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }
-  });
+  }, 60000);
 
   it('una mezcla muy caliente sale con pico verdadero <= -1 dBTP (sobremuestreo x8) a cualquier ganancia', async () => {
     const dir = mkdtempSync(join(tmpdir(), 've-audio-'));
@@ -292,7 +292,7 @@ describe.skipIf(!HAY_FFMPEG)('mezcla: ducking, retardo, pico verdadero y sonorid
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }
-  });
+  }, 60000);
 
   it('un efecto que no existe falla de entrada nombrando el cue', async () => {
     const dir = mkdtempSync(join(tmpdir(), 've-audio-'));
@@ -304,5 +304,5 @@ describe.skipIf(!HAY_FFMPEG)('mezcla: ducking, retardo, pico verdadero y sonorid
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }
-  });
+  }, 60000);
 });

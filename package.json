@@ -9,6 +9,7 @@
   },
   "scripts": {
     "test": "vitest run",
+    "test:e2e": "vitest run --config vitest.e2e.config.ts",
     "typecheck": "tsc --noEmit && tsx render/typecheck-externo.ts --opcional",
     "typecheck:videos": "tsx render/typecheck-externo.ts",
     "dev": "vite",
