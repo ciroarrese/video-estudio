@@ -17,7 +17,7 @@ const escena2: React.FC = () => React.createElement(SceneBody, { title: spec.top
 
 // Una escena por tema, en el mismo orden que `spec.topics`.
 const scenes: TopicScene[] = [
-  // `thumbnail` (componente sin props de 560x340): sin ella el cierre muestra una tarjeta genérica. Ver docs/guia-escenas.md, sección 8.
+  // `thumbnail` (componente sin props de 560x340): muy recomendada una real por tema: sin ella el cierre muestra una tarjeta derivada del nombre, pero genérica. Ver docs/guia-escenas.md, sección 8.
   { id: "tema-uno", component: escena1, durationInFrames: DURACION /*, thumbnail: MiniTemaUno */ },
   { id: "tema-dos", component: escena2, durationInFrames: DURACION /*, thumbnail: MiniTemaDos */ },
 ];
@@ -26,7 +26,8 @@ export default defineStory({
   id: "plantilla-historia",
   spec,
   scenes,
-  theme, // el tema del video (videos/<slug>/theme.ts)
+  theme, // el tema del video (videos/<slug>/theme.ts): un objeto Theme o un nombre ("neutral", "dark"); `--props '{"theme":"dark"}'` lo pisa con un nombre
+  // interludes: "compact", // vuelta al listado de 40 cuadros (mínimo 24, `timing.interludeCompact`) en vez de la completa
   formats: ["vertical"], // opt-in: sin esto el video sale solo en horizontal. Cada formato extra exige el diseño de cada escena (useFormat().pick).
   // audio: { src: "music/pista.m4a", startFrom: 0, volume: 0.8 }, // pista que cubre todo el video (archivo en public/ o --assets)
 });

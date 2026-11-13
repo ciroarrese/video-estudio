@@ -200,23 +200,20 @@ Criterios:
 | Vista general sin espacio arriba | el titular tapa el contenido | hoja de cuadros |
 | Texto claro sobre un color sólido mientras un `Wash` lo cruza | el velo lo deja sin contraste a mitad de camino | hoja de cuadros en los cuadros del velo; dejá el texto fuera del tramo del `Wash` o apartalo antes |
 
-Durante una transición (tarjeta volando sobre otra, cámara en movimiento) `overlap`, `covered` y `offscreen` pueden saltar a propósito: se juzga con la hoja de cuadros. Para silenciar uno que decidiste a propósito: `data-qa-ignore="overlap"` en el elemento (ver `qa/README.md`). Un umbral que no sirve en general se cambia con `--set regla.umbral=valor`.
+Durante una transición (tarjeta volando sobre otra, cámara en movimiento, fundidos) `qa` baja solo a `info` lo que se mueve o cambia de opacidad entre cuadros vecinos: no hace falta silenciarlo, se juzga con la hoja de cuadros. Para silenciar lo que sí decidiste a propósito: `data-qa-ignore="regla"` en el elemento (ver `qa/README.md`). Un umbral que no sirve en general se cambia con `--set regla.umbral=valor`.
 
 ### Recetas de `qa`
 
-- **Silenciar una regla solo mientras dura la transición.** El atributo acepta `undefined`, así que se activa con una condición del cuadro y el resto del tiempo la regla sigue vigilando:
+- **Silenciar una regla solo mientras dura el encuadre.** El atributo acepta `undefined`, así que se activa con una condición del cuadro y el resto del tiempo la regla sigue vigilando. Hoy hace falta casi solo para texto cortado a propósito bajo una cámara quieta con zoom:
 
   ```tsx
   const zoomed = cam.scale > 1.05;      // la cámara está encuadrando una parte del diseño
-  const volando = f >= T.fly[0] && f <= T.fly[1];
   <div data-qa-ignore={zoomed ? "offscreen" : undefined}>…filas vecinas cortadas por el borde…</div>
-  <div data-qa-ignore={volando ? "overlap covered" : undefined}>…tarjeta que cruza sobre otra…</div>
-  <div data-qa-ignore={f < 20 ? "contrast" : undefined}>…texto claro que entra sobre un bloque de acento…</div>
   ```
 
   Se puede poner en un ancestro (alcanza a todo lo de adentro), con varias reglas separadas por espacios o `all`. Hacelo en el elemento mínimo y con la condición más angosta posible; decí en el mensaje de entrega qué silenciaste y por qué.
 - **Falsos errores de `contrast` con texto que entra.** Un texto que se escribe (`typed`) mientras su contenedor está en fundido (entrada del titular, o `hide` al acercar) puede dar `contrast` como "quieto" con opacidad intermedia: cada cuadro tiene un texto distinto y no se empareja con el vecino. Escribilo cuando el contenedor ya terminó de entrar y de apartarse, o mostralo entero con el contenedor.
-- **Cortado por el zoom a propósito.** Las tarjetas o filas vecinas que la cámara deja cortadas por el borde dan `offscreen` (aviso si el recorte es grande y estable). Si es el encuadre que querés, la condición `zoomed` de arriba lo silencia solo durante el zoom; si no, alejá la cámara o usá el zoom máximo de la sección 13.
+- **Cortado por el zoom a propósito.** Las tarjetas o filas vecinas que la cámara deja cortadas por el borde dan `offscreen` (aviso si el recorte es grande y estable). Si es el encuadre que querés, la condición `zoomed` de arriba lo silencia solo durante el zoom (con la cámara en movimiento ya es `info`); si no, alejá la cámara o usá el zoom máximo de la sección 13.
 
 **Qué transiciones ya no hace falta silenciar** (`qa` las baja solo a `info`, que queda oculto salvo `--verbose`; criterio en `qa/README.md`, "Reglas de `ve-qa`" y "`offscreen`: por qué error, aviso o info"):
 
@@ -224,8 +221,11 @@ Durante una transición (tarjeta volando sobre otra, cámara en movimiento) `ove
 - Un `Wash` o cualquier velo de cuadro completo cuya opacidad cambia de un cuadro al siguiente: el texto de abajo da `contrast` en `info`.
 - Un panel que entra junto con el texto de adentro (los dos en fundido): `contrast` en `info` hasta que se asienta.
 - Texto con opacidad baja (fundido, decorativo): `info`.
+- Dos elementos que se cruzan mientras uno se mueve (una tarjeta que vuela sobre otras, un texto que entra sobre un fondo que cambia): `overlap`, `covered` y `contrast` en `info`.
+- Una rebaba chica (hasta 6 px) bajo una cámara que se mueve: `info`.
+- Texto bajo un `Wash` a medio fundido: `info` (con el velo quieto sigue siendo error).
 
-**Qué sigue pidiendo tu decisión**: un encuadre quieto que deja cortado un elemento (`offscreen` en aviso: `data-qa-ignore` con la condición del zoom), un velo que se queda a medias (error de `contrast`: es lo que ve la persona), un texto que se escribe mientras su contenedor se funde (ver arriba) y cualquier texto quieto tapado.
+**Qué sigue pidiendo tu decisión**: un encuadre quieto que deja cortado un elemento (`offscreen` en aviso: `data-qa-ignore` con la condición del zoom, solo si la cámara está quieta), un velo que se queda a medias (error de `contrast`: es lo que ve la persona), un texto que se escribe mientras su contenedor se funde (ver arriba) y cualquier texto quieto tapado.
 
 ### Para que no parezca un borrador
 
@@ -244,7 +244,7 @@ Con 2 a 6 temas usá `defineStory` (ver `stories/README.md` y `templates/story/`
 - es un componente sin `Stage` (la historia ya lo pone) y de duración fija (`durationInFrames`);
 - puede usar `useTopic()` y `<TopicHeadline start hide />` para el titular con el nombre del tema. Para que la escena se renderice también sola (lo recomendado) hay dos caminos: pasarle el titular por prop y usar `DockedHeadline`, como `templates/scene/Scene.tsx`, o dejar `TopicHeadline` con `title` y `number` (`<TopicHeadline title="Panel de ventas" number={1} />`; dentro de la historia pisan al tema, y sin `title` ni historia no dibuja nada y avisa una vez en la consola) y `useTopic({ name: "Panel de ventas" })` con valor de reserva (`useTopicOrNull()` devuelve `null` fuera de la historia). El contenido no debe depender de `StoryStage` ni de `composeStory`;
 - termina con `Wash` o atravesando algo;
-- **dale una `thumbnail` a cada tema**: es la miniatura de su panel en el muro del cierre; sin ella el cierre muestra una tarjeta genérica (el nombre del tema y unas barras de ejemplo). Va en la lista de escenas de `defineStory`: `{ id: "ventas", component: Ventas, durationInFrames: 150, thumbnail: MiniVentas }`. `MiniVentas` es un componente sin props que dibuja en un lienzo de **560×340** (coordenadas propias, `position: absolute` desde `(0, 0)`), con piezas del tema, no recibe props y, si lee `useFrame()`, obtiene el cuadro del cierre y no el de tu escena: dibujala quieta (sin `kf`): el recorte de la interfaz recreada en su momento más claro (un panel con 2 o 3 filas, una cifra y un gráfico chico). La letra de la miniatura es chica a propósito (el cierre la marca para `qa`); en 560 px de ancho entran unas 4 filas a `type.eyebrow * 0.8`. Reusá las mismas piezas de la escena (copiá el `Window`/`Table` de la sección 6) para que se reconozca.
+- **dale una `thumbnail` a cada tema**: es la miniatura de su panel en el muro del cierre; sin ella el cierre muestra una tarjeta derivada del número y el nombre del tema (varía según el tema, pero es genérica). Va en la lista de escenas de `defineStory`: `{ id: "ventas", component: Ventas, durationInFrames: 150, thumbnail: MiniVentas }`. `MiniVentas` es un componente sin props que dibuja en un lienzo de **560×340** (coordenadas propias, `position: absolute` desde `(0, 0)`), con piezas del tema, no recibe props y, si lee `useFrame()`, obtiene el cuadro del cierre y no el de tu escena: dibujala quieta (sin `kf`): el recorte de la interfaz recreada en su momento más claro (un panel con 2 o 3 filas, una cifra y un gráfico chico). La letra de la miniatura es chica a propósito (el cierre la marca para `qa`); en 560 px de ancho entran unas 4 filas a `type.eyebrow * 0.8`. Reusá las mismas piezas de la escena (copiá el `Window`/`Table` de la sección 6) para que se reconozca.
 
 Probá cada escena sola (su propio `defineVideo`, como en `templates/scene/index.ts`) y recién después en la historia. `defineStory` publica por defecto solo el formato base: los formatos extra se piden con `formats: ["vertical"]` y cada escena de tema tiene que tener su disposición. El presupuesto de cuadros de la historia entera se ve con `npm run qa -- <id> --list-scenes`.
 
