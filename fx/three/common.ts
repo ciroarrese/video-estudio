@@ -69,6 +69,13 @@ export interface ThreeFx {
   duration: number;
   theme: Theme;
   pal: Palette;
+  /** Escala de trazos y puntos: crece con la caja (1,8 en una de 900 px) para que las líneas aguanten en video. */
+  k: number;
+}
+
+/** Escala de trazos para una caja: 1,8 a 900 px de lado menor, proporcional al resto. */
+export function strokeScale(width: number, height: number): number {
+  return (Math.min(width, height) / 900) * 1.8;
 }
 
 /** Resuelve cuadro, caja, duracion, tema y paleta de una pieza 3D. */
@@ -85,6 +92,7 @@ export function useThreeFx(p: ThreeProps, def: { width: number; height: number; 
     duration,
     theme,
     pal: palette(theme, p),
+    k: strokeScale(width, height),
   };
 }
 

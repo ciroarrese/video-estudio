@@ -15,7 +15,7 @@ export type TunnelProps = ThreeProps & {
 
 /** Vuelo por marcos de alambre que giran; cada N-ésimo en acento y más gruesos al acercarse. */
 export function Tunnel(p: TunnelProps) {
-  const { t, width, height, pal } = useThreeFx(p, { width: 1000, height: 700, duration: 75 });
+  const { t, width, height, pal, k } = useThreeFx(p, { width: 1000, height: 700, duration: 75 });
   const rings = p.rings ?? 15;
   const every = p.accentEvery ?? 4;
   const sides = p.sides ?? 4;
@@ -26,7 +26,7 @@ export function Tunnel(p: TunnelProps) {
       frame={p.frame}
       style={p.style}
       draw={(ctx) => {
-        const unit = Math.min(width, height) * 0.5;
+        const unit = Math.min(width, height) * 0.72;
         const D = 1; // distancia de referencia: escala = D / profundidad
         const gap = 0.6;
         const nearCut = 0.9;
@@ -58,7 +58,7 @@ export function Tunnel(p: TunnelProps) {
           const fadeOut = Math.min(1, Math.max(0, (depth - nearCut * 0.75) / (nearCut * 0.35))); // se va al pasar
           const a = Math.min(fadeIn, fadeOut);
           const sty = (d: number) => {
-            const s = lineByDepth(d, nearCut, far * 0.8, { minAlpha: 0.1, maxAlpha: 1, minWidth: 1, maxWidth: 9 });
+            const s = lineByDepth(d, nearCut, far * 0.8, { minAlpha: 0.1, maxAlpha: 1, minWidth: 1.2 * k, maxWidth: 9 * k });
             return { alpha: s.alpha * a, width: s.width };
           };
           // Relleno de fondo: lo de atrás queda tapado por el marco que pasa (con hueco: solo se trazan los bordes).
@@ -68,7 +68,7 @@ export function Tunnel(p: TunnelProps) {
           if (back && back.length === pts.length) {
             for (let s = 0; s < pts.length; s++) {
               const st = sty((back[s]!.depth + pts[s]!.depth) / 2);
-              seg(ctx, back[s]!.x, back[s]!.y, pts[s]!.x, pts[s]!.y, pal.line, st.alpha * 0.28, Math.max(0.8, st.width * 0.4));
+              seg(ctx, back[s]!.x, back[s]!.y, pts[s]!.x, pts[s]!.y, pal.line, st.alpha * 0.28, Math.max(0.8 * k, st.width * 0.4));
             }
           }
           prev.push(pts);

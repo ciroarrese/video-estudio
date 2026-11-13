@@ -1,3 +1,4 @@
+import React from "react";
 import { Easing, FrameCanvas, lerp, mix, progress, sub } from "../core";
 import { camera, lineByDepth, rotateXYZ } from "./math";
 import type { Vec3 } from "./math";

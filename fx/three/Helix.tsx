@@ -12,7 +12,7 @@ export type HelixProps = ThreeProps & {
 
 /** Doble hélice con peldaños; crece de abajo hacia arriba mientras gira. */
 export function Helix(p: HelixProps) {
-  const { t, width, height, pal } = useThreeFx(p, { width: 700, height: 900, duration: 75 });
+  const { t, width, height, pal, k } = useThreeFx(p, { width: 700, height: 900, duration: 75 });
   const steps = p.steps ?? 44;
   const turns = p.turns ?? 2.5;
   return (
@@ -22,7 +22,7 @@ export function Helix(p: HelixProps) {
       frame={p.frame}
       style={p.style}
       draw={(ctx) => {
-        const unit = Math.min(width * 0.5, height * 0.2);
+        const unit = Math.min(width * 0.46, height * 0.3);
         const H = 2.4; // alto total en unidades
         const R = 1;
         const grow = Easing.out(sub(t, 0, 0.7));
@@ -45,19 +45,19 @@ export function Helix(p: HelixProps) {
           const nextRise = i < steps ? Easing.out(sub(grow, ((i + 1) / steps) * 0.75, ((i + 1) / steps) * 0.75 + 0.25)) : 0;
           // Peldaño.
           const dr = (A.depth + B.depth) / 2;
-          const sr = lineByDepth(dr, near, far, { minAlpha: 0.15, maxAlpha: 0.7, minWidth: 1, maxWidth: 2.4 });
+          const sr = lineByDepth(dr, near, far, { minAlpha: 0.15, maxAlpha: 0.7, minWidth: 1 * k, maxWidth: 2.4 * k });
           prims.push({ depth: dr, draw: (c) => seg(c, A.x, A.y, B.x, B.y, pal.line, sr.alpha * rise, sr.width) });
           // Tramos de cada hebra.
           if (A1 && B1 && nextRise > 0) {
             for (const [P, Q, col, w] of [[A, A1, pal.accent, 1], [B, B1, pal.ink, 1]] as const) {
               const d = (P.depth + Q.depth) / 2;
-              const s = lineByDepth(d, near, far, { minAlpha: 0.2, maxAlpha: 1, minWidth: 2, maxWidth: 5.5 });
+              const s = lineByDepth(d, near, far, { minAlpha: 0.2, maxAlpha: 1, minWidth: 2 * k, maxWidth: 5.5 * k });
               prims.push({ depth: d, draw: (c) => seg(c, P.x, P.y, Q.x, Q.y, col, s.alpha * Math.min(rise, nextRise) * w, s.width) });
             }
           }
           // Esferas en los nudos.
           for (const [P, col] of [[A, pal.accent], [B, mix(pal.ink, pal.line, 0.2)]] as const) {
-            const s = lineByDepth(P.depth, near, far, { minAlpha: 0.3, maxAlpha: 1, minWidth: 3, maxWidth: 8 });
+            const s = lineByDepth(P.depth, near, far, { minAlpha: 0.3, maxAlpha: 1, minWidth: 3 * k, maxWidth: 8 * k });
             prims.push({ depth: P.depth - 0.01, draw: (c) => dot(c, P.x, P.y, s.width * rise, col, s.alpha) });
           }
         }

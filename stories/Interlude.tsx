@@ -5,6 +5,9 @@ import { listLayout } from "./layout";
 import { CheckMark, HeadlineRow, scaler, useEase } from "./shared";
 import type { StorySpec } from "./types";
 
+/** Opacidad de las filas ya vistas (el resto del texto atenuado llega al contraste mínimo con ella). */
+const QUIET_DONE = 0.75;
+
 export const INTERLUDE_FRAMES = 120;
 export const interludeFrames = (spec: StorySpec) => spec.timing?.interlude ?? INTERLUDE_FRAMES;
 
@@ -44,7 +47,8 @@ export function Interlude({ spec, done }: { spec: StorySpec; done: number }) {
             const justDone = i === done - 1;
             const isNext = i === next;
             const cp = justDone ? checkP : isDone ? 1 : 0;
-            const quiet = isDone ? 0.5 + (1 - cp) * 0.5 : 1;
+            // las ya vistas quedan más tenues que la próxima, pero con el contraste del texto atenuado por encima del mínimo del control de calidad
+            const quiet = isDone ? QUIET_DONE + (1 - cp) * (1 - QUIET_DONE) : 1;
             const rowIn = kf(f, [u(i * 3), u(i * 3 + 14)], [0, 1], ease.out);
             const pop = justDone ? kf(f, [T.check[1] - u(4), T.check[1] + u(2), T.check[1] + u(14)], [0, 1, 0]) : 0;
             const rowOpacity = rowIn * (isNext ? 1 : others) * (isNext ? 1 - kf(f, [T.fly[1] - u(16), T.fly[1] - u(10)], [0, 1]) : 1);

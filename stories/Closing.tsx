@@ -100,20 +100,22 @@ export function Closing({ spec, scenes }: { spec: StorySpec; scenes: TopicScene[
 
   return (
     <Stage frame={f}>
-      {/* muro: desenfocado hasta que llegan las píldoras */}
-      <div style={{ position: "absolute", inset: 0, zIndex: 0, opacity: wallIn * (0.55 + focus * 0.45), filter: blur > 0 ? `blur(${blur}px)` : undefined }}>
-        {inner.map((c, i) => chipFor(c, i, false))}
-        {outer.map((c, i) => chipFor(c, i, true))}
-        {slots.map((s, i) => {
-          if (flyOf(i) < 1) return null;
-          const g = kf(f, [flyStart(i) + u(40), flyStart(i) + u(48), flyStart(i) + u(90)], [0, 1, 0.3]);
-          return (
-            <div key={`p${i}`} style={{ position: "absolute", left: 0, top: 0, transformOrigin: "0 0", transform: rigTransform(s.x, s.y, 0, wallCam, WALL_P, cx, cy, ` scale(${WALL_PILL}) translate(-50%, -50%)`), zIndex: 10 }}>
-              <Pill index={i} name={spec.topics[i]!.name} glow={g} />
-            </div>
-          );
-        })}
-      </div>
+      {/* muro: desenfocado hasta que llegan las píldoras; con el lavado de la firma ya opaco se desmonta en vez de quedar debajo */}
+      {wash < 1 && (
+        <div style={{ position: "absolute", inset: 0, zIndex: 0, opacity: wallIn * (0.55 + focus * 0.45), filter: blur > 0 ? `blur(${blur}px)` : undefined }}>
+          {inner.map((c, i) => chipFor(c, i, false))}
+          {outer.map((c, i) => chipFor(c, i, true))}
+          {slots.map((s, i) => {
+            if (flyOf(i) < 1) return null;
+            const g = kf(f, [flyStart(i) + u(40), flyStart(i) + u(48), flyStart(i) + u(90)], [0, 1, 0.3]);
+            return (
+              <div key={`p${i}`} style={{ position: "absolute", left: 0, top: 0, transformOrigin: "0 0", transform: rigTransform(s.x, s.y, 0, wallCam, WALL_P, cx, cy, ` scale(${WALL_PILL}) translate(-50%, -50%)`), zIndex: 10 }}>
+                <Pill index={i} name={spec.topics[i]!.name} glow={g} />
+              </div>
+            );
+          })}
+        </div>
+      )}
 
       {/* paneles flotantes con su título: cada uno lleva su propia perspectiva y se ordena por profundidad */}
       {fold < 1 &&

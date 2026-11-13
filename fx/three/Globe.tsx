@@ -22,7 +22,7 @@ const ROUTES: [number, number][] = [[0, 1], [1, 2], [2, 3], [3, 4], [4, 5], [0, 
 
 /** Esfera de alambre con ciudades y rutas (círculos máximos) que se dibujan de a una. */
 export function Globe(p: GlobeProps) {
-  const { local, t, width, height, pal } = useThreeFx(p, { width: 900, height: 900, duration: 75 });
+  const { local, t, width, height, pal, k } = useThreeFx(p, { width: 900, height: 900, duration: 75 });
   const cities = p.cities ?? CITIES;
   const routes = p.routes ?? ROUTES;
   const centerLon = p.centerLon ?? -40;
@@ -33,7 +33,7 @@ export function Globe(p: GlobeProps) {
       frame={p.frame}
       style={p.style}
       draw={(ctx) => {
-        const R = Math.min(width, height) * 0.4;
+        const R = Math.min(width, height) * 0.42;
         const settle = lerp(0.88, 1, Easing.lands(progress(local, 0, 28)));
         // Giro lento: termina con `centerLon` al centro.
         const yaw = -((centerLon - 70 * (1 - t)) * Math.PI) / 180;
@@ -41,7 +41,7 @@ export function Globe(p: GlobeProps) {
         ctx.translate(width / 2, height / 2);
         ctx.lineCap = "round";
         const near = 2.4, far = 4.4;
-        const style = (d: number) => lineByDepth(d, near, far, { minAlpha: 0.1, maxAlpha: 0.85, minWidth: 0.8, maxWidth: 1.8 });
+        const style = (d: number) => lineByDepth(d, near, far, { minAlpha: 0.12, maxAlpha: 0.9, minWidth: 0.8 * k, maxWidth: 1.8 * k });
 
         // Lineas: latitudes y meridianos; primero las de atras, luego el disco que las tapa, luego las de frente.
         const lines: Vec3[][] = [];
@@ -63,7 +63,7 @@ export function Globe(p: GlobeProps) {
               const isFront = (a.z + b.z) / 2 >= 0;
               if (isFront !== front) continue;
               const st = style((a.depth + b.depth) / 2);
-              seg(ctx, a.x, a.y, b.x, b.y, pal.line, front ? st.alpha : st.alpha * 0.4, front ? st.width : 0.8);
+              seg(ctx, a.x, a.y, b.x, b.y, pal.line, front ? st.alpha : st.alpha * 0.4, front ? st.width : 0.8 * k);
             }
           }
         };
@@ -79,7 +79,7 @@ export function Globe(p: GlobeProps) {
         drawLines(true);
         ctx.globalAlpha = 0.9;
         ctx.strokeStyle = pal.ink;
-        ctx.lineWidth = 2;
+        ctx.lineWidth = 2 * k;
         ctx.beginPath();
         ctx.arc(0, 0, rr, 0, Math.PI * 2);
         ctx.stroke();
@@ -103,11 +103,11 @@ export function Globe(p: GlobeProps) {
             if (!visible(q0) || !visible(q1)) continue;
             const a0 = cam.project(q0), a1 = cam.project(q1);
             const st = style((a0.depth + a1.depth) / 2);
-            seg(ctx, a0.x, a0.y, a1.x, a1.y, pal.accent, 0.35 + 0.65 * depthFade((a0.depth + a1.depth) / 2, near, far), st.width + 1);
+            seg(ctx, a0.x, a0.y, a1.x, a1.y, pal.accent, 0.35 + 0.65 * depthFade((a0.depth + a1.depth) / 2, near, far), st.width + k);
           }
           if (k < 1 && upto >= 1) {
             const q = pts[upto]!;
-            if (visible(q)) { const s = cam.project(q); dot(ctx, s.x, s.y, 4 * s.scale, pal.accent); }
+            if (visible(q)) { const s = cam.project(q); dot(ctx, s.x, s.y, 4 * k * s.scale, pal.accent); }
           }
         });
 
@@ -119,8 +119,8 @@ export function Globe(p: GlobeProps) {
           const s = cam.project(q);
           const a = clamp(sub(t, 0.04 + i * 0.03, 0.2 + i * 0.03));
           if (a <= 0) return;
-          const r = 5 * s.scale * Easing.lands(a);
-          dot(ctx, s.x, s.y, r + 4 * s.scale, pal.accent, 0.25);
+          const r = 5 * k * s.scale * Easing.lands(a);
+          dot(ctx, s.x, s.y, r + 4 * k * s.scale, pal.accent, 0.25);
           dot(ctx, s.x, s.y, r, pal.ink);
         });
       }}

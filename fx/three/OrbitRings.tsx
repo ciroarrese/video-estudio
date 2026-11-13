@@ -11,7 +11,7 @@ export type OrbitRingsProps = ThreeProps & {
 
 /** Esfera central con anillos inclinados y satélites que los recorren; los anillos pasan por detrás y por delante. */
 export function OrbitRings(p: OrbitRingsProps) {
-  const { local, t, width, height, pal } = useThreeFx(p, { width: 900, height: 900, duration: 75 });
+  const { local, t, width, height, pal, k } = useThreeFx(p, { width: 900, height: 900, duration: 75 });
   const n = Math.max(1, Math.min(5, p.rings ?? 3));
   return (
     <FrameCanvas
@@ -20,7 +20,7 @@ export function OrbitRings(p: OrbitRingsProps) {
       frame={p.frame}
       style={p.style}
       draw={(ctx) => {
-        const unit = Math.min(width, height) * 0.2;
+        const unit = Math.min(width, height) * 0.26;
         const D = 7;
         const cam = camera({ distance: D, tilt: 0.45, yaw: lerp(-0.5, 0.35, Easing.out(t)), unit });
         ctx.translate(width / 2, height / 2);
@@ -54,13 +54,13 @@ export function OrbitRings(p: OrbitRingsProps) {
             if ((i / N) * Math.PI * 2 > sweep) break;
             const A = cam.project(pointAt((i / N) * Math.PI * 2)), B = cam.project(pointAt(((i + 1) / N) * Math.PI * 2));
             const d = (A.depth + B.depth) / 2;
-            const s = lineByDepth(d, near, far, { minAlpha: 0.12, maxAlpha: 0.9, minWidth: 1, maxWidth: 3 });
+            const s = lineByDepth(d, near, far, { minAlpha: 0.12, maxAlpha: 0.9, minWidth: 1 * k, maxWidth: 3 * k });
             prims.push({ depth: d, draw: (c) => seg(c, A.x, A.y, B.x, B.y, pal.line, s.alpha, s.width) });
           }
           // Satélite.
           const ang = k * 2.1 + t * Math.PI * 2 * (1 + k * 0.5);
           const S = cam.project(pointAt(ang));
-          const ss = lineByDepth(S.depth, near, far, { minAlpha: 0.5, maxAlpha: 1, minWidth: 5, maxWidth: 11 });
+          const ss = lineByDepth(S.depth, near, far, { minAlpha: 0.5, maxAlpha: 1, minWidth: 5 * k, maxWidth: 11 * k });
           prims.push({ depth: S.depth, draw: (c) => dot(c, S.x, S.y, ss.width * on, k % 2 ? pal.ink : pal.accent2, 1) });
         }
         flush(ctx, prims);

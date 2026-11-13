@@ -23,7 +23,7 @@ export function terrainHeight(x: number, z: number): number {
 
 /** Vuelo sin fin sobre un terreno de alambre; cada franja se rellena antes de trazarse. */
 export function TerrainMesh(p: TerrainMeshProps) {
-  const { t, width, height, pal } = useThreeFx(p, { width: 1100, height: 650, duration: 75 });
+  const { t, width, height, pal, k } = useThreeFx(p, { width: 1100, height: 650, duration: 75 });
   const rows = p.rows ?? 34;
   const cols = p.cols ?? 64;
   const relief = p.relief ?? 1;
@@ -71,7 +71,7 @@ export function TerrainMesh(p: TerrainMeshProps) {
         for (let r = rows - 1; r >= 0; r--) {
           const a = grid[r + 1]!, b = grid[r]!; // a = mas lejos, b = mas cerca
           const depth = (a[0]!.depth + b[0]!.depth) / 2;
-          const st = lineByDepth(depth, near, far, { minAlpha: 0, maxAlpha: 1, minWidth: 0.7, maxWidth: 2.6 });
+          const st = lineByDepth(depth, near, far, { minAlpha: 0, maxAlpha: 1, minWidth: 0.9 * k, maxWidth: 2.6 * k });
           ctx.beginPath();
           ctx.moveTo(a[0]!.x, a[0]!.y);
           for (let c = 1; c <= cols; c++) ctx.lineTo(a[c]!.x, a[c]!.y);
@@ -98,7 +98,7 @@ export function TerrainMesh(p: TerrainMeshProps) {
         // Linea del horizonte.
         ctx.strokeStyle = pal.ink;
         ctx.globalAlpha = 0.35;
-        ctx.lineWidth = 1;
+        ctx.lineWidth = k;
         ctx.beginPath();
         ctx.moveTo(-width / 2, grid[rows]![0]!.y);
         ctx.lineTo(width / 2, grid[rows]![0]!.y);

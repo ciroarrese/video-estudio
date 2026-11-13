@@ -12,7 +12,7 @@ const sq = (x0: number, z0: number, y = -0.5): Vec3[] => [
 
 /** Red de cubo en cruz que se pliega hasta cerrar; la tapa va al final. */
 export function CubeFold(p: CubeFoldProps) {
-  const { t, width, height, pal } = useThreeFx(p, { width: 900, height: 900, duration: 75 });
+  const { t, width, height, pal, k } = useThreeFx(p, { width: 900, height: 900, duration: 75 });
   const light = normalize(p.light ?? { x: -0.4, y: 1, z: 0.8 });
   return (
     <FrameCanvas
@@ -21,7 +21,7 @@ export function CubeFold(p: CubeFoldProps) {
       frame={p.frame}
       style={p.style}
       draw={(ctx) => {
-        const unit = Math.min(width, height) / lerp(4.4, 2.5, Easing.inOut(subT(t, 0.15, 1)));
+        const unit = Math.min(width, height) / lerp(3.8, 2.3, Easing.inOut(subT(t, 0.15, 1)));
         const a = Math.PI / 2;
         // Plegado: lados en secuencia corta, tapa al final.
         const eSide = (i: number) => Easing.inOut(subT(t, 0.1 + i * 0.07, 0.5 + i * 0.07));
@@ -51,7 +51,7 @@ export function CubeFold(p: CubeFoldProps) {
           const sgn = toEye.z - cam.view({ x: 0, y: 0, z: 0 }).z >= 0 ? 1 : -1; // papel de dos caras
           return { pts: f.w.map((v) => cam.project(v)), depth: cam.project(c).depth, color: shadeColor(f.base, shade(vscale(n, sgn), light, 0.3), pal) };
         });
-        for (const f of sortBackToFront(drawn, (q) => q.depth)) poly(ctx, f.pts, f.color, pal.bg, 2.5);
+        for (const f of sortBackToFront(drawn, (q) => q.depth)) poly(ctx, f.pts, f.color, pal.bg, 2.5 * k);
       }}
     />
   );

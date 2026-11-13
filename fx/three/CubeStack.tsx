@@ -25,7 +25,7 @@ const FACES: Vec3[][] = (() => {
 
 /** 27 cubos que llegan desde lejos y forman un cubo de 3x3x3, con sombreado plano. */
 export function CubeStack(p: CubeStackProps) {
-  const { t, width, height, pal } = useThreeFx(p, { width: 900, height: 900, duration: 75 });
+  const { t, width, height, pal, k } = useThreeFx(p, { width: 900, height: 900, duration: 75 });
   const seed = p.seed ?? "cubestack";
   const light = normalize(p.light ?? { x: -0.5, y: 0.9, z: 0.7 });
   return (
@@ -35,7 +35,7 @@ export function CubeStack(p: CubeStackProps) {
       frame={p.frame}
       style={p.style}
       draw={(ctx) => {
-        const unit = Math.min(width, height) / 5.2;
+        const unit = Math.min(width, height) / 4.5;
         const yaw = lerp(-1.0, 0.62, Easing.out(t));
         const cam = camera({ distance: 9, tilt: 0.5, yaw, unit });
         ctx.translate(width / 2, height / 2);
@@ -63,7 +63,7 @@ export function CubeStack(p: CubeStackProps) {
             faces.push({ pts: pr, depth: cam.project(center).depth, color: shadeColor(base, shade(n, light, 0.25), pal) });
           }
         }
-        for (const f of sortBackToFront(faces, (q) => q.depth)) poly(ctx, f.pts, f.color, pal.bg, 2);
+        for (const f of sortBackToFront(faces, (q) => q.depth)) poly(ctx, f.pts, f.color, pal.bg, 2 * k);
       }}
     />
   );

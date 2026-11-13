@@ -12,7 +12,7 @@ export type TorusWireProps = ThreeProps & {
 
 /** Toro de alambre: se dibuja alrededor y gira; las caras tapan lo de atrás. */
 export function TorusWire(p: TorusWireProps) {
-  const { t, width, height, pal } = useThreeFx(p, { width: 900, height: 900, duration: 75 });
+  const { t, width, height, pal, k } = useThreeFx(p, { width: 900, height: 900, duration: 75 });
   const minor = p.minor ?? 0.38;
   const [U, V] = p.segments ?? [40, 16];
   return (
@@ -22,7 +22,7 @@ export function TorusWire(p: TorusWireProps) {
       frame={p.frame}
       style={p.style}
       draw={(ctx) => {
-        const unit = Math.min(width, height) * 0.3;
+        const unit = Math.min(width, height) * 0.4;
         const cam = camera({ distance: 4.6, tilt: 0, yaw: 0, unit });
         const rx = lerp(1.1, 0.55, Easing.out(t)), ry = lerp(-1.4, 0.7, Easing.out(t));
         const reveal = Easing.inOut(sub(t, 0, 0.55));
@@ -40,9 +40,9 @@ export function TorusWire(p: TorusWireProps) {
         }
         const near = 3.2, far = 6;
         for (const q of sortBackToFront(quads, (z) => z.depth)) {
-          const st = lineByDepth(q.depth, near, far, { minAlpha: 0.12, maxAlpha: 0.95, minWidth: 0.8, maxWidth: 2 });
+          const st = lineByDepth(q.depth, near, far, { minAlpha: 0.12, maxAlpha: 0.95, minWidth: 0.8 * k, maxWidth: 2 * k });
           const acc = q.u % 10 === 0 || q.v === 3; // meridiano y anillo en acento
-          poly(ctx, q.pts, pal.bg, acc ? pal.accent : pal.line, acc ? st.width + 0.8 : st.width, acc ? Math.max(0.5, st.alpha) : st.alpha);
+          poly(ctx, q.pts, pal.bg, acc ? pal.accent : pal.line, acc ? st.width + 0.8 * k : st.width, acc ? Math.max(0.5, st.alpha) : st.alpha);
         }
       }}
     />
