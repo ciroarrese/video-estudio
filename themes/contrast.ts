@@ -42,32 +42,48 @@ export interface ContrastWarning {
   pair: string;
   ratio: number;
   required: number;
+  /** "error" si el contraste es gravemente bajo (< 3), si no "warning". */
+  severity: "warning" | "error";
   message: string;
 }
 
-/** Texto normal exige 4.5; tipografía grande (>=24px bold / 32px) exige 3. */
+/**
+ * Texto normal exige 4.5 (aviso); por debajo de 3 es error.
+ * Cubre texto/fondo, atenuado, onAccent/accent, acentos y colores de estado como texto
+ * sobre bg/surface/surfaceAlt (estado) y bg/surface (acentos), y la serie `chart` sobre surface (>= 3).
+ */
 export function checkTheme(theme: Theme): ContrastWarning[] {
   const out: ContrastWarning[] = [];
-  const check = (pair: string, fg: string, bg: string, required: number) => {
+  const check = (pair: string, fg: string, bg: string, required = 4.5) => {
     let ratio: number;
     try {
       ratio = contrastRatio(fg, bg);
     } catch {
-      out.push({ pair, ratio: 0, required, message: `${pair}: color inválido` });
+      out.push({ pair, ratio: 0, required, severity: "error", message: `${pair}: color inválido` });
       return;
     }
     if (ratio < required) {
+      const severity = ratio < 3 ? "error" : "warning";
       out.push({
         pair,
         ratio,
         required,
-        message: `${pair}: contraste ${ratio.toFixed(2)}:1, mínimo ${required}:1`,
+        severity,
+        message: `${pair}: contraste ${ratio.toFixed(2)}:1, mínimo ${required}:1 (${severity})`,
       });
     }
   };
   const c = theme.color;
-  check("text/bg", c.text, c.bg, 4.5);
-  check("textMuted/bg", c.textMuted, c.bg, 4.5);
-  check("onAccent/accent", c.onAccent, c.accent, 4.5);
+  check("text/bg", c.text, c.bg);
+  check("textMuted/bg", c.textMuted, c.bg);
+  check("onAccent/accent", c.onAccent, c.accent);
+  for (const role of ["accent", "accent2"] as const) {
+    check(`${role}/bg`, c[role], c.bg);
+    check(`${role}/surface`, c[role], c.surface);
+  }
+  for (const role of ["success", "warning", "danger"] as const) {
+    for (const bg of ["bg", "surface", "surfaceAlt"] as const) check(`${role}/${bg}`, c[role], c[bg]);
+  }
+  c.chart.forEach((col, i) => check(`chart[${i}]/surface`, col, c.surface, 3));
   return out;
 }

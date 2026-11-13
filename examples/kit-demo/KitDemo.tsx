@@ -33,8 +33,8 @@ const T = { flight: [150, 190] as [number, number], through: [240, 299] as [numb
 const KEYS: CameraKey[] = [
   { f: 0, x: 960, y: 540, scale: 1 },
   { f: 55, x: 960, y: 540, scale: 1 },
-  { f: 90, x: cardCenter(PICK).x, y: cardCenter(PICK).y, scale: 1.9 },
-  { f: 135, x: cardCenter(PICK).x, y: cardCenter(PICK).y, scale: 1.9 },
+  { f: 90, x: cardCenter(PICK).x, y: 370, scale: 1.8 },
+  { f: 135, x: cardCenter(PICK).x, y: 370, scale: 1.8 },
   { f: 165, x: 1100, y: 520, scale: 0.8 },
   { f: 200, x: COUNTER.x, y: 480, scale: 1.6 },
   { f: 300, x: COUNTER.x, y: 480, scale: 1.6 },
@@ -43,10 +43,10 @@ const KEYS: CameraKey[] = [
 const camera = (f: number) =>
   cameraAt(f, KEYS, { map: (fr, c) => zoomThrough(fr, T.through, c, COUNTER, 40), noBlurFrom: T.through[0] });
 
-function Panel({ x, y, w, h, title, children }: { x: number; y: number; w: number; h: number; title: string; children?: React.ReactNode }) {
+function Panel({ x, y, w, h, title, opacity = 1, children }: { x: number; y: number; w: number; h: number; title: string; opacity?: number; children?: React.ReactNode }) {
   const theme = useTheme();
   return (
-    <div style={{ position: "absolute", left: x, top: y, width: w, height: h, background: theme.color.surfaceAlt, border: `1px solid ${theme.color.border}`, borderRadius: theme.radius.lg, boxShadow: theme.shadow.lg }}>
+    <div style={{ position: "absolute", left: x, top: y, width: w, height: h, background: theme.color.surfaceAlt, border: `1px solid ${theme.color.border}`, borderRadius: theme.radius.lg, boxShadow: theme.shadow.lg, opacity }}>
       <div style={{ padding: "26px 40px", fontSize: theme.type.body, fontWeight: theme.font.weights.semibold, color: theme.color.text }}>{title}</div>
       {children}
     </div>
@@ -83,7 +83,7 @@ function Scene({ frame }: { frame: number }) {
     <Stage clouds={false}>
       <CloudBackground frame={frame} />
       <World camera={cam} width={width} height={height}>
-        <Panel {...A} title="Panel de ejemplo">
+        <Panel {...A} title="Panel de ejemplo" opacity={kf(frame, [148, 162, 192, 210], [1, 0.45, 0.45, 1])}>
           {[0, 1, 2].map((i) => {
             const p = cardPos(i);
             const a = kf(frame, [i * 6 - 14, i * 6 + 8], [0, 1]);
@@ -119,14 +119,16 @@ function Scene({ frame }: { frame: number }) {
           </div>
         </Panel>
 
-        {frame >= T.flight[0] && (
-          <FlyingCard frame={frame} range={T.flight} from={cardCenter(PICK)} to={LANDING} arc={-150} width={CARD.w} height={CARD.h}>
+        {frame >= T.flight[0] && frame < T.through[0] + 16 && (
+          <div style={{ opacity: kf(frame, [T.through[0], T.through[0] + 14], [1, 0]) }}>
+          <FlyingCard frame={frame} range={T.flight} from={cardCenter(PICK)} to={LANDING} arc={110} width={CARD.w} height={CARD.h}>
             <StatCard i={PICK} frame={frame} selected />
           </FlyingCard>
+          </div>
         )}
 
         <DoodleCircle frame={frame} start={96} end={140} id="kd-circle" cx={pos.x + 110} cy={pos.y + 112} rx={130} ry={46} />
-        <DoodleArrow frame={frame} start={152} end={196} id="kd-arrow" x1={pos.x + CARD.w - 40} y1={pos.y - 24} x2={B.x - 20} y2={LANDING.y - 70} bend={-0.3} />
+        <DoodleArrow frame={frame} start={152} end={196} id="kd-arrow" x1={pos.x + CARD.w - 40} y1={pos.y - 24} x2={B.x - 20} y2={LANDING.y - 70} bend={0.3} />
         <DoodleUnderline frame={frame} start={200} end={250} id="kd-under" x={COUNTER.x - 150} y={COUNTER.y + 100} length={300} />
         <Cursor frame={frame} show={[74, 146]} keys={[[74, 1000, 800], [122, cardCenter(PICK).x + 40, cardCenter(PICK).y + 40], [146, cardCenter(PICK).x + 80, cardCenter(PICK).y + 90]]} clicks={[124]} />
       </World>

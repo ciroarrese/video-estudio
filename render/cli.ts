@@ -19,10 +19,10 @@ async function main(): Promise<number> {
   const log = (m: string) => console.log(m);
   const base = {
     videoId: o.videoId, out: o.out, props: o.props, frames: o.frames, concurrency: o.concurrency, scale: o.scale,
-    crf: o.crf, segment: o.segment, audio: o.audio, cache: o.cache, keepFrames: o.keepFrames, frameFormat: o.frameFormat, jpegQuality: o.jpegQuality, assets: o.assets, log,
+    crf: o.crf, segment: o.segment, audio: o.audio, cache: o.cache, keepFrames: o.keepFrames, frameFormat: o.frameFormat, jpegQuality: o.jpegQuality, assets: o.assets, checkMaxDelta: o.checkMaxDelta, checkMaxRatio: o.checkMaxRatio, checkStrict: o.checkStrict, log,
   };
   try {
-    if (o.check) {
+    if (o.check || o.checkStrict) {
       const r = await checkVideo(base);
       console.log(r.ok ? 'check: OK (determinista)' : 'check: FALLO (no determinista)');
       return r.ok ? 0 : 1;

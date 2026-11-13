@@ -215,13 +215,16 @@ describe("FlyingCard trail", () => {
 
 describe("World", () => {
   const cam = (rx: number, ry: number) => ({ x: 0, y: 0, scale: 1, rx, ry, blur: 0 });
-  it("uses a plain 2D transform when there is no tilt, 3D otherwise", () => {
+  it("uses a plain 2D transform when there is no tilt, own perspective() otherwise", () => {
     const flat = html(<World camera={cam(0, 0)} width={100} height={100}>w</World>, neutral, 0);
     expect(flat).not.toContain("preserve-3d");
     expect(flat).not.toContain("perspective");
     expect(flat).not.toContain("rotate");
     const tilted = html(<World camera={cam(2, -1)} width={100} height={100}>w</World>, neutral, 0);
-    expect(tilted).toContain("preserve-3d");
     expect(tilted).toContain("rotateX(2deg)");
+    // perspectiva propia dentro del transform; nunca en un ancestro ni con preserve-3d
+    expect(tilted).toMatch(/transform:translate\(50px, 50px\) perspective\(2400px\) rotateX/);
+    expect(tilted).not.toContain("preserve-3d");
+    expect(tilted).not.toMatch(/(^|[ ;"])perspective:/);
   });
 });

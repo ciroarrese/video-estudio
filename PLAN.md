@@ -1,5 +1,16 @@
 # video-estudio: plan
 
+## Estado
+
+Etapa 1 (lo mínimo para rehacer un video) entregada, salvo lo que figura como pendiente.
+
+- Hecho: motor (`useFrame`, `interpolate` con curvas, `random(seed)`, `Series`/`Sequence`, audio, espera de recursos, `checkDeterminism`, `FrameCanvas`); render con Chromium y ffmpeg, en paralelo y por partes con caché; temas (neutro, oscuro, adaptador de tokens con informe y chequeo de contraste); kit base (cámara con cuadros clave, desenfoque e inclinación, cursor, garabatos, viñeta, titular que se aparta, vuelo de tarjetas, velo); historias (apertura, vuelta al listado y cierre desde un `StorySpec`, con profundidad por elemento); skill `video-estudio` con el cuestionario y las etapas con aprobación; `docs/reglas.md`, `docs/guia-escenas.md`, plantillas en `templates/` y `CLAUDE.md`.
+- Adelantado de la etapa 2: control de calidad (`ve-qa`, siete reglas), hoja de cuadros (`ve-sheet`) y chequeo de privacidad (`ve-privacy`).
+- Hecho de las etapas siguientes: **catálogo de efectos** en `fx/` (texto, 3D, datos, interfaz y arte, con tres galerías y `docs/animaciones.md`); **resortes y curva de aterrizaje** (`Easing.back`, `Easing.lands`); **trazados parciales** (dibujar y recorrer trazados: `LineDraw`, `FlowSteps`, `BlueprintDraw`, `LogoLand`, `MarkerDraw`); **piezas de interfaz** (notificaciones, chat, paleta de comandos, teléfono, antes/después, baldosas); medición de texto (`fitText`).
+- Pendiente de la etapa 1: la prueba de equivalencia cuadro a cuadro contra la misma escena en Remotion (no hay comparador contra Remotion; `render --check` solo compara el render consigo mismo); caché de render por escena (hoy cualquier cambio invalida todas las partes); registro de videos sin tocar `engine/runtime/videos.ts` a mano.
+- Pendiente de etapas siguientes: carpeta `audio/` (tempo, empalme al compás, efectos de sonido); formatos vertical y cuadrado; tema por escena; render de una escena suelta dentro de un video; subtítulos y vista previa interactiva.
+- Definido: licencia MIT; `videos/` queda fuera del repo. Falta el registro de videos sin tocar `engine/runtime/videos.ts`, para que un video propio no deje cambios locales en el motor.
+
 Herramienta propia para generar videos animados de nivel profesional a partir de un cuestionario, con el design system como variable. Nace de la experiencia de producir un video anterior, hecho a mano escena por escena.
 
 ## Principios

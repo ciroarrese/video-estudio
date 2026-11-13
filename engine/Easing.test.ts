@@ -36,3 +36,18 @@ describe('Easing', () => {
     expect(() => bezier(1.5, 0, 0.5, 1)).toThrow();
   });
 });
+
+describe('back / lands', () => {
+  it('overshoots 1 and settles', () => {
+    const b = Easing.back();
+    expect(b(0)).toBe(0);
+    expect(b(1)).toBe(1);
+    expect(Math.max(...Array.from({ length: 101 }, (_, i) => b(i / 100)))).toBeGreaterThan(1.05);
+    expect(Math.max(...Array.from({ length: 101 }, (_, i) => Easing.lands(i / 100)))).toBeGreaterThan(1.05);
+    expect(Easing.lands(1)).toBe(1);
+  });
+  it('keeps out and inOut unchanged', () => {
+    expect(Easing.out(0.2)).toBeGreaterThan(0.5);
+    expect(Easing.inOut(0.5)).toBeCloseTo(0.5, 5);
+  });
+});

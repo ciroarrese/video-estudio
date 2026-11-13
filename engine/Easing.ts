@@ -48,6 +48,20 @@ export function bezier(x1: number, y1: number, x2: number, y2: number): EasingFn
   };
 }
 
+/**
+ * Salida con sobrepaso ("back out"): pasa de 1 y vuelve a 1. `overshoot` ~ cuanto se pasa
+ * (1.56 sobrepasa cerca de un 10 %). Formula polinomica estandar; devuelve 0 en 0 y 1 en 1.
+ */
+export function back(overshoot = 1.56): EasingFn {
+  const c3 = overshoot + 1;
+  return (t: number) => {
+    if (t <= 0) return 0;
+    if (t >= 1) return 1;
+    const u = t - 1;
+    return 1 + c3 * u * u * u + overshoot * u * u;
+  };
+}
+
 export const Easing = {
   linear: ((t) => t) as EasingFn,
   in: ((t) => t * t * t) as EasingFn,
@@ -59,4 +73,8 @@ export const Easing = {
   out: bezier(0.16, 1, 0.3, 1),
   /** Named preset: bezier(0.65, 0, 0.35, 1) */
   inOut: bezier(0.65, 0, 0.35, 1),
+  /** Sobrepaso configurable: `Easing.back(1.56)`. */
+  back,
+  /** Named preset "aterriza": bezier(0.34, 1.56, 0.64, 1); pasa de 1 y se asienta. */
+  lands: bezier(0.34, 1.56, 0.64, 1),
 };

@@ -1,0 +1,75 @@
+import React from "react";
+import { Easing, lerp, progress } from "../core";
+import { camera, sortBackToFront } from "./math";
+import { useThreeFx } from "./common";
+import type { ThreeProps } from "./common";
+
+export type CarouselRingProps = ThreeProps & {
+  /** Tarjetas (cualquier contenido plano). Por defecto, `count` tarjetas de muestra. */
+  children?: React.ReactNode;
+  count?: number;
+  cardWidth?: number;
+  cardHeight?: number;
+};
+
+/** N tarjetas sobre un anillo que gira; las de atrás, más chicas y apagadas. La tarjeta 0 termina al frente. */
+export function CarouselRing(p: CarouselRingProps) {
+  const { local, t, width, height, theme, pal } = useThreeFx(p, { width: 1500, height: 760, duration: 75 });
+  const kids = React.Children.toArray(p.children);
+  const n = kids.length || (p.count ?? 6);
+  const cw = p.cardWidth ?? 300;
+  const ch = p.cardHeight ?? 400;
+  const R = 2.6, D = 8;
+  const unit = Math.min(width / 8.5, 190);
+  const cam = camera({ distance: D, tilt: 0.22, unit });
+  const rot = (1 - Easing.inOut(t)) * -Math.PI * 1.0;
+  const enter = (i: number) => progress(local, i * 3, 20, Easing.lands);
+  const cards = Array.from({ length: n }, (_, i) => {
+    const a = (i / n) * Math.PI * 2 + rot;
+    const pos = { x: Math.sin(a) * R, y: 0, z: Math.cos(a) * R };
+    const pr = cam.project(pos);
+    const front = (pos.z + R) / (2 * R); // 0 atrás, 1 al frente
+    return { i, pr, front };
+  });
+  return (
+    <div style={{ position: "relative", width, height, overflow: "hidden", ...p.style }}>
+      {sortBackToFront(cards, (c) => c.pr.depth).map((c, z) => {
+        const e = enter(c.i);
+        const s = c.pr.scale * lerp(0.6, 1, e);
+        return (
+          <div
+            key={c.i}
+            // Oclusión intencional: las tarjetas de atrás quedan tapadas por la de adelante
+            data-qa-ignore={c.front < 0.85 ? "covered" : undefined}
+            style={{
+              position: "absolute",
+              left: Math.round(width / 2 + c.pr.x - cw / 2),
+              top: Math.round(height / 2 + c.pr.y - ch / 2),
+              width: cw,
+              height: ch,
+              boxSizing: "border-box",
+              transform: `scale(${s})`,
+              transformOrigin: "50% 50%",
+              opacity: lerp(0.35, 1, Math.pow(c.front, 0.8)) * Math.min(1, e * 2),
+              zIndex: z,
+              background: c.front > 0.85 ? theme.color.surface : theme.color.surfaceAlt,
+              border: `2px solid ${c.front > 0.92 ? pal.accent : theme.color.border}`,
+              borderRadius: theme.radius.lg,
+              overflow: "hidden",
+              fontFamily: theme.font.family,
+            }}
+          >
+            {kids.length ? kids[c.i] : (
+              <div style={{ padding: 24, display: "flex", flexDirection: "column", gap: 12, height: "100%", boxSizing: "border-box", justifyContent: "flex-end" }}>
+                <div style={{ width: 52, height: 52, borderRadius: theme.radius.md, background: c.i % 2 ? pal.accent2 : pal.accent }} />
+                <div style={{ fontSize: theme.type.caption, fontWeight: theme.font.weights.semibold, color: pal.ink }}>{`Tarjeta ${c.i + 1}`}</div>
+                <div style={{ height: 8, borderRadius: 4, background: pal.line, opacity: 0.35 }} />
+                <div style={{ height: 8, width: "70%", borderRadius: 4, background: pal.line, opacity: 0.35 }} />
+              </div>
+            )}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
