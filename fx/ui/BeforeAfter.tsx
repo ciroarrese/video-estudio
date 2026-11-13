@@ -71,13 +71,14 @@ export function BeforeAfter(p: BeforeAfterProps) {
     <div style={{ position: "relative", width: w, height: h, overflow: "hidden", fontFamily: theme.font.family, border: `2px solid ${theme.color.border}`, borderRadius: theme.radius.lg, boxSizing: "border-box", ...p.style }}>
       <div style={{ position: "absolute", inset: 0 }}>{p.before ?? <Wireframe w={w} h={h} />}</div>
       <div style={{ position: "absolute", inset: 0, clipPath: `inset(0 ${wipeInset(pos)}% 0 0)` }}>{p.after ?? <Design w={w} h={h} />}</div>
-      {chip(p.afterLabel ?? "Después", true)}
-      {chip(p.beforeLabel ?? "Antes", false)}
       <div style={{ position: "absolute", left: hx - 2, top: 0, width: 4, height: h, background: theme.color.accent }} />
       <svg width={56} height={56} style={{ position: "absolute", left: hx - 28, top: h / 2 - 28 }} viewBox="0 0 56 56">
         <circle cx={28} cy={28} r={26} fill={theme.color.accent} stroke={theme.color.surface} strokeWidth={4} />
         <path d="M22 20 L14 28 L22 36 M34 20 L42 28 L34 36" fill="none" stroke={theme.color.onAccent} strokeWidth={4} strokeLinecap="round" strokeLinejoin="round" />
       </svg>
+      {/* Los rótulos van después de la manija: ella pasa por debajo y nunca tapa un texto. */}
+      {chip(p.afterLabel ?? "Después", true)}
+      {chip(p.beforeLabel ?? "Antes", false)}
     </div>
   );
 }

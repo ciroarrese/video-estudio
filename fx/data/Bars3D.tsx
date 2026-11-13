@@ -36,10 +36,12 @@ export function Bars3D(p: Bars3DProps) {
   const bw = 84, gap = 30, D = 100, Hmax = 250;
   const Lx = n * bw + (n - 1) * gap;
   const max = Math.max(...data, 1);
-  const spanX = (Lx + D) * C30, spanY = (Lx + D) * S30 + Hmax + 50;
-  const s = Math.min((w - 40) / spanX, (h - 40) / spanY);
+  // Rango vertical en coordenadas isométricas: arriba, la barra más alta más el rótulo de valor; abajo, la losa y los rótulos de eje.
+  const yMin = -Hmax - 64, yMax = (Lx + D + 60) * S30 + 16;
+  const spanX = (Lx + D) * C30, spanY = yMax - yMin;
+  const s = Math.min((w - 40) / spanX, (h - 24) / spanY);
   const ox = w / 2 - s * ((Lx - D) * C30) / 2;
-  const oy = h / 2 + s * (((Lx + D) * S30 - Hmax) / 2) - 8;
+  const oy = h / 2 - s * (yMin + yMax) / 2;
   const P = (q: Pt) => ({ x: ox + q.x * s, y: oy + q.y * s });
   const poly = (pts: Pt[]) => toPath(pts.map(P), true);
   const slab = [iso(-30, -30, 0), iso(Lx + 30, -30, 0), iso(Lx + 30, D + 30, 0), iso(-30, D + 30, 0)];

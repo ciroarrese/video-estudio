@@ -53,7 +53,7 @@ const entries: Entry[] = [
   { group: "art", name: "PaperCollage", w: 900, h: 560, render: (f, w, h) => <PaperCollage frame={f} width={w} height={h} duration={D} /> },
   { group: "art", name: "ShapeMorph", w: 520, h: 520, render: (f, w, h) => <ShapeMorph frame={f} width={w} height={h} duration={D} /> },
   {
-    group: "art", name: "DotWipe", w: 1920, h: 1080,
+    group: "art", name: "DotWipe", w: 1500, h: 700,
     render: (f, w, h) => <DotWipeDemo f={f} w={w} h={h} />,
   },
   { group: "art", name: "HalftoneWave", w: 900, h: 560, render: (f, w, h) => <HalftoneWave frame={f} width={w} height={h} duration={D} /> },
@@ -83,14 +83,14 @@ function Scene() {
   const idx = Math.min(entries.length - 1, Math.floor(frame / SEGMENT));
   const local = Math.min(frame - idx * SEGMENT, SEGMENT - 1);
   const e = entries[idx]!;
-  const scale = e.w >= 1920 || e.noScale ? 1 : Math.min(1.6, 1700 / e.w, 860 / e.h);
+  const scale = e.noScale ? 1 : Math.min(1.6, 1700 / e.w, 860 / e.h);
   return (
     <Stage clouds={false}>
       <div style={{ position: "absolute", left: 90, top: 40, display: "flex", alignItems: "baseline", gap: 18 }}>
         <span style={{ fontSize: theme.type.h2, fontWeight: theme.font.weights.semibold, color: theme.color.text }}>{e.name}</span>
         <span style={{ fontSize: theme.type.caption, color: theme.color.textMuted }}>{`fx/${e.group} · ${idx + 1}/${entries.length}`}</span>
       </div>
-      <div style={{ position: "absolute", left: e.w >= 1920 ? 0 : 960 - (e.w * scale) / 2, top: e.w >= 1920 ? 0 : 590 - (e.h * scale) / 2, width: e.w, height: e.h, transform: `scale(${scale})`, transformOrigin: "0 0" }}>
+      <div style={{ position: "absolute", left: 960 - (e.w * scale) / 2, top: 590 - (e.h * scale) / 2, width: e.w, height: e.h, transform: `scale(${scale})`, transformOrigin: "0 0" }}>
         {e.render(local, e.w, e.h)}
       </div>
     </Stage>

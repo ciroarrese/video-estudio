@@ -50,14 +50,18 @@ export function PaperCollage(p: PaperCollageProps) {
       {strips.map((s, i) => {
         const e = Easing.lands(staggerT(t, i, n, 0.6));
         if (e <= 0) return null;
-        const from = { left: [-w, 0], right: [w, 0], top: [0, -h], bottom: [0, h] }[s.from];
+        // La tira viaja solo hasta donde cabe dentro del cuadro (con margen por el giro) y aparece con un fundido: nunca queda cortada por el borde.
+        const m = 28;
+        const room = { left: s.x - m, right: w - (s.x + s.w) - m, top: s.y - m, bottom: h - (s.y + s.h) - m }[s.from];
+        const d = Math.max(0, room);
+        const from = { left: [-d, 0], right: [d, 0], top: [0, -d], bottom: [0, d] }[s.from];
         const dx = from[0]! * (1 - e), dy = from[1]! * (1 - e);
         const rot = s.rot + (1 - e) * (i % 2 === 0 ? -22 : 22);
         const poly = toPath(tornStrip(s.w, s.h, `${seed}:${i}`), true);
         const col = paper[i % paper.length]!;
         const cx = s.x + s.w / 2, cy = s.y + s.h / 2;
         return (
-          <g key={i} transform={`translate(${(cx + dx).toFixed(2)} ${(cy + dy).toFixed(2)}) rotate(${rot.toFixed(3)}) translate(${-s.w / 2} ${-s.h / 2})`}>
+          <g key={i} opacity={Math.min(1, e * 2.5)} transform={`translate(${(cx + dx).toFixed(2)} ${(cy + dy).toFixed(2)}) rotate(${rot.toFixed(3)}) translate(${-s.w / 2} ${-s.h / 2})`}>
             <path d={poly} transform="translate(5 7)" fill={withAlpha(theme.color.text, 0.16)} />
             <path d={poly} fill={col.fill} stroke={theme.color.border} strokeWidth={1.5} />
             <text x={s.w / 2} y={s.h / 2 + fs * 0.33} textAnchor="middle" fontSize={fs} fontWeight={theme.font.weights.semibold} fill={col.ink}>{s.text}</text>
