@@ -51,7 +51,7 @@ export function LiquidBlob(p: LiquidBlobProps) {
         const i = (y * gw + x) * 4;
         const a = Math.min(1, Math.max(0, (f - 1) / 0.12));
         const m = f > 0 ? fb / f : 0;
-        const shade = 1 - Math.min(0.25, Math.max(0, (f - 1) * 0.08));
+        const shade = 1 - Math.min(0.08, Math.max(0, (f - 1) * 0.03));
         img.data[i] = (A.r + (B.r - A.r) * m) * shade;
         img.data[i + 1] = (A.g + (B.g - A.g) * m) * shade;
         img.data[i + 2] = (A.b + (B.b - A.b) * m) * shade;

@@ -6,3 +6,4 @@ import '../../examples/story-demo';
 import '../../examples/qa-defects';
 import '../../examples/fx-text';
 import '../../examples/fx-3d';
+import '../../examples/fx-data-ui-art';

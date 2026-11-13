@@ -37,7 +37,7 @@ export function DotWipe(p: DotWipeProps) {
   const t = progress(local, 0, dur);
   const f = wipeFraction(mode, t);
   // el segundo disco llega un poco atras: se ve un borde de color
-  const f2 = wipeFraction(mode, Math.max(0, mode === "out" ? t + 0.08 : t - 0.08));
+  const f2 = Math.max(0, f - 0.06);
   return (
     <svg width={w} height={h} viewBox={`0 0 ${w} ${h}`} style={{ display: "block", ...p.style }}>
       {f > 0.001 && <circle cx={x} cy={y} r={f * R} fill={roleColor(theme, p.edge ?? "accent2")} />}

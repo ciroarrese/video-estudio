@@ -73,7 +73,7 @@ export function MaskedRise(props: MaskedRiseProps) {
                   <span
                     style={{
                       display: "inline-block",
-                      transform: p >= 1 ? undefined : `translateY(${((1 - p) * 118).toFixed(3)}%) scale(${(1 + 0.08 * (1 - p)).toFixed(4)})`,
+                      transform: p >= 1 ? undefined : `translateY(${Math.round((1 - p) * fs * 1.36)}px)`,
                       transformOrigin: "0% 100%",
                     }}
                   >

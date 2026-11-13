@@ -21,7 +21,7 @@ export type LineDrawProps = FxProps & {
 const DEFAULT = [12, 18, 15, 26, 22, 34, 31, 46, 52, 64];
 
 /** Geometria pura del grafico: puntos de la curva (ya muestreada) y tick del eje. */
-export function lineLayout(data: number[], w: number, h: number, pad = { l: 78, r: 40, t: 90, b: 64 }) {
+export function lineLayout(data: number[], w: number, h: number, pad = { l: 78, r: 40, t: 130, b: 64 }) {
   const { max, ticks } = niceTicks(Math.max(...data, 1), 4);
   const x0 = pad.l, x1 = w - pad.r, y0 = h - pad.b, y1 = pad.t;
   const pts: Pt[] = data.map((v, i) => ({ x: x0 + ((x1 - x0) * i) / Math.max(1, data.length - 1), y: y0 - ((y0 - y1) * v) / max }));

@@ -52,7 +52,7 @@ export function DigitRoll(props: DigitRollProps) {
         data-qa-ignore="clip overlap covered"
         style={{ display: "inline-block", position: "relative", width: slotW, height: lineH, overflow: "hidden", opacity: shown ? 1 : 0 }}
       >
-        <span style={{ position: "absolute", left: 0, top: 0, width: slotW, transform: `translateY(${(-pos * lineH).toFixed(2)}px)` }}>
+        <span style={{ position: "absolute", left: 0, top: 0, width: slotW, transform: `translateY(${Math.round(-pos * lineH)}px)` }}>
           {Array.from({ length: 11 }, (_, d) => (
             <span key={d} style={{ display: "block", height: lineH, lineHeight: `${lineH}px`, textAlign: "center" }}>
               {d % 10}

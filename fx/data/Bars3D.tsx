@@ -33,7 +33,7 @@ export function Bars3D(p: Bars3DProps) {
   const dur = p.duration ?? 65;
   const fmt = p.format ?? fmtInt;
   const n = data.length;
-  const bw = 60, gap = 26, D = 70, Hmax = 250;
+  const bw = 64, gap = 44, D = 64, Hmax = 170;
   const Lx = n * bw + (n - 1) * gap;
   const max = Math.max(...data, 1);
   const spanX = (Lx + D) * C30, spanY = (Lx + D) * S30 + Hmax + 50;

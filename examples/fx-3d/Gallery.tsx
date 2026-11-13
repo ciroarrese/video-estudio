@@ -22,7 +22,7 @@ const ITEMS: { name: string; render: () => React.ReactNode }[] = [
   { name: "CubeStack", render: () => <CubeStack width={H} height={H} /> },
   { name: "CubeFold", render: () => <CubeFold width={H} height={H} /> },
   { name: "Tunnel", render: () => <Tunnel width={W} height={H} /> },
-  { name: "TerrainMesh", render: () => <TerrainMesh width={W} height={H} /> },
+  { name: "TerrainMesh", render: () => <TerrainMesh width={1920} height={H} /> },
   { name: "TorusWire", render: () => <TorusWire width={H} height={H} /> },
   { name: "Helix", render: () => <Helix width={H} height={H} /> },
   { name: "OrbitRings", render: () => <OrbitRings width={H} height={H} /> },
