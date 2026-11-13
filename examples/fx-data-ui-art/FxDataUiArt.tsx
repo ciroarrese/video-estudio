@@ -1,6 +1,6 @@
 import React from "react";
 import { useFrame } from "../../engine";
-import { ThemeProvider, dark, neutral, useTheme } from "../../themes";
+import { ThemeProvider, dark, editorial, neon, neutral, papel, useTheme } from "../../themes";
 import type { Theme } from "../../themes";
 import { Cursor, Stage } from "../../kit";
 import { BarsGrow, Bars3D, DonutRing, FlowSteps, LineDraw, RadarMorph } from "../../fx/data";
@@ -8,8 +8,8 @@ import { BeforeAfter, CardFan, ChatThread, CommandPalette, NotificationStack, Ph
 import { wipeFraction } from "../../fx/art";
 import { BlueprintDraw, DotWipe, HalftoneWave, LiquidBlob, LogoLand, MarkerDraw, PaperCollage, PixelBuild, RibbonTwist, SealSpin, ShapeMorph } from "../../fx/art";
 
-/** `theme`: "neutral" | "dark" (por defecto neutral); tambien acepta un objeto Theme (para pruebas). */
-export type FxDataUiArtProps = { theme?: "neutral" | "dark" | Theme };
+/** `theme`: "neutral" | "dark" | "editorial" | "neon" | "papel" (por defecto neutral); tambien acepta un objeto Theme (para pruebas). */
+export type FxDataUiArtProps = { theme?: "neutral" | "dark" | "editorial" | "neon" | "papel" | Theme };
 
 export const SEGMENT = 90;
 export const ANIM = 75;
@@ -97,9 +97,12 @@ function Scene() {
   );
 }
 
+/** Los temas con nombre: dos neutros y los tres design systems de ejemplo (`--props '{"theme":"neon"}'`). */
+const THEMES: Record<string, Theme> = { neutral, dark, editorial, neon, papel };
+
 export function FxDataUiArt({ theme = "neutral" }: FxDataUiArtProps) {
   return (
-    <ThemeProvider theme={typeof theme === "object" ? theme : theme === "dark" ? dark : neutral}>
+    <ThemeProvider theme={typeof theme === "object" ? theme : THEMES[theme] ?? neutral}>
       <Scene />
     </ThemeProvider>
   );

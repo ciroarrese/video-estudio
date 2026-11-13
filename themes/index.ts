@@ -11,6 +11,7 @@ export * from "./styleTypes";
 export { STYLE_FIELDS, DEFAULT_STYLE, resolveStyle, resolveStyleInput, styleIssues, styleTokenName, parseStyleValue, mergeStyleInput } from "./style";
 export type { StyleFieldSpec, StyleIssue } from "./style";
 export * from "./styleHelpers";
+export * from "./styleLine";
 export { editorial } from "./editorial";
 export { neon } from "./neon";
 export { papel } from "./papel";

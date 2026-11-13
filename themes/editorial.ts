@@ -52,6 +52,10 @@ export const editorial: ResolvedTheme = deepFreeze(resolveTheme({
       titleCard: "solid", listLayout: "inline", listUnderline: "name", handoff: "dock", headlineSize: "sm", closingBg: "surface", signoffBar: false,
       wallColumns: 5, wallRows: 6, wallChipScale: 0.9, wallDolly: 0, wallDepth: 0.5, wallBlurOpening: true, wallBlurClosing: false,
     },
+    line: { weight: "hairline", dash: "solid", cap: "square", glow: 0, dotShape: "square", accentUse: "sparse", sketch: 0 },
+    solid: { fill: "outline", contrast: 1, edge: "gap" },
+    depth: { extrude: "outline-stack", fog: false },
+    text: { arrival: "fade", caret: "underscore", tile: "outline", charset: "caps", decoration: "underline" },
     chart: { barRadius: "none", lineWidth: 3, grid: "on", fill: "hatched" },
   },
 }));

@@ -1,6 +1,6 @@
 import React from "react";
 import { Audio, Fill, Sequence } from "../engine";
-import { StoryStage } from "./shared";
+import { StoryStage, useStorySpec } from "./shared";
 import { Closing, closingFrames } from "./Closing";
 import { Interlude, interludeFrames, nextTopic } from "./Interlude";
 import { InterludeCompact, interludeCompactFrames } from "./InterludeCompact";
@@ -80,11 +80,13 @@ export function composeStory(
   push("closing", "closing", closingFrames(spec));
 
   const Story: React.FC = () => {
+    // diseño del video sobre el del design system: acople, nubes y titular de las escenas salen de acá (los bloques lo mezclan por su cuenta)
+    const rs = useStorySpec(spec);
     return (
       <Fill>
         {timeline.map((e, k) => {
           let body: React.ReactNode;
-          if (e.kind === "opening") body = <Opening spec={spec} first={Math.max(0, first)} dock={first >= 0 && spec.design?.handoff === "dock"} through={first >= 0 && spec.design?.handoff === "through"} />;
+          if (e.kind === "opening") body = <Opening spec={spec} first={Math.max(0, first)} dock={first >= 0 && rs.design?.handoff === "dock"} through={first >= 0 && rs.design?.handoff === "through"} />;
           else if (e.kind === "closing") body = <Closing spec={spec} scenes={scenes} />;
           else if (e.kind === "interlude") {
             const done = topicOf[k]!;
@@ -96,8 +98,8 @@ export function composeStory(
             const t = spec.topics[topic]!;
             const Scene = scenes[topic]!.component;
             body = (
-              <TopicContext.Provider value={{ index: topic, name: t.name, line: t.line, docked: topic === first && spec.design?.handoff === "dock", headline: headlineDefaults(spec) }}>
-                <StoryStage cloud={spec.design?.clouds}>
+              <TopicContext.Provider value={{ index: topic, name: t.name, line: t.line, docked: topic === first && rs.design?.handoff === "dock", headline: headlineDefaults(rs) }}>
+                <StoryStage cloud={rs.design?.clouds}>
                   <Scene />
                 </StoryStage>
               </TopicContext.Provider>

@@ -59,7 +59,7 @@ function Panel({ x, y, w, h, title, opacity = 1, children }: { x: number; y: num
   const s = surfaceStyle(theme, "panel", { level: "lg" });
   const fill = s.background === theme.color.surface ? theme.color.surfaceAlt : s.background;
   return (
-    <div key={opacity === 1 ? "rest" : "anim"} data-qa-ignore={opacity === 1 ? undefined : "contrast"} /* el panel se atenúa a propósito mientras vuela la tarjeta: es un foco, no texto para leer */ style={{ position: "absolute", left: x, top: y, width: w, height: h, background: fill, border: s.border, borderRadius: s.borderRadius, boxShadow: s.boxShadow, opacity: opacity === 1 ? undefined : opacity }}>
+    <div key={opacity === 1 ? "rest" : "anim"} data-qa-ignore={opacity === 1 ? undefined : "contrast"} /* el panel se atenúa a propósito mientras vuela la tarjeta: es un foco, no texto para leer; `opacity` se emite siempre, como antes, para que el aspecto por defecto sea idéntico al píxel */ style={{ position: "absolute", left: x, top: y, width: w, height: h, background: fill, border: s.border, borderRadius: s.borderRadius, boxShadow: s.boxShadow, opacity }}>
       <div style={{ padding: "26px 40px", fontSize: theme.type.body, ...textStyle(theme, "title"), color: theme.color.text }}>{title}</div>
       {children}
     </div>

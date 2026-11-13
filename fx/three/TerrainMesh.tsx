@@ -1,5 +1,5 @@
 import { FrameCanvas, clamp, lerp, mix } from "../core";
-import { camera, lineByDepth } from "./math";
+import { camera } from "./math";
 import { useThreeFx } from "./common";
 import type { ThreeProps } from "./common";
 
@@ -23,7 +23,7 @@ export function terrainHeight(x: number, z: number): number {
 
 /** Vuelo sin fin sobre un terreno de alambre; cada franja se rellena antes de trazarse. */
 export function TerrainMesh(p: TerrainMeshProps) {
-  const { t, width, height, pal, k } = useThreeFx(p, { width: 1100, height: 650, duration: 75 });
+  const { t, width, height, pal, k, pen } = useThreeFx(p, { width: 1100, height: 650, duration: 75 });
   const rows = p.rows ?? 34;
   const cols = p.cols ?? 64;
   const relief = p.relief ?? 1;
@@ -45,14 +45,8 @@ export function TerrainMesh(p: TerrainMeshProps) {
         // Horizonte: disco en acento detras del terreno.
         const hz = cam.project({ x: 0, y: groundY, z: zFar });
         const sunR = height * 0.17;
-        ctx.fillStyle = pal.accent;
-        ctx.globalAlpha = 0.95;
-        ctx.beginPath();
-        ctx.arc(0, hz.y - sunR * 0.55, sunR, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.globalAlpha = 1;
-        ctx.lineJoin = "round";
-        ctx.lineCap = "round";
+        pen.disc(ctx, 0, hz.y - sunR * 0.55, sunR, pal.accent, 0.95);
+        pen.caps(ctx, { cap: true, join: true });
         // Vertices por fila (fila 0 = la mas cercana).
         const grid: { x: number; y: number; h: number; depth: number }[][] = [];
         for (let r = 0; r <= rows; r++) {
@@ -71,7 +65,7 @@ export function TerrainMesh(p: TerrainMeshProps) {
         for (let r = rows - 1; r >= 0; r--) {
           const a = grid[r + 1]!, b = grid[r]!; // a = mas lejos, b = mas cerca
           const depth = (a[0]!.depth + b[0]!.depth) / 2;
-          const st = lineByDepth(depth, near, far, { minAlpha: 0, maxAlpha: 1, minWidth: 0.9 * k, maxWidth: 2.6 * k });
+          const st = pen.byDepth(depth, near, far, { minAlpha: 0, maxAlpha: 1, minWidth: 0.9 * k, maxWidth: 2.6 * k });
           ctx.beginPath();
           ctx.moveTo(a[0]!.x, a[0]!.y);
           for (let c = 1; c <= cols; c++) ctx.lineTo(a[c]!.x, a[c]!.y);
@@ -81,10 +75,12 @@ export function TerrainMesh(p: TerrainMeshProps) {
           ctx.fill();
           let hs = 0;
           for (let c = 0; c <= cols; c++) hs += b[c]!.h;
-          const col = mix(pal.line, pal.accent, clamp((hs / (cols + 1)) / 0.9));
+          const col = mix(pen.quiet(pal.line), pen.soft === pal.accent ? pal.accent : pal.ink, clamp((hs / (cols + 1)) / 0.9));
           ctx.strokeStyle = col;
-          ctx.lineWidth = st.width;
+          ctx.lineWidth = st.width * pen.w;
           ctx.globalAlpha = st.alpha * (r === rows - 1 ? 0.5 : 1);
+          const dash = pen.dashFor(st.width * pen.w);
+          if (dash) ctx.setLineDash(dash);
           ctx.beginPath();
           ctx.moveTo(b[0]!.x, b[0]!.y);
           for (let c = 1; c <= cols; c++) ctx.lineTo(b[c]!.x, b[c]!.y);
@@ -92,13 +88,23 @@ export function TerrainMesh(p: TerrainMeshProps) {
             ctx.moveTo(a[c]!.x, a[c]!.y);
             ctx.lineTo(b[c]!.x, b[c]!.y);
           }
+          if (pen.glow > 0) {
+            // Halo: la misma trama en una pasada más ancha y tenue (sin shadowBlur).
+            const a0 = ctx.globalAlpha;
+            ctx.globalAlpha = a0 * 0.16 * pen.glow;
+            ctx.lineWidth = st.width * pen.w * 3.2;
+            ctx.stroke();
+            ctx.globalAlpha = a0;
+            ctx.lineWidth = st.width * pen.w;
+          }
           ctx.stroke();
+          if (dash) ctx.setLineDash([]);
           ctx.globalAlpha = 1;
         }
         // Linea del horizonte.
         ctx.strokeStyle = pal.ink;
         ctx.globalAlpha = 0.35;
-        ctx.lineWidth = k;
+        ctx.lineWidth = k * pen.w;
         ctx.beginPath();
         ctx.moveTo(-width / 2, grid[rows]![0]!.y);
         ctx.lineTo(width / 2, grid[rows]![0]!.y);

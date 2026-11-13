@@ -6,14 +6,33 @@ Kit de movimiento reutilizable sobre `engine/` y `themes/`. Todo sale de `kit/in
 
 Cada pieza es una función pura del cuadro (de `useFrame()` o de una prop `frame` explícita) y del tema (`useTheme()`). La lista completa está en `docs/reglas.md` ("Lista única de determinismo"): nada de estado que acumule, temporizadores, animaciones CSS, `useId` ni `Math.random` (se usa `random(seed)` del motor). Colores, tipografías, radios, sombras y curvas salen del tema: ninguna pieza trae valores de marca. `__ve.checkDeterminism` debe dar `ok` en las escenas que las usan.
 
+## Estilo del design system (`theme.style`)
+
+Las piezas con forma, superficie, texto, fondo o movimiento leen `theme.style` por las ayudas de `themes/` (`surfaceStyle`, `cornerRadius`, `textStyle`, `numeralStyle`, `highlightStyle`, `entrance`, `transitionVeil`, `backgroundLayer`, `doodleStyle`, `vignetteStrength`). Con el estilo por defecto (`neutral`, `dark`) el marcado y los píxeles son los de antes; con `editorial`, `neon` y `papel` se ven distintas (`examples/kit-demo`, `{"theme":"neon"}`). Ninguna pieza compara cadenas del estilo.
+
+| Pieza | Qué toma del estilo |
+|---|---|
+| `Stage` | `background.kind` (nubes, liso, grilla, puntos, degradado, grano) e `intensity`; las nubes solo con `kind: clouds` o si la escena pasa `cloud` |
+| `CloudBackground` | opacidad por defecto = `theme.cloud.opacity * background.intensity` |
+| `DockedHeadline` | `surfaceStyle("headline")`, `textStyle("title")` y `("eyebrow")`, número por `Numeral`, `entrance(native: slide, 30 px)`; el tamaño exterior no cambia con el borde |
+| `GradientText` | `decor.gradientLoop` cuando no recibe `loop` ni `pan` |
+| `Numeral`, `Highlight` | `type.numerals` y `type.highlight` (con `decor.gradientLoop`) |
+| `Eyebrow` | `type.eyebrowCase` y `eyebrowTracking` |
+| `Wash` | `motion.transition`: `wash`, `wipe` (cortina), `cut` (escalón) o `through` (sin velo); conserva `data-qa-veil` |
+| `Vignette` | `strength * decor.vignette` |
+| `DoodleCircle/Arrow/Underline` | `decor.doodles: false` no dibuja; `doodleStroke: geometric` = trazo sin temblor (elipse cerrada, raya recta, remates rectos) |
+| `useCameraAt` | `cameraAt` con `cameraOptions(theme)` por defecto (`cameraBlur`, `cameraTilt`); lo explícito en `opts` gana |
+
+Sin cambios (no tienen forma ni superficie): `Cursor`, `FlyingCard` (dibuja lo que le pasan los hijos), `World`, `CountUp` (es una métrica: no sigue `numerals`) y `camera.ts` (función pura sin tema; para el estilo, `useCameraAt` o `cameraOptions(theme)` esparcido en las opciones).
+
 ## Piezas
 
 - **Ayudas**: `kf(frame, claves, valores, easing?)` cuadros clave; `track(frame, [[f, x, y], ...])` trayectos 2D; `typed(texto, frame, inicio, cps)` texto que se escribe.
-- **Cámara**: `cameraAt(frame, claves, opts?)` devuelve `{x, y, scale, rx, ry, blur}` con inclinación y desenfoque según la velocidad (cámara quieta = sin inclinación ni desenfoque; topes configurables). `<World camera width height>` aplica la transformación y el desenfoque a sus hijos (coordenadas del mundo). `zoomThrough(frame, [ini, fin], cam, objetivo, power?)` convierte la cámara en un atravesado de un punto (se pasa por `opts.map`). `<Wash frame range color?>` velo de cierre de escena.
+- **Cámara**: `cameraAt(frame, claves, opts?)` devuelve `{x, y, scale, rx, ry, blur}` con inclinación y desenfoque según la velocidad (cámara quieta = sin inclinación ni desenfoque; topes configurables). `<World camera width height>` aplica la transformación y el desenfoque a sus hijos (coordenadas del mundo). `zoomThrough(frame, [ini, fin], cam, objetivo, power?)` convierte la cámara en un atravesado de un punto (se pasa por `opts.map`). `<Wash frame range color?>` velo de cierre de escena; `useCameraAt(frame, claves, opts?)` es `cameraAt` con los valores del estilo.
 - **Cursor y viñeta**: `<Cursor frame keys clicks show>` con onda de clic en el acento; `<Vignette amount color? strength?>` (acento por defecto; `color` es un rol del tema o `data.<nombre>`).
 - **Profundidad**: `flyInZ(progress, { from, perspective, x, y, rotateX, rotateY, fade })` devuelve el `style` de una entrada en profundidad para un elemento (ver abajo).
 - **Garabatos** (trazo a mano que "hierve": el temblor se vuelve a sortear cada `boil` cuadros, 3 por defecto): `<DoodleCircle>`, `<DoodleArrow>`, `<DoodleUnderline>`; se dibujan y se desvanecen por cuadro; el trazo usa acento → acento 2 del tema. Cada uno necesita un `id` único.
-- **Texto y fondo**: `<GradientText>` (degradado del tema, `pan` o `loop` opcionales), `<CloudBackground>` (manchas de `theme.cloud`, con `colors`, `count`, `seed`, `blobs`, `opacity` y `blur` para pisarlas), `<CountUp from to start duration format?>`.
+- **Texto y fondo**: `<Eyebrow>`, `<Numeral>`, `<Highlight>` (rótulo, número de paso y palabra resaltada según el estilo), `<GradientText>` (degradado del tema, `pan` o `loop` opcionales), `<CloudBackground>` (manchas de `theme.cloud`, con `colors`, `count`, `seed`, `blobs`, `opacity` y `blur` para pisarlas), `<CountUp from to start duration format?>`.
 - **Titular**: `<DockedHeadline index title subtitle frame start hide layout>` y `hideFromScale(scale, umbral?, rango?)` para que se aparte cuando la cámara se acerca.
 - **Vuelo**: `flight(frame, [ini, fin], from, to, {arc})` y `<FlyingCard>` (arco y estela).
 - **Tema por ámbito**: `<ThemeScope theme paint? style?>` cambia el tema de un subárbol (se anida); con `paint` pinta fondo, texto y tipografía del tema; declara el `@font-face` de sus fuentes y espera su carga. Ver `themes/README.md`.
@@ -40,7 +59,7 @@ Props exactas de las piezas que más se usan (todas aceptan `frame?` para fijar 
 | `Vignette` | `amount: number` (0 a 1), `color = "accent"`, `strength = 1` | Oscurece los bordes; usala con el zoom. `color`: rol del tema (`"bg"`, `"text"`, `"data.x"`) o color sacado del tema; en una interfaz oscura, `color="bg"` y un `strength` bajo evitan teñirla. Opacidad del borde: `0,22 * strength * amount`. |
 | `flyInZ` | `(progress, { from = 900, perspective = 1400, x, y, rotateX, rotateY, fade = true })` | Devuelve un `style` (no un componente). Ver "Entrada en profundidad". |
 | `CountUp` | `from = 0`, `to`, `start`, `duration`, `format?`, `style?` | Número que cuenta. |
-| `GradientText` | `children`, `pan = 0`, `loop?`, `style?` | Texto con el degradado del tema. `loop` = cuadros de un vaivén completo (vuelve exacto al terminar el ciclo); `pan` = velocidad sin ciclo exacto. Ambos salen del cuadro. |
+| `GradientText` | `children`, `pan = 0`, `loop?` (por defecto `decor.gradientLoop`), `style?` | Texto con el degradado del tema. `loop` = cuadros de un vaivén completo (vuelve exacto al terminar el ciclo); `pan` = velocidad sin ciclo exacto. Ambos salen del cuadro. |
 
 ## Entrada en profundidad: `flyInZ`
 
@@ -92,4 +111,4 @@ export const Video = () => <ThemeProvider theme={neutral}><Scene /></ThemeProvid
 
 `Cursor` ubica la flecha en píxeles enteros (`left`/`top` redondeados): con un `scale()` en un ancestro, una posición fraccionaria hacía fallar `--check`.
 
-Ejemplos: `examples/theme-scope` (cambio de tema por ámbito). Ejemplo completo: `examples/kit-demo` (`/?video=kit-demo&props={"theme":"dark"}`).
+Ejemplos: `examples/theme-scope` (cambio de tema por ámbito). Ejemplo completo: `examples/kit-demo` (`/?video=kit-demo&props={"theme":"dark"}`; también `editorial`, `neon`, `papel`).

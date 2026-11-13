@@ -1,7 +1,7 @@
 import { Easing, FrameCanvas, lerp, sub as subT } from "../core";
 import { camera, faceNormal, normalize, rotateAround, shade, sortBackToFront, scale as vscale, add } from "./math";
 import type { Vec3 } from "./math";
-import { poly, shadeColor, useThreeFx } from "./common";
+import { useThreeFx } from "./common";
 import type { ThreeProps } from "./common";
 
 export type CubeFoldProps = ThreeProps & { light?: Vec3 };
@@ -12,7 +12,7 @@ const sq = (x0: number, z0: number, y = -0.5): Vec3[] => [
 
 /** Red de cubo en cruz que se pliega hasta cerrar; la tapa va al final. */
 export function CubeFold(p: CubeFoldProps) {
-  const { t, width, height, pal, k } = useThreeFx(p, { width: 900, height: 900, duration: 75 });
+  const { t, width, height, pal, k, pen } = useThreeFx(p, { width: 900, height: 900, duration: 75 });
   const light = normalize(p.light ?? { x: -0.4, y: 1, z: 0.8 });
   return (
     <FrameCanvas
@@ -32,14 +32,14 @@ export function CubeFold(p: CubeFoldProps) {
         ctx.translate(width / 2, height / 2);
         const hinge = (y: number, z: number): Vec3 => ({ x: 0, y, z });
         const faces: { w: Vec3[]; base: string }[] = [];
-        faces.push({ w: sq(-0.5, -0.5), base: pal.line });
+        faces.push({ w: sq(-0.5, -0.5), base: pen.quiet(pal.line) });
         // +x y -x: giran alrededor de Z.
-        faces.push({ w: sq(0.5, -0.5).map((v) => rotateAround(v, { x: 0.5, y: -0.5, z: 0 }, "z", a * eSide(0))), base: pal.line });
-        faces.push({ w: sq(-1.5, -0.5).map((v) => rotateAround(v, { x: -0.5, y: -0.5, z: 0 }, "z", -a * eSide(1))), base: pal.line });
+        faces.push({ w: sq(0.5, -0.5).map((v) => rotateAround(v, { x: 0.5, y: -0.5, z: 0 }, "z", a * eSide(0))), base: pen.quiet(pal.line) });
+        faces.push({ w: sq(-1.5, -0.5).map((v) => rotateAround(v, { x: -0.5, y: -0.5, z: 0 }, "z", -a * eSide(1))), base: pen.quiet(pal.line) });
         // +z: giro negativo alrededor de X; -z: positivo, con la tapa colgada de su borde.
-        faces.push({ w: sq(-0.5, 0.5).map((v) => rotateAround(v, hinge(-0.5, 0.5), "x", -a * eSide(2))), base: pal.line });
+        faces.push({ w: sq(-0.5, 0.5).map((v) => rotateAround(v, hinge(-0.5, 0.5), "x", -a * eSide(2))), base: pen.quiet(pal.line) });
         const side = a * eSide(3);
-        faces.push({ w: sq(-0.5, -1.5).map((v) => rotateAround(v, hinge(-0.5, -0.5), "x", side)), base: pal.line });
+        faces.push({ w: sq(-0.5, -1.5).map((v) => rotateAround(v, hinge(-0.5, -0.5), "x", side)), base: pen.quiet(pal.line) });
         const lid = sq(-0.5, -2.5)
           .map((v) => rotateAround(v, hinge(-0.5, -1.5), "x", a * eLid))
           .map((v) => rotateAround(v, hinge(-0.5, -0.5), "x", side));
@@ -49,9 +49,9 @@ export function CubeFold(p: CubeFoldProps) {
           const c = vscale(add(add(f.w[0]!, f.w[1]!), add(f.w[2]!, f.w[3]!)), 0.25);
           const toEye = cam.view(n); // normal en el espacio de la cámara
           const sgn = toEye.z - cam.view({ x: 0, y: 0, z: 0 }).z >= 0 ? 1 : -1; // papel de dos caras
-          return { pts: f.w.map((v) => cam.project(v)), depth: cam.project(c).depth, color: shadeColor(f.base, shade(vscale(n, sgn), light, 0.3), pal) };
+          return { pts: f.w.map((v) => cam.project(v)), depth: cam.project(c).depth, base: f.base, s: shade(vscale(n, sgn), light, 0.3) };
         });
-        for (const f of sortBackToFront(drawn, (q) => q.depth)) poly(ctx, f.pts, f.color, pal.bg, 2.5 * k);
+        for (const f of sortBackToFront(drawn, (q) => q.depth)) pen.face(ctx, f.pts, f.base, f.s, 2.5 * k, pal.bg);
       }}
     />
   );

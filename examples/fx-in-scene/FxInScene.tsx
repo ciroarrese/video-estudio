@@ -1,6 +1,6 @@
 import React from "react";
 import { useFrame, useVideoConfig } from "../../engine";
-import { ThemeProvider, dark, neutral, useTheme } from "../../themes";
+import { ThemeProvider, dark, editorial, neon, neutral, papel, useTheme } from "../../themes";
 import type { Theme } from "../../themes";
 import { DockedHeadline, Stage, Wash, World, cameraAt, hideFromScale, zoomThrough } from "../../kit";
 import type { CameraKey } from "../../kit";
@@ -15,7 +15,7 @@ import {
  * más un `zoomThrough` final y un `Wash`. Un efecto en reposo (antes de `start` o después de terminar) no
  * debe dejar transformaciones ni opacidades residuales: si las deja, `--check` falla bajo la cámara.
  */
-export type FxInSceneProps = { theme?: "neutral" | "dark" | Theme };
+export type FxInSceneProps = { theme?: "neutral" | "dark" | "editorial" | "neon" | "papel" | Theme };
 
 export const DURATION = 300;
 const THROUGH: [number, number] = [236, 299];
@@ -100,16 +100,19 @@ function Scene() {
           <Slot c={2} r={2} x={650}><TypeRing text="Anillo" start={224} width={250} height={190} /></Slot>
         </World>
       </div>
-      <DockedHeadline index={1} title="Efectos en escena" subtitle="Cámara en movimiento" frame={frame} start={0} hide={hideFromScale(cam.scale)} />
+      <DockedHeadline index={1} title="Efectos en escena" subtitle="Cámara en movimiento" frame={frame} start={0} hide={Math.max(hideFromScale(cam.scale), Math.min(1, Math.max(0, (frame - THROUGH[0] + 4) / 3)))} />
       <Wash frame={frame} range={WASH} />
     </Stage>
   );
 }
 
 /** Efectos de todos los grupos dentro de `World`, con cámara, atravesado final y velo. */
+/** Los temas con nombre: dos neutros y los tres design systems de ejemplo (`--props '{"theme":"neon"}'`). */
+const THEMES: Record<string, Theme> = { neutral, dark, editorial, neon, papel };
+
 export function FxInScene({ theme = "neutral" }: FxInSceneProps) {
   return (
-    <ThemeProvider theme={typeof theme === "object" ? theme : theme === "dark" ? dark : neutral}>
+    <ThemeProvider theme={typeof theme === "object" ? theme : THEMES[theme] ?? neutral}>
       <Scene />
     </ThemeProvider>
   );

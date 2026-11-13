@@ -26,6 +26,19 @@ export const STYLE_ENUMS = {
   barRadius: ["none", "sm", "md", "lg", "pill"],
   chartGrid: ["auto", "on", "off"],
   chartFill: ["solid", "gradient", "hatched"],
+  lineWeight: ["regular", "hairline", "bold"],
+  lineDash: ["solid", "dashed", "dotted"],
+  lineCap: ["round", "square"],
+  dotShape: ["round", "square", "cross"],
+  accentUse: ["balanced", "sparse", "rich"],
+  solidFill: ["shaded", "flat", "outline", "translucent"],
+  solidEdge: ["gap", "ink", "accent", "none"],
+  extrude: ["stack", "long-shadow", "outline-stack", "none"],
+  arrival: ["rise", "fade", "slide", "scale"],
+  caret: ["bar", "block", "underscore"],
+  tile: ["card", "flat", "outline"],
+  charset: ["caps", "hex", "binary", "symbols"],
+  decoration: ["none", "underline", "marker", "box"],
 } as const;
 
 type Of<K extends keyof typeof STYLE_ENUMS> = (typeof STYLE_ENUMS)[K][number];
@@ -40,6 +53,20 @@ export type BackgroundKind = Of<"backgroundKind">;
 export type EntranceStyle = Of<"entrance">;
 export type TransitionStyle = Of<"transition">;
 export type AccentDecor = Of<"accent">;
+
+export type LineWeight = Of<"lineWeight">;
+export type LineDash = Of<"lineDash">;
+export type LineCap = Of<"lineCap">;
+export type DotShape = Of<"dotShape">;
+export type AccentUse = Of<"accentUse">;
+export type SolidFill = Of<"solidFill">;
+export type SolidEdge = Of<"solidEdge">;
+export type ExtrudeStyle = Of<"extrude">;
+export type TextArrival = Of<"arrival">;
+export type CaretStyle = Of<"caret">;
+export type TileStyle = Of<"tile">;
+export type Charset = Of<"charset">;
+export type TextDecoration = Of<"decoration">;
 
 export interface ThemeStyle {
   /** Lenguaje de esquinas y bordes de chips, píldoras, tarjetas y paneles. */
@@ -135,6 +162,52 @@ export interface ThemeStyle {
     /** `auto`: cada gráfico como hoy; `on` / `off` fuerzan las líneas de guía. */
     grid: "auto" | "on" | "off";
     fill: "solid" | "gradient" | "hatched";
+  };
+  /** Dibujo lineal y puntos de las piezas de `fx/three` (alambres, puntos, trazos). Ayuda: `lineLook`. */
+  line: {
+    /** Escala del grosor de los trazos: `regular` (x1), `hairline` (x0,5) o `bold` (x1,8). */
+    weight: LineWeight;
+    /** Carácter de las líneas guía (las principales siempre van llenas): `solid`, `dashed` o `dotted`. */
+    dash: LineDash;
+    /** Terminación de los trazos: `round` (redondeada) o `square` (corte recto y esquinas vivas). */
+    cap: LineCap;
+    /** 0 a 1: halo de los trazos y los puntos (segunda pasada ancha y tenue; sin `shadowBlur`, para que pase el chequeo de determinismo). */
+    glow: number;
+    /** Forma de los puntos: `round`, `square` o `cross`. */
+    dotShape: DotShape;
+    /** Cuánto de una figura va en acento: `balanced` (como siempre), `sparse` (solo lo principal) o `rich` (también lo secundario). */
+    accentUse: AccentUse;
+    /** 0 a 1: temblor de trazo a mano, una función fija de la posición en pantalla (no del azar ni del cuadro). */
+    sketch: number;
+  };
+  /** Cómo se dibujan las caras rellenas de los sólidos 3D (cubos, ciudad, capas, esfera, sol). Ayuda: `solidLook`. */
+  solid: {
+    /** `shaded` (sombreado por cara), `flat` (un tono por pieza), `outline` (solo contorno, tapa lo de atrás) o `translucent` (cristal con borde). */
+    fill: SolidFill;
+    /** 0,2 a 1,6: diferencia de luz entre las caras de un sólido sombreado (1 = la de siempre). */
+    contrast: number;
+    /** Arista: `gap` (color del fondo, como siempre), `ink`, `accent` o `none`. */
+    edge: SolidEdge;
+  };
+  /** Profundidad: extrusión de texto y volumen en el espacio. Ayuda: `depthLook`. */
+  depth: {
+    /** `stack` (capas con degradé), `long-shadow` (sombra larga que se desvanece), `outline-stack` (capas de contorno) o `none`. */
+    extrude: ExtrudeStyle;
+    /** `true`: lo lejano se atenúa y se afina; `false`: trazos parejos y nítidos a cualquier distancia. */
+    fog: boolean;
+  };
+  /** Llegada y adorno de los efectos de texto (`fx/text`). Ayuda: `textLook`. */
+  text: {
+    /** Cómo entran las letras de `MaskedRise` / `KineticWords` y el extra de `Typewriter` y `DigitRoll`: `rise`, `fade`, `slide` o `scale`. */
+    arrival: TextArrival;
+    /** Cursor de `Typewriter` (y de `ScrambleDecode` con `block` o `underscore`): `bar`, `block` o `underscore`. */
+    caret: CaretStyle;
+    /** Losetas de `SplitFlap` y bandas de `MarqueeBands`: `card` (como siempre), `flat` (sin bisagra ni redondeo) u `outline` (solo contorno). */
+    tile: TileStyle;
+    /** Alfabeto de los glifos de `ScrambleDecode` y `SplitFlap`: `caps` (el propio de cada efecto), `hex`, `binary` o `symbols`. */
+    charset: Charset;
+    /** Adorno bajo el texto cuando termina de llegar: `none`, `underline`, `marker` o `box`. */
+    decoration: TextDecoration;
   };
 }
 

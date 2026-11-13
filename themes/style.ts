@@ -64,6 +64,23 @@ export const STYLE_FIELDS: readonly StyleFieldSpec[] = [
   nu("chart.lineWidth", 1, 12, 5, "grosor de las líneas de datos (px)"),
   en("chart.grid", E.chartGrid, "auto", "líneas de guía"),
   en("chart.fill", E.chartFill, "solid", "relleno de barras y áreas"),
+  en("line.weight", E.lineWeight, "regular", "escala del grosor de los trazos"),
+  en("line.dash", E.lineDash, "solid", "carácter de las líneas guía"),
+  en("line.cap", E.lineCap, "round", "terminación de los trazos"),
+  nu("line.glow", 0, 1, 0, "halo de trazos y puntos"),
+  en("line.dotShape", E.dotShape, "round", "forma de los puntos"),
+  en("line.accentUse", E.accentUse, "balanced", "cuánto de una figura va en acento"),
+  nu("line.sketch", 0, 1, 0, "temblor de trazo a mano"),
+  en("solid.fill", E.solidFill, "shaded", "relleno de las caras de los sólidos"),
+  nu("solid.contrast", 0.2, 1.6, 1, "contraste de luz entre caras"),
+  en("solid.edge", E.solidEdge, "gap", "arista de las caras"),
+  en("depth.extrude", E.extrude, "stack", "extrusión de texto y volumen"),
+  bo("depth.fog", true, "atenuación con la distancia"),
+  en("text.arrival", E.arrival, "rise", "llegada de las letras"),
+  en("text.caret", E.caret, "bar", "cursor de escritura"),
+  en("text.tile", E.tile, "card", "losetas y bandas de texto"),
+  en("text.charset", E.charset, "caps", "alfabeto de los glifos al azar"),
+  en("text.decoration", E.decoration, "none", "adorno bajo el texto"),
 ];
 
 const kebab = (s: string) => s.replace(/([a-z0-9])([A-Z])/g, "$1-$2").toLowerCase();

@@ -52,6 +52,10 @@ export const papel: ResolvedTheme = deepFreeze(resolveTheme({
       titleCard: "solid", listLayout: "stacked", listUnderline: "row", handoff: "wash", headlineSize: "md", closingBg: "surface", signoffBar: true,
       wallColumns: null, wallRows: null, wallChipScale: 1.1, wallDolly: 0, wallDepth: 1, wallBlurOpening: true, wallBlurClosing: true,
     },
+    line: { weight: "regular", dash: "dashed", cap: "round", glow: 0, dotShape: "cross", accentUse: "balanced", sketch: 0.7 },
+    solid: { fill: "flat", contrast: 1, edge: "ink" },
+    depth: { extrude: "long-shadow", fog: true },
+    text: { arrival: "rise", caret: "bar", tile: "flat", charset: "symbols", decoration: "marker" },
     chart: { barRadius: "sm", lineWidth: 4, grid: "on", fill: "solid" },
   },
 }));

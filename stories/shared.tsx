@@ -224,12 +224,12 @@ export function StoryNumeral({ children, loop }: { children: string; loop?: numb
 }
 
 /**
- * Entrada de una fila (o de lo que se mueva con la lista) según `style.motion.entrance`: solo el movimiento (`transform` / `clipPath`);
- * el fundido lo lleva la opacidad de la pieza. `dy` suma un desplazamiento vertical propio (el acople). Con la entrada `auto` es el
- * deslizamiento lateral de siempre (`native: "slide"`, de la derecha).
+ * Movimiento de entrada de un elemento (`transform` / `clipPath`) según `style.motion.entrance`; el fundido lo lleva la opacidad de la
+ * pieza, no esta ayuda. `dy` suma un desplazamiento vertical propio (el acople). Con la entrada `auto` es la propia de la pieza (`native`;
+ * las filas de la lista se deslizan desde la derecha).
  */
-export function rowEntrance(theme: Theme, p: number, index: number, o: { distance: number; dy?: number; round?: boolean }): React.CSSProperties {
-  const e = entrance(theme, p, index, { native: "slide", side: "right", distance: o.distance, round: o.round });
+export function moveIn(theme: Theme, p: number, index: number, o: { native?: "rise" | "fade" | "scale" | "slide" | "wipe"; distance: number; dy?: number; round?: boolean; side?: "left" | "right" }): React.CSSProperties {
+  const e = entrance(theme, p, index, { native: o.native ?? "slide", side: o.side ?? "right", distance: o.distance, round: o.round });
   const out: React.CSSProperties = {};
   const dy = o.dy ?? 0;
   const tr = [e.transform, dy !== 0 ? `translateY(${dy}px)` : undefined].filter(Boolean).join(" ");
@@ -237,6 +237,9 @@ export function rowEntrance(theme: Theme, p: number, index: number, o: { distanc
   if (e.clipPath) out.clipPath = e.clipPath;
   return out;
 }
+
+/** `moveIn` de una fila de la lista (se desliza desde la derecha con la entrada por defecto). */
+export const rowEntrance = moveIn;
 
 /**
  * Fila de la lista: número (o su reemplazo), nombre, línea y marca de acento (barra de degradado, filete o punto según `decor.accent`).

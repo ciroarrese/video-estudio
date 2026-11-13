@@ -52,6 +52,10 @@ export const neon: ResolvedTheme = deepFreeze(resolveTheme({
       titleCard: "glass", listLayout: "stacked", listUnderline: "name", handoff: "through", headlineSize: "md", closingBg: "bg", signoffBar: true,
       wallColumns: 8, wallRows: 7, wallChipScale: 0.85, wallDolly: 300, wallDepth: 1.5, wallBlurOpening: true, wallBlurClosing: true,
     },
+    line: { weight: "bold", dash: "solid", cap: "round", glow: 0.8, dotShape: "round", accentUse: "rich", sketch: 0 },
+    solid: { fill: "translucent", contrast: 1, edge: "accent" },
+    depth: { extrude: "stack", fog: true },
+    text: { arrival: "scale", caret: "block", tile: "card", charset: "hex", decoration: "box" },
     chart: { barRadius: "lg", lineWidth: 6, grid: "off", fill: "gradient" },
   },
 }));
