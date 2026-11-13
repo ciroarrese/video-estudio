@@ -1,7 +1,8 @@
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { sampleFrames, type SampleSpec } from './sampling';
-import { openSession } from './session';
+import { openSession, sceneFrames } from './session';
+import type { FormatName } from '../engine';
 
 export type Cell = { frame: number; x: number; y: number; w: number; h: number; labelY: number };
 export type Layout = { width: number; height: number; cols: number; rows: number; labelH: number; cells: Cell[] };
@@ -34,6 +35,9 @@ export function sheetLayout(frames: number[], o: { cols: number; cellW: number; 
 export type SheetOptions = SampleSpec & {
   videoId: string;
   props?: Record<string, unknown>;
+  format?: FormatName;
+  /** Solo esta escena (id/nombre o índice desde 0). */
+  scene?: string;
   cols?: number;
   /** Size of every thumbnail relative to the frame (default 0.25). */
   scale?: number;
@@ -57,10 +61,10 @@ const composeSrc = `(async function(layout, thumbs, labels, fontPx){
 })`;
 
 export async function makeSheet(o: SheetOptions): Promise<SheetResult> {
-  const session = await openSession({ videoId: o.videoId, props: o.props, log: o.log });
+  const session = await openSession({ videoId: o.videoId, props: o.props, format: o.format, log: o.log });
   try {
     const { meta } = session;
-    const frames = sampleFrames(o, meta.durationInFrames, 12);
+    const frames = sampleFrames(o, meta.durationInFrames, 12, await sceneFrames(session, o.scene));
     const scale = o.scale ?? 0.25;
     if (!(scale > 0 && scale <= 1)) throw new Error('--scale debe estar entre 0 y 1');
     const cellW = Math.max(1, Math.round(meta.width * scale));

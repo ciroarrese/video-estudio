@@ -1,5 +1,5 @@
 import React from "react";
-import { Easing, lerp, progress } from "../core";
+import { Easing, lerp, progress, styleKey, xform } from "../core";
 import { useThreeFx } from "./common";
 import type { ThreeProps } from "./common";
 
@@ -12,6 +12,9 @@ export type CardFlipProps = ThreeProps & {
   cardWidth?: number;
   cardHeight?: number;
 };
+
+// Una escala casi 1 (menos de 1,5 %) se toma como 1: bordes con escala casi identidad bajo una cámara con zoom se rasterizan distinto según el historial.
+const snap = (k: number) => (Math.abs(k - 1) < 0.015 ? 1 : k);
 
 /** Tarjeta que da media vuelta; la cara que no mira al espectador se oculta por ángulo. Proyección a mano: escala en X y en Y, sin `rotateY`. */
 export function CardFlip(p: CardFlipProps) {
@@ -34,28 +37,31 @@ export function CardFlip(p: CardFlipProps) {
       <div style={{ fontSize: theme.type.body, color: theme.color.textMuted }}>{hint}</div>
     </div>
   );
+  // La transformación solo se emite mientras la tarjeta se mueve o gira (en reposo no queda `translateY(0px) scale(1, 1)`).
+  const cardStyle: React.CSSProperties = {
+    position: "absolute",
+    left: (width - cw) / 2,
+    top: (height - ch) / 2,
+    width: cw,
+    height: ch,
+    boxSizing: "border-box",
+    borderRadius: theme.radius.lg,
+    background: showFront ? theme.color.surface : theme.color.surfaceAlt,
+    border: `2px solid ${showFront ? theme.color.border : pal.accent}`,
+    overflow: "hidden",
+    transform: xform({ y: -lift, scaleX: snap(sx * grow), scaleY: snap(grow) }),
+    transformOrigin: "50% 50%",
+    visibility: sx < 0.012 ? "hidden" : "visible",
+    fontFamily: theme.font.family,
+  };
   return (
     <div style={{ position: "relative", width, height, ...p.style }}>
       <div
-        style={{
-          position: "absolute",
-          left: (width - cw) / 2,
-          top: (height - ch) / 2,
-          width: cw,
-          height: ch,
-          boxSizing: "border-box",
-          borderRadius: theme.radius.lg,
-          background: showFront ? theme.color.surface : theme.color.surfaceAlt,
-          border: `2px solid ${showFront ? theme.color.border : pal.accent}`,
-          overflow: "hidden",
-          transform: `translateY(${-lift}px) scale(${sx * grow}, ${grow})`,
-          transformOrigin: "50% 50%",
-          visibility: sx < 0.012 ? "hidden" : "visible",
-          fontFamily: theme.font.family,
-        }}
+        key={styleKey(cardStyle)}
+        style={cardStyle}
       >
         {showFront ? p.front ?? placeholder("Anverso", "Primera cara", false) : p.back ?? placeholder("Reverso", "Segunda cara", true)}
-        <div style={{ position: "absolute", inset: 0, background: pal.darkest, opacity: shadeA }} />
+        {shadeA > 0.0005 && <div style={{ position: "absolute", inset: 0, background: pal.darkest, opacity: +shadeA.toFixed(4) }} />}
       </div>
     </div>
   );

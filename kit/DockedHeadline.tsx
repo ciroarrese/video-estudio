@@ -1,4 +1,5 @@
 import { useTheme } from "../themes";
+import React from "react";
 import { clamp, themeEasing, useFrameOr } from "./util";
 import { kf } from "./kf";
 import { GradientText } from "./GradientText";
@@ -28,25 +29,27 @@ export function DockedHeadline({
   const f = useFrameOr(frame);
   const a = kf(f, [start, start + 18], [0, 1], themeEasing(theme.motion.easing.out)) * (1 - clamp(hide, 0, 1));
   if (a <= 0) return null;
+  // En reposo (a = 1) la píldora no lleva `opacity` ni `transform`: con `opacity: 0.999` o `translateX(-0px)` Chromium la
+  // compone en una capa propia y la rasteriza distinto según el historial de cuadros (con la cámara quieta en escala 1 se veía).
+  const resting = a >= 0.9995;
+  const style: React.CSSProperties = {
+    position: "absolute",
+    left: theme.safe.x / 2,
+    top: theme.safe.y / 2,
+    display: "flex",
+    alignItems: "center",
+    gap: theme.type.caption * 0.5,
+    padding: `${theme.type.eyebrow * 0.45}px ${theme.type.caption * 0.9}px ${theme.type.eyebrow * 0.45}px ${theme.type.eyebrow * 0.5}px`,
+    borderRadius: theme.radius.pill,
+    background: theme.color.surface,
+    border: `1px solid ${theme.color.border}`,
+    boxShadow: theme.shadow.md,
+    opacity: resting ? undefined : +a.toFixed(4),
+    transform: resting ? undefined : `translateX(${+((1 - a) * -30).toFixed(2)}px)`,
+    zIndex: 90,
+  };
   return (
-    <div
-      style={{
-        position: "absolute",
-        left: theme.safe.x / 2,
-        top: theme.safe.y / 2,
-        display: "flex",
-        alignItems: "center",
-        gap: theme.type.caption * 0.5,
-        padding: `${theme.type.eyebrow * 0.45}px ${theme.type.caption * 0.9}px ${theme.type.eyebrow * 0.45}px ${theme.type.eyebrow * 0.5}px`,
-        borderRadius: theme.radius.pill,
-        background: theme.color.surface,
-        border: `1px solid ${theme.color.border}`,
-        boxShadow: theme.shadow.md,
-        opacity: a,
-        transform: `translateX(${(1 - a) * -30}px)`,
-        zIndex: 90,
-      }}
-    >
+    <div key={resting ? "rest" : "anim"} style={style}>
       <GradientText style={{ fontSize: theme.type.caption, fontWeight: theme.font.weights.stat }}>{String(index).padStart(2, "0")}</GradientText>
       <div style={{ display: "flex", flexDirection: "column" }}>
         <span style={{ fontSize: theme.type.caption, fontWeight: theme.font.weights.semibold, color: theme.color.text, lineHeight: 1.15 }}>{title}</span>

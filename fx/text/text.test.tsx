@@ -46,7 +46,9 @@ describe("fx/text", () => {
     const mid = html(el, 6);
     expect(mid).toMatch(/<span>abc<\/span>/);
     expect(html(el, 100)).toContain("<span>abcdef</span>");
-    expect(html(el, 100)).toContain("translateY(0px)");
+    // en reposo el extra no lleva traslado ni opacidad residuales
+    expect(html(el, 100)).not.toMatch(/translateY\(0/);
+    expect(html(el, 100)).toMatch(/<span style="display:inline-block"><b>ok<\/b>/);
   });
   it("ScrambleDecode: deterministic, resolves left to right, final is exact", () => {
     expect(scrambleAt("Hola", 10, 40, "s")).toBe(scrambleAt("Hola", 10, 40, "s"));
@@ -79,7 +81,7 @@ describe("fx/text", () => {
     expect(slots(b)).toBe(5);
     expect(slots(c)).toBe(5);
     expect(c).toContain("translateY(-792px)");
-    expect(c).toContain("translateY(0px)");
+    expect(c).not.toContain("translateY(0px)"); // la rueda en 0 no deja traslado
     expect(text(c)).toContain("%");
   });
   it("MarqueeBands: opposite directions, loops, frozen after duration", () => {

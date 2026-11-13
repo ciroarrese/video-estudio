@@ -35,13 +35,33 @@ Esta es la lista de referencia; `CLAUDE.md`, `engine/README.md`, `kit/README.md`
 - [ ] **Cada garabato tiene un `id` único.** *Por qué:* el `id` es también la semilla del temblor y el nombre del degradado SVG; dos iguales se pisan.
 - [ ] **Los cuadros clave de cámara, de `kf` y de `interpolate` son estrictamente crecientes.** *Por qué:* si no, lanzan un error que nombra los cuadros.
 
+## Qué hacer cuando --check falla
+
+`npm run render -- <id> --check` hace dos pruebas: compara el HTML de cada cuadro renderizado de dos maneras y compara los píxeles de dos capturas. La comparación de HTML ignora el orden de atributos, clases y propiedades de `style`: no hace falta mantener constante el conjunto de propiedades ni agregar `key`s para eso. Cuentan los valores, los hijos, el texto y el orden entre un atajo y su componente (`margin` + `margin-left`). La de píxeles atrapa cualquier diferencia visual dentro de la tolerancia. El error más caro de arreglar es el que se ataca a ciegas; seguí este orden.
+
+1. **Leé lo que imprime.** Para cada cuadro con diferencias: el rectángulo (bbox) donde difiere, los elementos que hay en su centro y sus esquinas (etiqueta, texto corto, ruta DOM), las escenas con nombre activas en ese cuadro y, al final, una línea `pista:` que remite a esta sección. El problema está en lo que se dibuja dentro de ese rectángulo, en ese cuadro; lo demás da igual. Repetí en el cuadro vecino: si falla solo en uno, mirá qué empieza o termina ahí (un `start`, un `kf` que cruza un valor, un montaje).
+2. **Bisecá sacando piezas.** Comentá la mitad de los elementos de la escena (o dejá solo los del bbox), corré `--check --frames a-b` sobre el rango del cuadro y volvé a poner de a una hasta que reaparezca. Con `--scene <id>` revisás una escena sola; con `--format` probá cada formato por separado.
+3. **Causas habituales y arreglos:**
+   - **Residuos en elementos quietos:** `scale(1)`, `translate(0px)` u `opacity: 1` que quedan puestos cuando el elemento ya no se anima. Chromium crea una capa distinta con y sin ellos. *Arreglo:* emití el `transform`, la opacidad o el filtro solo mientras anima; al terminar, sin propiedad (`xform`, `fade`, `svgScale` de `fx/core` lo hacen; que la propiedad aparezca y desaparezca no rompe la comparación de HTML).
+   - **Texto bajo `scale()`:** el glifo se rasteriza según el historial. *Arreglo:* animá `font-size`, o escalá el contenedor sin texto y poné el texto fuera, o con traslado entero.
+   - **`left`/`top` fraccionarios bajo un ancestro con transform:** *Arreglo:* `Math.round` en las posiciones de layout, y todo el movimiento dentro de `transform`.
+   - **Efectos de `fx/` montados antes de su `start` o después de terminar:** los efectos del catálogo pueden quedar montados todo el tiempo (`fx-in-scene` lo prueba): antes de `start` y una vez terminados no emiten `transform`, `filter` ni `opacity`. Si tu propio efecto deja residuos, aplicá lo de "Residuos" arriba; como último recurso montalo solo mientras corre (`f >= start && <Efecto start={start} />`).
+   - **Elementos visibles durante `zoomThrough`:** al atravesar, la escala llega a 40 y todo lo que sigue visible se rasteriza enorme. *Arreglo:* ocultá (no montes) lo que sobra desde el cuadro en que empieza el atravesado.
+   - **Escalas pesadas anidadas:** un contenedor con `scale()` dentro de un mundo que ya hace zoom multiplica el error. *Arreglo:* hacé el zoom con la cámara (`cameraAt`) y no escales además el contenedor.
+   - **Fuentes sin cargar:** el cuadro se captura con la tipografía de reserva. *Arreglo:* declarala en `theme.font.files` o con `asset()` para que el motor espere; confirmá que el archivo existe.
+4. **Verificá en todos los formatos** que el video admite y con `--check` completo (no solo el rango): un arreglo en vertical puede mover la causa en horizontal.
+5. Solo después de eso, y si el diferencial es desenfoque o sombra legítimos, ver la tolerancia de `--check` (no la subas para tapar un defecto real).
+
+Ver también el catálogo (`docs/animaciones.md`): los efectos de `fx/` ya cumplen estas reglas.
+
 ## De contenido y privacidad
 
 - [ ] **Cifras emuladas y nombres ficticios por defecto.** Solo van datos reales si la persona lo pidió expresamente y dijo cuáles.
   *Por qué:* un video se comparte más de lo previsto; un número o un nombre real en pantalla no se puede retirar.
 - [ ] **Nunca se imprimen ni se versionan credenciales.** Nada de claves, tokens, correos, dominios ni URLs internas en el código, en `--props`, en los registros ni en el chat.
-  *Por qué:* el repo es público y el código queda en el historial para siempre. *Se revisa con:* `npm run privacy -- <id> --deny <lista> --scan-source videos/<slug>` (correos, teléfonos, dominios que no sean de ejemplo y términos prohibidos).
-- [ ] **Cada video trae su lista de términos prohibidos** (`videos/<slug>/prohibidos.txt`), armada en el cuestionario con lo que la persona dijo que no puede salir, y se corre en cada escena y en el video final.
+  *Por qué:* el repo es público y el código queda en el historial para siempre. *Se revisa con:* `npm run privacy -- <id> --deny <lista> --scan-source videos/<slug>` (correos, teléfonos, dominios que no sean de ejemplo y términos prohibidos; no escanea los archivos de `--deny`/`--allow` ni ningún `prohibidos.txt`, así la lista no se reporta a sí misma).
+- [ ] **`privacy` también mira el texto unido entre elementos vecinos.** En pantalla no revisa solo cada nodo de texto: junta el texto de cada bloque, el del escenario entero y una versión sin espacios (para términos de 4 o más letras), así que un nombre o un correo partido en varios `span` (un efecto de `fx/text` que anima por letra o por palabra) o repartido en elementos contiguos se detecta igual. Lo que no ve es lo que no está en el DOM: el texto dibujado en un `canvas` y el de las imágenes (pasá por `--props` el que se dibuja en un `canvas`). Detalle de qué se junta y qué no: `qa/README.md`, sección "Privacidad (`ve-privacy`)".
+- [ ] **Cada video trae su lista de términos prohibidos** (`videos/<slug>/prohibidos.txt`, un término o `/regex/flags` por línea), armada en el cuestionario con lo que la persona dijo que no puede salir, y se corre en cada escena y en el video final.
 - [ ] **Nada de nombres de empresas, clientes o personas reales** en lo que se sube al repo: ni en el código, ni en los textos, ni en los ejemplos.
 - [ ] **Licencias del lugar de exhibición.** Antes de agregar una fuente, una música, un efecto de sonido, un logo o una marca de terceros, verificar que su licencia permita usarlos donde se va a mostrar el video (interno, web pública, redes, evento) y redistribuirlos si se suben al repo.
   *Por qué:* lo que sirve para una reunión interna puede no servir en un canal público. El repo no incluye fuentes, música ni marcas; la responsabilidad de lo que se agrega es de quien lo agrega.
@@ -66,6 +86,7 @@ Esta es la lista de referencia; `CLAUDE.md`, `engine/README.md`, `kit/README.md`
   *Por qué:* la transición es continua y nunca hay un corte seco.
 - [ ] **El texto es legible:** letra de al menos 18 px a 1080p (contando el zoom de cámara), contraste mínimo 4.5 en texto chico y todo dentro del área segura. Se usan los tamaños de `theme.type`.
   *Se revisa con:* `qa` (`min-size`, `contrast`, `safe-area`, `clip`, `offscreen`).
+  Cómo decide `qa` cada severidad (`offscreen`: error, aviso o info según el movimiento y la cámara; `contrast` bajo un velo en transición contra uno quieto): `qa/README.md`, secciones "Reglas de `ve-qa`" y "`offscreen`: por qué error, aviso o info". Un `Wash` lleva `data-qa-veil` para que `qa` lo distinga.
 
 ## De proceso
 

@@ -1,5 +1,5 @@
 import { Easing, holdRender, random, releaseRender } from "../../engine";
-import { chartColor, fxBox, progress, useFx } from "../core";
+import { chartColor, fade, fxBox, progress, useFx } from "../core";
 import type { FxProps } from "../core";
 
 export type PixelBuildProps = FxProps & {
@@ -113,7 +113,10 @@ export function PixelBuild(p: PixelBuildProps) {
         const rot = (random(`${seed}:o:${i}`) - 0.5) * 540 * (1 - e);
         const s = cs * 0.86;
         const accent = random(`${seed}:c:${i}`) < 0.2;
-        return <rect key={i} x={-s / 2} y={-s / 2} width={s} height={s} transform={`translate(${x.toFixed(2)} ${y.toFixed(2)}) rotate(${rot.toFixed(2)})`} fill={accent ? chartColor(theme, 1) : theme.color.accent} opacity={Math.min(1, e * 2)} />;
+        // El giro y la opacidad solo se emiten mientras la celda llega (en reposo no queda `rotate(0.00)` ni `opacity: 0.99`).
+        const spin = Math.abs(rot) >= 0.005;
+        const op = fade(Math.min(1, e * 2));
+        return <rect key={`${i}:${spin ? "s" : ""}${op === undefined ? "" : "o"}`} x={-s / 2} y={-s / 2} width={s} height={s} transform={`translate(${x.toFixed(2)} ${y.toFixed(2)})${spin ? ` rotate(${rot.toFixed(2)})` : ""}`} fill={accent ? chartColor(theme, 1) : theme.color.accent} opacity={op} />;
       })}
     </svg>
   );

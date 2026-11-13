@@ -1,4 +1,6 @@
 import { parseArgs } from 'node:util';
+import type { FormatName } from '../engine';
+import { parseFormat } from './meta';
 
 export type CliOptions = {
   videoId: string;
@@ -19,14 +21,24 @@ export type CliOptions = {
   checkMaxRatio: number;
   checkStrict: boolean;
   assets: string[];
+  format?: FormatName;
+  scene?: string;
+  list: boolean;
+  listScenes: boolean;
   help: boolean;
 };
 
 export const USAGE = `Uso: ve-render <videoId> [opciones]
+       ve-render --list                      (videos descubiertos: examples/* y videos/*)
+       ve-render <videoId> --list-scenes     (escenas con nombre del video)
 
   --out <archivo>        Salida (por defecto out/<id>.mp4)
   --props '<json>'       Props (objeto JSON) que se mezclan con defaultProps
   --frames a-b           Solo ese rango de cuadros (inclusive)
+  --format <f>           horizontal, vertical o cuadrado (el video tiene que admitirlo; ver defineVideo({ formats }))
+  --scene <id|indice>    Solo esa escena (indice desde 0, como en --list-scenes); no se combina con --frames
+  --list                 Lista los videos disponibles con su tamaño y formatos
+  --list-scenes          Lista las escenas con nombre del video y sus cuadros
   --concurrency N        Paginas en paralelo (por defecto min(cpus, 6))
   --scale N              Escala de salida, p. ej. 0.5 o 2 (por defecto 1)
   --crf N                Calidad x264, 0-51 (por defecto 18)
@@ -75,6 +87,10 @@ export function parseCliArgs(argv: string[]): CliOptions {
         'check-max-ratio': { type: 'string' },
         'check-strict': { type: 'boolean' },
         assets: { type: 'string', multiple: true },
+        format: { type: 'string' },
+        scene: { type: 'string' },
+        list: { type: 'boolean' },
+        'list-scenes': { type: 'boolean' },
         help: { type: 'boolean', short: 'h' },
       },
     });
@@ -83,10 +99,17 @@ export function parseCliArgs(argv: string[]): CliOptions {
   }
   const { values: v, positionals } = parsed;
   if (v.help) {
-    return { videoId: '', props: {}, scale: 1, crf: 18, segment: 150, audio: true, cache: true, keepFrames: false, frameFormat: 'png', jpegQuality: 95, check: false, checkMaxDelta: 2, checkMaxRatio: 0.001, checkStrict: false, assets: [], help: true };
+    return { videoId: '', props: {}, scale: 1, crf: 18, segment: 150, audio: true, cache: true, keepFrames: false, frameFormat: 'png', jpegQuality: 95, check: false, checkMaxDelta: 2, checkMaxRatio: 0.001, checkStrict: false, assets: [], list: false, listScenes: false, help: true };
+  }
+  if (v.list) {
+    if (positionals.length) throw new Error('--list no lleva <videoId>');
+    return { videoId: '', props: {}, scale: 1, crf: 18, segment: 150, audio: true, cache: true, keepFrames: false, frameFormat: 'png', jpegQuality: 95, check: false, checkMaxDelta: 2, checkMaxRatio: 0.001, checkStrict: false, assets: [], list: true, listScenes: false, help: false };
   }
   if (positionals.length !== 1) throw new Error('Falta <videoId> (o sobran argumentos posicionales)');
 
+  const format = parseFormat(v.format);
+  if (v.scene !== undefined && v.scene === '') throw new Error('--scene necesita un id o un índice');
+  if (v.scene !== undefined && v.frames !== undefined) throw new Error('--scene y --frames no se combinan: --scene ya fija el rango de cuadros');
   let props: Record<string, unknown> = {};
   if (v.props !== undefined) {
     let p: unknown;
@@ -148,6 +171,10 @@ export function parseCliArgs(argv: string[]): CliOptions {
     checkMaxRatio,
     checkStrict: !!v['check-strict'],
     assets: v.assets ?? [],
+    format,
+    scene: v.scene,
+    list: false,
+    listScenes: !!v['list-scenes'],
     help: false,
   };
 }

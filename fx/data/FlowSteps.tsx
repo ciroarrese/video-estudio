@@ -1,6 +1,6 @@
 import { withAlpha } from "../../themes";
 import { Easing } from "../../engine";
-import { fxBox, progress, useFx } from "../core";
+import { fade, fxBox, progress, styleKey, svgScale, useFx } from "../core";
 import type { FxProps } from "../core";
 import { pointAt, roundedPolyline, toPath, trimPolyline } from "./geom";
 import type { Pt } from "./geom";
@@ -60,8 +60,10 @@ export function FlowSteps(p: FlowStepsProps) {
         const col = state === "done" ? theme.color.success : state === "active" ? theme.color.accent : theme.color.textMuted;
         const cx = c.x + cw / 2, cy = c.y + ch / 2;
         const sc = 0.85 + 0.15 * Math.min(1.05, t);
+        // opacidad y escala solo mientras la tarjeta aterriza (en reposo no queda `scale(1)`)
+        const gp = { opacity: fade(Math.min(1, t * 1.6)), transform: svgScale(cx, cy, sc) };
         return (
-          <g key={i} opacity={Math.min(1, t * 1.6)} transform={`translate(${cx} ${cy}) scale(${sc}) translate(${-cx} ${-cy})`}>
+          <g key={`${i}:${styleKey(gp)}`} {...gp}>
             <rect x={c.x} y={c.y} width={cw} height={ch} rx={theme.radius.panel} fill={theme.color.surface} stroke={state === "pending" ? theme.color.border : col} strokeWidth={state === "active" ? 4 : 2.5} strokeDasharray={state === "pending" ? "10 8" : undefined} />
             <circle cx={c.x + 44} cy={cy} r={22} fill={state === "pending" ? "none" : state === "done" ? col : withAlpha(col, 0.15)} stroke={col} strokeWidth={3} />
             {state === "done" ? <path d={`M${c.x + 34} ${cy} l7 8 l13 -16`} fill="none" stroke={theme.color.onAccent} strokeWidth={4} strokeLinecap="round" strokeLinejoin="round" /> : <text x={c.x + 44} y={cy + fs * 0.35} textAnchor="middle" fontSize={fs} fontWeight={theme.font.weights.semibold} fill={col}>{i + 1}</text>}

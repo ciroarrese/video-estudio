@@ -3,7 +3,7 @@
 #   bash templates/nuevo.sh escena <slug> <nombre-de-escena>     -> videos/<slug>/<nombre-de-escena>/
 #   bash templates/nuevo.sh historia <slug> <escena-de-ejemplo>  -> videos/<slug>/historia/
 # Tambien crea videos/<slug>/theme.ts (tema neutro) si todavia no existe.
-# No registra nada: el import va a mano en engine/runtime/videos.ts (ver SKILL.md).
+# No hay que registrar nada: el runtime descubre solo toda carpeta videos/<slug>/**/index.ts (ver SKILL.md).
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
@@ -30,7 +30,7 @@ if [[ "$modo" == "escena" ]]; then
   sed -i -E 's#"\.\./\.\./(engine|kit|themes|stories|fx|qa)#"../../../\1#g' "$dest"/*.ts "$dest"/*.tsx
   sed -i "s#\"plantilla-escena\"#\"$slug-$nombre\"#" "$dest/index.ts"
   echo "creado $dest (id de video: $slug-$nombre)"
-  echo "falta: import \"../../videos/$slug/$nombre\"; en engine/runtime/videos.ts"
+  echo "ya se descubre solo (npm run render -- --list); no hay que registrarla"
 else
   dest="$base/historia"
   [[ ! -e "$dest" ]] || { echo "Ya existe $dest" >&2; exit 1; }
@@ -39,5 +39,5 @@ else
   sed -i -E 's#"\.\./\.\./(engine|kit|themes|stories|fx|qa)#"../../../\1#g' "$dest"/*.ts
   sed -i "s#\"\.\./scene/Scene\"#\"../$nombre/Scene\"#; s#\"plantilla-historia\"#\"$slug\"#" "$dest/index.ts"
   echo "creado $dest (id de video: $slug)"
-  echo "falta: reemplazar las dos escenas de ejemplo por las reales y agregar import \"../../videos/$slug/historia\"; en engine/runtime/videos.ts"
+  echo "falta: reemplazar las dos escenas de ejemplo por las reales (la historia ya se descubre sola)"
 fi

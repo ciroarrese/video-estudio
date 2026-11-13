@@ -1,6 +1,7 @@
 import { withAlpha } from "../../themes";
 import { Easing } from "../../engine";
-import { chartColor, fxBox, progress, useFx } from "../core";
+import { chartColor, fade, fxBox, progress, styleKey, useFx, xform } from "../core";
+import type React from "react";
 import type { FxProps } from "../core";
 import { staggerT } from "../data/geom";
 
@@ -14,6 +15,16 @@ const DEFAULT: Notice[] = [
   { title: "Actualización lista", body: "La versión 2.4 ya está disponible.", time: "1 h" },
 ];
 
+/** Tamaño por defecto de la caja (px). */
+export const NOTIFICATION_SIZE = { width: 760, height: 560 } as const;
+/** Alto de cada tarjeta (px). */
+export const NOTIFICATION_CARD_HEIGHT = 118;
+
+/** Paso vertical (px) entre tarjetas apiladas en una caja de alto `height` con `count` tarjetas: nunca más que alto + 18 y siempre dentro de la caja. */
+export function notificationPitch(height: number, count: number): number {
+  return Math.min(NOTIFICATION_CARD_HEIGHT + 18, (height - NOTIFICATION_CARD_HEIGHT - 10) / Math.max(1, count - 1));
+}
+
 /** Posicion vertical de la tarjeta `i`: cada tarjeta posterior que llega la empuja un paso hacia abajo. */
 export function stackOffsets(arrivals: number[], pitch: number): number[] {
   return arrivals.map((_, i) => arrivals.slice(i + 1).reduce((s, a) => s + Math.min(1, a), 0) * pitch);
@@ -22,12 +33,12 @@ export function stackOffsets(arrivals: number[], pitch: number): number[] {
 /** Notificaciones que llegan de a una y empujan a las anteriores hacia abajo. */
 export function NotificationStack(p: NotificationStackProps) {
   const { local, theme } = useFx(p);
-  const { width: w, height: h } = fxBox(p, { width: 760, height: 560 });
+  const { width: w, height: h } = fxBox(p, NOTIFICATION_SIZE);
   const items = p.items ?? DEFAULT;
   const n = items.length;
   const dur = p.duration ?? 70;
-  const ch = 118;
-  const pitch = Math.min(ch + 18, (h - ch - 10) / Math.max(1, n - 1));
+  const ch = NOTIFICATION_CARD_HEIGHT;
+  const pitch = notificationPitch(h, n);
   // la primera llega arriba, las siguientes empujan: orden visual = la ultima llegada arriba
   const arr = items.map((_, i) => Easing.out(staggerT(progress(local, 0, dur), i, n, 0.7)));
   const land = items.map((_, i) => Easing.lands(staggerT(progress(local, 0, dur), i, n, 0.7)));
@@ -39,8 +50,10 @@ export function NotificationStack(p: NotificationStackProps) {
         const a = arr[i]!;
         if (a <= 0) return null;
         const y = offs[i]! + (1 - land[i]!) * -50;
+        // Traslado y opacidad solo mientras la tarjeta llega o es empujada (en reposo no queda `translateY(0.00px)`).
+        const cardSt: React.CSSProperties = { position: "absolute", left: 0, top: 0, width: w, height: ch, boxSizing: "border-box", transform: xform({ y }), opacity: fade(Math.min(1, a * 1.8)), background: theme.color.surface, border: `1px solid ${theme.color.border}`, borderRadius: theme.radius.lg, boxShadow: theme.shadow.md, display: "flex", alignItems: "center", gap: 20, padding: "0 26px", zIndex: i };
         return (
-          <div key={i} style={{ position: "absolute", left: 0, top: 0, width: w, height: ch, boxSizing: "border-box", transform: `translateY(${y.toFixed(2)}px)`, opacity: Math.min(1, a * 1.8), background: theme.color.surface, border: `1px solid ${theme.color.border}`, borderRadius: theme.radius.lg, boxShadow: theme.shadow.md, display: "flex", alignItems: "center", gap: 20, padding: "0 26px", zIndex: i }}>
+          <div key={`${i}:${styleKey(cardSt)}`} style={cardSt}>
             <div style={{ width: 56, height: 56, flex: "none", borderRadius: theme.radius.pill, background: withAlpha(chartColor(theme, i), 0.18), color: theme.color.text, display: "flex", alignItems: "center", justifyContent: "center", fontSize: fs * 1.2, fontWeight: theme.font.weights.stat }}>{it.title.charAt(0)}</div>
             <div style={{ flex: 1, minWidth: 0 }}>
               <div style={{ display: "flex", justifyContent: "space-between", gap: 12 }}>

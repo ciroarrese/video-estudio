@@ -1,11 +1,12 @@
 import { Easing, useFrame, useVideoConfig } from "../engine";
-import { Stage, Wash, World, cameraAt, kf, zoomThrough } from "../kit";
+import { Wash, World, cameraAt, kf, zoomThrough } from "../kit";
 import { useTheme, withAlpha } from "../themes";
 import { fitText, listLayout, openingWall, rigTransform } from "./layout";
-import { Chip, HeadlineRow, HighlightedTitle, scaler, useEase } from "./shared";
+import { Chip, HeadlineRow, HighlightedTitle, StoryStage, scaler, useEase } from "./shared";
 import type { StorySpec } from "./types";
 
-export const OPENING_FRAMES = 300;
+import { OPENING_FRAMES } from "./durations";
+export { OPENING_FRAMES };
 export const openingFrames = (spec: StorySpec) => spec.timing?.opening ?? OPENING_FRAMES;
 
 const WALL_P = 1400;
@@ -24,7 +25,7 @@ export function Opening({ spec }: { spec: StorySpec }) {
   const u = scaler(dur, OPENING_FRAMES);
   const n = spec.topics.length;
   const L = listLayout(spec, theme, width, height);
-  const wall = openingWall(spec);
+  const wall = openingWall(spec, height, width);
   const cx = width / 2, cy = height / 2;
 
   const gap = Math.min(16, 64 / n) * (dur / OPENING_FRAMES);
@@ -42,7 +43,10 @@ export function Opening({ spec }: { spec: StorySpec }) {
   // título: legible desde el cuadro 0 (solo se asienta con una escala corta)
   const titleIn = kf(f, [0, u(16)], [0, 1], ease.out);
   const titleOut = kf(f, T.titleOut, [0, 1]);
-  const tf = fitText(spec.title.text, 1560, theme.type.hero, { min: theme.type.hero * 0.5, lines: 2, avg: 0.55 });
+  // en formatos angostos el título baja a más renglones y el cartel se queda dentro del ancho seguro
+  const narrow = width / height < 1.3;
+  const titleW = Math.min(1560, width - 2 * theme.safe.x);
+  const tf = fitText(spec.title.text, titleW, theme.type.hero, { min: theme.type.hero * (narrow ? 0.45 : 0.5), lines: narrow ? 3 : 2, avg: 0.55 });
 
   // atravesado del primer titular
   const cam = cameraAt(f, [{ f: 0, x: cx, y: cy, scale: 1 }], {
@@ -52,7 +56,7 @@ export function Opening({ spec }: { spec: StorySpec }) {
   const othersOut = kf(f, [T.fly[0] - u(6), T.fly[0] + u(14)], [1, 0]);
 
   return (
-    <Stage frame={f}>
+    <StoryStage frame={f}>
       <div style={{ position: "absolute", inset: 0, zIndex: 0, opacity: wallFade }}>
         {wall.map((c, i) => {
           const lit = kf(f, [u(c.on), u(c.on) + 3], [0, 1], Easing.linear);
@@ -63,7 +67,7 @@ export function Opening({ spec }: { spec: StorySpec }) {
             <div
               key={i}
               data-qa-ignore="min-size contrast overlap covered offscreen safe-area"
-              style={{ position: "absolute", left: 0, top: 0, transformOrigin: "0 0", transform: rigTransform(c.x, c.y, c.z, rig, WALL_P, cx, cy, " translate(-50%, -50%)"), zIndex: 1000 + c.z, opacity: appear, filter: blur > 0 ? `blur(${blur}px)` : undefined }}
+              style={{ position: "absolute", left: 0, top: 0, transformOrigin: "0 0", transform: rigTransform(c.x, c.y, c.z, rig, WALL_P, cx, cy, `${c.k === 1 ? "" : ` scale(${c.k})`} translate(-50%, -50%)`), zIndex: 1000 + c.z, opacity: appear, filter: blur > 0 ? `blur(${blur}px)` : undefined }}
             >
               <Chip text={c.text} lit={lit} pop={pop} />
             </div>
@@ -75,7 +79,8 @@ export function Opening({ spec }: { spec: StorySpec }) {
         <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", pointerEvents: "none", zIndex: 3 }}>
           <div
             style={{
-              maxWidth: 1700,
+              maxWidth: Math.min(1700, width - theme.safe.x),
+              boxSizing: "border-box",
               padding: `${Math.round(tf.size * 0.3)}px ${Math.round(tf.size * 0.55)}px`,
               borderRadius: theme.radius.lg * 2,
               background: theme.color.surface,
@@ -116,6 +121,6 @@ export function Opening({ spec }: { spec: StorySpec }) {
       </World>
 
       <Wash range={[T.fly[1] - u(16), T.fly[1] - u(2)]} />
-    </Stage>
+    </StoryStage>
   );
 }

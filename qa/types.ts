@@ -19,6 +19,8 @@ export type TextRun = {
   motion?: number;
   /** Largest change of the effective opacity of this text between this frame and its neighbours (0 when not matched): > 0 means mid-fade. */
   fade?: number;
+  /** An element at or above a surface painted behind the text has opacity < 1: the sampled background is mid-fade together with the text (see collect.inpage.js). */
+  fadingBg?: boolean;
   /** Id of the element that owns the text node, and of every element up to (excluding) the stage. */
   elId: number;
   chain: number[];
@@ -48,11 +50,16 @@ export type TextRun = {
    * of the sampled points it covers (1 = all, 0.4 = two of five). Solid = opaque background colour, background image/gradient, img, video, canvas.
    */
   cover: (ElementInfo & { ignore: string[]; id: number; key: string; motion?: number; frac?: number; /** Opacidad efectiva del elemento que tapa (con la de sus ancestros). */ opacity?: number }) | null;
+  /**
+   * Translucent full-frame element above the text (opacity x background alpha in [0.02, 0.9): a scene wash mid-fade, or a static veil).
+   * `fade` (set by applyMotion) is the largest change of that opacity between this frame and its neighbours (an absent veil counts as 0).
+   */
+  veil?: { key: string; opacity: number; testid: string | null; fade?: number } | null;
   /** Background under the text box (text hidden), filled by the runner when the contrast rule is on. */
   bg?: { r: number; g: number; b: number; samples: number } | null;
 };
 
-export type PageData = { frame: number; width: number; height: number; runs: TextRun[]; elems: Record<string, Rect> };
+export type PageData = { frame: number; width: number; height: number; runs: TextRun[]; elems: Record<string, Rect>; /** Coverage alpha of the elements in `elems` (same keys). */ opac?: Record<string, number> };
 
 export type Finding = {
   rule: RuleId;
@@ -67,13 +74,14 @@ export type Finding = {
 
 export type Thresholds = {
   clip: { tolerancePx: number; minHiddenFraction: number; minOpacity: number; maxFrames: number };
-  offscreen: { tolerancePx: number; minOpacity: number; maxFrames: number; slipPct: number };
+  offscreen: { tolerancePx: number; minOpacity: number; maxFrames: number; slipPct: number; /** Rebaba (px) que, con la cámara en movimiento, se informa como info. */ sliverPx: number; /** Desplazamiento mínimo (px) entre cuadros para decir que la cámara se mueve. */ cameraPx: number };
   'safe-area': { margin: number; minOpacity: number };
   overlap: { ratio: number; minOpacity: number; inkHeight: number; maxFrames: number };
   'min-size': { minPx1080: number; minOpacity: number; tolerancePx: number };
   contrast: { error: number; warn: number; largePx1080: number; minOpacity: number };
   covered: { minOpacity: number; maxCoverFraction: number; hiddenFully: number };
-  motion: { px: number };
+  /** `px`: movimiento que baja a info los recortes del cuadro y el tamaño; `crossPx` (menor): movimiento con el que dos elementos que se cruzan (superposición, tapado, contraste) son una transición. */
+  motion: { px: number; crossPx: number };
 };
 
 export type RuleContext = { frame: number; width: number; height: number; runs: TextRun[]; thresholds: Thresholds };

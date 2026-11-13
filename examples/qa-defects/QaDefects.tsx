@@ -11,9 +11,19 @@ import { Fill, useFrame } from '../../engine';
  * Frames 15-17 are defects that the first version of the rules missed: static text at 50% opacity that looks washed out
  * once composited (15), a gradient strip over the LEFT 40% of a line with its centre free (16), and static text fully
  * hidden under a static card (17). All three are errors.
+ * Frames 19-21 are a NON-defect: light text on an accent block under a scene wash (a full-frame veil) whose opacity changes frame to
+ * frame (0.45, 0.55, 0.65): the contrast the rule measures is a transition, so it is `info`. Frames 22-24 hold the SAME veil still
+ * at 0.55 over the same text: that contrast is what the viewer sees, so frame 23 (both neighbours identical) is a `contrast` error.
+ * Frames 25-54 pair each LENIENCY with its STRICT counterpart (same situation, but static: still an error). 25-27 text fading in at
+ * the slow tail of an easing (+0.01 per frame) vs 28-30 the same text held at 51% (error at 29, contrast); 31-33 dark text moving across a dark band
+ * (20 px per frame) vs 34-36 the same text still (error at 35, contrast); 37-39 a text drifting 6 px per frame over another vs 40-42 the same two
+ * texts still (error at 41, overlap); 43-45 an opaque pill drifting 6 px per frame over a text vs 46-48 still (error at 47, covered);
+ * 49-51 a 5 px sliver past the right edge under a camera that moves (info at 50) vs 52-54 the same sliver with the camera still (error at 53, offscreen).
+ * Frames 55-56 are for the privacy check with the deny term `mercado pago`: 55 has two DIFFERENT elements ("Supermercado" and "Pagó ...") that
+ * only look like the term when their texts are glued (no match); 56 writes the term in ONE line with a span per word (a `deny-joined` match).
  * Frame 18 builds a term and an e-mail out of one span per letter / per part: only the privacy check cares (block-level scan).
  */
-export const QA_DEFECT_FRAMES = { clean: 0, clip: 1, offscreen: 2, overlap: 3, tiny: 4, contrast: 5, covered: 6, privacy: 7, wash: 8, flyingA: 9, flyingB: 10, faint: 11, leavingA: 12, leavingB: 13, leavingC: 14, stillFaint: 15, sideCover: 16, hiddenStatic: 17, split: 18 } as const;
+export const QA_DEFECT_FRAMES = { clean: 0, clip: 1, offscreen: 2, overlap: 3, tiny: 4, contrast: 5, covered: 6, privacy: 7, wash: 8, flyingA: 9, flyingB: 10, faint: 11, leavingA: 12, leavingB: 13, leavingC: 14, stillFaint: 15, sideCover: 16, hiddenStatic: 17, split: 18, veilCrossA: 19, veilCrossB: 20, veilCrossC: 21, veilStaticA: 22, veilStaticB: 23, veilStaticC: 24, slowFadeA: 25, slowFadeB: 26, slowFadeC: 27, slowStaticA: 28, slowStaticB: 29, slowStaticC: 30, crossMoveA: 31, crossMoveB: 32, crossMoveC: 33, crossStillA: 34, crossStillB: 35, crossStillC: 36, overlapMoveA: 37, overlapMoveB: 38, overlapMoveC: 39, overlapStillA: 40, overlapStillB: 41, overlapStillC: 42, coverMoveA: 43, coverMoveB: 44, coverMoveC: 45, coverStillA: 46, coverStillB: 47, coverStillC: 48, camMoveA: 49, camMoveB: 50, camMoveC: 51, camStillA: 52, camStillB: 53, camStillC: 54, splitBlocks: 55, splitLine: 56 } as const;
 
 const font: CSSProperties = { fontFamily: 'Arial, Helvetica, sans-serif', color: '#1b1f2a' };
 const abs = (left: number, top: number, extra: CSSProperties = {}): CSSProperties => ({ position: 'absolute', left, top, margin: 0, whiteSpace: 'nowrap', ...font, ...extra });
@@ -133,6 +143,111 @@ export function QaDefects() {
           </p>
           <p data-testid="split-email" style={abs(40, 150, { fontSize: 28 })}>
             <span>persona</span><span>@</span><span>dominio-ficticio</span><span>.com</span>
+          </p>
+        </Card>
+      );
+      break;
+    case 19:
+    case 20:
+    case 21:
+    case 22:
+    case 23:
+    case 24: {
+      const veil = f <= 21 ? 0.45 + (f - 19) * 0.1 : 0.55;
+      body = (
+        <>
+          <div style={{ position: 'absolute', left: 96, top: 200, width: 640, height: 200, background: '#2b4a8c', borderRadius: 16 }}>
+            <p data-testid="veil-text" style={abs(32, 70, { fontSize: 36, fontWeight: 700, color: '#ffffff' })}>Texto claro sobre acento</p>
+          </div>
+          <div data-testid="veil" style={{ position: 'absolute', left: 0, top: 0, width: '100%', height: '100%', background: '#ffffff', opacity: veil }} />
+        </>
+      );
+      break;
+    }
+    case 25:
+    case 26:
+    case 27:
+    case 28:
+    case 29:
+    case 30: {
+      // lento al final de un easing: sube 0.01 por cuadro (25-27); el mismo texto quieto al 51 % (28-30)
+      const op = f <= 27 ? 0.5 + (f - 25) * 0.01 : 0.51;
+      body = <p data-testid="slow-fade" style={abs(96, 250, { fontSize: 40, fontWeight: 700, color: '#6b6b6b', opacity: op })}>Saldo disponible</p>;
+      break;
+    }
+    case 31:
+    case 32:
+    case 33:
+    case 34:
+    case 35:
+    case 36: {
+      // texto oscuro sobre una banda oscura: se cruza en movimiento (31-33) o queda quieto (34-36)
+      const x = f <= 33 ? 40 + (f - 31) * 20 : 80;
+      body = (
+        <div style={{ position: 'absolute', left: 96, top: 200, width: 1000, height: 160, background: '#2b3350', borderRadius: 16 }}>
+          <p data-testid="cross-text" style={abs(x, 50, { fontSize: 40, fontWeight: 700 })}>Cena en la plaza</p>
+        </div>
+      );
+      break;
+    }
+    case 37:
+    case 38:
+    case 39:
+    case 40:
+    case 41:
+    case 42: {
+      const x = f <= 39 ? 140 + (f - 37) * 6 : 140;
+      body = (
+        <>
+          <p data-testid="drift-a" style={abs(96, 220, { fontSize: 56, fontWeight: 700 })}>Ventas del mes</p>
+          <p data-testid="drift-b" style={abs(x, 245, { fontSize: 56, fontWeight: 700, color: '#2b4a8c' })}>Costos del mes</p>
+        </>
+      );
+      break;
+    }
+    case 43:
+    case 44:
+    case 45:
+    case 46:
+    case 47:
+    case 48: {
+      const x = f <= 45 ? 80 + (f - 43) * 6 : 80;
+      body = (
+        <Card>
+          <p data-testid="slow-covered" style={abs(40, 120, { fontSize: 36, fontWeight: 600 })}>Total pendiente</p>
+          <div data-testid="slow-pill" style={{ position: 'absolute', left: x - 60, top: 112, width: 190, height: 56, borderRadius: 28, background: '#d7dbe6' }} />
+        </Card>
+      );
+      break;
+    }
+    case 49:
+    case 50:
+    case 51:
+    case 52:
+    case 53:
+    case 54: {
+      // un contenedor con zoom 1.05: el texto sobresale ~5 px por la derecha; la camara se mueve 3 px por cuadro (49-51) o esta quieta (52-54)
+      const dx = f <= 51 ? (f - 50) * 3 : 0;
+      body = (
+        <div style={{ position: 'absolute', left: 0, top: 0, width: 1280, height: 720, transformOrigin: '0 0', transform: `translateX(${dx}px) scale(1.05)` }}>
+          <p data-testid="sliver-text" style={{ position: 'absolute', right: 56, top: 300, margin: 0, whiteSpace: 'nowrap', fontSize: 40, fontWeight: 600, ...font }}>Facturación total</p>
+        </div>
+      );
+      break;
+    }
+    case 55:
+      body = (
+        <Card>
+          <p data-testid="blocks-a" style={abs(40, 70, { fontSize: 28 })}>Supermercado</p>
+          <p data-testid="blocks-b" style={abs(40, 150, { fontSize: 28 })}>Pagó 1.200 con tarjeta</p>
+        </Card>
+      );
+      break;
+    case 56:
+      body = (
+        <Card>
+          <p data-testid="line-spans" style={abs(40, 70, { fontSize: 28 })}>
+            Cuenta <span>Mercado</span> <span>Pago</span> activa
           </p>
         </Card>
       );

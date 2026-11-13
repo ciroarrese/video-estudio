@@ -17,6 +17,8 @@ export function Cursor({
 }) {
   const theme = useTheme();
   const f = useFrameOr(frame);
+  // Posición en píxeles enteros: con un `scale()` en un ancestro, Chromium rasteriza la flecha SVG de forma distinta
+  // según el historial de cuadros si el `left`/`top` es fraccionario (falla `--check`); ver docs/reglas.md.
   const { x, y } = track(f, keys);
   const out = themeEasing(theme.motion.easing.out);
   const len = show[1] - show[0];
@@ -28,8 +30,12 @@ export function Cursor({
         : kf(f, [show[0], show[0] + 10, show[1] - 10, show[1]], [0, 1, 1, 0], Easing.linear);
   if (visible <= 0) return null;
   const press = clicks.reduce((a, c) => a + kf(f, [c - 3, c, c + 6], [0, 0.15, 0]), 0);
+  // Opacidad y escala solo mientras la flecha entra, sale o se presiona (en reposo no queda `opacity: 1` ni `scale(1)`).
+  const op = visible >= 0.9995 ? undefined : +visible.toFixed(4);
+  const sc = +(1 - press).toFixed(4);
+  const arrowStyle: React.CSSProperties = { position: "absolute", left: -4, top: -3, transform: sc === 1 ? undefined : `scale(${sc})`, transformOrigin: sc === 1 ? undefined : "4px 3px" };
   return (
-    <div style={{ position: "absolute", left: x, top: y, opacity: visible, zIndex: 50, pointerEvents: "none" }}>
+    <div key={op === undefined ? "full" : "part"} style={{ position: "absolute", left: Math.round(x), top: Math.round(y), opacity: op, zIndex: 50, pointerEvents: "none" }}>
       {clicks.map((c) => {
         const p = kf(f, [c, c + 18], [0, 1], out);
         return (
@@ -53,7 +59,8 @@ export function Cursor({
         width={34}
         height={40}
         viewBox="0 0 24 28"
-        style={{ position: "absolute", left: -4, top: -3, transform: `scale(${1 - press})`, transformOrigin: "4px 3px" }}
+        key={sc === 1 ? "rest" : "press"}
+        style={arrowStyle}
       >
         <path d="M2 2l18 11-8 2-4 8z" fill={theme.color.text} stroke={theme.color.bg} strokeWidth={1.6} strokeLinejoin="round" />
       </svg>

@@ -4,12 +4,16 @@ import { collectRuns, sampleBackgrounds } from './page';
 import { ALL_RULES, type Finding, type RuleId, type Severity } from './types';
 import { runRules } from './rules';
 import { sampleFrames, type SampleSpec } from './sampling';
-import { openSession } from './session';
+import { openSession, sceneFrames } from './session';
+import type { FormatName } from '../engine';
 import { mergeThresholds, type ThresholdOverrides } from './thresholds';
 
 export type QaOptions = SampleSpec & {
   videoId: string;
   props?: Record<string, unknown>;
+  format?: FormatName;
+  /** Solo esta escena (id/nombre o índice desde 0). */
+  scene?: string;
   /** Rules to run (default: all). */
   rules?: RuleId[];
   thresholds?: ThresholdOverrides;
@@ -34,10 +38,10 @@ export async function runQa(o: QaOptions): Promise<QaResult> {
   const t0 = Date.now();
   const thresholds = mergeThresholds(o.thresholds);
   const rules = o.rules ?? ALL_RULES;
-  const session = await openSession({ videoId: o.videoId, props: o.props, log: o.log });
+  const session = await openSession({ videoId: o.videoId, props: o.props, format: o.format, log: o.log });
   try {
     const { meta } = session;
-    const frames = sampleFrames(o, meta.durationInFrames, 24);
+    const frames = sampleFrames(o, meta.durationInFrames, 24, await sceneFrames(session, o.scene));
     const workers = Math.max(1, Math.min(o.concurrency ?? Math.min(cpus().length, 3), frames.length));
     const queue = [...frames];
     const findings: Finding[] = [];

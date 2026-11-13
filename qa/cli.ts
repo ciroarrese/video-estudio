@@ -3,6 +3,9 @@ import { dirname, resolve } from 'node:path';
 import { json, num, one, parseArgs, type Parsed } from './args';
 import { formatElement } from './geometry';
 import { makeSheet } from './sheet';
+import { openSession } from './session';
+import { budgetFromScenes, formatStoryBudget } from '../stories/budget';
+import { formatSceneList, parseFormat, suffixOf } from '../render/index';
 import { runPrivacy } from './privacy';
 import { failsAt, runQa } from './run';
 import { RULES } from './rules';
@@ -10,11 +13,12 @@ import { parseOverrides } from './thresholds';
 import { ALL_RULES, type Finding, type RuleId } from './types';
 
 const USAGE = {
-  sheet: `Uso: ve-sheet <videoId> [--frames 0,60,120 | --every N | --count 12] [--props json] [--cols 4] [--scale 0.25] [--out out/<id>-sheet.png] [--no-labels]`,
-  qa: `Uso: ve-qa <videoId> [--frames 0,60,120 | --every N | --count 24] [--props json] [--json salida.json] [--fail-on error|warn] [--verbose] [--max 40]
+  sheet: `Uso: ve-sheet <videoId> [--frames 0,60,120 | --every N | --count 12] [--props json] [--format horizontal|vertical|cuadrado] [--scene id|índice] [--list-scenes]
+             [--cols 4] [--scale 0.25] [--out out/<id>[-<formato>]-sheet.png] [--no-labels]   (--out acepta cualquier ruta, se crean las carpetas)`,
+  qa: `Uso: ve-qa <videoId> [--frames 0,60,120 | --every N | --count 24] [--props json] [--format horizontal|vertical|cuadrado] [--scene id|índice] [--list-scenes] [--json salida.json | --out salida.json] [--fail-on error|warn] [--verbose] [--max 40]
              [--rules clip,overlap,...] [--skip regla,...] [--set regla.umbral=valor]... [--concurrency N]
 Reglas: ${ALL_RULES.join(', ')}  (silenciar: data-qa-ignore="regla" en el elemento o un ancestro)`,
-  privacy: `Uso: ve-privacy [<videoId>] --deny lista.txt [--allow lista.txt] [--frames … | --every N | --count 24] [--props json] [--scan-source dir]... [--json salida.json]`,
+  privacy: `Uso: ve-privacy [<videoId>] --deny lista.txt [--allow lista.txt] [--frames … | --every N | --count 24] [--props json] [--format …] [--scene id|índice] [--scan-source dir]... [--json salida.json | --out salida.json]`,
 };
 
 const sample = (p: Parsed) => ({ frames: one(p, 'frames'), every: num(p, 'every'), count: num(p, 'count') });
@@ -69,6 +73,15 @@ function printQa(findings: Finding[], sampled: number[], o: { verbose: boolean; 
   if (more) console.log(`\n… ${more} más (--max N o --verbose)`);
 }
 
+/** Escribe el informe JSON (`--out` o `--json`, cualquier ruta; crea las carpetas) y dice dónde quedó. */
+function writeReport(out: string | undefined, data: unknown) {
+  if (!out) return;
+  const abs = resolve(out);
+  mkdirSync(dirname(abs), { recursive: true });
+  writeFileSync(abs, JSON.stringify(data, null, 2));
+  console.log(`informe: ${abs}`);
+}
+
 async function main(cmd: string, argv: string[]): Promise<number> {
   const usage = USAGE[cmd as keyof typeof USAGE];
   if (!usage) throw new Error(`Comando desconocido: ${cmd}`);
@@ -77,10 +90,27 @@ async function main(cmd: string, argv: string[]): Promise<number> {
   const log = (m: string) => console.error(m);
   const props = json(p, 'props');
   const id = p.positional[0];
+  const format = parseFormat(one(p, 'format'));
+  const scene = one(p, 'scene');
+
+  if (p.bools.has('list-scenes')) {
+    if (!id) throw new Error('Falta <videoId>');
+    const session = await openSession({ videoId: id, props, format, log });
+    try {
+      const scenes = await session.scenes();
+      console.log(formatSceneList(id, scenes, session.meta.fps));
+      // si es una historia (defineStory), el presupuesto de cuadros por bloque
+      const budget = budgetFromScenes(scenes, session.meta.fps);
+      if (budget) console.log(`\n${formatStoryBudget(budget)}`);
+    } finally {
+      await session.close();
+    }
+    return 0;
+  }
 
   if (cmd === 'sheet') {
     if (!id) throw new Error('Falta <videoId>');
-    const r = await makeSheet({ videoId: id, props, ...sample(p), cols: num(p, 'cols'), scale: num(p, 'scale'), out: one(p, 'out'), labels: !p.bools.has('no-labels'), log });
+    const r = await makeSheet({ videoId: id, props, format, scene, ...sample(p), cols: num(p, 'cols'), scale: num(p, 'scale'), out: one(p, 'out') ?? `out/${id}${suffixOf({ format, scene })}-sheet.png`, labels: !p.bools.has('no-labels'), log });
     console.log(`hoja: ${r.out} (${r.width}x${r.height}, ${r.frames.length} cuadros: ${r.frames.join(',')})`);
     return 0;
   }
@@ -93,18 +123,14 @@ async function main(cmd: string, argv: string[]): Promise<number> {
     const failOn = one(p, 'fail-on') ?? 'error';
     if (failOn !== 'error' && failOn !== 'warn') throw new Error('--fail-on debe ser error o warn');
     const r = await runQa({
-      videoId: id, props, ...sample(p), rules: (only ?? ALL_RULES).filter((x) => !skip.includes(x)),
+      videoId: id, props, format, scene, ...sample(p), rules: (only ?? ALL_RULES).filter((x) => !skip.includes(x)),
       thresholds: parseOverrides(p.flags.get('set') ?? []), concurrency: num(p, 'concurrency'), log,
     });
     printQa(r.findings, r.summary.frames, { verbose: p.bools.has('verbose'), max: p.bools.has('verbose') && one(p, 'max') === undefined ? Infinity : num(p, 'max') ?? 40 });
     const s = r.summary;
     const per = Object.entries(s.byRule).map(([k, v]) => `${k}=${v}`).join(' ') || 'ninguno';
     console.log(`\n${id}: ${s.frames.length} cuadros revisados en ${s.seconds}s; ${s.errors} errores, ${s.warnings} avisos, ${s.infos} info${p.bools.has('verbose') ? '' : ' (ocultos; --verbose)'} (${per})`);
-    const out = one(p, 'json');
-    if (out) {
-      mkdirSync(dirname(resolve(out)), { recursive: true });
-      writeFileSync(out, JSON.stringify(r, null, 2));
-    }
+    writeReport(one(p, 'out') ?? one(p, 'json'), r);
     return failsAt(r, failOn) ? 1 : 0;
   }
 
@@ -115,17 +141,14 @@ async function main(cmd: string, argv: string[]): Promise<number> {
   if (!id && !dirs.length) throw new Error('Indica un <videoId> y/o --scan-source <dir>');
   const allowFile = one(p, 'allow');
   const r = await runPrivacy({
-    videoId: id, props, ...sample(p), deny: readFileSync(denyFile, 'utf8'), allow: allowFile ? readFileSync(allowFile, 'utf8') : '', scanSource: dirs, log,
+    videoId: id, props, format, scene, ...sample(p), deny: readFileSync(denyFile, 'utf8'), allow: allowFile ? readFileSync(allowFile, 'utf8') : '', scanSource: dirs, skipFiles: [denyFile, ...(allowFile ? [allowFile] : [])], log,
   });
   for (const f of r.findings) {
-    console.log(`${f.kind.toUpperCase().padEnd(6)} "${f.value}"${f.term ? ` (termino: ${f.term})` : ''}  en ${f.where}${f.frames ? ` cuadros ${f.frames.join(',')}` : ''}\n       ...${f.context}...`);
+    console.log(`${f.kind.toUpperCase().padEnd(11)} "${f.value}"${f.term ? ` (termino: ${f.term})` : ''}  en ${f.where}${f.frames ? ` cuadros ${f.frames.join(',')}` : ''}\n       ...${f.context}...`);
+    if (f.kind === 'deny-joined') console.log('       (solo aparece al juntar textos de elementos o letras sueltas de la misma linea: no esta en ningun nodo de texto entero; si en pantalla se lee como dos cosas distintas, es un falso positivo: ajustar la lista o usar --allow)');
   }
   console.log(`\nprivacidad: ${r.ok ? 'OK' : `FALLO (${r.findings.length} hallazgos)`}; ${r.scannedTexts} textos, ${r.scannedFiles} archivos, ${r.frames.length} cuadros`);
-  const out = one(p, 'json');
-  if (out) {
-    mkdirSync(dirname(resolve(out)), { recursive: true });
-    writeFileSync(out, JSON.stringify(r, null, 2));
-  }
+  writeReport(one(p, 'out') ?? one(p, 'json'), r);
   return r.ok ? 0 : 1;
 }
 

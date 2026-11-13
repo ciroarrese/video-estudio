@@ -79,3 +79,49 @@ export function seededShuffle(n: number, seed: string | number): number[] {
 }
 
 export { Easing };
+
+// ---------- reposo: nada de transformaciones identidad y marcado independiente del historial ----------
+
+const num = (n: number, d: number) => String(+n.toFixed(d));
+
+/**
+ * Transformación CSS con solo las partes que no son identidad (`undefined` si todas lo son). Sirve para emitir
+ * `transform` solo mientras algo se anima: en reposo no queda `translateY(0px)`, `scale(1)` ni `rotate(0deg)`.
+ * `x`/`y` en px, `scale`/`scaleX`/`scaleY` sin unidad, `rotate` en grados. `round` redondea los traslados a enteros.
+ */
+export function xform(o: { x?: number; y?: number; scale?: number; scaleX?: number; scaleY?: number; rotate?: number; round?: boolean }): string | undefined {
+  const parts: string[] = [];
+  const t = (v: number) => (o.round ? Math.round(v) : +v.toFixed(2));
+  const x = t(o.x ?? 0), y = t(o.y ?? 0);
+  if (x !== 0 && y !== 0) parts.push(`translate(${num(x, 2)}px, ${num(y, 2)}px)`);
+  else if (x !== 0) parts.push(`translateX(${num(x, 2)}px)`);
+  else if (y !== 0) parts.push(`translateY(${num(y, 2)}px)`);
+  const sx = +(o.scaleX ?? o.scale ?? 1).toFixed(4), sy = +(o.scaleY ?? o.scale ?? 1).toFixed(4);
+  if (sx !== 1 && sy !== 1 && sx === sy) parts.push(`scale(${num(sx, 4)})`);
+  else {
+    if (sx !== 1) parts.push(`scaleX(${num(sx, 4)})`);
+    if (sy !== 1) parts.push(`scaleY(${num(sy, 4)})`);
+  }
+  const r = +(o.rotate ?? 0).toFixed(3);
+  if (r !== 0) parts.push(`rotate(${num(r, 3)}deg)`);
+  return parts.length ? parts.join(" ") : undefined;
+}
+
+/** Opacidad para emitir: `undefined` si es (casi) 1; así en reposo no queda `opacity: 0.999`. */
+export const fade = (o: number): number | undefined => (o >= 0.9995 ? undefined : +Math.max(0, o).toFixed(4));
+
+/**
+ * Clave que cambia cuando cambia el CONJUNTO de propiedades definidas de un estilo (o de unas props).
+ * Ponela como `key` del elemento: React, al sacar y volver a poner una propiedad, la agrega al final del atributo
+ * `style` (o de los atributos), así que el HTML del mismo cuadro saldría distinto según el historial y
+ * `checkDeterminism` fallaría. Con la clave, al cambiar el conjunto el elemento se vuelve a montar y el orden
+ * es siempre el del objeto.
+ */
+export const styleKey = (o: object): string =>
+  Object.entries(o).filter(([, v]) => v !== undefined && v !== false && v !== null).map(([k]) => k).join(",");
+
+/** `transform` SVG de una escala alrededor de (cx, cy); `undefined` si la escala es 1 (sin residuo en reposo). */
+export function svgScale(cx: number, cy: number, s: number): string | undefined {
+  const k = +s.toFixed(4);
+  return k === 1 ? undefined : `translate(${+cx.toFixed(2)} ${+cy.toFixed(2)}) scale(${k}) translate(${+(-cx).toFixed(2)} ${+(-cy).toFixed(2)})`;
+}

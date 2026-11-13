@@ -1,4 +1,5 @@
-import { Easing, lerp, mix, sub } from "../core";
+import type React from "react";
+import { Easing, lerp, mix, styleKey, sub, xform } from "../core";
 import { useThreeFx } from "./common";
 import type { ThreeProps } from "./common";
 
@@ -31,21 +32,20 @@ export function ExtrudeType(p: ExtrudeTypeProps) {
   }
   // Centro óptico: las capas se corren hacia un lado; se compensa a mitad de camino.
   const reach = n * step * depth;
+  const textStyle: React.CSSProperties = {
+    transform: xform({ x: (-dx * reach) / 2, y: (-dy * reach) / 2 }),
+    fontFamily: theme.font.family,
+    fontWeight: theme.font.weights.stat,
+    fontSize,
+    lineHeight: 1,
+    letterSpacing: "-0.02em",
+    color: pal.ink,
+    whiteSpace: "nowrap",
+    textShadow: shadows.join(", "),
+  };
   return (
     <div style={{ position: "relative", width, height, display: "flex", alignItems: "center", justifyContent: "center", overflow: "hidden", ...p.style }}>
-      <div
-        style={{
-          transform: `translate(${(-dx * reach) / 2}px, ${(-dy * reach) / 2}px)`,
-          fontFamily: theme.font.family,
-          fontWeight: theme.font.weights.stat,
-          fontSize,
-          lineHeight: 1,
-          letterSpacing: "-0.02em",
-          color: pal.ink,
-          whiteSpace: "nowrap",
-          textShadow: shadows.join(", "),
-        }}
-      >
+      <div key={styleKey(textStyle)} style={textStyle}>
         {text}
       </div>
     </div>

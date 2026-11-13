@@ -1,4 +1,5 @@
 import type React from "react";
+import { MIN_COMPACT_FRAMES } from "./durations";
 
 /** Una escena de tema que entra en la historia. */
 export type TopicScene = {
@@ -12,7 +13,14 @@ export type TopicScene = {
 export type StoryTopic = { id: string; name: string; line: string };
 
 /** Duraciones (en cuadros) de los tres bloques generados; lo que no se indica usa el valor por defecto. */
-export type StoryTiming = { opening?: number; interlude?: number; closing?: number };
+export type StoryTiming = {
+  opening?: number;
+  /** Vuelta al listado completa (mínimo 60). */
+  interlude?: number;
+  /** Vuelta compacta (`interludes: "compact"`; mínimo 24, por defecto 40). */
+  interludeCompact?: number;
+  closing?: number;
+};
 
 export type StorySpec = {
   /** `highlight` es un fragmento de `text` que se pinta con el degradado del tema. */
@@ -21,8 +29,11 @@ export type StorySpec = {
   topics: StoryTopic[];
   /** Palabras del muro; si faltan, se repiten de forma determinista. */
   labels: string[];
-  /** `logo` es una ruta de /public (se resuelve con `asset()`); `text` es la línea de cierre. */
-  signoff: { logo?: string; tagline?: string; text: string };
+    /**
+   * `logo` es una ruta de /public (se resuelve con `asset()`); `slot` es un nodo propio (marca, ícono, sello) que va arriba del texto y
+   * reemplaza al logo; `text` es la línea de cierre.
+   */
+  signoff: { logo?: string; slot?: React.ReactNode; tagline?: string; text: string };
   timing?: StoryTiming;
 };
 
@@ -32,7 +43,7 @@ export const MAX_TOPICS = 6;
 /** Ids que usa la composición para sus propios bloques: un tema no puede llamarse así. */
 export const isReservedSceneId = (id: string) => id === "opening" || id === "closing" || /^interlude(-.*)?$/.test(id);
 
-const TIMING_KEYS = ["opening", "interlude", "closing"];
+const TIMING_KEYS = ["opening", "interlude", "interludeCompact", "closing"];
 const isInt = (v: unknown): v is number => typeof v === "number" && Number.isInteger(v);
 
 /** Lanza un error claro si la configuración no se puede componer. */
@@ -55,6 +66,7 @@ export function validateSpec(spec: StorySpec): void {
   const timing = (spec.timing ?? {}) as Record<string, unknown>;
   for (const [k, v] of Object.entries(timing)) {
     if (!TIMING_KEYS.includes(k)) throw new Error(`StorySpec: timing.${k} no existe (las claves válidas son ${TIMING_KEYS.join(", ")})`);
-    if (v !== undefined && (!isInt(v) || v < 60)) throw new Error(`StorySpec: timing.${k} debe ser un número entero de cuadros >= 60`);
+    const min = k === "interludeCompact" ? MIN_COMPACT_FRAMES : 60;
+    if (v !== undefined && (!isInt(v) || v < min)) throw new Error(`StorySpec: timing.${k} debe ser un número entero de cuadros >= ${min}`);
   }
 }

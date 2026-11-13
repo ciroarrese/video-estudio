@@ -1,20 +1,31 @@
 import type { Stage } from './stage';
+import { diffHtml, normalizeHtml } from './htmlDiff';
 
 /** Firma de un cuadro: el HTML mas el contenido de los `<canvas>` (si el stage los expone). `unreadable` avisa de un lienzo ilegible. */
-const signature = (stage: Stage): { sig: string; unreadable?: string } => {
+const signature = (stage: Stage): { html: string; canvas: string; sig: string; unreadable?: string } => {
+  const html = stage.html();
   try {
-    return { sig: stage.html() + (stage.canvasData?.() ?? '') };
+    const canvas = stage.canvasData?.() ?? '';
+    return { html, canvas, sig: html + canvas };
   } catch (e) {
-    return { sig: stage.html(), unreadable: e instanceof Error ? e.message : String(e) };
+    return { html, canvas: '', sig: html, unreadable: e instanceof Error ? e.message : String(e) };
   }
 };
 
 /** `ok` es false si las firmas difieren o si algun `<canvas>` no se pudo leer (en ese caso `error` dice por que). */
-export type DeterminismResult = { frame: number; ok: boolean; error?: string };
+export type DeterminismResult = {
+  frame: number;
+  ok: boolean;
+  error?: string;
+  /** Si falló: qué elementos del DOM cambiaron entre los dos renders (ruta, texto, atributo y los dos valores). */
+  diffs?: string[];
+  /** true si los dos HTML diferían solo en el ORDEN de atributos, de clases o de propiedades de `style` (no es una falla). */
+  reordered?: boolean;
+};
 
 /**
  * For each frame f: render it after frame 0 and again after a different frame, then compare the
- * stage HTML. A scene that is a pure function of the frame gives identical markup; scenes that
+ * stage HTML (ignoring pure ordering of attributes/classes/style properties, see `normalizeHtml`). A scene that is a pure function of the frame gives identical markup; scenes that
  * accumulate state in refs/useState/timers do not. `settle` (optional) is awaited after each render
  * (the runtime passes fonts/holds/animation frames). Restores the frame shown before.
  */
@@ -40,7 +51,19 @@ export async function checkDeterminism(
     const b = signature(stage);
     const unreadable = a.unreadable ?? b.unreadable;
     if (unreadable !== undefined) out.push({ frame: f, ok: false, error: `no se pudo leer un canvas, no se puede verificar el cuadro: ${unreadable}` });
-    else out.push({ frame: f, ok: a.sig === b.sig });
+    else if (a.sig === b.sig) out.push({ frame: f, ok: true });
+    else {
+      // El orden de atributos/propiedades depende de qué se renderizó antes (React agrega al final lo que antes era undefined):
+      // no es visual. Se compara normalizado; los píxeles los juzga `render --check`.
+      const na = normalizeHtml(a.html);
+      const nb = normalizeHtml(b.html);
+      if (na === nb && a.canvas === b.canvas) out.push({ frame: f, ok: true, reordered: a.html !== b.html });
+      else {
+        const diffs = diffHtml(na, nb);
+        if (a.canvas !== b.canvas) diffs.push('un <canvas> se dibujó distinto en los dos renders (draw no es una función pura del cuadro)');
+        out.push({ frame: f, ok: false, diffs });
+      }
+    }
   }
   if (prev !== null) await show(prev);
   return out;

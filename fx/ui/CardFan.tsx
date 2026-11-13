@@ -1,6 +1,6 @@
 import React from "react";
 import { Easing } from "../../engine";
-import { chartColor, fxBox, progress, useFx } from "../core";
+import { chartColor, fade, fxBox, progress, styleKey, useFx, xform } from "../core";
 import type { FxProps } from "../core";
 import { staggerT } from "../data/geom";
 
@@ -50,8 +50,10 @@ export function CardFan(p: CardFanProps) {
         const a = pose.angle * t, x = pose.dx * t;
         const stackY = (i - (n - 1) / 2) * -3 * (1 - t);
         const enter = gT;
+        // Traslado, giro y opacidad solo mientras la tarjeta sale (en reposo del todo no queda ninguno).
+        const cardSt: React.CSSProperties = { position: "absolute", left: (w - cw) / 2, top: h - ch - 40, width: cw, height: ch, boxSizing: "border-box", transformOrigin: "50% 130%", transform: xform({ x: Math.round(x), y: Math.round(stackY + (1 - enter) * 30), rotate: a, round: true }), opacity: fade(enter), zIndex: i, background: theme.color.surface, border: `1px solid ${theme.color.border}`, borderRadius: theme.radius.lg, borderBottom: `5px solid ${theme.color.border}`, padding: 22, overflow: "hidden" };
         return (
-          <div key={i} data-qa-ignore="overlap covered" style={{ position: "absolute", left: (w - cw) / 2, top: h - ch - 40, width: cw, height: ch, boxSizing: "border-box", transformOrigin: "50% 130%", transform: `translate(${Math.round(x)}px, ${Math.round(stackY + (1 - enter) * 30)}px) rotate(${a.toFixed(3)}deg)`, opacity: enter, zIndex: i, background: theme.color.surface, border: `1px solid ${theme.color.border}`, borderRadius: theme.radius.lg, borderBottom: `5px solid ${theme.color.border}`, padding: 22, overflow: "hidden" }}>
+          <div key={`${i}:${styleKey(cardSt)}`} data-qa-ignore="overlap covered" style={cardSt}>
             {kids ? kids[i] : (
               <>
                 <div style={{ width: 44, height: 44, borderRadius: theme.radius.pill, background: chartColor(theme, i) }} />

@@ -6,13 +6,15 @@
 //  - Coordenadas del MUNDO dentro de <World>; la cámara se mueve con cuadros clave.
 //  - El titular se aparta solo cuando la cámara se acerca (`hideFromScale`).
 //  - Un efecto del catálogo `fx/` (MaskedRise) para empezar desde piezas hechas; ver docs/animaciones.md.
+//  - Diseño por formato (`useFormat().pick`): una disposición para horizontal y otra para vertical.
+//    El mundo mide width x height del formato (no 1920x1080 a mano) y la cámara arranca en su centro.
 //  - Un acercamiento rápido en la acción clave, un clic, un garabato y un atravesado final.
 //  - Termina atravesando un elemento y con un velo (`Wash`) hacia la escena siguiente.
 import React from "react";
-import { useFrame, useVideoConfig } from "../../engine";
+import { useFormat, useFrame } from "../../engine";
 import {
   Cursor, DockedHeadline, DoodleCircle, Stage, Wash, World,
-  cameraAt, hideFromScale, kf, typed, zoomThrough,
+  cameraAt, hideFromScale, kf, zoomThrough,
 } from "../../kit";
 import type { CameraKey } from "../../kit";
 import { MaskedRise } from "../../fx";
@@ -29,47 +31,91 @@ export type SceneProps = {
   subtitle?: string;
 };
 
-// --- Diseño en coordenadas del mundo (1 unidad = 1 px a escala 1, lienzo de 1920x1080) ---
-// Dejamos libre la franja de arriba (y < 170) para el titular en la vista general.
-const PANEL = { x: 260, y: 200, w: 1400, h: 700 };
-const CARD = { w: 400, h: 220 };
-const cardPos = (i: number) => ({ x: PANEL.x + 50 + i * 450, y: PANEL.y + 90 });
-const cardCenter = (i: number) => ({ x: cardPos(i).x + CARD.w / 2, y: cardPos(i).y + CARD.h / 2 });
+// --- Diseño por formato, en coordenadas del mundo (1 unidad = 1 px a escala 1) ---
+// El lienzo mide width x height del formato: 1920x1080 en horizontal, 1080x1920 en vertical (receta completa en
+// docs/guia-escenas.md, sección "Composición"). Margen seguro = theme.safe / 2 por lado (70 px a los costados y 55 arriba con
+// el tema neutro): ningún texto va más cerca del borde. El titular fijo ocupa la franja de arriba (hasta y = 145): la
+// ventana empieza debajo (200 en horizontal, 260 en vertical). En vertical el contenido se apila y llena el cuadro: un
+// diseño horizontal achicado quedaría vacío, y por eso las tarjetas son 4 en dos columnas y la letra sube de escalón.
+type Layout = {
+  panel: { x: number; y: number; w: number; h: number };
+  card: { w: number; h: number };
+  cards: { x: number; y: number }[]; // esquina de cada tarjeta
+  row: { w: number; h: number };
+  rows: { x: number; y: number }[]; // esquina de cada fila
+  cursorHome: { x: number; y: number };
+  zoom: number; // acercamiento a la tarjeta elegida
+  through: { x: number; y: number }; // punto que se atraviesa al final
+};
+const LAYOUTS: { horizontal: Layout; vertical: Layout } = {
+  horizontal: {
+    panel: { x: 260, y: 200, w: 1400, h: 700 },
+    card: { w: 400, h: 220 },
+    cards: [0, 1, 2].map((i) => ({ x: 310 + i * 450, y: 290 })),
+    row: { w: 1300, h: 58 },
+    rows: [0, 1, 2].map((i) => ({ x: 310, y: 560 + i * 76 })),
+    cursorHome: { x: 1500, y: 880 },
+    zoom: 1.8, // tope para ver la tarjeta entera: (1920 - 2 * 70) / 400 = 4,45; 1,8 deja aire
+    through: { x: 1520, y: 740 },
+  },
+  vertical: {
+    panel: { x: 40, y: 260, w: 1000, h: 1400 },
+    card: { w: 440, h: 400 },
+    cards: [0, 1, 2, 3].map((i) => ({ x: 80 + (i % 2) * 480, y: 360 + Math.floor(i / 2) * 430 })),
+    row: { w: 920, h: 96 },
+    rows: [0, 1, 2].map((i) => ({ x: 80, y: 1250 + i * 120 })),
+    cursorHome: { x: 940, y: 1580 },
+    zoom: 2, // tope: (1080 - 2 * 70) / 440 = 2,13; 2 muestra la tarjeta entera con su garabato
+    through: { x: 540, y: 1298 },
+  },
+};
 const PICK = 1; // tarjeta que se destaca
 const FILAS = ["Elemento alfa", "Elemento beta", "Elemento gamma"]; // contenido ficticio
 
 // --- Línea de tiempo (cuadros) ---
+// La vista general se sostiene hasta `hold` con todo el contenido ya adentro: el primer cuadro clave de cámara no se mueve
+// hasta entonces, así que quien mira ve el panel completo y no uno vacío.
 const T = {
-  zoom: 40, // llega al acercamiento sobre la tarjeta elegida
-  click: 62,
-  doodle: 72,
-  through: [112, 149] as [number, number], // atravesado final
+  hold: 26, // termina la vista general (el contenido entra de 0 a 26)
+  zoom: 52, // llega al acercamiento sobre la tarjeta elegida
+  click: 76,
+  doodle: 84,
+  through: [114, 149] as [number, number], // atravesado final
   wash: [133, 149] as [number, number],
 };
 
-// Tres cuadros clave: vista general -> acercamiento rápido -> sostener.
-const KEYS: CameraKey[] = [
-  { f: 0, x: 960, y: 540, scale: 1 },
-  { f: T.zoom, x: cardCenter(PICK).x, y: cardCenter(PICK).y, scale: 1.8 },
-  { f: 110, x: cardCenter(PICK).x, y: cardCenter(PICK).y, scale: 1.8 },
-];
-
-// El final atraviesa un punto del panel; el desenfoque se apaga en ese tramo.
-const THROUGH_TARGET = { x: PANEL.x + PANEL.w - 140, y: PANEL.y + 540 };
-const camera = (f: number) =>
-  cameraAt(f, KEYS, {
-    map: (fr, c) => zoomThrough(fr, T.through, c, THROUGH_TARGET, 40),
+// Cámara: vista general sostenida -> acercamiento rápido -> sostener -> atravesado final (el desenfoque se apaga en ese tramo).
+const makeCamera = (f: number, L: Layout, cx: number, cy: number) => {
+  const c = { x: L.cards[PICK]!.x + L.card.w / 2, y: L.cards[PICK]!.y + L.card.h / 2 };
+  const keys: CameraKey[] = [
+    { f: 0, x: cx, y: cy, scale: 1 },
+    { f: T.hold, x: cx, y: cy, scale: 1 },
+    { f: T.zoom, x: c.x, y: c.y, scale: L.zoom },
+    { f: T.through[0] - 2, x: c.x, y: c.y, scale: L.zoom },
+  ];
+  return cameraAt(f, keys, {
+    map: (fr, cam) => zoomThrough(fr, T.through, cam, L.through, 40),
     noBlurFrom: T.through[0],
   });
+};
 
 /** Contenido de la escena SIN `Stage`: es lo que usa la historia (que ya trae su propio `Stage`). */
 export function SceneBody({ title, subtitle }: SceneProps) {
   const f = useFrame();
   const t = useTheme();
-  const { width, height } = useVideoConfig();
-  const cam = camera(f);
+  const { width, height, pick } = useFormat();
+  const L = pick(LAYOUTS); // cuadrado cae en horizontal: si lo habilitás, agregale su diseño
+  // Tamaños de letra del tema: en vertical suben un escalón (el cuadro es angosto y el sujeto tiene que leerse grande).
+  const fs = pick({
+    horizontal: { label: t.type.eyebrow, value: t.type.stat * 0.6, row: t.type.eyebrow },
+    vertical: { label: t.type.caption, value: t.type.stat * 0.8, row: t.type.caption },
+  });
+  const { panel: PANEL, card: CARD } = L;
+  const cam = makeCamera(f, L, width / 2, height / 2);
   const picked = f >= T.click;
-  const target = cardCenter(PICK);
+  // Con zoom, las tarjetas vecinas quedan cortadas por el borde a propósito (encuadre): solo durante el zoom se silencia `offscreen`.
+  const zoomed = cam.scale > 1.05;
+  const target = { x: L.cards[PICK]!.x + CARD.w / 2, y: L.cards[PICK]!.y + CARD.h / 2 };
 
   return (
     <>
@@ -79,30 +125,31 @@ export function SceneBody({ title, subtitle }: SceneProps) {
           style={{
             position: "absolute", left: PANEL.x, top: PANEL.y, width: PANEL.w, height: PANEL.h,
             background: t.color.surface, border: `1px solid ${t.color.border}`,
-            borderRadius: t.radius.lg, boxShadow: t.shadow.lg, opacity: kf(f, [0, 18], [0, 1]),
+            borderRadius: t.radius.lg, boxShadow: t.shadow.lg, opacity: kf(f, [0, 12], [0, 1]),
           }}
         >
           {/* Efecto del catálogo (docs/animaciones.md): el rótulo sube desde una máscara. Probá también BarsGrow o DigitRoll. */}
           <div style={{ padding: "22px 50px" }}>
-            <MaskedRise text="Panel de ejemplo" start={6} fontSize={t.type.body} by="word" />
+            <MaskedRise text="Panel de ejemplo" start={4} fontSize={t.type.body} by="word" />
           </div>
         </div>
 
-        {[0, 1, 2].map((i) => {
-          const a = kf(f, [8 + i * 6, 26 + i * 6], [0, 1]); // entrada escalonada
+        {L.cards.map((pos, i) => {
+          const a = kf(f, [2 + i * 4, 14 + i * 4], [0, 1]); // entrada escalonada, todas adentro antes de T.hold
           const sel = i === PICK && picked;
           return (
             <div
               key={i}
+              data-qa-ignore={zoomed ? "offscreen" : undefined}
               style={{
-                position: "absolute", left: cardPos(i).x, top: cardPos(i).y + (1 - a) * 30,
+                position: "absolute", left: pos.x, top: pos.y + (1 - a) * 30,
                 width: CARD.w, height: CARD.h, boxSizing: "border-box", padding: 30, opacity: a,
                 background: t.color.surfaceAlt, borderRadius: t.radius.panel,
                 border: `2px solid ${sel ? t.color.accent : t.color.border}`,
               }}
             >
-              <div style={{ fontSize: t.type.eyebrow, color: t.color.textMuted }}>Indicador {i + 1}</div>
-              <div style={{ fontSize: t.type.stat * 0.6, fontWeight: t.font.weights.stat, color: t.color.chart[i % t.color.chart.length] }}>
+              <div style={{ fontSize: fs.label, color: t.color.textMuted }}>Indicador {i + 1}</div>
+              <div style={{ fontSize: fs.value, fontWeight: t.font.weights.stat, color: t.color.chart[i % t.color.chart.length] }}>
                 {(i + 1) * 21}
               </div>
             </div>
@@ -112,11 +159,12 @@ export function SceneBody({ title, subtitle }: SceneProps) {
         {FILAS.map((r, i) => (
           <div
             key={r}
+            data-qa-ignore={zoomed ? "offscreen" : undefined}
             style={{
-              position: "absolute", left: PANEL.x + 50, top: PANEL.y + 360 + i * 76, width: PANEL.w - 100, height: 58,
+              position: "absolute", left: L.rows[i]!.x, top: L.rows[i]!.y, width: L.row.w, height: L.row.h,
               boxSizing: "border-box", display: "flex", alignItems: "center", padding: "0 24px",
               background: t.color.bg, border: `1px solid ${t.color.border}`, borderRadius: t.radius.md,
-              fontSize: t.type.eyebrow, color: t.color.text, opacity: kf(f, [30 + i * 5, 48 + i * 5], [0, 1]),
+              fontSize: fs.row, color: t.color.text, opacity: kf(f, [6 + i * 4, 18 + i * 4], [0, 1]),
             }}
           >
             {r}
@@ -124,14 +172,16 @@ export function SceneBody({ title, subtitle }: SceneProps) {
         ))}
 
         {/* Un garabato sobre lo que importa (también en coordenadas del mundo). Cada uno lleva un `id` único. */}
-        <DoodleCircle start={T.doodle} end={105} id="tpl-circle" cx={target.x} cy={target.y} rx={CARD.w / 2 + 20} ry={CARD.h / 2 + 16} />
+        <DoodleCircle start={T.doodle} end={108} id="tpl-circle" cx={target.x} cy={target.y} rx={CARD.w / 2 + 20} ry={CARD.h / 2 + 16} />
 
         {/* Un clic: el cursor viaja en coordenadas del mundo y la onda sale en cada cuadro de `clicks`. */}
-        <Cursor show={[20, 100]} keys={[[20, 1500, 880], [T.click - 2, target.x + 60, target.y + 50]]} clicks={[T.click]} />
+        <Cursor show={[T.hold - 2, 108]} keys={[[T.hold - 2, L.cursorHome.x, L.cursorHome.y], [T.click - 2, target.x + 60, target.y + 50]]} clicks={[T.click]} />
       </World>
 
-      {/* Fuera del mundo: no se mueve con la cámara. Se aparta cuando la escala pasa de 1. */}
-      <DockedHeadline index={1} title={title} subtitle={subtitle ? typed(subtitle, f, 6, 0.8) : undefined} start={4} hide={hideFromScale(cam.scale)} />
+      {/* Fuera del mundo: no se mueve con la cámara. El subtítulo entra completo con la píldora: un texto que se
+          escribe (`typed`) mientras su contenedor está en fundido (entrada o `hide`) da un falso error de contraste. */}
+      {/* El titular se aparta cuando la escala pasa de 1. */}
+      <DockedHeadline index={1} title={title} subtitle={subtitle} start={4} hide={hideFromScale(cam.scale)} />
       <Wash range={T.wash} />
     </>
   );

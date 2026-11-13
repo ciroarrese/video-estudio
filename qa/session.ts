@@ -1,15 +1,18 @@
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { ensureBundle, launchChromium, newRunId, serveStatic, type PwBrowser, type PwCdp, type PwContext, type PwPage } from '../render/index';
+import { ensureBundle, launchChromium, metaForFormat, newRunId, pageQuery, resolveScene, sceneRange, serveStatic, type PwBrowser, type PwCdp, type PwContext, type PwPage, type VideoMeta as RenderMeta } from '../render/index';
+import type { FormatName, SceneInfo } from '../engine';
 
 export const projectRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 
-export type VideoMeta = { id: string; fps: number; width: number; height: number; durationInFrames: number };
+export type VideoMeta = RenderMeta;
 
 export type Session = {
   meta: VideoMeta;
   pageUrl: string;
   browser: PwBrowser;
+  /** Escenas con nombre del video (declaradas o juntadas de `<Sequence name>`). */
+  scenes(): Promise<SceneInfo[]>;
   /** Opens one more page on the video (own context), ready at frame 0. */
   openPage(): Promise<VideoPage>;
   close(): Promise<void>;
@@ -25,7 +28,14 @@ export type VideoPage = {
   close(): Promise<void>;
 };
 
-export type SessionOptions = { videoId: string; props?: Record<string, unknown>; bundleDir?: string; log?: (m: string) => void };
+export type SessionOptions = { videoId: string; props?: Record<string, unknown>; format?: FormatName; bundleDir?: string; log?: (m: string) => void };
+
+/** Rango de cuadros de `--scene` (o todo el video si no se pidió escena). */
+export async function sceneFrames(session: Session, scene?: string): Promise<[number, number] | undefined> {
+  if (scene === undefined) return undefined;
+  const sc = resolveScene(await session.scenes(), scene);
+  return sceneRange(sc);
+}
 
 /** Serves the compiled runtime and launches Chromium (render/browser.ts + render/server.ts). */
 export async function openSession(o: SessionOptions): Promise<Session> {
@@ -39,7 +49,7 @@ export async function openSession(o: SessionOptions): Promise<Session> {
     throw e;
   }
   const props = o.props ?? {};
-  const pageUrl = `${server.url}/?video=${encodeURIComponent(o.videoId)}${Object.keys(props).length ? `&props=${encodeURIComponent(JSON.stringify(props))}` : ''}`;
+  const pageUrl = `${server.url}/${pageQuery(o.videoId, props, o.format)}`;
   const pages: VideoPage[] = [];
   const open = async (width: number, height: number): Promise<VideoPage> => {
     const context = await browser.newContext({ viewport: { width, height }, deviceScaleFactor: 1 });
@@ -67,6 +77,7 @@ export async function openSession(o: SessionOptions): Promise<Session> {
   };
   // Metadata through a tiny first page.
   let meta: VideoMeta;
+  let scenesOnce: Promise<SceneInfo[]> | undefined;
   {
     const context = await browser.newContext({ viewport: { width: 320, height: 180 }, deviceScaleFactor: 1 });
     try {
@@ -78,7 +89,7 @@ export async function openSession(o: SessionOptions): Promise<Session> {
       const metas = (await page.evaluate(() => (window as any).__ve.videos)) as VideoMeta[];
       const m = metas.find((x) => x.id === o.videoId);
       if (!m) throw new Error(`Video desconocido "${o.videoId}". Disponibles: ${metas.map((x) => x.id).join(', ')}`);
-      meta = m;
+      meta = metaForFormat(m, o.format);
     } catch (e) {
       await context.close().catch(() => {});
       await browser.close().catch(() => {});
@@ -90,6 +101,19 @@ export async function openSession(o: SessionOptions): Promise<Session> {
   return {
     meta, pageUrl, browser,
     openPage: () => open(meta.width, meta.height),
+    // Solo cuando se pide (recorre todos los cuadros una vez), en una pagina chica aparte.
+    scenes: () =>
+      (scenesOnce ??= (async () => {
+        const context = await browser.newContext({ viewport: { width: 320, height: 180 }, deviceScaleFactor: 1 });
+        try {
+          const page = await context.newPage();
+          await page.goto(pageUrl, { waitUntil: 'load' });
+          await page.evaluate(() => (window as any).__ve.ready as Promise<unknown>);
+          return (await page.evaluate(() => (window as any).__ve.scenes())) as SceneInfo[];
+        } finally {
+          await context.close().catch(() => {});
+        }
+      })()),
     async close() {
       await Promise.all(pages.map((p) => p.close()));
       await browser.close().catch(() => {});

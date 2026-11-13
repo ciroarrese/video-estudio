@@ -37,7 +37,7 @@ function bounds(pts: [number, number][]) {
 function Svg({ id, fade, box, children }: { id: string; fade: number; box: ReturnType<typeof bounds>; children: React.ReactNode }) {
   const theme = useTheme();
   return (
-    <svg style={{ position: "absolute", left: 0, top: 0, overflow: "visible", pointerEvents: "none", opacity: fade, zIndex: 40 }} width={1} height={1}>
+    <svg key={fade >= 0.9995 ? "full" : "part"} style={{ position: "absolute", left: 0, top: 0, overflow: "visible", pointerEvents: "none", opacity: fade >= 0.9995 ? undefined : +fade.toFixed(4), zIndex: 40 }} width={1} height={1}>
       <defs>
         {/* userSpaceOnUse: un trazo perfectamente recto (bbox sin alto) igual se pinta */}
         <linearGradient id={safeId(id)} gradientUnits="userSpaceOnUse" x1={box.x1} y1={box.y1} x2={box.x2} y2={box.y2}>

@@ -37,10 +37,11 @@ export async function sampleBackgrounds(vp: VideoPage, runs: TextRun[]): Promise
 export type PageText = {
   /** Un texto por nodo de texto, mas alt/title/aria-label/placeholder/value. */
   nodes: string[];
-  /** Textos de bloque (textContent de cada elemento que no es en linea, y de todo el escenario) y `innerText` del escenario, con espacios colapsados. */
+  /**
+   * Textos de bloque (de cada elemento que no es en linea, y de todo el escenario) y `innerText` del escenario, con espacios colapsados.
+   * El limite entre bloques (o un `<br>`) es \u0001: no es espacio en blanco y no se cruza al buscar; entre items de un flex/grid es \u0002 (se lee como espacio, pero un termino armado con una letra por item si coincide). Ver `scanJoined`.
+   */
   joined: string[];
-  /** Los mismos textos de bloque con TODO el espacio en blanco quitado (para texto armado con un span por letra o por palabra). */
-  squashed: string[];
 };
 
 /**
@@ -51,16 +52,17 @@ export async function collectAllText(vp: VideoPage): Promise<PageText> {
   return evalStr<PageText>(
     vp,
     `(()=>{const root=document.getElementById('stage')||document.body;
-      const nodes=[];const joined=new Set();const squashed=new Set();
+      const nodes=[];const joined=new Set();
       const norm=s=>s.replace(/\\s+/g,' ').trim();
-      const add=s=>{const t=norm(s||'');if(!t)return;joined.add(t);const q=t.replace(/\\s+/g,'');if(q)squashed.add(q);};
+      const add=s=>{const t=norm(s||'');if(t)joined.add(t);};
       const w=document.createTreeWalker(root,NodeFilter.SHOW_TEXT);let n;
       while((n=w.nextNode())){const t=n.data.trim();if(t)nodes.push(t);}
-      // Texto de un bloque: los elementos en linea (y en linea-bloque) se pegan sin separador, el resto separa con un espacio,
-      // para no fabricar un correo o un dominio con el final de un bloque y el inicio del siguiente.
+      // Texto de un bloque: los elementos en linea (y en linea-bloque) se pegan sin separador, el resto separa con \\u0001 (limite de bloque) o con \\u0002 si es un item de flex/grid (vecinos en la misma linea, p. ej. una letra por span),
+      // para no fabricar un correo, un dominio o un termino con el final de un bloque y el inicio del siguiente.
       const flat=e=>{let t='';for(const c of e.childNodes){
         if(c.nodeType===3)t+=c.data;
-        else if(c.nodeType===1&&c.tagName!=='SCRIPT'&&c.tagName!=='STYLE'){const d=getComputedStyle(c).display;if(d==='none')continue;const tight=d==='inline'||d==='contents'||d==='inline-block';t+=(tight?'':' ')+flat(c)+(tight?'':' ');}}
+        else if(c.nodeType===1&&c.tagName==='BR')t+='\\u0001';
+        else if(c.nodeType===1&&c.tagName!=='SCRIPT'&&c.tagName!=='STYLE'){const d=getComputedStyle(c).display;if(d==='none')continue;const tight=d==='inline'||d==='contents'||d==='inline-block';const sp=/flex|grid/.test(getComputedStyle(e).display)?'\\u0002':'\\u0001';t+=(tight?'':sp)+flat(c)+(tight?'':sp);}}
         return t;};
       const els=root.querySelectorAll('*');
       els.forEach(e=>{
@@ -69,7 +71,7 @@ export async function collectAllText(vp: VideoPage): Promise<PageText> {
         const d=getComputedStyle(e).display;
         if(d!=='inline'&&d!=='contents'&&d!=='none')add(flat(e));
       });
-      add(flat(root));add(root.innerText);
-      return {nodes,joined:[...joined],squashed:[...squashed]};})()`,
+      add(flat(root));add((root.innerText||'').replace(/\\n+/g,'\\u0001'));
+      return {nodes,joined:[...joined]};})()`,
   );
 }

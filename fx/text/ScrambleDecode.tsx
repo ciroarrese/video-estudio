@@ -45,7 +45,7 @@ export function ScrambleDecode(props: ScrambleDecodeProps) {
         const w = ch === " " ? measureWidth(" ", fs, font) : measureWidth(ch, fs, font);
         const resolved = shown[i] === ch;
         return (
-          <span key={i} data-qa-ignore={resolved ? undefined : "overlap"} style={{ display: "inline-block", width: w, textAlign: "center", opacity: resolved ? 1 : 0.75 }}>
+          <span key={`${i}${resolved ? "r" : "s"}`} data-qa-ignore={resolved ? undefined : "overlap"} style={{ display: "inline-block", width: w, textAlign: "center", opacity: resolved ? 1 : 0.75 }}>
             {shown[i] === " " ? " " : shown[i]}
           </span>
         );

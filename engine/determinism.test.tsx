@@ -1,6 +1,6 @@
 import { afterEach, beforeAll, describe, expect, it } from 'vitest';
 import { useRef } from 'react';
-import { checkDeterminism, createStage, useFrame, type Stage } from './index';
+import { checkDeterminism, diffHtml, createStage, useFrame, type Stage } from './index';
 import hello from '../examples/hello';
 
 // We drive React roots directly here (no RTL act()).
@@ -30,6 +30,13 @@ describe('checkDeterminism', () => {
     const stage = mk({ id: 'bad', component: Counter, fps: 30, width: 10, height: 10, durationInFrames: 10 });
     const res = await checkDeterminism(stage, [0, 3, 9]);
     expect(res.map((r) => r.ok)).toEqual([false, false, false]);
+    // dice qué elemento cambió y cómo (no solo "falló")
+    expect(res[1]!.diffs![0]).toMatch(/div.*texto cambia.*"3:\d+" vs "3:\d+"/);
+  });
+  it('diffHtml da la ruta, el atributo y los dos valores', () => {
+    const d = diffHtml('<div><p style="left:1px" data-k="a">x</p><p>y</p></div>', '<div><p style="left:2px" data-k="a">x</p><p>y</p></div>');
+    expect(d).toEqual(['div > p:nth-of-type(1) "x" [data-k="a"]: style cambia ("left:1px" vs "left:2px")']);
+    expect(diffHtml('<i>a</i>', '<i>a</i>')).toEqual([]);
   });
   it('passes the hello video', async () => {
     const stage = mk(hello);

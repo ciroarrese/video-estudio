@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { collectStrings, detectDomains, detectEmails, detectPhones, fold, isSafeDomain, matchTerms, parseTermList, scanText } from './privacyCore';
+import { collectStrings, detectDomains, detectEmails, detectPhones, fold, isSafeDomain, matchTerms, parseTermList, scanJoined, scanText } from './privacyCore';
 
 describe('deny list', () => {
   it('parses terms, regexes and comments', () => {
@@ -126,5 +126,33 @@ describe('regex del usuario', () => {
     const t = parseTermList('/secreto-\\d+/');
     const long = `${'x '.repeat(30_000)}SECRETO-42${' y'.repeat(30_000)}`;
     expect(matchTerms(long, t)).toHaveLength(1);
+  });
+});
+
+describe('scanJoined: texto armado de varios elementos', () => {
+  const deny = parseTermList('mercado pago\nAcme Corp', 'auto');
+  const kinds = (t: string) => scanJoined(t, deny).map((h) => `${h.kind}:${h.value}`);
+  it('no fabrica un termino con el final de un elemento y el inicio de otro ("Supermercado" + "Pagó")', () => {
+    expect(kinds('Supermercado\u0001Pagó 120')).toEqual([]);
+    expect(kinds('Supermercado \u0002Pagó 120')).toEqual([]); // vecinos de un flex: no hay limite de palabra al empezar
+    expect(kinds('Supermercadopago')).toEqual([]);
+  });
+  it('no cruza el limite de bloque aunque las palabras sean enteras', () => {
+    expect(kinds('mercado\u0001pago')).toEqual([]);
+    expect(kinds('Hola mercado\u0001Pago hoy')).toEqual([]);
+  });
+  it('un termino partido en spans de UNA linea sigue coincidiendo, con limite de palabra, y se informa aparte', () => {
+    expect(kinds('Hola Acme Corp hoy')).toEqual(['deny-joined:acme corp', 'deny-joined:acmecorp']);
+    expect(kinds('AcmeCorp')).toEqual(['deny-joined:acmecorp']);
+    expect(kinds('A\u0002c\u0002m\u0002e\u0002C\u0002o\u0002r\u0002p')).toEqual(['deny-joined:acmecorp']);
+    expect(kinds('MiAcmeCorp')).toEqual([]); // empieza en medio de una palabra
+    expect(kinds('Acme Corporation')).toEqual([]); // termina en medio de una palabra
+  });
+  it('mercado pago en una sola linea de varios spans: coincide', () => {
+    expect(kinds('Cuenta Mercado Pago activa')).toContain('deny-joined:mercado pago');
+  });
+  it('los correos se buscan por segmento, sin cruzar bloques', () => {
+    expect(scanJoined('persona@dominio-ficticio.com', []).map((h) => h.kind)).toEqual(['email']);
+    expect(scanJoined('persona\u0001@dominio-ficticio.com', []).map((h) => h.kind)).toEqual([]);
   });
 });

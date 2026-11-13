@@ -1,6 +1,6 @@
 import React from "react";
 import { Easing } from "../../engine";
-import { clamp, lerp, progress, roleColor, useFx } from "../core";
+import { clamp, lerp, progress, roleColor, styleKey, useFx, xform } from "../core";
 import type { ColorRole, FxProps } from "../core";
 import { baseText } from "./shared";
 
@@ -46,13 +46,14 @@ export function DigitRoll(props: DigitRollProps) {
   for (let k = N - 1; k >= 0; k--) {
     const shown = k < vis || k === 0;
     const pos = wheelPos(v, k) % 10;
+    const wheel: React.CSSProperties = { position: "absolute", left: 0, top: 0, width: slotW, transform: xform({ y: -pos * lineH, round: true }) };
     slots.push(
       <span
         key={k}
         data-qa-ignore="clip overlap covered offscreen safe-area"
         style={{ display: "inline-block", position: "relative", width: slotW, height: lineH, overflow: "hidden", opacity: shown ? 1 : 0 }}
       >
-        <span style={{ position: "absolute", left: 0, top: 0, width: slotW, transform: `translateY(${Math.round(-pos * lineH)}px)` }}>
+        <span key={styleKey(wheel)} style={wheel}>
           {Array.from({ length: 11 }, (_, d) => (
             <span key={d} style={{ display: "block", height: lineH, lineHeight: `${lineH}px`, textAlign: "center" }}>
               {d % 10}
@@ -69,20 +70,20 @@ export function DigitRoll(props: DigitRollProps) {
       );
     }
   }
+  // El sufijo solo lleva opacidad, tamano y traslado mientras aterriza.
+  const sufStyle: React.CSSProperties = {
+    display: "inline-block",
+    marginLeft: fs * 0.08,
+    color: roleColor(theme, suffixColor),
+    opacity: sufP > 0 ? undefined : 0,
+    fontSize: sufP >= 1 ? undefined : `${(fs * (0.6 + 0.4 * sufP)).toFixed(1)}px`,
+    transform: xform({ y: (1 - sufP) * fs * 0.5, round: true }),
+  };
   return (
     <div style={{ ...baseText(theme, { fontSize: fs, color: props.color, weight: props.weight ?? theme.font.weights.stat }), display: "flex", alignItems: "center", lineHeight: 1, ...style }}>
       {slots}
       {suffix && (
-        <span
-          style={{
-            display: "inline-block",
-            marginLeft: fs * 0.08,
-            color: roleColor(theme, suffixColor),
-            opacity: sufP > 0 ? 1 : 0,
-            fontSize: sufP >= 1 ? undefined : `${(fs * (0.6 + 0.4 * sufP)).toFixed(1)}px`,
-            transform: `translateY(${Math.round((1 - sufP) * fs * 0.5)}px)`,
-          }}
-        >
+        <span key={styleKey(sufStyle)} style={sufStyle}>
           {suffix}
         </span>
       )}

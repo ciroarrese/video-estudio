@@ -181,6 +181,94 @@ describe('rules on plain data', () => {
   });
 });
 
+describe('formato vertical: los umbrales se miden sobre el lado corto', () => {
+  const V = { width: 1080, height: 1920 };
+  const at = (r: TextRun, rules: Parameters<typeof runRules>[1]) => runRules({ frame: 0, ...V, runs: [r], thresholds: DEFAULT_THRESHOLDS } as RuleContext, rules);
+  it('min-size: 1080x1920 pide 18 px (no 32 como si el alto fuera el lado de referencia)', () => {
+    expect(at(run({ screenPx: 17, rect: { x: 100, y: 900, w: 300, h: 30 } }), ['min-size']).map((x) => x.severity)).toEqual(['error']);
+    expect(at(run({ screenPx: 18, rect: { x: 100, y: 900, w: 300, h: 30 } }), ['min-size'])).toEqual([]);
+    expect(at(run({ screenPx: 24, rect: { x: 100, y: 900, w: 300, h: 30 } }), ['min-size'])).toEqual([]);
+    const f = at(run({ screenPx: 10, rect: { x: 100, y: 900, w: 300, h: 30 } }), ['min-size'])[0]!;
+    expect(f.message).toContain('minimo 18.0px');
+  });
+  it('contrast: texto grande desde 24 px en 1080x1920 (3:1 alcanza), y de 23 px es chico (pide 4.5:1)', () => {
+    // gris que da ~3.9:1 sobre blanco: error si no es grande, nada si es grande
+    const base = { color: 'rgba(130,130,130,1)', bg: { r: 255, g: 255, b: 255, samples: 9 } };
+    const sev = (px: number) => contrastRule.check({ frame: 0, ...V, runs: [run({ ...base, screenPx: px })], thresholds: DEFAULT_THRESHOLDS })[0]?.severity;
+    expect(sev(23)).toBe('warn');
+    expect(sev(24)).toBeUndefined();
+    expect(isLargeText(24, false, 1080, DEFAULT_THRESHOLDS.contrast)).toBe(true);
+    expect(isLargeText(23.9, false, 1080, DEFAULT_THRESHOLDS.contrast)).toBe(false);
+  });
+  it('en 1080x1080 (cuadrado) igual: 18 / 24', () => {
+    const sq = (r: TextRun) => runRules({ frame: 0, width: 1080, height: 1080, runs: [r], thresholds: DEFAULT_THRESHOLDS } as RuleContext, ['min-size']);
+    expect(sq(run({ screenPx: 17.4, rect: { x: 100, y: 500, w: 300, h: 30 } }))).toHaveLength(1);
+    expect(sq(run({ screenPx: 18, rect: { x: 100, y: 500, w: 300, h: 30 } }))).toHaveLength(0);
+  });
+});
+
+describe('offscreen: la decision se explica en el mensaje', () => {
+  const cam = { rect: { x: -120, y: 300, w: 300, h: 40 }, transformed: true }; // 40 % recortado bajo zoom
+  const one = (extra: Partial<TextRun>) => check([run({ ...cam, ...extra })], ['offscreen'])[0]!;
+  it('texto que APARECE (fundido) con la camara quieta y recortado: error, con el arreglo', () => {
+    const f = one({ motion: 0, fade: 0.06, opacity: 0.5 });
+    expect(f.severity).toBe('error');
+    expect(f.message).toMatch(/camara esta quieta en este cuadro/);
+    expect(f.message).toMatch(/aparece \(fundido\)/);
+    expect(f.message).toMatch(/Arreglo: moverlo dentro del cuadro, o hacerlo aparecer despues/);
+  });
+  it('mismo recorte, estable (sin fundido ni movimiento): aviso de encuadre', () => {
+    const f = one({ motion: 0, fade: 0 });
+    expect(f.severity).toBe('warn');
+    expect(f.message).toMatch(/aviso porque/);
+  });
+  it('en movimiento: info (aunque se funda a la vez)', () => {
+    expect(one({ motion: 80, fade: 0.1 }).severity).toBe('info');
+  });
+  it('sin camara: error y dice por que; rebaba chica bajo camara: error y lo dice', () => {
+    const plain = check([run({ rect: { x: 1800, y: 300, w: 300, h: 40 } })], ['offscreen'])[0]!;
+    expect(plain.severity).toBe('error');
+    expect(plain.message).toMatch(/no hay camara\/zoom que lo explique/);
+    const sliver = one({ rect: { x: -8, y: 300, w: 300, h: 40 } });
+    expect(sliver.severity).toBe('error');
+    expect(sliver.message).toMatch(/rebaba/);
+  });
+});
+
+describe('contrast bajo un velo de cuadro completo', () => {
+  // texto claro sobre acento: bajo un velo claro a medio fundido queda ~2.2:1
+  const base = { color: 'rgba(255,255,255,1)', bg: { r: 159, g: 173, b: 203, samples: 9 }, screenPx: 30 };
+  const veil = (fade: number | undefined) => ({ key: 'v', opacity: 0.55, testid: 'wash', ...(fade === undefined ? {} : { fade }) });
+  const out = (v: TextRun['veil']) => contrastRule.check({ frame: 0, width: W, height: H, runs: [run({ ...base, veil: v })], thresholds: DEFAULT_THRESHOLDS })[0]!;
+  it('velo que cruza (su opacidad cambia entre cuadros vecinos): info', () => {
+    const f = out(veil(0.06));
+    expect(f.severity).toBe('info');
+    expect(f.message).toMatch(/velo de cuadro completo que cruza/);
+  });
+  it('velo quieto o sin medir: sigue siendo error', () => {
+    expect(out(veil(0)).severity).toBe('error');
+    expect(out(veil(undefined)).severity).toBe('error');
+    expect(out(veil(0)).message).toMatch(/QUIETO/);
+    expect(out(null).severity).toBe('error');
+  });
+});
+
+describe('contrast con la superficie del fondo en fundido', () => {
+  // texto claro sobre un panel oscuro a medio entrar sobre un video claro: el fondo muestreado es gris medio
+  const base = { color: 'rgba(169,174,198,1)', bg: { r: 134, g: 137, b: 149, samples: 9 }, screenPx: 30, opacity: 0.5 };
+  const out = (p: Partial<TextRun>) => contrastRule.check({ frame: 0, width: W, height: H, runs: [run({ ...base, ...p })], thresholds: DEFAULT_THRESHOLDS })[0]!;
+  it('el panel y el texto entran a la vez (fade > 0 y superficie con opacidad < 1): info', () => {
+    const f = out({ fadingBg: true, fade: 0.05 });
+    expect(f.severity).toBe('info');
+    expect(f.message).toMatch(/superficie de su fondo/);
+  });
+  it('quieto, o con el fundido solo en el texto (sin superficie que se funda): sigue siendo error', () => {
+    expect(out({ fadingBg: true, fade: 0 }).severity).not.toBe('info');
+    expect(out({ fadingBg: false, fade: 0.05 }).severity).toBe('error');
+    expect(out({ fade: 0.05 }).severity).toBe('error');
+  });
+});
+
 describe('thresholds', () => {
   it('merges overrides and rejects unknown ones', () => {
     expect(mergeThresholds({ overlap: { ratio: 0.5 } }).overlap.ratio).toBe(0.5);
@@ -190,5 +278,33 @@ describe('thresholds', () => {
   it('parses --set assignments', () => {
     expect(parseOverrides(['overlap.ratio=0.3', 'min-size.minPx1080=20'])).toEqual({ overlap: { ratio: 0.3 }, 'min-size': { minPx1080: 20 } });
     expect(() => parseOverrides(['bad'])).toThrow();
+  });
+});
+
+describe('transiciones con movimiento lento y fundidos al final del easing', () => {
+  const rect = { x: 1700, y: 300, w: 240, h: 40 }; // sobresale 20 px
+  const sliver = { x: 1700, y: 300, w: 224, h: 40 }; // sobresale 4 px
+  it('offscreen: una rebaba chica bajo camara en movimiento es info; con la camara quieta, error; una grande en movimiento lento, sigue el criterio de antes', () => {
+    expect(check([run({ rect: sliver, transformed: true, motion: 3 })], ['offscreen'])[0]!.severity).toBe('info');
+    expect(check([run({ rect: sliver, transformed: true, motion: 0 })], ['offscreen'])[0]!.severity).toBe('error');
+    expect(check([run({ rect: sliver, transformed: false, motion: 3 })], ['offscreen'])[0]!.severity).toBe('error'); // sin camara no hay excusa
+    expect(check([run({ rect, transformed: true, motion: 3 })], ['offscreen'])[0]!.severity).not.toBe('info');
+  });
+  it('overlap y covered: un elemento que se mueve mas de motion.crossPx (menos que motion.px) es una transicion', () => {
+    const a = { x: 100, y: 100, w: 300, h: 40 };
+    const pair = (motion: number) => check([run({ rect: a, motion }), run({ rect: a, motion: 0 })], ['overlap'])[0]!.severity;
+    expect(pair(6)).toBe('info');
+    expect(pair(0)).toBe('error');
+    const cover = (motion: number) => ({ id: 99, key: 'c', tag: 'div', testid: 'c', text: '', rect: a, ignore: [], motion });
+    expect(check([run({ rect: a, cover: cover(6), motion: 0 })], ['covered'])[0]!.severity).toBe('info');
+    expect(check([run({ rect: a, cover: cover(0), motion: 0 })], ['covered'])[0]!.severity).toBe('error');
+  });
+  it('contrast: texto en movimiento es info; quieto, error; un fundido lento (0.01 por cuadro) se juzga por su color, no por la opacidad compuesta', () => {
+    const bad = { color: 'rgba(210,210,210,1)', bg: { r: 242, g: 242, b: 242, samples: 9 } };
+    expect(check([run({ ...bad, motion: 8 })], ['contrast'])[0]!.severity).toBe('info');
+    expect(check([run({ ...bad, motion: 0, fade: 0 })], ['contrast'])[0]!.severity).toBe('error');
+    const gray = { color: 'rgba(107,107,107,1)', bg: { r: 255, g: 255, b: 255, samples: 9 }, opacity: 0.5 };
+    expect(check([run({ ...gray, motion: 0, fade: 0 })], ['contrast'])[0]!.severity).toBe('error');
+    expect(check([run({ ...gray, motion: 0, fade: 0.01 })], ['contrast'])).toEqual([]);
   });
 });

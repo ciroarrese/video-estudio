@@ -15,7 +15,29 @@ Cada pieza es una función pura del cuadro (de `useFrame()` o de una prop `frame
 - **Texto y fondo**: `<GradientText>` (degradado del tema, `pan` opcional), `<CloudBackground>` (manchas de `theme.cloud`), `<CountUp from to start duration format?>`.
 - **Titular**: `<DockedHeadline index title subtitle frame start hide>` y `hideFromScale(scale, umbral?, rango?)` para que se aparte cuando la cámara se acerca.
 - **Vuelo**: `flight(frame, [ini, fin], from, to, {arc})` y `<FlyingCard>` (arco y estela).
+- **Tema por ámbito**: `<ThemeScope theme paint? style?>` cambia el tema de un subárbol (se anida); con `paint` pinta fondo, texto y tipografía del tema; declara el `@font-face` de sus fuentes y espera su carga. Ver `themes/README.md`.
 - **Escena**: `<Stage>` fondo, tipografía y nubes opcionales del tema.
+
+## Referencia de firmas
+
+Props exactas de las piezas que más se usan (todas aceptan `frame?` para fijar el cuadro; sin él leen el del motor). Los `?` son opcionales y `=` marca el valor por defecto.
+
+| Pieza | Props | Notas |
+|---|---|---|
+| `DockedHeadline` | `index: number`, `title: string`, `subtitle?: string`, `start = 0`, `hide = 0` | Píldora fija en pantalla (fuera de `World`), en `left = theme.safe.x / 2`, `top = theme.safe.y / 2`. `index` es el número que se muestra (`01`, `02`...; empieza en 1 porque se muestra tal cual). Entra en `start..start + 18`; `hide` (0 a 1) la aparta: pasale `hideFromScale(cam.scale)`. |
+| `hideFromScale` | `(scale, threshold = 1, range = 0.08)` | 0 con escala 1, 1 desde `1,08`. |
+| `FlyingCard` | `range: [ini, fin]`, `from: {x, y}`, `to: {x, y}`, `arc = 0`, `width`, `height`, `trail = 5`, `trailLag = 1.5`, `hideBefore = true`, `hideAfter = false`, `children` | `from`/`to` son el **centro** de la tarjeta; los hijos se dibujan en `width x height` centrados ahí. Antes de `range[0]` no se dibuja (`hideBefore`; con `hideBefore={false}` espera en `from`), y después de `range[1]` queda en `to` (`hideAfter` la oculta): la tarjeta "real" del origen sigue ahí hasta que arranca el vuelo, y mientras vuela dejá un hueco punteado. `arc` en px, el signo elige el lado. |
+| `Cursor` | `keys: [cuadro, x, y][]`, `clicks?: number[]`, `show: [ini, fin]` | Coordenadas del mundo (va dentro de `World`). La última parada antes de cada clic, 2 cuadros antes. `show` más largo que 20 cuadros hace fundido de 10 al entrar y al salir. |
+| `DoodleCircle` | `id`, `start`, `end = 99999`, `cx`, `cy`, `rx`, `ry`, `boil = 3`, `width = 5` | Elipse centrada en `(cx, cy)`. `end` es el cuadro donde empieza a desvanecerse (dura 10). |
+| `DoodleArrow` | `id`, `start`, `end`, `x1`, `y1`, `x2`, `y2`, `bend = 0.25`, `boil = 3`, `width = 6` | De `(x1, y1)` a `(x2, y2)` con la punta en el segundo; `bend` curva el trazo (el signo elige el lado). |
+| `DoodleUnderline` | `id`, `start`, `end`, `x`, `y`, `length`, `boil = 3`, `width = 5` | Raya horizontal desde `(x, y)` hacia la derecha. |
+| `Wash` | `range: [ini, fin]`, `color?` | Velo de cuadro completo (color del fondo del tema por defecto). Va fuera de `World`, al final del contenido. Lleva `data-qa-veil` para que `qa` lo trate como transición. |
+| `ThemeScope` | `theme: Theme`, `paint = false`, `style?`, `children` | Cambia el tema de un subárbol. Con `paint`, pinta una superficie (el `style` le da posición, tamaño, radio y sombra). Ver `docs/guia-escenas.md`, sección 10. |
+| `World` | `camera`, `width`, `height`, `perspective = 2400`, `children` | `width`/`height` del formato (`useFormat()`), no 1920x1080 escritos a mano. |
+| `Stage` | `clouds = true`, `cloudOpacity?`, `children` | Fondo, tipografía y nubes del tema. |
+| `Vignette` | `amount: number` (0 a 1) | Oscurece los bordes con el acento; usala con el zoom. |
+| `CountUp` | `from = 0`, `to`, `start`, `duration`, `format?`, `style?` | Número que cuenta. |
+| `GradientText` | `children`, `pan = 0`, `style?` | Texto con el degradado del tema. |
 
 ## Precondiciones
 
@@ -50,4 +72,6 @@ function Scene() {
 export const Video = () => <ThemeProvider theme={neutral}><Scene /></ThemeProvider>;
 ```
 
-Ejemplo completo: `examples/kit-demo` (`/?video=kit-demo&props={"theme":"dark"}`).
+`Cursor` ubica la flecha en píxeles enteros (`left`/`top` redondeados): con un `scale()` en un ancestro, una posición fraccionaria hacía fallar `--check`.
+
+Ejemplos: `examples/theme-scope` (cambio de tema por ámbito). Ejemplo completo: `examples/kit-demo` (`/?video=kit-demo&props={"theme":"dark"}`).

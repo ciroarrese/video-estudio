@@ -3,3 +3,5 @@ dist
 out
 .ve-cache/
 videos/
+public/sfx/
+public/audio-*

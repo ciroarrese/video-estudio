@@ -18,11 +18,16 @@ npm run render -- kit-demo                 # out/kit-demo.mp4 (video de ejemplo,
 npm run sheet -- kit-demo --count 12       # out/kit-demo-sheet.png: hoja de cuadros
 npm run qa -- kit-demo                     # control de calidad automático
 npm run privacy -- kit-demo --deny lista.txt   # chequeo de privacidad (lista.txt: un término por línea)
-npm run dev                                # vista en el navegador: /?video=kit-demo
+npm run dev                                # vista en el navegador: /?video=kit-demo (y &format=vertical)
+npm run render -- --list                   # videos descubiertos (examples/* y videos/*), con tamaños y formatos; al final, las carpetas que no cargaron
+npm run render -- hello --format vertical  # vertical (1080x1920 / 720x1280); también cuadrado
+npm run sheet -- hello --format vertical --count 8   # out/hello-vertical-sheet.png
+npm run render -- story-demo --list-scenes # escenas con nombre; --scene <id|índice> renderiza solo una
+npm run qa -- story-demo --list-scenes     # lo mismo y, en una historia, el presupuesto de cuadros por bloque
 npm run sheet -- fx-text --count 8         # galería del catálogo de efectos (también fx-3d y fx-data-ui-art)
 ```
 
-Catálogo de efectos listos (texto, 3D, datos, interfaz y arte): [docs/animaciones.md](docs/animaciones.md), con tres galerías para verlos: `fx-text`, `fx-3d` y `fx-data-ui-art` (`/?video=fx-3d&props={"theme":"dark"}`). Otros ejemplos: `hello`, `story-demo` (historia con apertura, vueltas al listado y cierre), `qa-defects` (defectos sembrados para probar el QA). Cada comando y sus opciones: [render/README.md](render/README.md) y [qa/README.md](qa/README.md). Pruebas y tipos: `npm test`, `npm run typecheck`.
+Catálogo de efectos listos (texto, 3D, datos, interfaz y arte): [docs/animaciones.md](docs/animaciones.md), con tres galerías para verlos: `fx-text`, `fx-3d` y `fx-data-ui-art` (`/?video=fx-3d&props={"theme":"dark"}`). Sonido (tempo, empalme al compás, efectos propios y mezcla): [docs/audio.md](docs/audio.md). Otros ejemplos: `hello`, `fx-in-scene` (regresión: efectos montados desde el cuadro 0 dentro de una escena, sin residuos antes de su `start` ni después de terminar), `story-demo` (historia con apertura, vueltas al listado y cierre), `qa-defects` (defectos sembrados para probar el QA). Un video roto no deja inservibles a los demás (solo falla el que tiene el problema) y los tamaños tienen que ser pares. Cada comando y sus opciones: [render/README.md](render/README.md) y [qa/README.md](qa/README.md) (con el criterio de severidad de `offscreen` y del velo en `contrast`). Pruebas y tipos: `npm test`, `npm run typecheck`.
 
 ## Mapa de carpetas
 
@@ -32,14 +37,15 @@ Catálogo de efectos listos (texto, 3D, datos, interfaz y arte): [docs/animacion
 | `kit/` | Cámara, cursor, garabatos, titular que se aparta, vuelo de tarjetas, velo, números que cuentan |
 | `themes/` | Tema neutro y oscuro, adaptador de tokens de un design system, chequeo de contraste |
 | `fx/` | Catálogo de efectos listos y deterministas: texto, 3D, datos, interfaz y arte (`docs/animaciones.md`) |
-| `stories/` | Apertura, vuelta al listado y cierre armados desde un solo objeto de configuración |
+| `stories/` | Apertura, vuelta al listado y cierre armados desde un solo objeto de configuración, con su presupuesto de cuadros (`storyBudget`) |
+| `audio/` | `tempo`, `empalme`, `efectos` y `mezcla` (`npm run audio -- <comando>`); ver `docs/audio.md` |
 | `render/` | `ve-render`: captura con Chromium y MP4 con ffmpeg, en paralelo y por partes |
 | `qa/` | `ve-qa`, `ve-sheet`, `ve-privacy`: control de calidad, hoja de cuadros y privacidad |
-| `examples/` | Videos cortos genéricos con datos ficticios y las galerías del catálogo (`fx-text`, `fx-3d`, `fx-data-ui-art`) |
+| `examples/` | Videos cortos genéricos con datos ficticios, las galerías del catálogo (`fx-text`, `fx-3d`, `fx-data-ui-art`) y `fx-in-scene` |
 | `templates/` | Escena e historia de arranque (con `nuevo.sh` para copiarlas) |
-| `docs/` | Reglas de producción (con la lista de determinismo), guía de escenas, catálogo de animaciones, origen del motor |
+| `docs/` | Reglas de producción (con la lista de determinismo), guía de escenas, catálogo de animaciones, sonido, origen del motor |
 | `.claude/` | Skill `video-estudio` (cuestionario y etapas con aprobación) |
-| `videos/` | Los videos que se producen (`videos/<slug>/`); lo crea la skill |
+| `videos/` | Los videos que se producen (`videos/<slug>/`). No existe en un clon nuevo: lo crea la skill (o `templates/nuevo.sh`) y se descubre solo |
 | `public/` | Fuentes, imágenes y música con licencia, referenciadas con `asset()` |
 
 ## Hacer un video nuevo
@@ -51,13 +57,15 @@ Abrí el repo con Claude Code y pedí lo que necesitás: "haceme un video de pre
 2. **Tema**: el design system pasado a tokens, con informe de contraste.
 3. **Guion** por escena (tiempos, qué se ve, efecto, texto, fuente).
 4. **Escenas de a una**, con QA, privacidad, hoja de cuadros y un MP4 de esa escena.
-5. **Armado**: apertura, vueltas al listado, cierre, música, render final y verificación.
+5. **Armado**: apertura, vueltas al listado, cierre, sonido (efectos, música, mezcla), render final y verificación.
 
-Las reglas de producción y sus motivos: [docs/reglas.md](docs/reglas.md). Cómo se escribe una escena: [docs/guia-escenas.md](docs/guia-escenas.md). Qué efecto usar: [docs/animaciones.md](docs/animaciones.md). Convenciones para agentes en este repo: [CLAUDE.md](CLAUDE.md).
+Cada etapa exige lo anterior aprobado: sobre todo, el guion (con su presupuesto de cuadros) antes que cualquier escena.
+
+Las reglas de producción y sus motivos: [docs/reglas.md](docs/reglas.md) (con "Qué hacer cuando --check falla"). Cómo se escribe una escena: [docs/guia-escenas.md](docs/guia-escenas.md). Qué efecto usar: [docs/animaciones.md](docs/animaciones.md). Convenciones para agentes en este repo: [CLAUDE.md](CLAUDE.md).
 
 ## Licencias
 
 - El repo no incluye fuentes, música, efectos de sonido, logos ni marcas de terceros. Quien los agrega es responsable de que su licencia permita usarlos en el lugar donde se va a mostrar el video y, si se suben al repo, redistribuirlos.
 - Los datos, nombres y cifras de los ejemplos son ficticios.
 - Licencia del código del repo: MIT (ver `LICENSE`).
-- La carpeta `videos/` no se sube al repo (está en `.gitignore`): ahí viven los guiones y las escenas de cada persona. Por eso la línea de import de un video propio en `engine/runtime/videos.ts` tampoco se sube.
+- La carpeta `videos/` no se sube al repo (está en `.gitignore`): ahí viven los guiones y las escenas de cada persona. El motor descubre solo las carpetas `videos/<slug>/` (no hay que editar `engine/runtime/videos.ts`), así que un video propio no deja cambios locales en el motor.

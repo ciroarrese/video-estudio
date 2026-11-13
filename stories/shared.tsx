@@ -1,11 +1,26 @@
 import React, { useEffect } from "react";
-import { asset, holdRender, releaseRender } from "../engine";
-import { GradientText, kf } from "../kit";
+import { asset, holdRender, releaseRender, useFrame, useVideoConfig } from "../engine";
+import { CloudBackground, GradientText, Stage, kf } from "../kit";
 import { themeEasing } from "../kit/util";
 import { useTheme, withAlpha } from "../themes";
 import type { ListLayout } from "./layout";
-import { ROW_GAP, fitText } from "./layout";
+import { ROW_GAP, fitText, pillFit } from "./layout";
 
+
+/**
+ * `Stage` con las nubes del tamaño del cuadro: el fondo de `kit` se reparte por 1920×1080 y en vertical o cuadrado
+ * quedaba como una franja arriba; acá se lo pide con el ancho y el alto reales (en horizontal es idéntico).
+ */
+export function StoryStage({ frame, children }: { frame?: number; children?: React.ReactNode }) {
+  const { width, height } = useVideoConfig();
+  const cur = useFrame();
+  return (
+    <Stage clouds={false} frame={frame}>
+      <CloudBackground frame={frame ?? cur} width={width} height={height} />
+      {children}
+    </Stage>
+  );
+}
 
 /** Escala los cuadros de un bloque cuando su duración se pisa con `timing`. */
 export const scaler = (dur: number, base: number) => (n: number) => (n * dur) / base;
@@ -36,9 +51,9 @@ export function Chip({ text, lit, pop, faint }: { text: string; lit: number; pop
 }
 
 /** Píldora con el número y el nombre del tema (cierre, ~34 px de letra). */
-export function Pill({ index, name, scale = 1, glow = 0 }: { index: number; name: string; scale?: number; glow?: number }) {
+export function Pill({ index, name, scale = 1, glow = 0, maxW }: { index: number; name: string; scale?: number; glow?: number; /** Ancho total máximo (px): achica la letra y corta con "…" (ver `pillFit`). */ maxW?: number }) {
   const theme = useTheme();
-  const t = fitText(name, 560, theme.type.caption * 1.06, { min: theme.type.caption * 0.8 });
+  const t = pillFit(theme, name, maxW);
   return (
     <div
       style={{
@@ -55,7 +70,7 @@ export function Pill({ index, name, scale = 1, glow = 0 }: { index: number; name
         transformOrigin: "50% 50%",
       }}
     >
-      <GradientText style={{ fontSize: Math.max(26, t.size * 0.8), fontWeight: theme.font.weights.stat }}>{String(index + 1).padStart(2, "0")}</GradientText>
+      <GradientText style={{ fontSize: t.numSize, fontWeight: theme.font.weights.stat }}>{String(index + 1).padStart(2, "0")}</GradientText>
       <span style={{ fontSize: t.size, fontWeight: theme.font.weights.semibold, color: theme.color.text }}>{t.text}</span>
     </div>
   );
@@ -96,7 +111,29 @@ export function HeadlineRow({
   style?: React.CSSProperties;
 }) {
   const theme = useTheme();
-  const barTop = L.blockTop + L.nameH + ROW_GAP.a + L.lineH + ROW_GAP.b;
+  if (L.stacked) {
+    const nameTop = L.blockTop + L.numH + L.numGap;
+    return (
+      <div style={{ position: "absolute", left: L.left, top: L.top + i * L.rowH, width: L.rowW, height: L.rowH, opacity, ...style }}>
+        <div style={{ position: "absolute", left: 0, top: L.blockTop, width: L.rowW, opacity: quiet }}>
+          <div style={{ height: L.numH, lineHeight: `${L.numH}px`, fontSize: L.numSize, fontWeight: theme.font.weights.stat, position: "relative", whiteSpace: "nowrap" }}>
+            {number ?? <GradientText>{String(i + 1).padStart(2, "0")}</GradientText>}
+          </div>
+          <div style={{ position: "absolute", left: 0, top: nameTop - L.blockTop, fontSize: L.nameSize, lineHeight: `${L.nameH}px`, height: L.nameH, fontWeight: theme.font.weights.semibold, color: theme.color.text, letterSpacing: "-0.02em", whiteSpace: "nowrap" }}>{L.names[i]}</div>
+          <div style={{ position: "absolute", left: 0, top: nameTop - L.blockTop + L.nameH + ROW_GAP.a, fontSize: L.lineSize, lineHeight: `${L.lineH}px`, color: theme.color.textMuted, whiteSpace: "nowrap" }}>
+            {L.lineRows[i]!.map((r, k) => <div key={k}>{r}</div>)}
+          </div>
+        </div>
+        <div
+          style={{
+            position: "absolute", left: L.barLeft, top: L.barTop, height: ROW_GAP.bar, borderRadius: theme.radius.pill, width: Math.round(L.barW * underline),
+            background: theme.gradient.brand, boxShadow: underline > 0.02 ? `0 0 18px ${withAlpha(theme.color.accent, 0.5)}` : undefined, opacity: underlineOpacity,
+          }}
+        />
+      </div>
+    );
+  }
+  const barTop = L.barTop;
   return (
     <div style={{ position: "absolute", left: L.left, top: L.top + i * L.rowH, width: L.rowW, height: L.rowH, opacity, ...style }}>
       <div style={{ position: "absolute", left: 0, top: L.blockTop, width: L.rowW, opacity: quiet }}>
@@ -111,7 +148,7 @@ export function HeadlineRow({
       <div
         style={{
           position: "absolute",
-          left: L.numW,
+          left: L.barLeft,
           top: barTop,
           height: ROW_GAP.bar,
           borderRadius: theme.radius.pill,

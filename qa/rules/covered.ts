@@ -17,7 +17,7 @@ export const coveredRule: Rule = {
   description: 'Texto tapado por otro elemento opaco',
   check({ frame, width, height, runs, thresholds }) {
     const t = thresholds.covered;
-    const px = thresholds.motion.px;
+    const px = thresholds.motion.crossPx;
     const byCover = new Map<number, typeof runs>();
     for (const r of runs) {
       const c = r.cover;

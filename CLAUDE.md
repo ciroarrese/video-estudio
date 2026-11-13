@@ -1,6 +1,6 @@
 # video-estudio: convenciones para agentes
 
-Herramienta para producir videos animados con un motor propio (TypeScript + React 18). Para hacer un video seguí la skill `.claude/skills/video-estudio/SKILL.md`; las reglas están en `docs/reglas.md`, la guía de escenas en `docs/guia-escenas.md` y el catálogo de efectos listos (`fx/`) en `docs/animaciones.md`: usalo antes de escribir una animación desde cero.
+Herramienta para producir videos animados con un motor propio (TypeScript + React 18). Para hacer un video seguí la skill `.claude/skills/video-estudio/SKILL.md`; las reglas están en `docs/reglas.md`, la guía de escenas en `docs/guia-escenas.md`, el sonido en `docs/audio.md` y el catálogo de efectos listos (`fx/`) en `docs/animaciones.md`: usalo antes de escribir una animación desde cero.
 
 ## Idioma
 
@@ -15,17 +15,17 @@ Herramienta para producir videos animados con un motor propio (TypeScript + Reac
 - **Privacidad**: repo público. Sin nombres de empresas, clientes o personas reales, sin credenciales, correos ni dominios internos, en ningún archivo. Cifras emuladas y nombres ficticios por defecto. Lo que la persona dice que no puede aparecer va en `videos/<slug>/prohibidos.txt` y se verifica con `ve-privacy`.
 - **Licencias**: no agregar fuentes, música, imágenes ni marcas sin verificar que su licencia permita usarlas donde se va a mostrar el video y redistribuirlas.
 - **Origen del motor**: no leer ni copiar código fuente de otros frameworks de video; ver `docs/ORIGEN.md`.
-- **Ámbito**: para producir un video no se edita `engine/`, `kit/`, `themes/`, `render/`, `stories/`, `fx/` ni `qa/` (la única excepción es la línea de import en `engine/runtime/videos.ts`); las escenas viven en `videos/<slug>/`. Si falta una pieza, anotarlo y pedirlo.
+- **Ámbito**: para producir un video no se edita `engine/`, `kit/`, `themes/`, `render/`, `stories/`, `fx/` ni `qa/` (no hay excepciones: los videos se descubren solos); las escenas viven en `videos/<slug>/`. Si falta una pieza, anotarlo y pedirlo.
 
 ## Antes de dar algo por terminado
 
 ```bash
 npm run typecheck
 npm test
-npm run render -- <id> --check          # determinismo
+npm run render -- <id> --check          # determinismo (repetir con --format vertical y cuadrado si el video los admite)
 npm run qa -- <id> --count 40           # control de calidad
 npm run privacy -- <id> --deny videos/<slug>/prohibidos.txt --scan-source videos/<slug>
 npm run sheet -- <id> --count 12        # y mirar la hoja
 ```
 
-Los videos se registran con una línea de import en `engine/runtime/videos.ts`.
+Los videos no se registran a mano: el runtime descubre toda carpeta `examples/*/index.ts(x)` y `videos/<slug>/index.ts(x)` (también `videos/<slug>/<carpeta>/index.ts(x)`); `npm run render -- --list` muestra los que ve. Un `id` repetido entre dos carpetas falla con un error que nombra las dos. Formatos: `--format horizontal|vertical|cuadrado` en render, qa y sheet (el video los habilita con `formats` en `defineVideo`); una escena sola: `--scene <id|índice>` y `--list-scenes`.

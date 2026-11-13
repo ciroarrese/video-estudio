@@ -165,7 +165,7 @@ describe("degenerate inputs", () => {
     expect(html(<CountUp to={50} start={5} duration={0} />, neutral, 4)).toContain(">0<");
     expect(html(<CountUp to={50} start={5} duration={0} />, neutral, 5)).toContain(">50<");
     expect(html(<Wash range={[5, 5]} />, neutral, 4)).toBe("");
-    expect(html(<Wash range={[5, 5]} />, neutral, 5)).toContain("opacity:1");
+    expect(html(<Wash range={[5, 5]} />, neutral, 5)).toContain("data-qa-veil=\"1.000\"");
   });
   it("flight / zoomThrough with start == end step", () => {
     expect(flight(4, [5, 5], { x: 0, y: 0 }, { x: 9, y: 9 }).t).toBe(0);
@@ -210,6 +210,26 @@ describe("FlyingCard trail", () => {
     expect((f(30).match(/opacity/g) ?? []).length).toBe(0);
     const ghostOpacity = (s: string) => Math.max(0, ...[...s.matchAll(/opacity:([0-9.e-]+)/g)].map((m) => Number(m[1])));
     expect(ghostOpacity(f(29))).toBeLessThan(ghostOpacity(f(20)) * 0.6);
+  });
+});
+
+describe("FlyingCard hideBefore / hideAfter", () => {
+  const fc = (fr: number, extra: { hideBefore?: boolean; hideAfter?: boolean } = {}) =>
+    html(<FlyingCard range={[10, 30]} from={{ x: 0, y: 0 }} to={{ x: 200, y: 0 }} width={50} height={50} {...extra}>c</FlyingCard>, neutral, fr);
+  it("por defecto no dibuja antes de range[0] y queda en `to` después de range[1]", () => {
+    expect(fc(9)).toBe("");
+    expect(fc(0)).toBe("");
+    expect(fc(10)).toContain("c</div>");
+    expect(fc(31)).toContain("left:175px");
+    expect(fc(500)).toContain("left:175px");
+  });
+  it("hideBefore={false} la deja en `from` y hideAfter la oculta al terminar", () => {
+    expect(fc(0, { hideBefore: false })).toContain("left:-25px");
+    expect(fc(30, { hideAfter: true })).toContain("c</div>");
+    expect(fc(31, { hideAfter: true })).toBe("");
+  });
+  it("es determinista: mismo cuadro, misma salida", () => {
+    expect(fc(20)).toBe(fc(20));
   });
 });
 

@@ -1,6 +1,6 @@
 import { withAlpha } from "../../themes";
 import { Easing } from "../../engine";
-import { fxBox, progress, useFx } from "../core";
+import { fade, fxBox, progress, svgScale, useFx } from "../core";
 import type { FxProps } from "../core";
 import { toPath } from "../data/geom";
 import type { Pt } from "../data/geom";
@@ -32,10 +32,12 @@ export function SealSpin(p: SealSpinProps) {
   const ang = sealAngle(t, p.turns ?? 1.5);
   const fs = theme.type.eyebrow * 0.95;
   const ticks = 72;
+  // Escala y opacidad solo mientras el sello aparece (en reposo no queda `scale(1)`).
+  const gp = { transform: svgScale(cx, cy, 0.6 + 0.4 * Math.min(1.08, pop)), opacity: fade(Math.min(1, pop * 2)) };
   return (
     <svg width={w} height={h} viewBox={`0 0 ${w} ${h}`} style={{ display: "block", fontFamily: theme.font.family, ...p.style }}>
       <defs><path id={`sp-${uid}`} d={`M${cx - rt} ${cy} a${rt} ${rt} 0 1 1 ${2 * rt} 0 a${rt} ${rt} 0 1 1 ${-2 * rt} 0`} /></defs>
-      <g transform={`translate(${cx} ${cy}) scale(${(0.6 + 0.4 * Math.min(1.08, pop)).toFixed(4)}) translate(${-cx} ${-cy})`} opacity={Math.min(1, pop * 2)}>
+      <g key={`${gp.transform ? "t" : ""}${gp.opacity === undefined ? "" : "o"}`} {...gp}>
         <circle cx={cx} cy={cy} r={R} fill={theme.color.surface} stroke={theme.color.accent} strokeWidth={6} />
         <circle cx={cx} cy={cy} r={R - 14} fill="none" stroke={theme.color.accent} strokeWidth={2} />
         <g transform={`rotate(${ang.toFixed(3)} ${cx} ${cy})`}>
