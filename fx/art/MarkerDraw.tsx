@@ -1,4 +1,4 @@
-import { withAlpha } from "../../themes";
+import { doodleStyle, textStyle, withAlpha } from "../../themes";
 import { Easing, random } from "../../engine";
 import { fxBox, progress, roleColor, useFx } from "../core";
 import type { ColorRole, FxProps } from "../core";
@@ -13,8 +13,8 @@ export type MarkerDrawProps = FxProps & {
 };
 
 /** Puntos del trazo de marcador dentro de una caja w x h, con temblor sembrado. */
-export function markerPoints(kind: MarkerKind, w: number, h: number, seed: string | number): Pt[] {
-  const wob = (i: number, amp: number) => (random(`${seed}:${kind}:${i}`) - 0.5) * 2 * amp;
+export function markerPoints(kind: MarkerKind, w: number, h: number, seed: string | number, jitter = true): Pt[] {
+  const wob = (i: number, amp: number) => (jitter ? (random(`${seed}:${kind}:${i}`) - 0.5) * 2 * amp : 0);
   const pts: Pt[] = [];
   if (kind === "highlight") {
     const n = 8;
@@ -41,20 +41,25 @@ export function markerPoints(kind: MarkerKind, w: number, h: number, seed: strin
 
 /** Trazos gruesos de marcador (resaltar, subrayar, encerrar) con temblor sembrado, sobre un texto. */
 export function MarkerDraw(p: MarkerDrawProps) {
-  const { local, theme } = useFx(p);
+  const { local, theme, style } = useFx(p);
   const { width: w, height: h } = fxBox(p, { width: 560, height: 160 });
-  const kind = p.kind ?? "highlight";
+  // Estilo del diseño: trazo a mano (con temblor) o geométrico (limpio) y, para el resalte, lo que dice `type.highlight`: con `underline` el
+  // resalte se dibuja como filete bajo la palabra; con el resto, el marcador translúcido de siempre.
+  const jitter = doodleStyle(theme).jitter;
+  const tw = textStyle(theme, "title");
+  const asUnderline = style.type.highlight === "underline";
+  const kind = (p.kind ?? "highlight") === "highlight" && asUnderline ? "underline" : p.kind ?? "highlight";
   const dur = p.duration ?? 40;
-  const color = roleColor(theme, p.color ?? (kind === "highlight" ? "warning" : "accent"));
+  const color = roleColor(theme, p.color ?? ((p.kind ?? "highlight") === "highlight" && !asUnderline ? "warning" : "accent"));
   const t = Easing.inOut(progress(local, dur * 0.1, dur * 0.8));
-  const pts = trimPolyline(markerPoints(kind, w, h, p.seed ?? "marker"), t);
+  const pts = trimPolyline(markerPoints(kind, w, h, p.seed ?? "marker", jitter), t);
   const sw = kind === "highlight" ? h * 0.82 : kind === "underline" ? h * 0.11 : kind === "circle" ? h * 0.07 : h * 0.09;
   const alpha = kind === "highlight" ? 0.4 : 0.9;
   const stroke = pts.length > 1 ? <path d={toPath(pts)} fill="none" stroke={kind === "highlight" ? withAlpha(color, alpha) : color} strokeWidth={sw} strokeLinecap="round" strokeLinejoin="round" /> : null;
   return (
     <svg width={w} height={h} viewBox={`0 0 ${w} ${h}`} style={{ display: "block", fontFamily: theme.font.family, ...p.style }}>
       {kind === "highlight" && stroke}
-      <text x={w / 2} y={h / 2 + h * 0.2} textAnchor="middle" fontSize={h * 0.58} fontWeight={theme.font.weights.semibold} fill={theme.color.text}>{p.text ?? "palabra clave"}</text>
+      <text x={w / 2} y={h / 2 + h * 0.2} textAnchor="middle" fontSize={h * 0.58} fontWeight={tw.fontWeight} {...(tw.letterSpacing ? { letterSpacing: tw.letterSpacing } : {})} fill={theme.color.text}>{p.text ?? "palabra clave"}</text>
       {kind !== "highlight" && stroke}
     </svg>
   );

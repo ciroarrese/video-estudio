@@ -6,6 +6,9 @@
 //  - Coordenadas del MUNDO dentro de <World>; la cámara se mueve con cuadros clave.
 //  - El titular se aparta solo cuando la cámara se acerca (`hideFromScale`).
 //  - Un efecto del catálogo `fx/` (MaskedRise) para empezar desde piezas hechas; ver docs/animaciones.md.
+//  - El design system decide la estética: esquinas, bordes, superficies, rótulos, entradas y cámara salen de las ayudas de
+//    `themes/` (`surfaceStyle` con sus roles y opciones, `borderWidth`, `entrance`, `staggerFrames`; también `cornerRadius`, `textStyle`, `chartStyle`) y de las piezas del kit
+//    (`Eyebrow`, `useCameraAt`, y `Highlight` / `Numeral` para palabras y cifras destacadas). La escena no pone radios, sombras, pesos ni curvas propios: cambiar el tema cambia el video.
 //  - Diseño por formato (`useFormat().pick`): una disposición para horizontal y otra para vertical.
 //    El mundo mide width x height del formato (no 1920x1080 a mano) y la cámara arranca en su centro.
 //  - Un acercamiento rápido en la acción clave, un clic, un garabato y un atravesado final.
@@ -13,12 +16,12 @@
 import React from "react";
 import { useFormat, useFrame } from "../../engine";
 import {
-  Cursor, DockedHeadline, DoodleCircle, Stage, Wash, World,
-  cameraAt, hideFromScale, kf, zoomThrough,
+  Cursor, DockedHeadline, DoodleCircle, Eyebrow, Stage, Wash, World,
+  hideFromScale, kf, useCameraAt, zoomThrough,
 } from "../../kit";
 import type { CameraKey } from "../../kit";
 import { MaskedRise } from "../../fx";
-import { ThemeProvider, useTheme } from "../../themes";
+import { ThemeProvider, borderWidth, dark, editorial, entrance, neon, neutral, papel, staggerFrames, surfaceStyle, useTheme } from "../../themes";
 import { theme as videoTheme } from "../theme";
 
 /** Duración de la escena en cuadros (30 fps = 5 s). La historia la lee de acá. */
@@ -85,18 +88,15 @@ const T = {
 };
 
 // Cámara: vista general sostenida -> acercamiento rápido -> sostener -> atravesado final (el desenfoque se apaga en ese tramo).
-const makeCamera = (f: number, L: Layout, cx: number, cy: number) => {
+// `useCameraAt` aplica el desenfoque y la inclinación que decide el design system (`motion.cameraBlur`, `cameraTilt`).
+const cameraKeys = (L: Layout, cx: number, cy: number): CameraKey[] => {
   const c = { x: L.cards[PICK]!.x + L.card.w / 2, y: L.cards[PICK]!.y + L.card.h / 2 };
-  const keys: CameraKey[] = [
+  return [
     { f: 0, x: cx, y: cy, scale: 1 },
     { f: T.hold, x: cx, y: cy, scale: 1 },
     { f: T.zoom, x: c.x, y: c.y, scale: L.zoom },
     { f: T.through[0] - 2, x: c.x, y: c.y, scale: L.zoom },
   ];
-  return cameraAt(f, keys, {
-    map: (fr, cam) => zoomThrough(fr, T.through, cam, L.through, 40),
-    noBlurFrom: T.through[0],
-  });
 };
 
 /** Contenido de la escena SIN `Stage`: es lo que usa la historia (que ya trae su propio `Stage`). */
@@ -111,7 +111,10 @@ export function SceneBody({ title, subtitle }: SceneProps) {
     vertical: { label: t.type.caption, value: t.type.stat * 0.8, row: t.type.caption },
   });
   const { panel: PANEL, card: CARD } = L;
-  const cam = makeCamera(f, L, width / 2, height / 2);
+  const cam = useCameraAt(f, cameraKeys(L, width / 2, height / 2), {
+    map: (fr, c) => zoomThrough(fr, T.through, c, L.through, 40),
+    noBlurFrom: T.through[0],
+  });
   const picked = f >= T.click;
   // Con zoom, las tarjetas vecinas quedan cortadas por el borde a propósito (encuadre): solo durante el zoom se silencia `offscreen`.
   const zoomed = cam.scale > 1.05;
@@ -120,12 +123,11 @@ export function SceneBody({ title, subtitle }: SceneProps) {
   return (
     <>
       <World camera={cam} width={width} height={height}>
-        {/* Panel: se recrea con primitivas del tema, no con una captura. */}
+        {/* Panel: se recrea con primitivas del tema, no con una captura. La superficie (relleno, borde, sombra, esquinas) la decide el design system. */}
         <div
           style={{
             position: "absolute", left: PANEL.x, top: PANEL.y, width: PANEL.w, height: PANEL.h,
-            background: t.color.surface, border: `1px solid ${t.color.border}`,
-            borderRadius: t.radius.lg, boxShadow: t.shadow.lg, opacity: kf(f, [0, 12], [0, 1]),
+            ...surfaceStyle(t, "window", { level: "lg" }), opacity: kf(f, [0, 12], [0, 1]),
           }}
         >
           {/* Efecto del catálogo (docs/animaciones.md): el rótulo sube desde una máscara. Probá también BarsGrow o DigitRoll. */}
@@ -135,20 +137,25 @@ export function SceneBody({ title, subtitle }: SceneProps) {
         </div>
 
         {L.cards.map((pos, i) => {
-          const a = kf(f, [2 + i * 4, 14 + i * 4], [0, 1]); // entrada escalonada, todas adentro antes de T.hold
+          // entrada escalonada (el paso lo escala el tema), todas adentro antes de T.hold
+          const d = staggerFrames(t, i, { base: 4 });
+          const a = kf(f, [2 + d, 14 + d], [0, 1]);
           const sel = i === PICK && picked;
+          // ficha: borde grueso y esquinas de panel; la elegida lleva el borde en acento (si el tema no dibuja bordes, tampoco acá)
+          const card = surfaceStyle(t, "card", { level: "sm", bold: true, corner: "panel" });
+          const w = borderWidth(t, "card", { bold: true });
           return (
             <div
               key={i}
               data-qa-ignore={zoomed ? "offscreen" : undefined}
               style={{
-                position: "absolute", left: pos.x, top: pos.y + (1 - a) * 30,
-                width: CARD.w, height: CARD.h, boxSizing: "border-box", padding: 30, opacity: a,
-                background: t.color.surfaceAlt, borderRadius: t.radius.panel,
-                border: `2px solid ${sel ? t.color.accent : t.color.border}`,
+                position: "absolute", left: pos.x, top: pos.y,
+                width: CARD.w, height: CARD.h, boxSizing: "border-box", padding: 30,
+                ...card, ...(sel && w > 0 ? { border: `${w}px solid ${t.color.accent}` } : {}),
+                ...entrance(t, a, i, { native: "rise", distance: 30 }),
               }}
             >
-              <div style={{ fontSize: fs.label, color: t.color.textMuted }}>Indicador {i + 1}</div>
+              <Eyebrow size={fs.label}>Indicador {i + 1}</Eyebrow>
               <div style={{ fontSize: fs.value, fontWeight: t.font.weights.stat, color: t.color.chart[i % t.color.chart.length] }}>
                 {(i + 1) * 21}
               </div>
@@ -163,8 +170,8 @@ export function SceneBody({ title, subtitle }: SceneProps) {
             style={{
               position: "absolute", left: L.rows[i]!.x, top: L.rows[i]!.y, width: L.row.w, height: L.row.h,
               boxSizing: "border-box", display: "flex", alignItems: "center", padding: "0 24px",
-              background: t.color.bg, border: `1px solid ${t.color.border}`, borderRadius: t.radius.md,
-              fontSize: fs.row, color: t.color.text, opacity: kf(f, [6 + i * 4, 18 + i * 4], [0, 1]),
+              ...surfaceStyle(t, "card", { level: "sm", corner: "control" }),
+              fontSize: fs.row, color: t.color.text, opacity: kf(f, [6 + staggerFrames(t, i, { base: 4 }), 18 + staggerFrames(t, i, { base: 4 })], [0, 1]),
             }}
           >
             {r}
@@ -196,9 +203,12 @@ export function Scene(props: SceneProps) {
   );
 }
 
-/** Video de la escena sola: agrega el tema. Lo registra `index.ts`. */
-export const SceneVideo: React.FC<Partial<SceneProps>> = ({ title = "Título de la escena", subtitle }) => (
-  <ThemeProvider theme={videoTheme}>
+/** Design systems con nombre para probar la escena con otro: `--props '{"theme":"editorial"}'` (también "neon", "papel", "dark", "neutral"). */
+const NOMBRADOS = { neutral, dark, editorial, neon, papel };
+
+/** Video de la escena sola: agrega el tema (el del video, `videos/<slug>/theme.ts`, o el que se pida por nombre en `--props`). Lo registra `index.ts`. */
+export const SceneVideo: React.FC<Partial<SceneProps> & { theme?: keyof typeof NOMBRADOS }> = ({ title = "Título de la escena", subtitle, theme }) => (
+  <ThemeProvider theme={theme ? NOMBRADOS[theme] : videoTheme}>
     <Scene title={title} subtitle={subtitle} />
   </ThemeProvider>
 );

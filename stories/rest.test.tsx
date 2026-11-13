@@ -3,7 +3,8 @@ import { flushSync } from "react-dom";
 import { createRoot } from "react-dom/client";
 import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import { FrameProvider } from "../engine";
-import { ThemeProvider, neutral } from "../themes";
+import { ThemeProvider, dark, editorial, neon, neutral, papel } from "../themes";
+import type { Theme } from "../themes";
 import { Closing, Interlude, InterludeCompact, Opening, closingFrames, interludeCompactFrames, interludeFrames, openingFrames } from "./index";
 import type { StorySpec } from "./index";
 import { CheckMark, Chip, HeadlineRow, Pill } from "./shared";
@@ -41,9 +42,9 @@ const SPECS: Record<string, StorySpec> = {
 
 const R = React.createElement;
 const config = { fps: 30, width: 1920, height: 1080, durationInFrames: 600 };
-const tree = (el: React.ReactElement, frame: number, cfg = config) => (
+const tree = (el: React.ReactElement, frame: number, cfg = config, theme: Theme = neutral) => (
   <FrameProvider frame={frame} config={cfg}>
-    <ThemeProvider theme={neutral}>{el}</ThemeProvider>
+    <ThemeProvider theme={theme}>{el}</ThemeProvider>
   </FrameProvider>
 );
 
@@ -79,10 +80,10 @@ beforeAll(() => {
 afterEach(() => vi.restoreAllMocks());
 
 /** Marcado del cuadro `f` en una raíz que ya pasó por los cuadros de `before`. */
-function htmlAfter(el: React.ReactElement, before: number[], f: number, cfg = config): string {
+function htmlAfter(el: React.ReactElement, before: number[], f: number, cfg = config, theme: Theme = neutral): string {
   const host = document.createElement("div");
   const root = createRoot(host);
-  for (const n of [...before, f]) flushSync(() => root.render(tree(el, n, cfg)));
+  for (const n of [...before, f]) flushSync(() => root.render(tree(el, n, cfg, theme)));
   const out = host.innerHTML;
   root.unmount();
   return out;
@@ -94,23 +95,32 @@ function htmlAfter(el: React.ReactElement, before: number[], f: number, cfg = co
  */
 const without3d = (markup: string) => markup.replace(/transform:[^;"]*perspective\([^;"]*/g, "transform:3d").replace(/transform:\s*translate\([^)]*\)\s*scale\([^)]*\)\s*translate\([^)]*\)/g, "transform:world");
 
-describe("piezas de stories: reposo e historial", () => {
+/**
+ * Los cinco design systems: `neutral` y `dark` con todas las piezas y los de estilo propio (`editorial`, `neon`, `papel`: cartel de vidrio,
+ * esquinas rectas, superficies de contorno, entradas con rebote, números sólidos, filete o punto de acento, fondos de patrón) con las
+ * piezas y opciones que cambian de camino (apertura con los tres finales, lista apilada y en un renglón, vuelta compacta, cierre).
+ */
+const THEMED = ["Opening/base", "Opening/acople", "Opening/paso", "Opening/vidrio", "Closing/base", "Closing/muro", "Interlude/1", "Interlude/renglon", "Interlude/2 con tema visto sin escena", "InterludeCompact/1", "Chip", "Pill", "HeadlineRow", "CheckMark"];
+const THEMES: [string, Theme, string[] | null][] = [["neutral", neutral, null], ["dark", dark, THEMED], ["editorial", editorial, THEMED], ["neon", neon, THEMED], ["papel", papel, THEMED]];
+
+for (const [tname, theme, only] of THEMES) describe(`piezas de stories: reposo e historial (tema ${tname})`, () => {
   for (const [name, piece] of Object.entries(PIECES)) {
+    if (only && !only.includes(name)) continue;
     const cfg = { ...config, durationInFrames: piece.frames };
     it(`${name}: el marcado de cada cuadro no depende del historial`, { timeout: 120_000 }, () => {
       const el = piece.make();
       const last = piece.frames - 1;
       for (const f of framesOf(piece.frames)) {
-        const fresh = htmlAfter(el, [], f, cfg);
+        const fresh = htmlAfter(el, [], f, cfg, theme);
         for (const before of [[last], [0, last], [Math.floor(last / 2), last, 0], [f === 0 ? 1 : 0]]) {
-          expect(htmlAfter(el, before, f, cfg), `${name} cuadro ${f} tras ${before}`).toBe(fresh);
+          expect(htmlAfter(el, before, f, cfg, theme), `${name} cuadro ${f} tras ${before}`).toBe(fresh);
         }
       }
     });
     it(`${name}: no deja transformaciones identidad, desenfoque 0 ni opacidad casi 1`, () => {
       const el = piece.make();
       for (const f of framesOf(piece.frames)) {
-        const markup = without3d(htmlAfter(el, [], f, cfg));
+        const markup = without3d(htmlAfter(el, [], f, cfg, theme));
         // con contexto (30 caracteres antes) para ver de qué elemento se trata
         const find = (re: RegExp) => [...markup.matchAll(re)].map((m) => markup.slice(Math.max(0, m.index! - 60), m.index! + m[0].length));
         const leftovers = [

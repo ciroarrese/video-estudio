@@ -12,3 +12,15 @@ Efectos de datos: gráficos que se dibujan solos. Todos siguen el contrato de `f
 | `FlowSteps` | Pasos en escalera unidos por un conector redondeado que se dibuja | `steps` (`{title, caption?, state?}`), `activeIndex` |
 
 Ayudas puras exportadas (sirven para pruebas y para otras piezas): `trimPolyline`, `pointAt`, `catmullRom`, `parsePath`, `resample`, `morphPoints`, `roundedPolyline`, `niceTicks`, `staggerT`, `donutArc`, `radarValues`, `radarPoints`, `iso`, `boxFaces`.
+
+## Estilo del diseño (`theme.style`)
+
+| Pieza | Qué toma |
+|---|---|
+| `BarsGrow` | `chart.barRadius`, `chart.fill` (sólido, degradado o rayado con `<defs>` de id derivado de `seed` e índice), `chart.grid` (`on` suma guías, `off` quita la línea base), `motion.stagger` y `motion.overshoot` |
+| `LineDraw` | `chart.lineWidth` (la punta lo sigue), `chart.grid`, `chart.fill` del área (sólido = el degradado suave de siempre) |
+| `RadarMorph` | `chart.lineWidth`, `chart.grid` (`on` anillos intermedios, `off` solo el exterior), `chart.fill` |
+| `FlowSteps` | `shape.corners` (por el factor de `cornerRadius("panel")` sobre `radius.panel`), `surface` (relleno, filo duro o halo), `type.numerals` (el paso pendiente queda atenuado), `motion.stagger` |
+| `Bars3D`, `DonutRing` | sin cambio (geometría y cifras de contenido) |
+
+`styleKit.tsx` traduce `surfaceStyle` y `chartFill` a lo que pide un SVG (`svgSurface`, `SvgShadow`, `FillDef`) (sobre `surfaceParts`, sin leer CSS). La entrada con traslado propio es `entrance(theme, p, i, { curve, offset })` de `themes/`. Con el estilo por defecto el resultado es el de antes.

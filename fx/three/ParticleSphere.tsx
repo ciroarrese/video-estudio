@@ -1,7 +1,7 @@
 import { Easing, FrameCanvas, lerp, mix, progress, random } from "../core";
-import { camera, fibonacciSphere, lerp3, lineByDepth, sortBackToFront } from "./math";
+import { camera, fibonacciSphere, lerp3, sortBackToFront } from "./math";
 import type { Vec3 } from "./math";
-import { dot, useThreeFx } from "./common";
+import { useThreeFx } from "./common";
 import type { ThreeProps } from "./common";
 
 export type ParticleSphereProps = ThreeProps & {
@@ -35,9 +35,9 @@ function cloud(n: number): Cloud {
 
 /** ~1000 puntos que pasan de una grilla plana a una esfera que gira. */
 export function ParticleSphere(p: ParticleSphereProps) {
-  const { local, t, width, height, pal, k } = useThreeFx(p, { width: 900, height: 900, duration: 75 });
+  const { local, t, width, height, pal, k, pen } = useThreeFx(p, { width: 900, height: 900, duration: 75 });
   const n = p.count ?? 1000;
-  const share = p.accentShare ?? 0.12;
+  const share = pen.share(p.accentShare ?? 0.12);
   const seed = p.seed ?? "psphere";
   return (
     <FrameCanvas
@@ -64,8 +64,8 @@ export function ParticleSphere(p: ParticleSphereProps) {
         const sorted = sortBackToFront(items, (q) => q.depth);
         const near = 2.6, far = 4.6;
         for (const q of sorted) {
-          const st = lineByDepth(q.depth, near, far, { minAlpha: 0.15, maxAlpha: 1, minWidth: 1.2 * k, maxWidth: 3.4 * k });
-          dot(ctx, q.x, q.y, st.width * (q.acc ? 1.25 : 1), q.acc ? pal.accent : mix(pal.ink, pal.line, 0.4), st.alpha);
+          const st = pen.byDepth(q.depth, near, far, { minAlpha: 0.15, maxAlpha: 1, minWidth: 1.2 * k, maxWidth: 3.4 * k });
+          pen.dot(ctx, q.x, q.y, st.width * (q.acc ? 1.25 : 1), q.acc ? pal.accent : pen.quiet(mix(pal.ink, pal.line, 0.4)), st.alpha);
         }
       }}
     />

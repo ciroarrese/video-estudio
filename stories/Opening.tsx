@@ -1,10 +1,10 @@
 import type React from "react";
 import { Easing, useFrame, useVideoConfig } from "../engine";
-import { Wash, World, cameraAt, kf, zoomThrough } from "../kit";
-import { useTheme, withAlpha } from "../themes";
+import { Wash, World, kf, useCameraAt, zoomThrough } from "../kit";
+import { entrance, staggerFrames, surfaceStyle, textStyle, useTheme } from "../themes";
 import { fade, styleKey, xform } from "../fx/core/math";
 import { fitText, listLayout, openingWall, rigTransform } from "./layout";
-import { Chip, HeadlineRow, HighlightedTitle, StoryStage, scaler, useEase } from "./shared";
+import { Chip, HeadlineRow, HighlightedTitle, StoryStage, rowEntrance, scaler, useEase, useStorySpec } from "./shared";
 import { TopicContext, TopicHeadline, headlineDefaults } from "./topic";
 import { wallOptions } from "./types";
 import type { StorySpec } from "./types";
@@ -30,8 +30,9 @@ const DOCK_FRAMES = 26;
  * cuadro en el punto donde arrancan en la escena. `through` (pisa a `design.handoff: "through"`): se atraviesa el titular como en el velo
  * pero sin velo y con las nubes continuas; la escena entra sobre el fondo.
  */
-export function Opening({ spec, first = 0, dock, through }: { spec: StorySpec; first?: number; dock?: boolean; through?: boolean }) {
+export function Opening({ spec: specIn, first = 0, dock, through }: { spec: StorySpec; first?: number; dock?: boolean; through?: boolean }) {
   const theme = useTheme();
+  const spec = useStorySpec(specIn); // el diseño del video sobre el del design system
   const ease = useEase();
   const f = useFrame();
   const { width, height } = useVideoConfig();
@@ -46,14 +47,14 @@ export function Opening({ spec, first = 0, dock, through }: { spec: StorySpec; f
   const docking = dock ?? (through ? false : design.handoff === "dock");
   const flying = !docking && (through ?? (dock === undefined && design.handoff === "through"));
   const wo = wallOptions(design);
-  const glass = design.titleCard === "glass";
   const wallBlur = wo.blurOpening;
   const target = Math.min(Math.max(0, first), n - 1);
   const gap = Math.min(16, 64 / n) * (dur / OPENING_FRAMES);
   // con acople la lista se queda hasta DOCK_FRAMES antes del final (la píldora termina de entrar en el último cuadro menos 8)
   const dockAt = Math.max(Math.round(u(120)), dur - DOCK_FRAMES);
+  const heads = (i: number) => staggerFrames(theme, i, { base: gap }); // demora de cada titular (el paso lo escala el tema)
   const T = { titleOut: [u(78), u(100)] as [number, number], wallOff: [u(94), u(126)] as [number, number], heads: u(104), fly: (docking ? [dockAt, dockAt + 1] : flying ? [u(246), u(292)] : [u(236), u(282)]) as [number, number] };
-  const underStart = T.heads + (n - 1) * gap + u(20);
+  const underStart = T.heads + heads(n - 1) + u(20);
 
   // muro: avance lento de cámara con inclinación; al irse la lista se aleja
   const dolly = kf(f, [0, u(130)], [0, 240 + wo.dolly], Easing.linear);
@@ -72,7 +73,7 @@ export function Opening({ spec, first = 0, dock, through }: { spec: StorySpec; f
   const tf = fitText(spec.title.text, titleW, theme.type.hero, { min: theme.type.hero * (narrow ? 0.45 : 0.5), lines: narrow ? 3 : 2, avg: 0.55 });
 
   // atravesado del primer titular
-  const cam = cameraAt(f, [{ f: 0, x: cx, y: cy, scale: 1 }], {
+  const cam = useCameraAt(f, [{ f: 0, x: cx, y: cy, scale: 1 }], {
     map: (fr, c) => (docking ? c : zoomThrough(fr, T.fly, c, L.target(target), 60)),
     noBlurFrom: T.fly[0],
   });
@@ -100,28 +101,32 @@ export function Opening({ spec, first = 0, dock, through }: { spec: StorySpec; f
       {titleOut < 1 && (() => {
         // el cartel solo lleva `transform` / `opacity` mientras se anima: en reposo un `translateY(0px) scale(1)` residual lo compone en
         // capa propia y su texto se rasteriza distinto según el historial de cuadros
+        // superficie, borde, sombra y radio del cartel según el design system (`surfaceStyle`); `design.titleCard` del video pisa al del tema
+        const surf = surfaceStyle(theme, "title", { titleCard: design.titleCard === "glass" ? "glass" : "solid" });
+        // la entrada del cartel (`motion.entrance`) es solo un asentado de movimiento: el título se lee desde el primer cuadro, así que
+        // el progreso arranca en 0,8 (con la entrada por defecto: escala de 0,95 a 1) y no lleva fundido
+        const enter = entrance(theme, 0.8 + 0.2 * titleIn, 0, { native: "scale", from: 0.75 });
+        const exit = xform({ y: Math.round(-titleOut * 120), scale: 1 - titleOut * 0.1 });
+        const transform = [enter.transform, exit].filter(Boolean).join(" ") || undefined;
+        const tt = textStyle(theme, "title", { tracking: -0.03 });
         const card: React.CSSProperties = {
           maxWidth: Math.min(1700, width - theme.safe.x),
           boxSizing: "border-box",
           padding: `${Math.round(tf.size * 0.3)}px ${Math.round(tf.size * 0.55)}px`,
-          borderRadius: theme.radius.lg * 2,
-          // "glass": superficie semiopaca con borde fino (emulación del vidrio: `backdrop-filter` no es determinista en --check)
-          background: glass ? withAlpha(theme.color.surface, 0.74) : theme.color.surface,
-          border: glass ? `1px solid ${withAlpha(theme.color.surface, 0.9)}` : undefined,
-          boxShadow: `0 40px 90px -30px ${withAlpha(theme.color.text, 0.35)}, ${theme.shadow.lg}`,
+          ...surf,
           opacity: fade(1 - titleOut),
-          transform: xform({ y: Math.round(-titleOut * 120), scale: 0.95 + titleIn * 0.05 - titleOut * 0.1 }),
+          transform,
           textAlign: "center",
           fontSize: tf.size,
-          fontWeight: theme.font.weights.semibold,
+          fontWeight: tt.fontWeight,
           color: theme.color.text,
-          letterSpacing: "-0.03em",
+          letterSpacing: tt.letterSpacing,
           lineHeight: 1.08,
         };
         return (
           <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", pointerEvents: "none", zIndex: 3 }}>
             <div key={styleKey(card)} style={card}>
-              <HighlightedTitle text={tf.text} highlight={spec.title.highlight} loop={design.gradient?.loop} />
+              <HighlightedTitle text={tf.text} highlight={spec.title.highlight} loop={design.gradient?.loop} progress={kf(f, [u(10), u(46)], [0, 1], ease.out)} />
             </div>
           </div>
         );
@@ -129,13 +134,12 @@ export function Opening({ spec, first = 0, dock, through }: { spec: StorySpec; f
 
       <World camera={cam} width={width} height={height}>
         {spec.topics.map((_, i) => {
-          const s = T.heads + i * gap;
+          const s = T.heads + heads(i);
           const a = kf(f, [s, s + u(24)], [1e-6, 1], ease.out);
           const isTarget = i === target;
           const opacity = isTarget ? (docking ? 1 - dockOut : kf(f, [T.fly[1] - u(6), T.fly[1]], [1, 0])) : othersOut;
           if (f < s) return null;
           // con acople el titular elegido sube un poco hacia la esquina al irse; en el resto el desplazamiento es el de la entrada
-          const dx = Math.round((1 - a) * 80);
           const dy = docking && isTarget ? Math.round(-dockOut * 40) : 0;
           return (
             <HeadlineRow
@@ -145,7 +149,7 @@ export function Opening({ spec, first = 0, dock, through }: { spec: StorySpec; f
               opacity={a * opacity}
               gradientLoop={design.gradient?.loop}
               underline={isTarget ? kf(f, [underStart, underStart + u(28)], [0, 1], ease.out) : 0}
-              style={{ transform: xform({ x: dx, y: dy }), filter: a < 0.98 ? `blur(${((1 - a) * 8).toFixed(1)}px)` : undefined }}
+              style={{ ...rowEntrance(theme, a, i, { distance: 80, dy }), filter: a < 0.98 ? `blur(${((1 - a) * 8).toFixed(1)}px)` : undefined }}
             />
           );
         })}

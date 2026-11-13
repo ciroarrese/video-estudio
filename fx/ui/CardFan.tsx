@@ -1,8 +1,10 @@
 import React from "react";
 import { Easing } from "../../engine";
-import { chartColor, fade, fxBox, progress, styleKey, useFx, xform } from "../core";
+import { cornerRadius, entrance, staggerScale, textStyle } from "../../themes";
+import { chartColor, fxBox, progress, styleKey, useFx, xform } from "../core";
 import type { FxProps } from "../core";
 import { staggerT } from "../data/geom";
+import { svgSurface } from "../data/styleKit";
 
 export type FanCard = { title: string; text?: string };
 export type CardFanProps = FxProps & {
@@ -40,27 +42,38 @@ export function CardFan(p: CardFanProps) {
   const gap = Math.min(70, (w - cw - 40) / Math.max(1, n - 1));
   const gT = progress(local, 0, dur * 0.2, Easing.out);
   const fs = theme.type.eyebrow;
+  // Estilo del diseño: superficie y esquinas de la tarjeta, paso entre tarjetas (`motion.stagger`) y entrada (`motion.entrance`).
+  const surf = svgSurface(theme, "card");
+  const radius = cornerRadius(theme, "card");
+  const stag = Math.min(0.95, 0.45 * staggerScale(theme));
   // Sin sombra: bajo rotate() una sombra (con o sin desenfoque) no rasteriza igual según el historial; el borde inferior grueso da el relieve.
   return (
     <div style={{ position: "relative", width: w, height: h, fontFamily: theme.font.family, ...p.style }}>
       {Array.from({ length: n }, (_, i) => {
         const pose = fanPose(i, n, spread, gap);
         // el orden de salida es de afuera hacia el centro de la pila: las del medio salen primero
-        const t = Easing.lands(staggerT(progress(local, dur * 0.12, dur * 0.88), i, n, 0.45));
+        const t = Easing.lands(staggerT(progress(local, dur * 0.12, dur * 0.88), i, n, stag));
         const a = pose.angle * t, x = pose.dx * t;
         const stackY = (i - (n - 1) / 2) * -3 * (1 - t);
         const enter = gT;
-        // Traslado, giro y opacidad solo mientras la tarjeta sale (en reposo del todo no queda ninguno).
-        const cardSt: React.CSSProperties = { position: "absolute", left: (w - cw) / 2, top: h - ch - 40, width: cw, height: ch, boxSizing: "border-box", transformOrigin: "50% 130%", transform: xform({ x: Math.round(x), y: Math.round(stackY + (1 - enter) * 30), rotate: a, round: true }), opacity: fade(enter), zIndex: i, background: theme.color.surface, border: `1px solid ${theme.color.border}`, borderRadius: theme.radius.lg, borderBottom: `5px solid ${theme.color.border}`, padding: 22, overflow: "hidden" };
+        // La entrada (sube 30 px y aparece) va en una capa exterior; el giro y el abanico, en la interior. Con la entrada por defecto la suma de
+        // traslados enteros es la de siempre. Solo mientras la tarjeta sale: en reposo no queda traslado, giro ni opacidad.
+        const rise = Math.round((1 - enter) * 30);
+        const outerSt: React.CSSProperties = { position: "absolute", left: (w - cw) / 2, top: h - ch - 40, width: cw, height: ch, zIndex: i, ...entrance(theme, enter, i, { native: "rise", distance: 30 }) };
+        // Sin sombra suave: bajo rotate() no rasteriza igual según el historial; el borde inferior grueso da el relieve (con `flat` o `border`, lo que diga el diseño).
+        const relief = surf.shadow.shadow === "soft" ? 5 : surf.border;
+        const cardSt: React.CSSProperties = { position: "absolute", inset: 0, boxSizing: "border-box", transformOrigin: "50% 130%", transform: xform({ x: Math.round(x), y: Math.round(stackY + (1 - enter) * 30) - rise, rotate: a, round: true }), background: surf.fill, border: surf.border > 0 ? `${surf.border}px solid ${surf.edge}` : "none", borderBottom: relief > 0 ? `${relief}px solid ${surf.edge}` : "none", borderRadius: radius, boxShadow: surf.shadow.shadow === "hard" ? String(surf.css.boxShadow) : undefined, padding: 22, overflow: "hidden" };
         return (
-          <div key={`${i}:${styleKey(cardSt)}`} data-qa-ignore="overlap covered" style={cardSt}>
+          <div key={`${i}:${styleKey(outerSt)}`} data-qa-ignore="overlap covered" style={outerSt}>
+          <div key={styleKey(cardSt)} data-qa-ignore="overlap covered" style={cardSt}>
             {kids ? kids[i] : (
               <>
-                <div style={{ width: 44, height: 44, borderRadius: theme.radius.pill, background: chartColor(theme, i) }} />
-                <div style={{ marginTop: 22, fontSize: fs * 1.3, fontWeight: theme.font.weights.semibold, color: theme.color.text }}>{items[i]!.title}</div>
-                {items[i]!.text && <div style={{ marginTop: 8, fontSize: fs * 0.85, color: theme.color.textMuted }}>{items[i]!.text}</div>}
+                <div style={{ width: 44, height: 44, borderRadius: cornerRadius(theme, "chip"), background: chartColor(theme, i) }} />
+                <div style={{ marginTop: 22, fontSize: fs * 1.3, fontWeight: textStyle(theme, "label", { strong: true }).fontWeight, color: theme.color.text }}>{items[i]!.title}</div>
+                {items[i]!.text && <div style={{ marginTop: 8, fontSize: fs * 0.85, color: theme.color.textMuted, ...textStyle(theme, "eyebrow") }}>{items[i]!.text}</div>}
               </>
             )}
+          </div>
           </div>
         );
       })}

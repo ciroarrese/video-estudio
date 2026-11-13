@@ -1,5 +1,5 @@
 import { useMemo } from "react";
-import { withAlpha } from "../../themes";
+import { staggerScale, withAlpha } from "../../themes";
 import { Easing } from "../../engine";
 import { fxBox, progress, useFx } from "../core";
 import type { FxProps } from "../core";
@@ -56,7 +56,7 @@ export function LogoLand(p: LogoLandProps) {
         </linearGradient>
         <mask id={`mk-${uid}`} maskUnits="userSpaceOnUse" x="-20" y="-20" width="260" height="260" style={{ maskType: "alpha" }}>
           {polys.map((pl, i) => {
-            const tr = trimPolyline(pl, Easing.inOut(staggerT(ph.strokes, i, n, n > 1 ? 0.5 : 0)));
+            const tr = trimPolyline(pl, Easing.inOut(staggerT(ph.strokes, i, n, n > 1 ? Math.min(0.95, 0.5 * staggerScale(theme)) : 0)));
             return tr.length > 1 ? <path key={i} d={toPath(tr)} fill="none" stroke={theme.color.text} strokeWidth={sw + 8} strokeLinecap="round" strokeLinejoin="round" /> : null;
           })}
         </mask>

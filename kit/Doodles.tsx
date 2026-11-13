@@ -1,6 +1,6 @@
 import React from "react";
 import { Easing } from "../engine";
-import { useTheme } from "../themes";
+import { doodleStyle, useTheme } from "../themes";
 import { arrowPoints, circlePoints, pointsToArray, pointsToString, underlinePoints } from "./doodle";
 import { kf } from "./kf";
 import { themeEasing, useFrameOr } from "./util";
@@ -23,7 +23,9 @@ function useDoodle(frame: number | undefined, start: number, end: number, drawFr
   const f = useFrameOr(frame);
   const draw = kf(f, [start, start + drawFrames], [0, 1], themeEasing(theme.motion.easing.out));
   const fade = kf(f, [end, end + 10], [1, 0], Easing.linear);
-  return { theme, f, draw, fade };
+  // Estilo del design system: `enabled` apaga el garabato; `jitter: false` da el trazo geométrico (sin temblor).
+  const { enabled, jitter } = doodleStyle(theme);
+  return { theme, f, draw, fade, enabled, jitter };
 }
 
 const safeId = (id: string) => `ve-doodle-${id.replace(/[^A-Za-z0-9_-]/g, "_")}-g`;
@@ -51,7 +53,7 @@ function Svg({ id, fade, box, children }: { id: string; fade: number; box: Retur
 }
 
 /** Trazo con avance normalizado (pathLength=1): el tramo dibujado no depende del largo del temblor de este cuadro. */
-function Stroke({ id, pts, draw, width }: { id: string; pts: [number, number][]; draw: number; width: number }) {
+function Stroke({ id, pts, draw, width, jitter }: { id: string; pts: [number, number][]; draw: number; width: number; jitter: boolean }) {
   return (
     <polyline
       points={pointsToString(pts)}
@@ -59,8 +61,8 @@ function Stroke({ id, pts, draw, width }: { id: string; pts: [number, number][];
       fill="none"
       stroke={`url(#${safeId(id)})`}
       strokeWidth={width}
-      strokeLinecap="round"
-      strokeLinejoin="round"
+      strokeLinecap={jitter ? "round" : "butt"}
+      strokeLinejoin={jitter ? "round" : "miter"}
       strokeDasharray="1 1"
       strokeDashoffset={1 - draw}
     />
@@ -69,21 +71,22 @@ function Stroke({ id, pts, draw, width }: { id: string; pts: [number, number][];
 
 /** Elipse dibujada a mano que se traza y se desvanece; coordenadas del mundo. */
 export function DoodleCircle({ cx, cy, rx, ry, frame, start, end = 99999, id, boil = 3, width = 5 }: Common & { cx: number; cy: number; rx: number; ry: number }) {
-  const { f, draw, fade } = useDoodle(frame, start, end, 16);
-  if (f < start || fade <= 0) return null;
-  const pts = pointsToArray(circlePoints(id, f, cx, cy, rx, ry, boil));
+  const { f, draw, fade, enabled, jitter } = useDoodle(frame, start, end, 16);
+  if (!enabled || f < start || fade <= 0) return null;
+  const pts = pointsToArray(circlePoints(id, f, cx, cy, rx, ry, boil, jitter));
   return (
     <Svg id={id} fade={fade} box={bounds(pts)}>
-      <Stroke id={id} pts={pts} draw={draw} width={width} />
+      <Stroke id={id} pts={pts} draw={draw} width={width} jitter={jitter} />
     </Svg>
   );
 }
 
 /** Flecha curva dibujada a mano de (x1, y1) a (x2, y2); la cabeza aparece al terminar el trazo. */
 export function DoodleArrow({ x1, y1, x2, y2, bend = 0.25, frame, start, end = 99999, id, boil = 3, width = 6 }: Common & { x1: number; y1: number; x2: number; y2: number; bend?: number }) {
-  const { theme, f, draw, fade } = useDoodle(frame, start, end, 20);
-  if (f < start || fade <= 0) return null;
-  const pts = arrowPoints(id, f, x1, y1, x2, y2, bend, boil);
+  const { theme, f, draw, fade, enabled, jitter } = useDoodle(frame, start, end, 20);
+  if (!enabled || f < start || fade <= 0) return null;
+  const pts = arrowPoints(id, f, x1, y1, x2, y2, bend, boil, jitter);
+  const cap = jitter ? "round" : "butt", join = jitter ? "round" : "miter";
   const shown = pts.slice(0, Math.max(2, Math.round(draw * pts.length)));
   const [ax, ay] = shown[shown.length - 1]!;
   const [bx, by] = shown[shown.length - 2]!;
@@ -91,9 +94,9 @@ export function DoodleArrow({ x1, y1, x2, y2, bend = 0.25, frame, start, end = 9
   const head = (d: number): [number, number] => [ax - Math.cos(ang + d) * 22, ay - Math.sin(ang + d) * 22];
   return (
     <Svg id={id} fade={fade} box={bounds(pts)}>
-      <polyline points={pointsToString(shown)} fill="none" stroke={`url(#${safeId(id)})`} strokeWidth={width} strokeLinecap="round" strokeLinejoin="round" />
+      <polyline points={pointsToString(shown)} fill="none" stroke={`url(#${safeId(id)})`} strokeWidth={width} strokeLinecap={cap} strokeLinejoin={join} />
       {draw > 0.95 && (
-        <polyline points={pointsToString([head(0.5), [ax, ay], head(-0.5)])} fill="none" stroke={theme.color.accent2} strokeWidth={width - 1} strokeLinecap="round" strokeLinejoin="round" />
+        <polyline points={pointsToString([head(0.5), [ax, ay], head(-0.5)])} fill="none" stroke={theme.color.accent2} strokeWidth={width - 1} strokeLinecap={cap} strokeLinejoin={join} />
       )}
     </Svg>
   );
@@ -101,12 +104,12 @@ export function DoodleArrow({ x1, y1, x2, y2, bend = 0.25, frame, start, end = 9
 
 /** Subrayado ondulado dibujado a mano de (x, y) hacia la derecha `length` px. */
 export function DoodleUnderline({ x, y, length, frame, start, end = 99999, id, boil = 3, width = 5 }: Common & { x: number; y: number; length: number }) {
-  const { f, draw, fade } = useDoodle(frame, start, end, 14);
-  if (f < start || fade <= 0) return null;
-  const pts = pointsToArray(underlinePoints(id, f, x, y, length, boil));
+  const { f, draw, fade, enabled, jitter } = useDoodle(frame, start, end, 14);
+  if (!enabled || f < start || fade <= 0) return null;
+  const pts = pointsToArray(underlinePoints(id, f, x, y, length, boil, jitter));
   return (
     <Svg id={id} fade={fade} box={bounds(pts)}>
-      <Stroke id={id} pts={pts} draw={draw} width={width} />
+      <Stroke id={id} pts={pts} draw={draw} width={width} jitter={jitter} />
     </Svg>
   );
 }

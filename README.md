@@ -35,7 +35,7 @@ Catálogo de efectos listos (texto, 3D, datos, interfaz y arte): [docs/animacion
 |---|---|
 | `engine/` | Reloj de cuadros, interpolación, azar determinista, secuencias, audio, espera de recursos, página runtime |
 | `kit/` | Cámara, cursor, garabatos, titular que se aparta, vuelo de tarjetas, velo, números que cuentan |
-| `themes/` | Tema neutro y oscuro, adaptador de tokens de un design system, chequeo de contraste |
+| `themes/` | Tema neutro y oscuro, tres design systems de ejemplo (`editorial`, `neon`, `papel`), adaptador de tokens, capa de estilo (`theme.style`) y chequeo de contraste y de estilo |
 | `fx/` | Catálogo de efectos listos y deterministas: texto, 3D, datos, interfaz y arte (`docs/animaciones.md`) |
 | `stories/` | Apertura, vuelta al listado y cierre armados desde un solo objeto de configuración, con su presupuesto de cuadros (`storyBudget`) |
 | `audio/` | `tempo`, `empalme`, `efectos` y `mezcla` (`npm run audio -- <comando>`); ver `docs/audio.md` |
@@ -54,14 +54,14 @@ Abrí el repo con Claude Code y pedí lo que necesitás: "haceme un video de pre
 
 0. **Cuestionario** (un solo mensaje, con valores por defecto: podés contestar "todo por defecto").
 1. **Fichas** de cada tema.
-2. **Tema**: el design system pasado a tokens, con informe de contraste.
+2. **Tema (el design system va primero)**: tokens, informe del adaptador, estilo elegido (esquinas, superficies, números, fondo, movimiento: `docs/estilo.md`) y una hoja de la historia de arranque bajo ese estilo. Las escenas no deciden forma ni movimiento: usan las ayudas del tema.
 3. **Guion** por escena (tiempos, qué se ve, efecto, texto, fuente).
 4. **Escenas de a una**, con QA, privacidad, hoja de cuadros y un MP4 de esa escena.
 5. **Armado**: apertura, vueltas al listado, cierre, sonido (efectos, música, mezcla), render final y verificación.
 
 Cada etapa exige lo anterior aprobado: sobre todo, el guion (con su presupuesto de cuadros) antes que cualquier escena.
 
-Las reglas de producción y sus motivos: [docs/reglas.md](docs/reglas.md) (con "Qué hacer cuando --check falla"). Cómo se escribe una escena: [docs/guia-escenas.md](docs/guia-escenas.md). Qué efecto usar: [docs/animaciones.md](docs/animaciones.md). Convenciones para agentes en este repo: [CLAUDE.md](CLAUDE.md).
+El estilo del design system (qué decide y quién lo cumple): [docs/estilo.md](docs/estilo.md). Probar un video con otro design system: `--props '{"theme":"editorial"}'` en `render`, `qa` y `sheet`. Las reglas de producción y sus motivos: [docs/reglas.md](docs/reglas.md) (con "Qué hacer cuando --check falla"). Cómo se escribe una escena: [docs/guia-escenas.md](docs/guia-escenas.md). Qué efecto usar: [docs/animaciones.md](docs/animaciones.md). Convenciones para agentes en este repo: [CLAUDE.md](CLAUDE.md).
 
 ## Trabajar con material privado
 

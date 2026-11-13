@@ -2,6 +2,31 @@
 
 Estructuras narrativas listas, generadas desde UN objeto de configuración: un video con varios temas recibe la apertura, las vueltas al listado ("volver a la lista") y el cierre sin escribirlos. Todo es función pura del cuadro y sale del tema (`useTheme()`); se apoya en `kit/` (Stage, GradientText, World/cameraAt/zoomThrough, Wash, DockedHeadline, kf).
 
+## El design system manda (`theme.style`)
+
+La estética de la historia (esquinas, superficies, tratamiento del texto, fondo, movimiento, decoración y cómo se arman la apertura, la lista y el cierre) sale del design system activo: `theme.style` (ver `docs/estilo.md` y `themes/README.md`). Un video que no indica nada recibe el estilo de historias del design system; con los temas `neutral` y `dark` es exactamente el aspecto de siempre. Con `editorial`, `neon` y `papel` (ejemplos inventados en `themes/`) la misma historia cambia de forma, no solo de colores: se ve con `npm run -s render -- story-demo --props '{"theme":"editorial"}'` (o `neon`, `papel`; también `--format vertical`).
+
+`spec.design` pasa a ser un **ajuste por video sobre el design system**: cada opción que el video indica gana, el resto sale del tema (`withStoryDefaults(theme, spec.design)`; lo hacen todos los bloques con `useStorySpec` / `useStoryDesign`).
+
+| Campo de `theme.style` | Qué cambia en las historias |
+| --- | --- |
+| `shape.corners`, `shape.border`, `shape.outlined` | Radio y borde de las piezas del muro (`Chip`), de la píldora del cierre (`Pill`), del cartel del título, de los paneles y de la miniatura por defecto, del punto y el anillo de la tilde y de las marcas de acento. La medida de cada pieza no cambia (el relleno compensa el borde). |
+| `surface.kind`, `surface.elevation`, `surface.opacity` | Relleno, borde y sombra de esas superficies (`surfaceStyle`): sólida, vidrio emulado, contorno, teñida; con sombra, plana, filo duro o halo. El panel flotante del cierre usa la sombra larga solo con elevación `shadow`. |
+| `type.titleWeight`, `titleTracking` | Peso y interletrado de los nombres de la lista, del cartel, de la píldora y de la firma (`textStyle`). |
+| `type.labelWeight`, `eyebrowTracking` | Letra de las piezas del muro; el "Sigue ·" de la vuelta compacta (que siempre va en mayúsculas). |
+| `type.numerals` | Números de la lista y de la píldora, tilde (degradado de marca o sólido) y tira de la vuelta compacta (`numeralStyle`). |
+| `type.highlight` | Palabra resaltada del título de la apertura y firma sin marca: degradado, acento, filete o marcador (se va dibujando de izquierda a derecha). |
+| `background.kind`, `background.intensity` | Fondo de todos los bloques y de las escenas (`StoryStage` sobre `Stage`): nubes, liso, grilla, puntos, degradado o grano. Las filas atenuadas de la vuelta calculan su opacidad contra el peor fondo del patrón. |
+| `motion.entrance`, `overshoot`, `stagger` | Entrada de las filas de la lista (de la derecha por defecto), del cartel del título (asentado de escala, sin fundido: se lee desde el primer cuadro) y de la vuelta compacta; paso entre filas y entre paneles. |
+| `motion.cameraBlur`, `cameraTilt` | Cámara de la apertura y de las vueltas (`useCameraAt`). |
+| `motion.transition` | Velo del final de las vueltas y telón de la firma (fundido, cortina, corte; con `through` no hay velo, salvo el telón de la firma, que siempre hace falta para que se lea). El final de la **apertura** lo decide `story.handoff`, no la transición. |
+| `decor.accent` | Marca bajo la fila que sigue y bajo la firma: barra de degradado, filete, punto o nada. |
+| `decor.gradientLoop` | `design.gradient.loop` (vaivén del degradado de los textos). |
+| `chart.barRadius`, `lineWidth`, `grid`, `fill` | Miniatura por defecto del cierre: esquinas de las barras (un escalón menos que el gráfico grande), línea (1 px más), guías y relleno (liso, degradado o rayado). |
+| `story.titleCard`, `listLayout`, `listUnderline`, `handoff`, `headlineSize`, `closingBg`, `signoffBar`, `wall*` | Los valores por defecto de `spec.design` (tabla de abajo). En formato vertical las columnas y filas del muro del tema no rigen (el muro alto lo decide el formato); las que el video pide en `spec.design.wall` sí. |
+
+Lo que NO depende del estilo: los tamaños de letra, el área segura, la medida de la lista, del muro y de las miniaturas, y el contenido (con `doodles: false` o `transition: "cut"` no se quita información). Con `surface.kind: "outline"` el cartel de la apertura lleva su borde de tinta (`borderWidth(theme, "title")` lo da) y la variante del video (`design.titleCard`) se la pasa a `surfaceStyle(theme, "title", { titleCard })`.
+
 ## Configuración (`StorySpec`)
 
 ```ts
@@ -78,9 +103,9 @@ import { Opening, Closing, Interlude, TopicProvider, StoryStage, openingFrames, 
 
 Piezas exportadas: `Opening`, `Interlude`, `InterludeCompact`, `Closing` (y sus `*Frames`), `TopicProvider`/`TopicContext`, `StoryStage`, `Chip`, `Pill`, `CheckMark`, `HeadlineRow`, `HighlightedTitle`, `RichText`, `listLayout`, `nextTopic`. Cada pieza es una función pura del cuadro local de su `Sequence`. `Opening` dura `openingFrames(spec)` (300 por defecto): con otra duración los tiempos se escalan, pero fuera de esa duración no hay garantía.
 
-## Opciones de diseño
+## Opciones de diseño (`spec.design`: ajuste por video)
 
-Todas van en `spec.design`, son opcionales y lo que no se indica deja el aspecto de siempre. Todo sale del tema.
+Todas van en `spec.design` y son opcionales: lo que no se indica sale del design system (`theme.style.story`; con `neutral` y `dark`, el aspecto de siempre). Lo que se indica gana sobre el tema. Todo sale del tema.
 
 | Opción | Valores | Qué hace |
 | --- | --- | --- |
@@ -90,6 +115,7 @@ Todas van en `spec.design`, son opcionales y lo que no se indica deja el aspecto
 | `headline.size` | `"md"` (defecto), `"sm"` | Tamaño de la píldora del titular (`TopicHeadline` y la que acopla la apertura): `"sm"` es el 85 % de letra, huecos y relleno. También por prop: `<TopicHeadline size="sm" />`. |
 | `gradient.loop` | entero >= 2 (cuadros) | Los textos con degradado de la historia (resalte del título, números de la lista, número de la píldora y firma sin marca) hacen un vaivén que vuelve exacto cada `loop` cuadros (`GradientText loop`). Sin él quedan quietos. |
 | `closing.bg` | rol del tema (`"bg"` defecto, p. ej. `"surface"`) | Fondo que cubre el cierre cuando entra la firma. |
+| `closing.bar` | `true` (defecto), `false` | Marca de acento bajo la firma (barra de degradado, filete o punto según `decor.accent`); `false` la quita. |
 | `wall.columns`, `wall.rows` | enteros de 2 a 12 | Piezas del muro de la apertura (6 × 6 en horizontal, 3 × 12 en vertical por defecto). |
 | `wall.blur` | `true` (defecto), `false` o `{ opening?, closing? }` | `false`: las piezas del muro de la apertura no se desenfocan con la distancia y el muro del cierre no arranca desenfocado. El objeto lo decide por bloque (lo que falte es `true`). |
 | `wall.chipScale` | 0,5 a 3 (1) | Tamaño de las piezas del muro de la apertura (la grilla no cambia: con piezas muy grandes se solapan). |
@@ -117,7 +143,7 @@ Las piezas de `stories/` emiten `transform`, `opacity` y `filter` solo mientras 
 Opening (300) → [escena i → Interlude(done = i+1) (120)] × n → Closing (480)
 ```
 
-`timeline` = `[{ id, kind: "opening"|"topic"|"interlude"|"closing", from, durationInFrames }]`, contiguo y sin huecos. Con `interludes: false` los temas van uno tras otro; con `interludes: "compact"` cada vuelta es una tira corta (ver abajo). `defineStory` registra el video con `engine.defineVideo` (con `formats` y `scenes`) y acepta `theme`: un nombre ("neutral", "dark") o un objeto `Theme` (se usa tal cual en la apertura, las vueltas, el cierre y dentro de las escenas). Por props (`--props '{"theme":"dark"}'`, `&props=...`) se puede pisar en el render con un nombre; el objeto no se publica como prop (no es serializable) y por eso `defaultProps` queda vacío.
+`timeline` = `[{ id, kind: "opening"|"topic"|"interlude"|"closing", from, durationInFrames }]`, contiguo y sin huecos. Con `interludes: false` los temas van uno tras otro; con `interludes: "compact"` cada vuelta es una tira corta (ver abajo). `defineStory` registra el video con `engine.defineVideo` (con `formats` y `scenes`) y acepta `theme`: un nombre ("neutral", "dark", "editorial", "neon", "papel") o un objeto `Theme` (se usa tal cual en la apertura, las vueltas, el cierre y dentro de las escenas). Por props (`--props '{"theme":"dark"}'`, `&props=...`) se puede pisar en el render con un nombre; el objeto no se publica como prop (no es serializable) y por eso `defaultProps` queda vacío.
 
 Piezas sueltas: `<Opening spec />`, `<Interlude spec done />`, `<Closing spec scenes />` y sus duraciones `OPENING_FRAMES`, `INTERLUDE_FRAMES`, `CLOSING_FRAMES` (ver "Armar a mano").
 
@@ -148,7 +174,7 @@ Cada píldora va sobre el borde superior de su panel. El diseño (`panelLayout`)
 
 ## Límites
 
-- Validaciones (errores en español): ids de escena únicos y distintos de `opening`, `closing` e `interlude-N`; `durationInFrames` entero > 0; `labels`, si viene, es una lista de textos no vacíos (ausente o vacío usa los nombres de los temas); `signoff.text` obligatorio salvo con `logo` o `slot`; `design` con claves y valores válidos.
+- Validaciones (errores en español): ids de escena únicos y distintos de `opening`, `closing` e `interlude-N`; `durationInFrames` entero > 0; `labels`, si viene, es una lista de textos no vacíos (ausente o vacío usa los nombres de los temas); `signoff.text` obligatorio salvo con `logo` o `slot`; `design` con claves y valores válidos (`closing` acepta `bg` y `bar`).
 
 - De 2 a 6 temas (otro número lanza un error claro). La lista, el tamaño de letra, los paneles del cierre y los lugares reservados del muro se calculan según `n`.
 - Escala (1920×1080, sale de `theme.type`): la lista es lo más grande de la pantalla (nombre ~0.8 × h1, línea ~0.9 × body, filas de ~170 px hasta 4 temas; con 5 o 6 se achica parejo y el nombre no baja de ~44 px). Título de apertura a `type.hero`, etiquetas del muro ~30 px (marcadas con `data-qa-ignore`), píldoras del cierre ~34 px, firma a `type.h2`.

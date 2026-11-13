@@ -1,16 +1,18 @@
 import React from "react";
 import { defineVideo } from "../engine";
 import type { FormatsOption } from "../engine";
-import { ThemeProvider, dark, neutral } from "../themes";
+import { ThemeProvider, dark, editorial, neon, neutral, papel } from "../themes";
 import type { Theme } from "../themes";
 import { composeStory } from "./compose";
 import type { ComposeOptions } from "./compose";
 import type { StorySpec, TopicScene } from "./types";
 
-export type ThemeInput = "neutral" | "dark" | Theme;
+/** Los design systems con nombre: `neutral` y `dark` (los de siempre) y los de ejemplo `editorial`, `neon` y `papel`. */
+export type ThemeInput = "neutral" | "dark" | "editorial" | "neon" | "papel" | Theme;
 export type StoryProps = { theme?: ThemeInput };
 
-export const resolveTheme = (t: ThemeInput | undefined): Theme => (typeof t === "object" && t ? t : t === "dark" ? dark : neutral);
+const NAMED: Record<string, Theme> = { neutral, dark, editorial, neon, papel };
+export const resolveTheme = (t: ThemeInput | undefined): Theme => (typeof t === "object" && t ? t : (t && NAMED[t]) || neutral);
 
 /**
  * Registra la historia como video (`/?video=<id>&props={"theme":"dark"}`). Por defecto solo el formato base: cada formato extra

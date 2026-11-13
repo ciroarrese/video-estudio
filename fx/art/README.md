@@ -17,3 +17,7 @@ Efectos de arte y transición. Mismo contrato que el resto de `fx`. `LiquidBlob`
 | `RibbonTwist` | Cinta que se retuerce a lo largo de una curva mostrando dos caras | `segments`, `twists`, `ribbonWidth` |
 
 Los datos de trazado aceptan `M L H V C S Q T A Z` (absolutos y relativos). `DotWipe` va a cuadro completo: se superpone a la escena y, con `inout`, termina despejado.
+
+## Estilo del diseño (`theme.style`)
+
+`PaperCollage` (superficie de la tira: sombra suave, filo duro, plana o halo; rasgado a mano o casi limpio con `decor.doodleStroke: "geometric"`; `motion.stagger`), `BlueprintDraw` (papel como panel; la grilla propia no cambia) y `MarkerDraw` (`decor.doodleStroke` sin temblor, `type.titleWeight`, y con `type.highlight: "underline"` el resalte se dibuja como filete). `LogoLand` escala su escalonado con `motion.stagger`. El resto no cambia.

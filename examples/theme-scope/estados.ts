@@ -1,4 +1,4 @@
-import { dark, neutral, themeFromTokens } from "../../themes";
+import { dark, editorial, neon, neutral, papel, themeFromTokens } from "../../themes";
 import type { ResolvedTheme, Theme } from "../../themes";
 
 // Colores de datos de la herramienta recreada: estados que no tienen rol en `theme.color`.
@@ -20,7 +20,7 @@ const OSCURO = `:root {
 
 /** El mismo tema con los colores de estado de la herramienta (según sea claro u oscuro). */
 export function conEstados(base: Theme): ResolvedTheme {
-  return themeFromTokens(base === dark || base.name === "dark" ? OSCURO : CLARO, base, {
+  return themeFromTokens(base === dark || base === neon || base.name === "dark" || base.name === "neon" ? OSCURO : CLARO, base, {
     data: {
       estadoOk: { on: ["surface", "bg"], min: 4.5 },
       estadoAlerta: { on: ["surface", "bg"], min: 4.5 },
@@ -30,4 +30,5 @@ export function conEstados(base: Theme): ResolvedTheme {
   });
 }
 
-export const ESTADOS = { neutral: conEstados(neutral), dark: conEstados(dark) };
+/** Los temas con `theme.style` (editorial, neón, papel) también se pueden usar como ámbito: la herramienta toma su forma y su superficie. */
+export const ESTADOS = { neutral: conEstados(neutral), dark: conEstados(dark), editorial: conEstados(editorial), neon: conEstados(neon), papel: conEstados(papel) };

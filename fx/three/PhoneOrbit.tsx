@@ -1,8 +1,8 @@
 import React from "react";
 import { Easing, FrameCanvas, lerp, mix, progress, sub } from "../core";
-import { camera, lineByDepth, rotateXYZ } from "./math";
+import { camera, rotateXYZ } from "./math";
 import type { Vec3 } from "./math";
-import { dot, flush, poly, roundedRect, seg, useThreeFx } from "./common";
+import { flush, poly, roundedRect, useThreeFx } from "./common";
 import type { Prim, ThreeProps } from "./common";
 
 /** Caja de la pantalla (px) que reciben los hijos y el render prop `screen`. */
@@ -30,7 +30,7 @@ const DIST = 7;
  * es determinista bajo `--check` y no usa `preserve-3d` ni perspectiva en un ancestro.
  */
 export function PhoneOrbit(p: PhoneOrbitProps) {
-  const { local, t, width, height, pal, theme } = useThreeFx(p, { width: 900, height: 900, duration: 75 });
+  const { local, t, width, height, pal, theme, pen } = useThreeFx(p, { width: 900, height: 900, duration: 75 });
   const start = ((p.startAngle ?? 56) * Math.PI) / 180;
   const unit = Math.min(height * 0.37, width * 0.34);
   const yaw = lerp(start, 0.1, Easing.out(t));
@@ -41,8 +41,7 @@ export function PhoneOrbit(p: PhoneOrbitProps) {
   const draw = (ctx: CanvasRenderingContext2D, layer: "all" | "back" | "front") => {
     const cam = camera({ distance: DIST, tilt, yaw, unit });
     ctx.translate(width / 2, height / 2);
-    ctx.lineCap = "round";
-    ctx.lineJoin = "round";
+    pen.caps(ctx, { cap: true, join: true });
     const prims: Prim[] = [];
     const k = Math.max(1, unit / 240); // grosor de trazos con el tamaño del teléfono
 
@@ -110,12 +109,12 @@ export function PhoneOrbit(p: PhoneOrbitProps) {
       if (i / N > on) break;
       const A = cam.project(ringPt((i / N) * Math.PI * 2 + spin)), B = cam.project(ringPt(((i + 1) / N) * Math.PI * 2 + spin));
       const d = (A.depth + B.depth) / 2;
-      const s = lineByDepth(d, near, far, { minAlpha: 0.15, maxAlpha: 1, minWidth: 1.5 * k, maxWidth: 5 * k });
-      prims.push({ depth: d, draw: (c) => seg(c, A.x, A.y, B.x, B.y, pal.accent, s.alpha, s.width) });
+      const s = pen.byDepth(d, near, far, { minAlpha: 0.15, maxAlpha: 1, minWidth: 1.5 * k, maxWidth: 5 * k });
+      prims.push({ depth: d, draw: (c) => pen.seg(c, A.x, A.y, B.x, B.y, pal.accent, s.alpha, s.width, { i }) });
     }
     const bead = cam.project(ringPt(spin * 2 + 0.6));
-    const bs = lineByDepth(bead.depth, near, far, { minAlpha: 0.6, maxAlpha: 1, minWidth: 6 * k, maxWidth: 12 * k });
-    prims.push({ depth: bead.depth, draw: (c) => dot(c, bead.x, bead.y, bs.width * on, pal.ink) });
+    const bs = pen.byDepth(bead.depth, near, far, { minAlpha: 0.6, maxAlpha: 1, minWidth: 6 * k, maxWidth: 12 * k });
+    prims.push({ depth: bead.depth, draw: (c) => pen.dot(c, bead.x, bead.y, bs.width * on, pal.ink) });
     // Con pantalla DOM: lo lejano (y el cuerpo) detrás, lo cercano delante.
     const chosen = layer === "all" ? prims : prims.filter((q) => (layer === "back" ? q.depth >= phoneDepth : q.depth < phoneDepth));
     flush(ctx, chosen);

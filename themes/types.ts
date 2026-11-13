@@ -1,3 +1,5 @@
+import type { ThemeStyle, ThemeStyleInput } from "./styleTypes";
+
 /** Tema de video a 1920x1080, 30 fps. Solo React; sin dependencias del motor. */
 export type CubicBezier = [number, number, number, number];
 
@@ -68,6 +70,12 @@ export interface Theme {
   /** Fondo de nubes difuminadas. */
   cloud: ThemeCloud;
   /**
+   * Capa de estilo: forma, superficies, tratamiento del texto, fondo, movimiento, decoración y diseño de las historias.
+   * Todo es opcional; lo que falte sale de los valores por defecto (el aspecto de siempre) y `useTheme().style` siempre viene completo.
+   * Un valor inválido lanza un error que lista lo que se acepta. Contrato: `docs/estilo.md`.
+   */
+  style?: ThemeStyleInput;
+  /**
    * Colores con nombre que define el video (estados, severidades, fondos de ficha...) y que no tienen rol en `color`.
    * Se leen con `useTheme().data.<nombre>`; un nombre que no existe lanza un error que lista los declarados.
    * Los nombres son identificadores simples (letras y números, empezando con letra).
@@ -122,8 +130,9 @@ export interface ThemeCloud {
   blobs?: CloudBlob[];
 }
 
-/** El tema que devuelve `useTheme()`: con `type.ui`, `type.display` y `data` siempre presentes. */
+/** El tema que devuelve `useTheme()`: con `type.ui`, `type.display`, `style` y `data` siempre presentes. */
 export type ResolvedTheme = Theme & {
   type: Theme["type"] & { ui: TypeUi; display: TypeDisplay };
+  style: ThemeStyle;
   data: Record<string, string>;
 };

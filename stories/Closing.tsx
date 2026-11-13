@@ -1,11 +1,11 @@
 import React from "react";
 import { Easing, random, useFrame, useVideoConfig } from "../engine";
-import { GradientText, kf } from "../kit";
-import { resolveColor, useTheme, withAlpha } from "../themes";
+import { GradientText, Highlight, kf } from "../kit";
+import { accentMark, chartStyle, cornerRadius, numeralStyle, resolveColor, resolveStyle, staggerFrames, surfaceStyle, textStyle, transitionVeil, useTheme, withAlpha } from "../themes";
 import type { Theme } from "../themes";
 import { fade, styleKey, xform } from "../fx/core/math";
 import { PILL_OFF, closingWall, fitText, panelEntryLift, panelLayout, closingCamStart, pillBudget, pillFit, rigProject, rigTransform } from "./layout";
-import { Chip, Logo, Pill, RichText, StoryStage, pillNumberColor, scaler, useEase } from "./shared";
+import { Chip, Logo, Pill, RichText, StoryStage, pillNumberColor, scaler, useEase, useStorySpec } from "./shared";
 import { plainRich, wallOptions } from "./types";
 import type { StorySpec, TopicScene } from "./types";
 
@@ -33,14 +33,27 @@ export function DefaultThumbnail({ index, name }: { index: number; name: string 
   const col = (k: number) => chart[(index + k) % chart.length]!;
   const variant = index % 4;
   // el número va en un color con contraste garantizado sobre la barra del título (`surfaceAlt`): el del gráfico si llega a 4,5:1, si no un acento o el texto
-  const numColor = pillNumberColor(theme, theme.color.surfaceAlt, [col(0)]);
+  const numStyle = resolveStyle(theme).type.numerals === "gradient" ? { color: pillNumberColor(theme, theme.color.surfaceAlt, [col(0)]) } : numeralStyle(theme, { on: theme.color.surfaceAlt });
+  // gráficos del design system (`chartStyle`): esquinas y relleno de las barras, grosor de la línea y líneas de guía. La miniatura es chica: usa un
+  // escalón menos de radio y 1 px más de línea que el gráfico grande (con el estilo por defecto: `radius.sm` y 6 px, como siempre)
+  const ch = chartStyle(theme);
+  const barRadius = thumbBarRadius(theme);
+  const barFill = (color: string): React.CSSProperties => ch.fill === "gradient" ? { background: `linear-gradient(${color}, ${withAlpha(color, 0.55)})` } : ch.fill === "hatched" ? { background: `repeating-linear-gradient(45deg, ${color} 0 3px, ${withAlpha(color, 0.18)} 3px 9px)` } : { background: color, opacity: 0.85 };
+  const guides = ch.grid === "on" && (
+    <div style={{ position: "absolute", left: 28, top: 84, width: PANEL.w - 56, height: PANEL.h - 84 - 30 }}>
+      {[0, 1, 2, 3].map((k) => <div key={k} style={{ position: "absolute", left: 0, right: 0, top: `${k * 33.33}%`, height: 1, background: theme.color.border }} />)}
+    </div>
+  );
+  const pillR = cornerRadius(theme, "chip");
+  const barR = cornerRadius(theme, "bar");
+  const title = textStyle(theme, "title");
   const vals = [0, 1, 2, 3, 4].map((k) => 0.3 + seedOf(name, k) * 0.7);
   const area = { left: 28, top: 84, w: PANEL.w - 56, h: PANEL.h - 84 - 30 };
   let body: React.ReactNode;
   if (variant === 0) {
     body = (
       <div style={{ position: "absolute", left: area.left, top: area.top, width: area.w, height: area.h, display: "flex", alignItems: "flex-end", gap: 18 }}>
-        {vals.map((v, k) => <div key={k} style={{ flex: 1, height: `${v * 100}%`, borderRadius: theme.radius.sm, background: col(k), opacity: 0.85 }} />)}
+        {vals.map((v, k) => <div key={k} style={{ flex: 1, height: `${v * 100}%`, borderRadius: barRadius, ...barFill(col(k)) }} />)}
       </div>
     );
   } else if (variant === 1) {
@@ -48,7 +61,7 @@ export function DefaultThumbnail({ index, name }: { index: number; name: string 
     body = (
       <svg style={{ position: "absolute", left: area.left, top: area.top }} width={area.w} height={area.h} viewBox={`0 0 ${area.w} ${area.h}`} overflow="visible">
         <polygon points={`0,${area.h} ${pts} ${area.w},${area.h}`} fill={col(0)} opacity={0.18} />
-        <polyline points={pts} fill="none" stroke={col(0)} strokeWidth={6} strokeLinejoin="round" strokeLinecap="round" />
+        <polyline points={pts} fill="none" stroke={col(0)} strokeWidth={ch.lineWidth + 1} strokeLinejoin="round" strokeLinecap="round" />
         {vals.map((v, k) => <circle key={k} cx={(k / 4) * area.w} cy={area.h - v * area.h} r={8} fill={theme.color.surface} stroke={col(1)} strokeWidth={4} />)}
       </svg>
     );
@@ -75,23 +88,31 @@ export function DefaultThumbnail({ index, name }: { index: number; name: string 
       <div style={{ position: "absolute", left: area.left, top: area.top, width: area.w, height: area.h, display: "flex", flexDirection: "column", justifyContent: "space-between" }}>
         {vals.slice(0, 4).map((v, k) => (
           <div key={k} style={{ display: "flex", alignItems: "center", gap: 14, height: 36 }}>
-            <span style={{ width: 22, height: 22, borderRadius: theme.radius.pill, background: col(k), flexShrink: 0 }} />
-            <span style={{ flex: 1, height: 12, borderRadius: theme.radius.pill, background: theme.color.border }}><span style={{ display: "block", width: `${v * 100}%`, height: "100%", borderRadius: theme.radius.pill, background: col(k), opacity: 0.8 }} /></span>
+            <span style={{ width: 22, height: 22, borderRadius: pillR, background: col(k), flexShrink: 0 }} />
+            <span style={{ flex: 1, height: 12, borderRadius: barR, background: theme.color.border }}><span style={{ display: "block", width: `${v * 100}%`, height: "100%", borderRadius: barR, background: col(k), opacity: 0.8 }} /></span>
           </div>
         ))}
       </div>
     );
   }
   return (
-    <div style={{ width: PANEL.w, height: PANEL.h, borderRadius: theme.radius.lg, background: theme.color.surface, border: `1px solid ${theme.color.border}`, boxShadow: theme.shadow.lg, overflow: "hidden", position: "relative" }}>
+    <div style={{ width: PANEL.w, height: PANEL.h, ...surfaceStyle(theme, "card", { level: "lg" }), overflow: "hidden", position: "relative" }}>
       <div style={{ height: 52, display: "flex", alignItems: "center", gap: 12, padding: "0 24px", borderBottom: `1px solid ${theme.color.border}`, background: theme.color.surfaceAlt }}>
-        <span style={{ width: 14, height: 14, borderRadius: theme.radius.pill, background: col(0), flexShrink: 0 }} />
-        <span style={{ fontSize: t.size, fontWeight: theme.font.weights.semibold, color: theme.color.text, whiteSpace: "nowrap" }}>{t.text}</span>
-        <span style={{ marginLeft: "auto", fontSize: 26, fontWeight: theme.font.weights.stat, color: numColor }}>{String(index + 1).padStart(2, "0")}</span>
+        <span style={{ width: 14, height: 14, borderRadius: pillR, background: col(0), flexShrink: 0 }} />
+        <span style={{ fontSize: t.size, fontWeight: title.fontWeight, color: theme.color.text, whiteSpace: "nowrap" }}>{t.text}</span>
+        <span style={{ marginLeft: "auto", fontSize: 26, fontWeight: theme.font.weights.stat, ...numStyle }}>{String(index + 1).padStart(2, "0")}</span>
       </div>
+      {guides}
       {body}
     </div>
   );
+}
+
+/** Radio (px) de las barras de la miniatura: un escalón menos que el de `style.chart.barRadius` (por defecto `md` -> `radius.sm`, como siempre). */
+function thumbBarRadius(theme: Theme): number {
+  const step = resolveStyle(theme).chart.barRadius;
+  const r = theme.radius;
+  return step === "none" ? 0 : step === "pill" ? r.pill : step === "lg" ? r.md : step === "md" ? r.sm : Math.round(r.sm / 2);
 }
 
 const WALL_PILL = 1.5;
@@ -123,8 +144,9 @@ const fadeIn = (o: number): React.CSSProperties => ({ opacity: fade(o), visibili
  * Se usa suelta (`<Closing spec />` dentro de un `Sequence` de `closingFrames(spec)` cuadros): `scenes` es opcional y, parejo a los temas,
  * admite `null` (o faltar) para un tema sin escena; el panel de ese tema usa `spec.topics[i].thumbnail` o la tarjeta por defecto.
  */
-export function Closing({ spec, scenes = [] }: { spec: StorySpec; scenes?: (TopicScene | null)[] }) {
+export function Closing({ spec: specIn, scenes = [] }: { spec: StorySpec; scenes?: (TopicScene | null)[] }) {
   const theme = useTheme();
+  const spec = useStorySpec(specIn); // el diseño del video sobre el del design system
   const ease = useEase();
   const f = useFrame();
   const { width, height } = useVideoConfig();
@@ -156,11 +178,16 @@ export function Closing({ spec, scenes = [] }: { spec: StorySpec; scenes?: (Topi
   const wash = kf(f, T.wash, [0, 1], Easing.linear);
   const logo = kf(f, [T.logo, T.logo + u(26)], [0, 1], ease.out);
   const sign = kf(f, [T.sign, T.sign + u(22)], [0, 1], ease.out);
-  const flyStart = (i: number) => T.fly[0] + u(i * stagger);
+  const flyStart = (i: number) => T.fly[0] + u(staggerFrames(theme, i, { base: stagger }));
   const flyOf = (i: number) => kf(f, [flyStart(i), flyStart(i) + u(40)], [0, 1], Easing.inOut);
   const bobOf = (i: number) => Math.sin(f / 28 + i * 1.7) * 10;
   const blur = !wallOptions(spec.design).blurClosing ? 0 : Math.round((1 - focus) * 90) / 10;
 
+  // el panel flota: con sombra, la larga de siempre; con otra elevación (plana, filo duro, halo) la del design system (`surfaceStyle`)
+  const panelSurf = surfaceStyle(theme, "window");
+  const panelSurface: React.CSSProperties = resolveStyle(theme).surface.elevation === "shadow"
+    ? { borderRadius: panelSurf.borderRadius, boxShadow: `0 44px 80px -28px ${withAlpha(theme.color.text, 0.42)}` }
+    : { borderRadius: panelSurf.borderRadius, boxShadow: panelSurf.boxShadow };
   const ignore = "min-size contrast overlap covered offscreen safe-area";
   const chipFor = (c: { x: number; y: number; text: string }, i: number, faint: boolean) => {
     const on = faint ? T.light + u(10) + random(`o${i}`) * u(50) : Math.min(T.wall + random(`con${i}`) * u(70), T.light + random(`l2${i}`) * u(30));
@@ -185,6 +212,17 @@ export function Closing({ spec, scenes = [] }: { spec: StorySpec; scenes?: (Topi
   const tagline = signLines.tagline ? fitRich(signLines.tagline, Math.min(1500, signW), theme.type.body, { min: theme.type.caption, avg: 0.5, lines: 2 }) : null;
   // sin texto de despedida la marca entra sola y la barra y la nota la siguen
   const textIn = hasMark ? sign : logo;
+  const titleStyle = textStyle(theme, "title");
+  // marca de acento bajo la firma (`decor.accent`: barra, filete o punto; `design.closing.bar: false` la quita)
+  const signMark = spec.design?.closing?.bar === false ? null : accentMark(theme, { length: Math.min(signW, 420), thickness: 8, progress: sign });
+  // la despedida sin marca es el titular del cierre: resaltada como el resto de la historia (`type.highlight`: degradado, acento, filete o marcador)
+  const signText = (node: React.ReactNode) => resolveStyle(theme).type.highlight === "gradient"
+    ? <GradientText loop={spec.design?.gradient?.loop}>{node}</GradientText>
+    : <Highlight loop={spec.design?.gradient?.loop} progress={textIn}>{node}</Highlight>;
+
+  // el telón de la firma sigue a `motion.transition` (fundido, cortina o corte); sin velo (`through`) igual hace falta: tapa el muro para que la firma se lea
+  const coverBg = spec.design?.closing?.bg ? resolveColor(theme, spec.design.closing.bg) : theme.color.bg;
+  const cover = transitionVeil(theme, wash, coverBg) ?? (wash > 0 && resolveStyle(theme).motion.transition === "through" ? { kind: "wash" as const, style: wash >= 0.9995 ? { background: coverBg } : { background: coverBg, opacity: +wash.toFixed(4) } } : null);
 
   return (
     <StoryStage frame={f} cloud={spec.design?.clouds}>
@@ -208,7 +246,8 @@ export function Closing({ spec, scenes = [] }: { spec: StorySpec; scenes?: (Topi
       {/* paneles flotantes con su título: cada uno lleva su propia perspectiva y se ordena por profundidad */}
       {fold < 1 &&
         panels.map((c, i) => {
-          const a = kf(f, [u(i * 8), u(i * 8 + 24)], [0, 1], ease.out);
+          const st = staggerFrames(theme, i, { base: 8 }); // el paso entre paneles lo escala el tema
+          const a = kf(f, [u(st), u(st + 24)], [0, 1], ease.out);
           if (a <= 0) return null;
           const W = Math.round(PANEL.w * c.k);
           const H = Math.round(PANEL.h * c.k);
@@ -223,7 +262,7 @@ export function Closing({ spec, scenes = [] }: { spec: StorySpec; scenes?: (Topi
           return (
             <div key={`${i}-${styleKey(card)}`} style={card}>
               <div style={{ width: PANEL.w, height: PANEL.h, transform: xform({ scaleX: c.k, scaleY: Math.max(0.001, c.k * (1 - fold)) }), transformOrigin: "0 0" }}>
-                <div data-qa-ignore="min-size" style={{ width: PANEL.w, height: PANEL.h, borderRadius: theme.radius.lg, boxShadow: `0 44px 80px -28px ${withAlpha(theme.color.text, 0.42)}` }}>
+                <div data-qa-ignore="min-size" style={{ width: PANEL.w, height: PANEL.h, ...panelSurface }}>
                   {Thumb ? <Thumb /> : <DefaultThumbnail index={i} name={spec.topics[i]!.name} />}
                 </div>
               </div>
@@ -269,7 +308,7 @@ export function Closing({ spec, scenes = [] }: { spec: StorySpec; scenes?: (Topi
 
       {/* firma: cada pieza se pinta recién cuando empieza a entrar (en reposo sin `opacity` ni `transform`) y, mientras vale 0, queda
           con `visibility: hidden`: ocupa su lugar (la columna no se corre al entrar la siguiente) pero no tapa ni cuenta como texto */}
-      {wash > 0 && <div key={wash >= 1 ? "full" : "part"} style={{ position: "absolute", inset: 0, background: spec.design?.closing?.bg ? resolveColor(theme, spec.design.closing.bg) : theme.color.bg, opacity: fade(wash), zIndex: 500 }} />}
+      {wash > 0 && cover && <div key={`${cover.kind}-${wash >= 1 ? "full" : "part"}`} style={{ position: "absolute", inset: 0, ...cover.style, zIndex: 500 }} />}
       <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", flexDirection: "column", gap: 40, zIndex: 600 }}>
         {signLines.slot && <div key={`slot-${styleKey({ ...fadeIn(logo), t: xform({ scale: 0.92 + logo * 0.08 }) })}`} style={{ ...fadeIn(logo), transform: xform({ scale: 0.92 + logo * 0.08 }), maxWidth: signW, display: "flex", justifyContent: "center" }}>{signLines.slot}</div>}
         {!signLines.slot && signLines.logo && (
@@ -280,12 +319,12 @@ export function Closing({ spec, scenes = [] }: { spec: StorySpec; scenes?: (Topi
         {sf && (
           <div
             key={`text-${styleKey({ ...fadeIn(textIn), t: xform({ y: Math.round((1 - textIn) * 16) }) })}`}
-            style={{ maxWidth: signW, textAlign: "center", fontSize: sf.size, lineHeight: 1.12, fontWeight: theme.font.weights.semibold, color: theme.color.text, ...fadeIn(textIn), transform: xform({ y: Math.round((1 - textIn) * 16) }) }}
+            style={{ maxWidth: signW, textAlign: "center", fontSize: sf.size, lineHeight: 1.12, fontWeight: titleStyle.fontWeight, color: theme.color.text, letterSpacing: titleStyle.letterSpacing, ...fadeIn(textIn), transform: xform({ y: Math.round((1 - textIn) * 16) }) }}
           >
-            {hasMark ? <RichText text={sf.text} /> : <GradientText loop={spec.design?.gradient?.loop}><RichText text={sf.text} /></GradientText>}
+            {hasMark ? <RichText text={sf.text} /> : signText(<RichText text={sf.text} />)}
           </div>
         )}
-        <div style={{ width: Math.round(Math.min(signW, 420) * sign), height: 8, borderRadius: theme.radius.pill, background: theme.gradient.brand, visibility: sign <= 0 ? "hidden" : undefined, opacity: fade(sign) }} />
+        {signMark && <div style={{ ...signMark.style, visibility: sign <= 0 ? "hidden" : undefined, opacity: fade(sign) }} />}
         {tagline && (
           <div
             key={`tagline-${styleKey({ ...fadeIn(sign), t: xform({ y: Math.round((1 - sign) * 16) }) })}`}

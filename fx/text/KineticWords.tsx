@@ -59,6 +59,7 @@ export function KineticWords(props: KineticWordsProps) {
         weight={w}
         color={pair.fg}
         align="center"
+        decorate={false}
       />
     </div>
   );

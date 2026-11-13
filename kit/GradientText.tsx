@@ -1,11 +1,12 @@
 import React from "react";
-import { useTheme } from "../themes";
+import { resolveStyle, useTheme } from "../themes";
 import { useFrameOr } from "./util";
 
 /**
  * Texto con el degradado de marca del tema.
  * Con `loop` (largo del ciclo en cuadros) el degradado hace un vaivén por ciclo y vuelve exacto al punto de partida: es lo que conviene para una cuenta o un cierre que se repite.
  * Con `pan` (velocidad; 1 = un vaivén cada ~125 cuadros) oscila sin saltos pero sin ciclo exacto; `loop` tiene prioridad.
+ * Sin `loop` ni `pan`, el vaivén sale de `style.decor.gradientLoop` del tema (0 = quieto).
  * Ambos salen solo del cuadro y la posición se redondea a centésimas, así que pasan `--check`.
  */
 export function GradientText({
@@ -24,8 +25,10 @@ export function GradientText({
 }) {
   const theme = useTheme();
   const f = useFrameOr(frame);
-  const panning = (loop !== undefined && loop > 0) || pan !== 0;
-  const phase = loop !== undefined && loop > 0 ? Math.sin(((f % loop) / loop) * Math.PI * 2) : Math.sin(f * pan * 0.05);
+  // `loop` explícito > `pan` explícito > vaivén del design system
+  const lp = loop ?? (pan === 0 ? resolveStyle(theme).decor.gradientLoop : undefined);
+  const panning = (lp !== undefined && lp > 0) || pan !== 0;
+  const phase = lp !== undefined && lp > 0 ? Math.sin(((f % lp) / lp) * Math.PI * 2) : Math.sin(f * pan * 0.05);
   const pos = panning ? `${+(50 + 50 * phase).toFixed(2)}% 0` : "0% 0";
   return (
     <span

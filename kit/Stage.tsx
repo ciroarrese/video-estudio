@@ -1,5 +1,5 @@
 import React from "react";
-import { useTheme } from "../themes";
+import { backgroundLayer, useTheme } from "../themes";
 import { CloudBackground } from "./CloudBackground";
 import type { CloudOptions } from "./CloudBackground";
 import { firstFamily, fontFaceCss } from "./fonts";
@@ -7,7 +7,11 @@ import { useThemeFonts } from "./ThemeScope";
 
 export { firstFamily };
 
-/** Escena a cuadro completo: fondo, tipografía y color de texto del tema, con nubes opcionales. */
+/**
+ * Escena a cuadro completo: fondo, tipografía y color de texto del tema, con la capa de fondo del estilo (`style.background`:
+ * nubes, liso, grilla, puntos, degradado o grano fijo). Las nubes solo se dibujan si `clouds` (por defecto sí) y el estilo
+ * pide nubes, o si la escena pasa `cloud` a propósito.
+ */
 export function Stage({
   clouds = true,
   cloudOpacity,
@@ -25,6 +29,8 @@ export function Stage({
   const theme = useTheme();
   useThemeFonts(theme);
   const fontCss = fontFaceCss(theme);
+  const layer = backgroundLayer(theme);
+  const showClouds = clouds && (layer.clouds || cloud !== undefined);
   return (
     <div
       style={{
@@ -38,7 +44,8 @@ export function Stage({
       }}
     >
       {fontCss && <style>{fontCss}</style>}
-      {clouds && <CloudBackground frame={frame} {...cloud} opacity={cloudOpacity ?? cloud?.opacity} />}
+      {layer.style && <div data-qa-ignore="covered" style={{ position: "absolute", inset: 0, pointerEvents: "none", ...layer.style }} />}
+      {showClouds && <CloudBackground frame={frame} {...cloud} opacity={cloudOpacity ?? cloud?.opacity ?? layer.cloudOpacity} />}
       {children}
     </div>
   );

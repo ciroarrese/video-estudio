@@ -11,7 +11,7 @@ export { defineStory, resolveTheme } from "./define";
 export type { StoryProps, ThemeInput } from "./define";
 export { useTopic, useTopicOrNull, TopicHeadline, TopicContext, TopicProvider, headlineDefaults } from "./topic";
 // piezas para armar la historia a mano (ver "Armar a mano" en stories/README.md)
-export { StoryStage, scaler, useEase, Chip, Pill, CheckMark, HeadlineRow, HighlightedTitle, RichText, pillNumberColor } from "./shared";
+export { StoryStage, scaler, useEase, Chip, Pill, CheckMark, HeadlineRow, HighlightedTitle, RichText, pillNumberColor, StoryNumeral, moveIn, useStoryDesign, useStorySpec, resolveStoryDesign, resolveStorySpec } from "./shared";
 export { listLayout } from "./layout";
 export type { ListLayout } from "./layout";
 export type { TopicInfo, HeadlineDefaults } from "./topic";

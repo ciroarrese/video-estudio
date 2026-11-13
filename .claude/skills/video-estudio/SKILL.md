@@ -16,7 +16,7 @@ Cada etapa empieza con una lista de lo que **tiene que existir** antes de arranc
 | Etapa | Tiene que existir antes de empezar |
 |---|---|
 | 1 fichas | respuestas del cuestionario confirmadas, `videos/<slug>/` y `prohibidos.txt` |
-| 2 tema | fichas aprobadas |
+| 2 tema (design system) | fichas aprobadas |
 | 3 guion | tema aprobado |
 | 4 escenas | `guion.md` **aprobado** con la columna de cuadros y la línea de presupuesto |
 | 5 armado | todas las escenas aprobadas una por una |
@@ -116,11 +116,11 @@ Si la información de un tema no alcanza para una ficha, preguntá en vez de inv
 
 **Alto: esperá aprobación o correcciones.**
 
-## Etapa 2: tema
+## Etapa 2: tema (el design system va primero)
 
-Antes de empezar: fichas aprobadas.
+Antes de empezar: fichas aprobadas. **El design system se decide antes de escribir una sola escena**: una escena no decide forma, superficie, tipografía ni movimiento; lo decide el tema y la escena lo lee con las ayudas. El orden es: tokens, informe del adaptador, estilo, prueba con la plantilla y hoja, y recién después fuentes.
 
-1. Con los tokens de la persona (archivo CSS con variables o JSON), escribí `videos/<slug>/theme.ts` con `themeFromTokensWithReport` (ver `themes/README.md`). Debe exportar `theme` y, cuando sale de tokens, `report`:
+1. **Tokens.** Con los tokens de la persona (archivo CSS con variables o JSON), escribí `videos/<slug>/theme.ts` con `themeFromTokensWithReport` (ver `themes/README.md`). Debe exportar `theme` y, cuando sale de tokens, `report`:
 
    ```ts
    import { themeFromTokensWithReport } from "../../themes";
@@ -139,8 +139,24 @@ Antes de empezar: fichas aprobadas.
    **Nubes**: el fondo sale de `theme.cloud`; con tokens, `--cloud-color-1..12` (o `--cloud-colors`), `--cloud-count`, `--cloud-opacity`, `--cloud-seed` y `--cloud-blob-1..24: "x y [tamaño]"`. Una escena puede pisarlas con `<Stage cloud={{ colors, count, blobs, opacity }}>` y una historia entera con `spec.design.clouds`.
 
    `report` existe solo con `themeFromTokensWithReport`. Si no hay tokens, usá `neutral` (o `dark` si la herramienta que se recrea es oscura), exportá solo `theme` (`export const theme = dark;`, con `import { dark } from "../../themes"`) y decilo: `templates/tema-informe.ts` lo tolera y muestra solo el contraste. No inventes marcas ni colores corporativos.
-2. Corré `npx tsx templates/tema-informe.ts <slug>` y mostrá: roles tomados de los tokens, roles que quedaron con el valor base (`fallback`), avisos y fallas de contraste. Para cada falla proponé el arreglo (oscurecer el color de texto, cambiar el acento) y no lo apliques sin que la persona lo apruebe. Cada aviso trae `usedBy` (dónde usan las piezas ese color, como texto o como gráfico) y `suggestion` (el tono más cercano que llega al mínimo). Si la marca ya aprobó un par que no llega a 4.5:1 y la persona lo confirma, se reconoce en el tema con `acknowledge: ["accent/bg"]` (en `themeFromTokensWithReport(tokens, base, { acknowledge })`): sale como `note` en vez de aviso y queda en `report.notes`. `acknowledge` no cambia lo que mide `qa`, que juzga el texto real en pantalla.
-3. Fuentes: si la persona trae archivos, van en `public/` y se declaran en `theme.font.files`; confirmá su licencia para el lugar de exhibición (etapa 0, punto 8).
+2. **Informe del adaptador.** Corré `npx tsx templates/tema-informe.ts <slug>` y mostrá: roles tomados de los tokens, roles que quedaron con el valor base (`fallback`), avisos y fallas de contraste. Para cada falla proponé el arreglo (oscurecer el color de texto, cambiar el acento) y no lo apliques sin que la persona lo apruebe. Cada aviso trae `usedBy` (dónde usan las piezas ese color, como texto o como gráfico) y `suggestion` (el tono más cercano que llega al mínimo). Si la marca ya aprobó un par que no llega a 4.5:1 y la persona lo confirma, se reconoce en el tema con `acknowledge: ["accent/bg"]` (en `themeFromTokensWithReport(tokens, base, { acknowledge })`): sale como `note` en vez de aviso y queda en `report.notes`. `acknowledge` no cambia lo que mide `qa`, que juzga el texto real en pantalla.
+3. **Elegí el estilo** (`theme.style`). Un design system no es solo una paleta: define cómo son las esquinas, las superficies, los números, el fondo y el movimiento. Se declara en el tema (`themeFromTokensWithReport(tokens, base, { style: {...} })`, o tokens `--style-<grupo>-<campo>`); lo que no se declara queda como en `neutral`. `templates/theme.ts` trae el bloque completo, comentado, con los valores por defecto. Elegí campo por campo mirando el design system de la persona y mostrale la tabla con lo elegido:
+
+   | Grupo | Qué decide |
+   |---|---|
+   | `shape` | esquinas (`pill`, `rounded`, `sharp`), grosor de borde, si lleva borde |
+   | `surface` | tipo (`solid`, `glass`, `outline`, `tinted`) y elevación (`shadow`, `flat`, `border`, `glow`) |
+   | `type` | pesos, interletrado, mayúsculas de rótulos, tratamiento de los números y de la palabra resaltada |
+   | `background` | nubes, liso, grilla, puntos, degradado o grano, y su intensidad |
+   | `motion` | cómo entran las cosas, rebote, paso entre elementos, desenfoque de cámara, transición entre escenas |
+   | `decor` | garabatos y su trazo, viñeta, marca de acento, vaivén del degradado |
+   | `story` | valores por defecto de la historia: cartel, lista, acople, muro, cierre |
+   | `chart` | radio de las barras, grosor de línea, guías y relleno de los gráficos |
+   | `line`, `solid`, `depth`, `text` | trazos, sólidos, volumen y texto de los efectos de `fx/` |
+
+   Referencias: los tres design systems de ejemplo, inventados y con estéticas opuestas: `themes/editorial.ts` (esquinas rectas, contorno, marcador y subrayado), `themes/neon.ts` (vidrio con halo, puntos, rebote) y `themes/papel.ts` (esquinas suaves, superficie teñida, grano, trazo a mano). Contrato completo en `docs/estilo.md`. `checkTheme` revisa contraste y combinaciones del estilo; lo que informe se corrige o se reconoce con `acknowledge` como el resto.
+4. **Probá el estilo con la plantilla y mirá la hoja.** Con `videos/<slug>/theme.ts` listo, creá la escena y la historia de arranque (`bash templates/nuevo.sh historia <slug> <escena>`), corré `npm run sheet -- <slug> --count 12` y abrí la imagen con Read: tiene que verse como el design system (esquinas, bordes, números, fondo), no como el video neutro con otros colores. Pasá también `npm run qa -- <slug>-<escena> --count 30`. Ajustá el estilo hasta que la hoja convenza y mostrásela a la persona.
+5. Fuentes: si la persona trae archivos, van en `public/` y se declaran en `theme.font.files`; confirmá su licencia para el lugar de exhibición (etapa 0, punto 8).
 
 **Alto: esperá aprobación del tema.**
 
@@ -181,7 +197,7 @@ Antes de empezar: `guion.md` aprobado (con presupuesto de cuadros) y el tema apr
 Para cada escena del guion, en orden:
 
 1. **Elegí efectos del catálogo antes de escribir desde cero:** abrí `docs/animaciones.md` (sección "Cómo elegir") y usá los efectos de `fx/` que ya existen para cada momento del guion; combinalos con cámara, cursor y garabatos del kit (`docs/guia-escenas.md`, sección 9). Podés ver cualquiera con `npm run dev` y `/?video=fx-text`, `fx-3d` o `fx-data-ui-art`.
-2. `bash templates/nuevo.sh escena <slug> <escena>` (no hay que registrarla; con `VE_VIDEOS_DIR` definida escribe en esa carpeta). Antes de acomodar nada a ojo, usá las medidas de la sección 13 de `docs/guia-escenas.md` (caja de la ventana por formato, franja del titular, zoom máximo que muestra una fila entera) y copiá de ahí la escena de datos completa si la escena es de ese tipo. Construí la escena con piezas del kit siguiendo `docs/guia-escenas.md`: coordenadas del mundo, cámara con cuadros clave, todo del tema (los colores de la interfaz recreada, de `useTheme().data`; la letra densa de `type.ui`), interfaces recreadas con su estructura y rótulos, nunca capturas. Piezas que conviene conocer: `DockedHeadline layout="inline"` (título y línea en un renglón), `Vignette color="bg" strength={0.5}` en interfaces oscuras, `GradientText loop={90}` (vaivén que vuelve exacto), `flyInZ(progreso, { from })` para un panel que llega en profundidad y `Stage cloud={...}`. La plantilla ya trae una disposición horizontal y otra vertical con `useFormat().pick`; para cada formato extra del guion, diseñá la disposición (no achiques la horizontal). Si va en una historia, el contenido es `SceneBody` (sin `Stage`) y el titular va con `DockedHeadline` y una prop `title` (como en la plantilla), que funciona tanto sola como dentro de la historia. La alternativa es `<TopicHeadline title="..." number={1} />`: con `title` dibuja el titular también fuera de la historia (dentro, `title` y `number` pisan al tema); sin `title` y sin historia no dibuja nada y avisa una vez en la consola. `useTopic({ name: "..." })` (con valor de reserva) y `useTopicOrNull()` sirven para leer el tema sin que la escena sola falle. La escena exporta su `DURACION` y se prueba sola antes de entrar a la historia.
+2. `bash templates/nuevo.sh escena <slug> <escena>` (no hay que registrarla; con `VE_VIDEOS_DIR` definida escribe en esa carpeta). Antes de acomodar nada a ojo, usá las medidas de la sección 13 de `docs/guia-escenas.md` (caja de la ventana por formato, franja del titular, zoom máximo que muestra una fila entera) y copiá de ahí la escena de datos completa si la escena es de ese tipo. **Estética por las ayudas, no a mano**: la escena no escribe radios, sombras, bordes, pesos de letra ni curvas propios. Usa `surfaceStyle` (con `bold`, `corner`, `level`), `cornerRadius`, `textStyle` y `Eyebrow`, `Highlight` y `Numeral` para texto y cifras destacadas, `entrance` y `staggerFrames` para entradas, `useCameraAt` para la cámara y `chartStyle` para gráficos (ver `docs/guia-escenas.md`, sección 14); así el mismo video se rehace con otro design system. Con la plantilla, probala bajo otros sistemas: `npm run qa -- <slug>-<escena> --props '{"theme":"editorial"}' --count 30` (también `neon`, `papel`) y `npm run sheet -- ... --props '{"theme":"neon"}'`. Construí la escena con piezas del kit siguiendo `docs/guia-escenas.md`: coordenadas del mundo, cámara con cuadros clave, todo del tema (los colores de la interfaz recreada, de `useTheme().data`; la letra densa de `type.ui`), interfaces recreadas con su estructura y rótulos, nunca capturas. Piezas que conviene conocer: `DockedHeadline layout="inline"` (título y línea en un renglón), `Vignette color="bg" strength={0.5}` en interfaces oscuras, `GradientText loop={90}` (vaivén que vuelve exacto), `flyInZ(progreso, { from })` para un panel que llega en profundidad y `Stage cloud={...}`. La plantilla ya trae una disposición horizontal y otra vertical con `useFormat().pick`; para cada formato extra del guion, diseñá la disposición (no achiques la horizontal). Si va en una historia, el contenido es `SceneBody` (sin `Stage`) y el titular va con `DockedHeadline` y una prop `title` (como en la plantilla), que funciona tanto sola como dentro de la historia. La alternativa es `<TopicHeadline title="..." number={1} />`: con `title` dibuja el titular también fuera de la historia (dentro, `title` y `number` pisan al tema); sin `title` y sin historia no dibuja nada y avisa una vez en la consola. `useTopic({ name: "..." })` (con valor de reserva) y `useTopicOrNull()` sirven para leer el tema sin que la escena sola falle. La escena exporta su `DURACION` y se prueba sola antes de entrar a la historia.
 3. **Antes de mostrar nada**, corré en este orden y corregí lo que salga hasta que quede limpio:
    ```bash
    npm run typecheck

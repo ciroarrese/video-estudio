@@ -1,14 +1,16 @@
 import React from "react";
 import { Sequence, useFrame } from "../../engine";
-import { ThemeProvider, dark, neutral, useTheme } from "../../themes";
+import { ThemeProvider, dark, editorial, neon, neutral, papel, useTheme } from "../../themes";
 import type { Theme } from "../../themes";
 import {
   CardFlip, CarouselRing, CubeFold, CubeStack, ExtrudeType, Globe, Helix, IsoCity, LayerExplode, OrbitRings,
   ParticleSphere, PhoneOrbit, TerrainMesh, TorusWire, Tunnel, WaveDots,
 } from "../../fx/three";
 
-/** `theme`: "neutral" | "dark" (por defecto neutral); también acepta un objeto Theme (para pruebas). */
-export type Fx3dProps = { theme?: "neutral" | "dark" | Theme };
+/** `theme`: nombre de un tema de `themes/` (por defecto neutral); también acepta un objeto Theme (para pruebas). */
+export type Fx3dProps = { theme?: "neutral" | "dark" | "editorial" | "neon" | "papel" | Theme };
+
+const POR_NOMBRE = { neutral, dark, editorial, neon, papel };
 
 const ACTIVE = 75;
 const HOLD = 15;
@@ -92,7 +94,7 @@ function Slot({ name, children }: { name: string; children: React.ReactNode }) {
 }
 
 export function Fx3dGallery({ theme = "neutral" }: Fx3dProps) {
-  const th: Theme = typeof theme === "object" ? theme : theme === "dark" ? dark : neutral;
+  const th: Theme = typeof theme === "object" ? theme : POR_NOMBRE[theme] ?? neutral;
   return (
     <ThemeProvider theme={th}>
       <div style={{ position: "absolute", inset: 0, background: th.color.bg }}>

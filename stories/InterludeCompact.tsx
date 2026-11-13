@@ -1,12 +1,12 @@
 import { Easing, useFrame, useVideoConfig } from "../engine";
 import { kf } from "../kit";
-import { useTheme } from "../themes";
-import { fade, styleKey, xform } from "../fx/core/math";
+import { accentMark, cornerRadius, resolveStyle, textStyle, useTheme } from "../themes";
+import { fade, styleKey } from "../fx/core/math";
 import type React from "react";
 import { INTERLUDE_COMPACT_FRAMES } from "./durations";
 import { fitText } from "./layout";
 import { nextTopic } from "./Interlude";
-import { CheckMark, StoryStage, scaler, useEase } from "./shared";
+import { CheckMark, StoryStage, moveIn, scaler, useEase, useStorySpec } from "./shared";
 import type { StorySpec } from "./types";
 
 export { INTERLUDE_COMPACT_FRAMES };
@@ -18,8 +18,9 @@ export const interludeCompactFrames = (spec: StorySpec) => spec.timing?.interlud
  * `done` = cuántos temas ya se mostraron (1..n); sin siguiente (último tema, o ninguno más con escena) dice que sigue el resumen.
  * `skip` (índices de temas sin escena) los saca de la tira y del "Sigue"; `next` fuerza el siguiente (-1: ninguno).
  */
-export function InterludeCompact({ spec, done, skip = [], next: nextProp }: { spec: StorySpec; done: number; skip?: number[]; next?: number }) {
+export function InterludeCompact({ spec: specIn, done, skip = [], next: nextProp }: { spec: StorySpec; done: number; skip?: number[]; next?: number }) {
   const theme = useTheme();
+  const spec = useStorySpec(specIn); // el diseño del video sobre el del design system
   const ease = useEase();
   const f = useFrame();
   const { width } = useVideoConfig();
@@ -47,12 +48,18 @@ export function InterludeCompact({ spec, done, skip = [], next: nextProp }: { sp
   const nameFit = fitText(last.name, maxW - theme.type.h2 * 1.4, theme.type.h2, { min: theme.type.body, avg: 0.55 });
   const nextFit = next ? fitText(next.name, maxW, theme.type.h2 * 0.62, { min: theme.type.body * 0.8, avg: 0.55 }) : null;
   const cs = Math.round(theme.type.h2 * 0.95);
+  // la tira sigue al design system: forma de las esquinas, relleno (degradado de marca o acento sólido) y, con `decor.accent: "underline"`, un filete más fino
+  const mark = accentMark(theme, { length: segW, thickness: 10 });
+  const segH = mark?.kind === "underline" ? Number(mark.style.height) : 10;
+  const segFill = resolveStyle(theme).type.numerals === "gradient" ? theme.gradient.brand : theme.color.accent;
+  const title = textStyle(theme, "title", { tracking: -0.02 });
+  const eyebrow = textStyle(theme, "eyebrow", { tracking: 0.08 });
 
   // propiedades que se emiten solo mientras se animan (React agrega al final las que reaparecen): la clave remonta el elemento al cambiar el conjunto
   const col: React.CSSProperties = { position: "absolute", inset: 0, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: Math.round(theme.type.h2 * 0.55), opacity: fade(out) };
   const strip: React.CSSProperties = { display: "flex", gap, width: barW, opacity: fade(appear) };
-  const nameRow: React.CSSProperties = { display: "flex", alignItems: "center", gap: Math.round(cs * 0.4), maxWidth: maxW, opacity: fade(appear), transform: xform({ y: Math.round((1 - appear) * 18) }) };
-  const nextBox: React.CSSProperties = { textAlign: "center", opacity: fade(nextIn), transform: xform({ y: Math.round((1 - nextIn) * 14) }), color: theme.color.textMuted, fontSize: theme.type.body };
+  const nameRow: React.CSSProperties = { display: "flex", alignItems: "center", gap: Math.round(cs * 0.4), maxWidth: maxW, opacity: fade(appear), ...moveIn(theme, appear, 0, { native: "rise", distance: 18 }) };
+  const nextBox: React.CSSProperties = { textAlign: "center", opacity: fade(nextIn), ...moveIn(theme, nextIn, 1, { native: "rise", distance: 14 }), color: theme.color.textMuted, fontSize: theme.type.body };
 
   return (
     <StoryStage frame={f} cloud={spec.design?.clouds}>
@@ -61,20 +68,20 @@ export function InterludeCompact({ spec, done, skip = [], next: nextProp }: { sp
           {shown.map((_, i) => {
             const p = i < pos ? 1 : i === pos ? fill : 0;
             return (
-              <div key={i} style={{ flex: 1, height: 10, borderRadius: theme.radius.pill, background: theme.color.border, overflow: "hidden", width: segW }}>
-                <div style={{ width: `${(p * 100).toFixed(2)}%`, height: "100%", background: theme.gradient.brand }} />
+              <div key={i} style={{ flex: 1, height: segH, borderRadius: cornerRadius(theme, "bar"), background: theme.color.border, overflow: "hidden", width: segW }}>
+                <div style={{ width: `${(p * 100).toFixed(2)}%`, height: "100%", background: segFill }} />
               </div>
             );
           })}
         </div>
         <div key={`name-${styleKey(nameRow)}`} style={nameRow}>
           <div style={{ flexShrink: 0, width: cs, height: cs }}>{check > 0 && <CheckMark p={check} size={cs} id={`c${done}`} />}</div>
-          <div style={{ fontSize: nameFit.size, fontWeight: theme.font.weights.semibold, color: theme.color.text, letterSpacing: "-0.02em", whiteSpace: "nowrap" }}>{nameFit.text}</div>
+          <div style={{ fontSize: nameFit.size, fontWeight: title.fontWeight, color: theme.color.text, letterSpacing: title.letterSpacing, whiteSpace: "nowrap" }}>{nameFit.text}</div>
         </div>
         <div key={`next-${styleKey(nextBox)}`} style={nextBox}>
           {nextFit ? (
             <>
-              <div style={{ fontSize: theme.type.caption * 0.9, letterSpacing: "0.08em", textTransform: "uppercase", fontWeight: theme.font.weights.medium }}>{`Sigue · ${pos + 2} de ${m}`}</div>
+              <div style={{ fontSize: theme.type.caption * 0.9, letterSpacing: eyebrow.letterSpacing, textTransform: "uppercase", fontWeight: theme.font.weights.medium }}>{`Sigue · ${pos + 2} de ${m}`}</div>
               <div style={{ fontSize: nextFit.size, color: theme.color.text, fontWeight: theme.font.weights.medium, marginTop: 6, whiteSpace: "nowrap" }}>{nextFit.text}</div>
             </>
           ) : (

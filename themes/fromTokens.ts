@@ -1,4 +1,6 @@
 import type { CloudBlob, DataCheck, ResolvedTheme, Surface, Theme } from "./types";
+import type { ThemeStyleInput } from "./styleTypes";
+import { STYLE_FIELDS, acceptedValues, mergeStyleInput, parseStyleValue, styleIssues, styleTokenName } from "./style";
 import { neutral } from "./neutral";
 import { isValidColor, shiftColor } from "./color";
 import { checkTheme, contrastRatio, pairColors } from "./contrast";
@@ -19,6 +21,11 @@ export interface TokenOptions {
   data?: Record<string, DataRoleInput>;
   /** Pares de contraste de marca que se dan por conocidos (`["accent/bg"]`); `checkTheme` los informa como `note`, mientras los colores del par sigan siendo los aprobados. */
   acknowledge?: string[];
+  /**
+   * Forma compacta de las decisiones de estilo (`theme.style`), que pisa a los tokens `--style-*`: `{ style: { shape: { corners: "sharp" }, surface: { kind: "glass" } } }`.
+   * Un valor inválido no lanza: se ignora y queda en `report.style.invalid` (y en `report.warnings`) con lo que acepta el campo.
+   */
+  style?: ThemeStyleInput;
 }
 
 export type DataRoleInput =
@@ -40,6 +47,15 @@ export interface TokenReport {
   data: Record<string, { color: string; source: string } & DataCheck>;
   /** pares de contraste reconocidos en `acknowledge` (no son avisos) */
   notes: string[];
+  /** Decisiones de estilo: de dónde salió cada campo, cuáles quedaron con el valor de la base y cuáles se ignoraron por inválidas. */
+  style: {
+    /** campo (`shape.corners`) -> token de origen (`style-shape-corners`) o `options.style` */
+    mapped: Record<string, string>;
+    /** campos que quedaron con el valor del tema base (o el por defecto) */
+    fallback: string[];
+    /** valores ignorados, con lo que acepta el campo (o los campos válidos, si el nombre no existe) */
+    invalid: { path: string; source: string; value: unknown; accepted: string }[];
+  };
 }
 
 type Flat = Map<string, string>;
@@ -55,7 +71,7 @@ const norm = (s: string) =>
 
 function flattenObject(obj: unknown, path: string[], out: Flat): void {
   if (obj === null || obj === undefined) return;
-  if (typeof obj === "string" || typeof obj === "number") {
+  if (typeof obj === "string" || typeof obj === "number" || typeof obj === "boolean") {
     out.set(norm(path.join("-")), String(obj));
     return;
   }
@@ -67,7 +83,7 @@ function flattenObject(obj: unknown, path: string[], out: Flat): void {
     const o = obj as Record<string, unknown>;
     const leaf = "$value" in o ? o.$value : "value" in o && typeof o.value !== "object" ? o.value : undefined;
     if (leaf !== undefined) {
-      if (typeof leaf === "string" || typeof leaf === "number") {
+      if (typeof leaf === "string" || typeof leaf === "number" || typeof leaf === "boolean") {
         out.set(norm(path.join("-")), String(leaf));
       }
       return;
@@ -181,7 +197,7 @@ export function themeFromTokensWithReport(
   resolveRefs(flat);
 
   const theme: Theme = deepClone(base);
-  const report: TokenReport = { mapped: {}, fallback: [], derived: [], warnings: [], ambiguous: {}, data: {}, notes: [] };
+  const report: TokenReport = { mapped: {}, fallback: [], derived: [], warnings: [], ambiguous: {}, data: {}, notes: [], style: { mapped: {}, fallback: [], invalid: [] } };
   const used = new Set<string>();
 
   /** Tokens que coinciden con alguno de los nombres, en orden de prioridad (nombre exacto antes que sufijo -default/-500). */
@@ -423,6 +439,44 @@ export function themeFromTokensWithReport(
     const v = noUnresolved(`shadow.${sh}`, [`shadow-${sh}`, `box-shadow-${sh}`, `elevation-${sh}`, `shadows-${sh}`], "Sombra");
     if (v) theme.shadow[sh] = v;
   }
+
+  // Estilo: tokens `style-*` y, encima, la forma compacta `options.style`
+  const patch: Record<string, Record<string, unknown>> = {};
+  const setStyle = (path: string, value: unknown, source: string) => {
+    const [g, k] = path.split(".") as [string, string];
+    (patch[g] ??= {})[k] = value;
+    report.style.mapped[path] = source;
+  };
+  const rejectStyle = (path: string, source: string, value: unknown, accepted: string) => {
+    report.style.invalid.push({ path, source, value, accepted });
+    report.warnings.push(`Estilo inválido ignorado en "${source}" (${path}): ${JSON.stringify(value)}; acepta ${accepted}`);
+  };
+  const known = new Set(STYLE_FIELDS.map((f) => styleTokenName(f.path)));
+  for (const spec of STYLE_FIELDS) {
+    const tok = styleTokenName(spec.path);
+    const raw = flat.get(tok);
+    if (raw === undefined) continue;
+    const r = UNRESOLVED.test(raw) ? { ok: false as const } : parseStyleValue(spec, raw);
+    if (r.ok) {
+      setStyle(spec.path, r.value, tok);
+      used.add(tok);
+    } else rejectStyle(spec.path, tok, raw, acceptedValues(spec));
+  }
+  for (const k of flat.keys()) {
+    if (k.startsWith("style-") && !known.has(k)) rejectStyle(k, k, flat.get(k), "un campo de style: " + STYLE_FIELDS.map((f) => styleTokenName(f.path)).join(", "));
+  }
+  if (options.style) {
+    for (const i of styleIssues(options.style)) rejectStyle(i.path, "options.style", i.value, i.accepted);
+    for (const spec of STYLE_FIELDS) {
+      const [g, k] = spec.path.split(".") as [string, string];
+      const raw = (options.style as Record<string, Record<string, unknown> | undefined>)[g]?.[k];
+      if (raw === undefined) continue;
+      const r = parseStyleValue(spec, raw);
+      if (r.ok) setStyle(spec.path, r.value, "options.style");
+    }
+  }
+  if (Object.keys(patch).length) theme.style = mergeStyleInput(theme.style, patch as ThemeStyleInput);
+  report.style.fallback = STYLE_FIELDS.map((f) => f.path).filter((p) => !(p in report.style.mapped));
 
   // Nombre
   const nm = matches(["name", "theme-name"], false)[0];

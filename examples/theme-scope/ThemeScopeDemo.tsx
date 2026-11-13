@@ -1,23 +1,23 @@
 import { useFrame } from "../../engine";
-import { ThemeProvider, useTheme } from "../../themes";
+import { ThemeProvider, cornerRadius, useTheme } from "../../themes";
 import type { Theme } from "../../themes";
 import { CountUp, Cursor, DockedHeadline, Stage, ThemeScope, kf } from "../../kit";
 import { DonutRing, Typewriter } from "../../fx";
 import { ParticleSphere } from "../../fx/three";
 import { ESTADOS } from "./estados";
 
-type Named = "neutral" | "dark" | Theme;
+type Named = "neutral" | "dark" | "editorial" | "neon" | "papel" | Theme;
 /** `theme`: tema del video. `scoped`: tema de la herramienta recreada (por defecto el contrario). Aceptan un objeto Theme (para pruebas). */
 export type ThemeScopeDemoProps = { theme?: Named; scoped?: Named; inner?: Named };
 
-const resolve = (t: Named): Theme => (typeof t === "object" ? t : t === "dark" ? ESTADOS.dark : ESTADOS.neutral);
+const resolve = (t: Named): Theme => (typeof t === "object" ? t : ESTADOS[t] ?? ESTADOS.neutral);
 
 /** Tarjeta de estadística: sale entera de `useTheme()`, así que toma el tema del ámbito donde se la ponga. */
 function Stat({ label, value, to, left }: { label: string; value: string; to: number; left: number }) {
   const theme = useTheme();
   const frame = useFrame();
   return (
-    <div style={{ position: "absolute", left, top: 120, width: 230, height: 150, boxSizing: "border-box", padding: "18px 22px", background: theme.color.surface, border: `1px solid ${theme.color.border}`, borderRadius: theme.radius.md, boxShadow: theme.shadow.sm }}>
+    <div style={{ position: "absolute", left, top: 120, width: 230, height: 150, boxSizing: "border-box", padding: "18px 22px", background: theme.color.surface, border: `1px solid ${theme.color.border}`, borderRadius: cornerRadius(theme, "control"), boxShadow: theme.shadow.sm }}>
       <div style={{ fontSize: theme.type.eyebrow, color: theme.color.textMuted }}>{label}</div>
       <div style={{ fontSize: 64, lineHeight: 1.15, fontWeight: theme.font.weights.stat, color: theme.color.text }}>
         <CountUp frame={frame} from={0} to={to} start={20} duration={40} />
@@ -40,7 +40,7 @@ function Tool({ inner }: { inner: Theme }) {
       {"estadoOk" in theme.data && (
         <div style={{ position: "absolute", left: 600, top: 36, display: "flex", gap: 8 }}>
           {([["Ok", theme.data.estadoOk], ["Alerta", theme.data.estadoAlerta], ["Fallo", theme.data.estadoFallo]] as const).map(([t, c]) => (
-            <span key={t} style={{ padding: "2px 12px", borderRadius: theme.radius.pill, background: theme.data.fichaFondo, border: `2px solid ${c}`, color: c, fontSize: theme.type.ui.sm, fontWeight: theme.font.weights.semibold }}>{t}</span>
+            <span key={t} style={{ padding: "2px 12px", borderRadius: cornerRadius(theme, "chip"), background: theme.data.fichaFondo, border: `2px solid ${c}`, color: c, fontSize: theme.type.ui.sm, fontWeight: theme.font.weights.semibold }}>{t}</span>
           ))}
         </div>
       )}
@@ -49,11 +49,11 @@ function Tool({ inner }: { inner: Theme }) {
       <div style={{ position: "absolute", left: 560, top: 70, width: 260, height: 260 }}>
         <DonutRing frame={frame} start={10} duration={60} width={260} height={260} value={72} label="Avance" />
       </div>
-      <div style={{ position: "absolute", left: 36, top: 300, width: 330, height: 330, borderRadius: theme.radius.panel, overflow: "hidden", background: theme.color.surfaceAlt, border: `1px solid ${theme.color.border}` }}>
+      <div style={{ position: "absolute", left: 36, top: 300, width: 330, height: 330, borderRadius: cornerRadius(theme, "panel"), overflow: "hidden", background: theme.color.surfaceAlt, border: `1px solid ${theme.color.border}` }}>
         <ParticleSphere frame={frame} start={0} duration={75} width={330} height={330} />
       </div>
       {/* Subárbol anidado: vuelve al otro tema, dentro de la herramienta. */}
-      <ThemeScope theme={inner} paint style={{ position: "absolute", left: 400, top: 340, width: 420, height: 280, borderRadius: theme.radius.panel, border: `1px solid ${inner.color.border}`, padding: 28, boxSizing: "border-box" }}>
+      <ThemeScope theme={inner} paint style={{ position: "absolute", left: 400, top: 340, width: 420, height: 280, borderRadius: cornerRadius(inner, "panel"), border: `1px solid ${inner.color.border}`, padding: 28, boxSizing: "border-box" }}>
         <InnerNote />
       </ThemeScope>
       <Cursor frame={frame} show={[30, 120]} keys={[[30, 700, 560], [80, 330, 160], [120, 340, 170]]} clicks={[82]} />
@@ -67,7 +67,7 @@ function InnerNote() {
     <>
       <div style={{ fontSize: theme.type.body, fontWeight: theme.font.weights.semibold, color: theme.color.text }}>Nota anidada</div>
       <div style={{ marginTop: 10, fontSize: theme.type.caption, color: theme.color.textMuted }}>Otro ámbito, dentro del ámbito de la herramienta.</div>
-      <div style={{ marginTop: 18, display: "inline-block", padding: "8px 20px", borderRadius: theme.radius.pill, background: theme.color.accent, color: theme.color.onAccent, fontSize: theme.type.caption, fontWeight: theme.font.weights.semibold }}>Listo</div>
+      <div style={{ marginTop: 18, display: "inline-block", padding: "8px 20px", borderRadius: cornerRadius(theme, "chip"), background: theme.color.accent, color: theme.color.onAccent, fontSize: theme.type.caption, fontWeight: theme.font.weights.semibold }}>Listo</div>
     </>
   );
 }
@@ -79,7 +79,7 @@ function Scene({ scoped, inner }: { scoped: Theme; inner: Theme }) {
     <Stage clouds={false}>
       <DockedHeadline index={1} title="Un tema por escena" subtitle="La herramienta oscura dentro de un video claro" frame={frame} start={0} />
       <div style={{ position: "absolute", left: 500, top: 190, opacity: kf(frame, [0, 20], [0, 1]) }}>
-        <ThemeScope theme={scoped} paint style={{ width: 860, height: 660, borderRadius: theme.radius.lg, border: `1px solid ${scoped.color.border}`, boxShadow: scoped.shadow.lg, overflow: "hidden" }}>
+        <ThemeScope theme={scoped} paint style={{ width: 860, height: 660, borderRadius: cornerRadius(scoped, "window"), border: `1px solid ${scoped.color.border}`, boxShadow: scoped.shadow.lg, overflow: "hidden" }}>
           <Tool inner={inner} />
         </ThemeScope>
       </div>

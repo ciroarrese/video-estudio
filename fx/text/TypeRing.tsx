@@ -2,6 +2,9 @@ import { Easing, FrameCanvas } from "../../engine";
 import { fxBox, progress, roleColor, useFx } from "../core";
 import type { ColorRole, FxProps } from "../core";
 import { measureWidth } from "./measure";
+import { depthLook, textLook } from "../../themes";
+
+const SEPARATORS = { round: "•", square: "\u25AA", cross: "+" } as const;
 
 export type TypeRingProps = FxProps & {
   text: string;
@@ -21,7 +24,7 @@ export type RingGlyph = { ch: string; x: number; y: number; scale: number; squee
 /** Proyeccion a mano (sin 3D de CSS) de las letras de un anillo: devuelve los glifos ordenados de lejos a cerca. Funcion pura para pruebas. */
 export function projectRing(
   letters: string[],
-  o: { cx: number; cy: number; radius: number; tilt: number; angle: number; textLen: number; widths?: number[] },
+  o: { cx: number; cy: number; radius: number; tilt: number; angle: number; textLen: number; widths?: number[]; /** `false` (`style.depth.fog`): las letras de atrás no se apagan de a poco (0,3 parejo) y las de frente van plenas. */ fog?: boolean },
 ): RingGlyph[] {
   const N = letters.length;
   const step = (Math.PI * 2) / N;
@@ -45,7 +48,7 @@ export function projectRing(
       y: o.cy + z * Math.sin(phi) * sc,
       scale: sc,
       squeeze: facing,
-      alpha: facing >= 0 ? 0.6 + 0.4 * facing : 0.16,
+      alpha: o.fog === false ? (facing >= 0 ? 1 : 0.3) : facing >= 0 ? 0.6 + 0.4 * facing : 0.16,
       z,
     };
   });
@@ -62,7 +65,9 @@ export function TypeRing(props: TypeRingProps) {
   const duration = props.duration ?? 75;
   const weight = props.weight ?? theme.font.weights.stat;
   const family = theme.font.family;
-  const sep = "  •  ";
+  const look = textLook(theme);
+  const fog = depthLook(theme).fog;
+  const sep = `  ${SEPARATORS[look.dotShape]}  `;
   const pattern = Array.from(text + sep);
   const patW = measureWidth(text + sep, fs, { family, weight });
   const reps = Math.max(1, Math.round((2 * Math.PI * radius) / (patW * 1.1)));
@@ -77,7 +82,7 @@ export function TypeRing(props: TypeRingProps) {
       height={box.height}
       style={style}
       draw={(ctx, _f, { width, height }) => {
-        const glyphs = projectRing(letters, { cx: width / 2, cy: height / 2, radius, tilt, angle, textLen: Array.from(text).length, widths });
+        const glyphs = projectRing(letters, { cx: width / 2, cy: height / 2, radius, tilt, angle, textLen: Array.from(text).length, widths, fog });
         ctx.font = `${weight} ${fs}px ${family}`;
         ctx.textAlign = "center";
         ctx.textBaseline = "middle";
@@ -88,6 +93,20 @@ export function TypeRing(props: TypeRingProps) {
           ctx.globalAlpha = g.alpha;
           ctx.translate(g.x, g.y);
           ctx.scale(g.scale * g.squeeze, g.scale);
+          if (look.glow > 0 && g.squeeze > 0.5) {
+            // Halo: la misma letra más grande y muy tenue, detrás (sin shadowBlur).
+            ctx.globalAlpha = g.alpha * 0.12 * look.glow;
+            ctx.save();
+            ctx.scale(1.12, 1.12);
+            ctx.fillText(g.ch, 0, 0);
+            ctx.restore();
+            ctx.globalAlpha = g.alpha * 0.22 * look.glow;
+            ctx.save();
+            ctx.scale(1.05, 1.05);
+            ctx.fillText(g.ch, 0, 0);
+            ctx.restore();
+            ctx.globalAlpha = g.alpha;
+          }
           ctx.fillText(g.ch, 0, 0);
           ctx.restore();
         }

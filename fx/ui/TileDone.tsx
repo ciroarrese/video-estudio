@@ -1,7 +1,8 @@
-import { withAlpha } from "../../themes";
+import { cornerRadius, withAlpha, textStyle } from "../../themes";
 import { Easing } from "../../engine";
 import { fxBox, progress, svgScale, useFx } from "../core";
 import type { FxProps } from "../core";
+import { SvgShadow, svgSurface } from "../data/styleKit";
 
 export type TileDoneProps = FxProps & {
   label?: string;
@@ -22,16 +23,20 @@ export function TileDone(p: TileDoneProps) {
   const press = local >= 0 && local < dur * 0.18 ? 1 - 0.03 * Math.sin((Math.PI * local) / (dur * 0.18)) : 1;
   const fs = theme.type.caption * 0.85;
   const cx = 70, cy = h / 2;
-  const colBorder = done ? theme.color.success : theme.color.border;
+  // Estilo del diseño: superficie (relleno, filo duro o halo) y esquinas de la baldosa; el borde de "hecha" sigue en verde.
+  const surf = svgSurface(theme, "card");
+  const rx = cornerRadius(theme, "card");
+  const colBorder = done ? theme.color.success : surf.border > 0 ? surf.edge : "none";
   return (
     <svg width={w} height={h} viewBox={`0 0 ${w} ${h}`} style={{ display: "block", fontFamily: theme.font.family, ...p.style }}>
       <g key={svgScale(w / 2, h / 2, press) ? "p" : "r"} transform={svgScale(w / 2, h / 2, press)}>
-        <rect x={6} y={6} width={w - 12} height={h - 12} rx={theme.radius.lg} fill={theme.color.surface} stroke={colBorder} strokeWidth={done ? 3 : 2} />
-        {done && <rect x={6} y={6} width={w - 12} height={h - 12} rx={theme.radius.lg} fill={withAlpha(theme.color.success, 0.1 * Math.min(1, flip))} />}
+        <SvgShadow shadow={surf.shadow} x={6} y={6} width={w - 12} height={h - 12} rx={rx} />
+        <rect x={6} y={6} width={w - 12} height={h - 12} rx={rx} fill={surf.fill} stroke={colBorder} strokeWidth={(done ? 3 : 2) * (done ? 1 : surf.border)} />
+        {done && <rect x={6} y={6} width={w - 12} height={h - 12} rx={rx} fill={withAlpha(theme.color.success, 0.1 * Math.min(1, flip))} />}
         {t > 0 && t < 1 && <circle cx={cx} cy={cy} r={ripple * w * 0.5} fill="none" stroke={withAlpha(theme.color.success, 0.5 * (1 - ripple))} strokeWidth={6 * (1 - ripple) + 1} />}
         <circle key={done ? "d" : "p"} cx={cx} cy={cy} r={32 * (done ? 0.85 + 0.15 * Math.min(1.1, flip) : 1)} fill={done ? theme.color.success : "none"} stroke={done ? theme.color.success : theme.color.textMuted} strokeWidth={3.5} strokeDasharray={done ? undefined : "8 6"} />
         {done && <path d={`M${cx - 13} ${cy + 1} l10 11 l18 -22`} fill="none" stroke={theme.color.onAccent} strokeWidth={6} strokeLinecap="round" strokeLinejoin="round" pathLength={1} strokeDasharray={1} strokeDashoffset={1 - check} />}
-        <text x={126} y={cy - 4} fontSize={fs * 1.15} fontWeight={theme.font.weights.semibold} fill={theme.color.text}>{p.label ?? "Revisar informe"}</text>
+        <text x={126} y={cy - 4} fontSize={fs * 1.15} fontWeight={textStyle(theme, "label", { strong: true }).fontWeight} fill={theme.color.text}>{p.label ?? "Revisar informe"}</text>
         <text x={126} y={cy + fs * 1.1} fontSize={fs * 0.85} fill={done ? theme.color.success : theme.color.textMuted}>{done ? p.doneText ?? "Hecho" : p.pendingText ?? "Pendiente"}</text>
       </g>
     </svg>

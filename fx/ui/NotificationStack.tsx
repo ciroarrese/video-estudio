@@ -1,6 +1,6 @@
-import { withAlpha } from "../../themes";
+import { cornerRadius, entrance, staggerScale, surfaceStyle, textStyle, withAlpha } from "../../themes";
 import { Easing } from "../../engine";
-import { chartColor, fade, fxBox, progress, styleKey, useFx, xform } from "../core";
+import { chartColor, fade, fxBox, progress, styleKey, useFx } from "../core";
 import type React from "react";
 import type { FxProps } from "../core";
 import { staggerT } from "../data/geom";
@@ -40,8 +40,10 @@ export function NotificationStack(p: NotificationStackProps) {
   const ch = NOTIFICATION_CARD_HEIGHT;
   const pitch = notificationPitch(h, n);
   // la primera llega arriba, las siguientes empujan: orden visual = la ultima llegada arriba
-  const arr = items.map((_, i) => Easing.out(staggerT(progress(local, 0, dur), i, n, 0.7)));
-  const land = items.map((_, i) => Easing.lands(staggerT(progress(local, 0, dur), i, n, 0.7)));
+  // El paso entre tarjetas lo escala el diseño (`motion.stagger`); la entrada (subir 50 px) la decide `motion.entrance`.
+  const spread = Math.min(0.95, 0.7 * staggerScale(theme));
+  const arr = items.map((_, i) => Easing.out(staggerT(progress(local, 0, dur), i, n, spread)));
+  const raw = items.map((_, i) => staggerT(progress(local, 0, dur), i, n, spread));
   const offs = stackOffsets(arr, pitch);
   const fs = theme.type.eyebrow;
   return (
@@ -49,16 +51,21 @@ export function NotificationStack(p: NotificationStackProps) {
       {items.map((it, i) => {
         const a = arr[i]!;
         if (a <= 0) return null;
-        const y = offs[i]! + (1 - land[i]!) * -50;
-        // Traslado y opacidad solo mientras la tarjeta llega o es empujada (en reposo no queda `translateY(0.00px)`).
-        const cardSt: React.CSSProperties = { position: "absolute", left: 0, top: 0, width: w, height: ch, boxSizing: "border-box", transform: xform({ y }), opacity: fade(Math.min(1, a * 1.8)), background: theme.color.surface, border: `1px solid ${theme.color.border}`, borderRadius: theme.radius.lg, boxShadow: theme.shadow.md, display: "flex", alignItems: "center", gap: 20, padding: "0 26px", zIndex: i };
+        // Traslado y opacidad solo mientras la tarjeta llega o es empujada (en reposo no queda `translateY(0.00px)`). La entrada sube 50 px
+        // con el estilo por defecto; el diseño la reemplaza (`motion.entrance`) y le da rebote (`motion.overshoot`).
+        const cardSt: React.CSSProperties = {
+          position: "absolute", left: 0, top: 0, width: w, height: ch, boxSizing: "border-box", ...surfaceStyle(theme, "card"),
+          display: "flex", alignItems: "center", gap: 20, padding: "0 26px", zIndex: i,
+          ...entrance(theme, raw[i]!, i, { native: "rise", distance: -50, curve: Easing.lands, round: false, offset: { y: offs[i]! } }),
+          opacity: fade(Math.min(1, a * 1.8)),
+        };
         return (
           <div key={`${i}:${styleKey(cardSt)}`} style={cardSt}>
-            <div style={{ width: 56, height: 56, flex: "none", borderRadius: theme.radius.pill, background: withAlpha(chartColor(theme, i), 0.18), color: theme.color.text, display: "flex", alignItems: "center", justifyContent: "center", fontSize: fs * 1.2, fontWeight: theme.font.weights.stat }}>{it.title.charAt(0)}</div>
+            <div style={{ width: 56, height: 56, flex: "none", borderRadius: cornerRadius(theme, "chip"), background: withAlpha(chartColor(theme, i), 0.18), color: theme.color.text, display: "flex", alignItems: "center", justifyContent: "center", fontSize: fs * 1.2, fontWeight: theme.font.weights.stat }}>{it.title.charAt(0)}</div>
             <div style={{ flex: 1, minWidth: 0 }}>
               <div style={{ display: "flex", justifyContent: "space-between", gap: 12 }}>
-                <span style={{ fontSize: fs * 1.15, fontWeight: theme.font.weights.semibold, color: theme.color.text }}>{it.title}</span>
-                <span style={{ fontSize: fs * 0.8, color: theme.color.textMuted }}>{it.time}</span>
+                <span style={{ fontSize: fs * 1.15, color: theme.color.text, ...textStyle(theme, "title") }}>{it.title}</span>
+                <span style={{ fontSize: fs * 0.8, color: theme.color.textMuted, ...textStyle(theme, "eyebrow") }}>{it.time}</span>
               </div>
               {it.body && <div style={{ marginTop: 6, fontSize: fs * 0.9, color: theme.color.textMuted, maxHeight: fs * 1.3, overflow: "hidden" }}>{it.body}</div>}
             </div>

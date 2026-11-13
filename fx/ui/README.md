@@ -15,3 +15,7 @@ Efectos de interfaz recreada: notificaciones, chat, paleta de comandos, teléfon
 | `TileDone` | Baldosa que pasa a "hecha" con onda en `start` (acompaña a `Cursor`) | `label`, `pendingText`, `doneText` |
 
 Nota: `PhoneFrame` recorta con `clip-path: inset(0 round r)` (r = 2,2 veces `radius.lg`), no con `border-radius`, para que el radio de pantalla no quede limitado a los radios del tema. Pura geometría exportada: `wipePosition`, `wipeInset`, `filterItems`, `fanPose`, `scrollState`, `stackOffsets`, `chatSchedule`, `tilePlan`.
+
+## Estilo del diseño (`theme.style`)
+
+`NotificationStack`, `ChatThread`, `CommandPalette`, `CardFan`, `BeforeAfter`, `TileGrid` y `TileDone` toman superficie (`surface.kind` y `elevation`), esquinas (`shape.corners`), borde (`shape.border`, `outlined`), entrada (`motion.entrance`, `overshoot`) y paso entre elementos (`motion.stagger`); las etiquetas pequeñas, `type.eyebrow*`. `ChatThread` conserva su "salto" propio solo con `entrance: "auto"`. `PhoneFrame` y `PhoneScroll`: el aparato no sigue `shape.corners`; el contenido de pantalla, sí. Los rótulos llevan `textStyle(theme, "label", { strong: true })` (un escalón sobre `labelWeight`: `semibold` con el estilo por defecto) y el título de la notificación, `textStyle(theme, "title")`.
