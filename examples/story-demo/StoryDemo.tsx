@@ -48,7 +48,7 @@ function DemoScene({ variant }: { variant: number }) {
   const cx = width / 2, cy = height / 2;
   const v = VARIANTS[variant]!;
   const target = { x: cardPos(v.pick).x + CARD.w / 2, y: cardPos(v.pick).y + CARD.h / 2 };
-  const zoom = format === "horizontal" ? 1.7 : 1.35; // en los formatos angostos la tarjeta ya es grande
+  const zoom = format === "horizontal" ? 1.7 : format === "vertical" ? 1.08 : 1.1; // en vertical la tarjeta ya ocupa casi todo el ancho
   const keys: CameraKey[] = [
     { f: 0, x: cx, y: cy, scale: 1 },
     { f: 30, x: cx, y: cy, scale: 1 },

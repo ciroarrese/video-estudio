@@ -64,7 +64,7 @@ export function PaperCollage(p: PaperCollageProps) {
           <g key={i} opacity={Math.min(1, e * 2.5)} transform={`translate(${(cx + dx).toFixed(2)} ${(cy + dy).toFixed(2)}) rotate(${rot.toFixed(3)}) translate(${-s.w / 2} ${-s.h / 2})`}>
             <path d={poly} transform="translate(5 7)" fill={withAlpha(theme.color.text, 0.16)} />
             <path d={poly} fill={col.fill} stroke={theme.color.border} strokeWidth={1.5} />
-            <text x={s.w / 2} y={s.h / 2 + fs * 0.33} textAnchor="middle" fontSize={fs} fontWeight={theme.font.weights.semibold} fill={col.ink}>{s.text}</text>
+            <text x={s.w / 2} y={s.h / 2 + fs * 0.33} textAnchor="middle" fontSize={fs} fontWeight={theme.font.weights.semibold} fill={col.ink} style={{ color: col.ink }}>{s.text}</text>
           </g>
         );
       })}

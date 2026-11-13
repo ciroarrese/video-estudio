@@ -53,11 +53,11 @@ export function Hello() {
   return (
     <Fill style={{ background: '#f4f1ea' }}>
       <Series>
-        <Series.Item durationInFrames={45}>
+        <Series.Item durationInFrames={45} name="hello">
           <Title text="Hello" />
           <Dot color="#e4572e" />
         </Series.Item>
-        <Series.Item durationInFrames={45}>
+        <Series.Item durationInFrames={45} name="world">
           <Title text="World" />
           <Dot color="#2e86e4" />
         </Series.Item>

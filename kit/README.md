@@ -15,6 +15,7 @@ Cada pieza es una función pura del cuadro (de `useFrame()` o de una prop `frame
 - **Texto y fondo**: `<GradientText>` (degradado del tema, `pan` opcional), `<CloudBackground>` (manchas de `theme.cloud`), `<CountUp from to start duration format?>`.
 - **Titular**: `<DockedHeadline index title subtitle frame start hide>` y `hideFromScale(scale, umbral?, rango?)` para que se aparte cuando la cámara se acerca.
 - **Vuelo**: `flight(frame, [ini, fin], from, to, {arc})` y `<FlyingCard>` (arco y estela).
+- **Tema por ámbito**: `<ThemeScope theme paint? style?>` cambia el tema de un subárbol (se anida); con `paint` pinta fondo, texto y tipografía del tema; declara el `@font-face` de sus fuentes y espera su carga. Ver `themes/README.md`.
 - **Escena**: `<Stage>` fondo, tipografía y nubes opcionales del tema.
 
 ## Precondiciones
@@ -50,4 +51,6 @@ function Scene() {
 export const Video = () => <ThemeProvider theme={neutral}><Scene /></ThemeProvider>;
 ```
 
-Ejemplo completo: `examples/kit-demo` (`/?video=kit-demo&props={"theme":"dark"}`).
+`Cursor` ubica la flecha en píxeles enteros (`left`/`top` redondeados): con un `scale()` en un ancestro, una posición fraccionaria hacía fallar `--check`.
+
+Ejemplos: `examples/theme-scope` (cambio de tema por ámbito). Ejemplo completo: `examples/kit-demo` (`/?video=kit-demo&props={"theme":"dark"}`).

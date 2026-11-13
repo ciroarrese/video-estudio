@@ -1,7 +1,7 @@
 import { spawn } from 'node:child_process';
 import { createHash, randomBytes } from 'node:crypto';
 import { cpus } from 'node:os';
-import { createReadStream, existsSync, mkdirSync, readdirSync, renameSync, rmSync, statSync, writeFileSync } from 'node:fs';
+import { createReadStream, existsSync, mkdirSync, readFileSync, readdirSync, renameSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { writeFile } from 'node:fs/promises';
 import { dirname, join, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -132,6 +132,28 @@ export async function ensureBundle(root: string, cacheDir: string, runId: string
     untrackPath(tmp);
   }
   return dir;
+}
+
+/**
+ * Huella del código que puede cambiar los cuadros de UN video: los fuentes que usa el runtime y la carpeta del video
+ * (`ve-deps.json`, que arma vite.config.ts siguiendo los imports), todos los archivos de esa carpeta (por si carga
+ * recursos con `new URL(...)`), `public/` entero y la configuración de compilación. Un cambio en otro video no la toca.
+ * Sin `ve-deps.json` o sin carpeta conocida devuelve `null` (se usa el hash de todo el bundle).
+ */
+export async function videoCodeHash(root: string, bundleDir: string, source: string | null | undefined): Promise<string | null> {
+  if (!source) return null;
+  let deps: { runtime: string[]; videos: Record<string, string[]> };
+  try {
+    deps = JSON.parse(readFileSync(join(bundleDir, 've-deps.json'), 'utf8'));
+  } catch {
+    return null;
+  }
+  const own = deps.videos[source];
+  if (!own) return null;
+  const files = new Set<string>();
+  for (const f of [...deps.runtime, ...own, 'package-lock.json', 'tsconfig.json', 'vite.config.ts', 'engine/runtime/index.html']) files.add(join(root, f));
+  for (const dir of [join(root, source), join(root, 'public')]) if (existsSync(dir)) for (const f of walk(dir)) files.add(f);
+  return (await hashFiles(root, [...files].filter((f) => existsSync(f)))).slice(0, 32);
 }
 
 type Shared = { error: Error | null };
@@ -280,7 +302,9 @@ async function setup(o: RenderOptions, needAudio: boolean) {
         frameFormat: shot.format,
         jpegQuality: shot.format === 'jpeg' ? shot.quality : null,
       };
-      return { env, tracks, bundleHash, keyEnv, root, bundleDir, cacheDir, runId, assets, cleanup, page, context, log, props, scenes };
+      // La clave de las partes usa la huella de ESTE video (no la de todo el bundle) cuando se puede calcular.
+      const codeHash = (await videoCodeHash(root, bundleDir, found.source)) ?? bundleHash;
+      return { env, tracks, bundleHash: codeHash, keyEnv, root, bundleDir, cacheDir, runId, assets, cleanup, page, context, log, props, scenes };
     } catch (e) {
       await context.close().catch(() => {});
       throw e;

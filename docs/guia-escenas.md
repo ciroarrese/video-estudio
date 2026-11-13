@@ -162,7 +162,7 @@ Cómo usarlas dentro de `<World>`: `<Window x={260} y={200} w={1400} h={700} tit
 Criterios:
 
 - **Estructura real**: las mismas columnas, pestañas, botones y rótulos que la herramienta, con datos ficticios. Si no los conocés, preguntá o pedí el nombre de las secciones; no los inventes parecidos.
-- **Herramienta oscura = tema oscuro.** Usá `dark` o un tema propio oscuro para esa escena (envolviendo solo esa escena con `ThemeProvider` si el resto del video es claro).
+- **Herramienta oscura = tema oscuro.** Usá `dark` o un tema propio oscuro para esa escena (envolviendo solo esa escena, o solo la herramienta, con `ThemeScope`; ver la sección 10).
 - **Estado por cuadro**: lo que cambia (un casillero que se tilda, un campo que se completa) se deriva del cuadro: `const checked = f >= T.click + 2;`.
 - **Texto que se escribe**: `typed("texto", f, inicio, 0.8)`.
 - **Todo con tamaño legible**: si en la vista general algo queda debajo de 18 px de pantalla, es decoración: el zoom lo lleva a tamaño legible o no lleva texto.
@@ -242,3 +242,27 @@ export function EscenaCombinada() {
 ```
 
 El titular y las barras entran solos con su propio escalonado; la cámara se acerca a las barras, el cursor hace clic y el círculo marca la barra más alta. Probalo con `npm run dev` y `/?video=fx-text`, `fx-3d` o `fx-data-ui-art` para ver cada efecto por separado.
+
+## 10. Un tema distinto para una escena o una parte de la escena
+
+Para una herramienta oscura dentro de un video claro (o al revés) envolvela con `<ThemeScope theme={dark}>`, de `kit/`:
+
+```tsx
+import { Stage, ThemeScope } from "../../../kit";
+import { dark } from "../../../themes";
+
+<Stage>
+  <ThemeScope theme={dark} paint style={{ position: "absolute", left: 500, top: 190, width: 860, height: 660, borderRadius: 24, overflow: "hidden" }}>
+    {/* piezas del kit, efectos de fx/, canvas, tu recreación de la herramienta */}
+  </ThemeScope>
+</Stage>
+```
+
+- Todo lo de adentro lee `useTheme()` y obtiene el tema del ámbito; lo de afuera sigue con el del video. Se puede anidar (un ámbito claro dentro del oscuro).
+- Con `paint`, el ámbito pinta una superficie con el fondo, el texto y la tipografía de su tema; sin `paint` solo cambia el tema.
+- Los colores de un canvas (`FrameCanvas`, efectos de `fx/three`) también salen del ámbito donde estén.
+- Si el tema trae `font.files`, `ThemeScope` declara el `@font-face` y frena la captura hasta que la fuente cargue.
+- Un tema para toda una escena: poné el `ThemeScope` en la raíz de la escena, o un `ThemeProvider` si no necesitás nada más.
+- Corré `checkTheme(tema)` una vez por cada tema que uses.
+
+Ejemplo completo: `examples/theme-scope` (`/?video=theme-scope`).

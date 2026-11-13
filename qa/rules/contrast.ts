@@ -9,9 +9,9 @@ export function classifyContrast(ratio: number, large: boolean, t: Thresholds['c
   return null;
 }
 
-/** WCAG "large text": >= 24px, or >= 18.66px bold (at 1080p, scaled with the frame height). */
-export const isLargeText = (screenPx: number, bold: boolean, height: number, t: Thresholds['contrast']) => {
-  const k = height / 1080;
+/** WCAG "large text": >= 24px, or >= 18.66px bold (at 1080p, scaled with the frame's short side). */
+export const isLargeText = (screenPx: number, bold: boolean, shortSide: number, t: Thresholds['contrast']) => {
+  const k = shortSide / 1080;
   return screenPx >= t.largePx1080 * k || (bold && screenPx >= 18.66 * k);
 };
 
@@ -24,7 +24,7 @@ const STILL_FADE = 0.02;
 export const contrastRule: Rule = {
   id: 'contrast',
   description: 'Contraste insuficiente entre el texto y el fondo real',
-  check({ frame, height, runs, thresholds }) {
+  check({ frame, width, height, runs, thresholds }) {
     const t = thresholds.contrast;
     const out: Finding[] = [];
     const seen = new Set<number>();
@@ -43,7 +43,7 @@ export const contrastRule: Rule = {
       } catch {
         continue;
       }
-      let sev: Severity | null = classifyContrast(ratio, isLargeText(r.screenPx, r.bold, height, t), t);
+      let sev: Severity | null = classifyContrast(ratio, isLargeText(r.screenPx, r.bold, Math.min(width, height), t), t);
       if (!sev) continue;
       if (r.opacity < t.minOpacity) sev = 'info'; // muy tenue: decorativo o a mitad de un fundido
       seen.add(r.elId);

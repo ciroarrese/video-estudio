@@ -1,13 +1,13 @@
 import { describe, ignored } from '../geometry';
 import type { Finding, Rule } from '../types';
 
-/** Text drawn smaller than `minPx1080` (scaled by frame height / 1080), measured on screen: CSS size x transform scale. */
+/** Text drawn smaller than `minPx1080` (scaled by the frame's short side / 1080: height in horizontal, width in vertical), measured on screen: CSS size x transform scale. */
 export const minSizeRule: Rule = {
   id: 'min-size',
   description: 'Texto demasiado chico en pantalla',
-  check({ frame, height, runs, thresholds }) {
+  check({ frame, width, height, runs, thresholds }) {
     const t = thresholds['min-size'];
-    const min = (t.minPx1080 * height) / 1080;
+    const min = (t.minPx1080 * Math.min(width, height)) / 1080;
     const out: Finding[] = [];
     const seen = new Set<number>();
     for (const r of runs) {

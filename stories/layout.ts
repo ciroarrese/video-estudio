@@ -237,7 +237,7 @@ export function panelLayout(n: number, width = 1920, height = 1080): PanelPlace[
  * entra en el ancho seguro y en el alto (cada panel lleva su píldora asomando ~50 px por arriba).
  */
 function panelGrid(n: number, width: number, height: number): PanelPlace[] {
-  const cols = width > height || n > 3 ? 2 : 1;
+  const cols = width >= height || n > 3 ? 2 : 1;
   const rows = Math.ceil(n / cols);
   const gapX = 36, gapY = 96; // el hueco vertical deja lugar a la píldora del panel de abajo
   const availW = width - 2 * 80;
