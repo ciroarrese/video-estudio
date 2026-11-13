@@ -69,7 +69,7 @@ const cam = cameraAt(f, KEYS);            // { x, y, scale, rx, ry, blur }
 | 1 a 1,3 s | 30 a 40 | atravesado final (los últimos 15 a 20 llevan el velo) |
 | 5 s | 150 | escena de un tema |
 
-Una escena de un tema dura entre 150 y 600 cuadros. Entradas escalonadas: desfasá 5 a 6 cuadros entre elementos (`kf(f, [8 + i * 6, 26 + i * 6], [0, 1])`). Un clic ocurre cuando el cursor ya llegó: la última parada de `keys` antes del clic es 2 cuadros antes de `clicks`.
+Una escena de un tema dura entre 150 y 600 cuadros (más corta, de 90 a 150, en un video corto: el presupuesto de cuadros del video completo está en la skill, etapa 3, y en `stories/README.md`). Entradas escalonadas: desfasá 5 a 6 cuadros entre elementos (`kf(f, [8 + i * 6, 26 + i * 6], [0, 1])`). Un clic ocurre cuando el cursor ya llegó: la última parada de `keys` antes del clic es 2 cuadros antes de `clicks`.
 
 Escribí los tiempos en una constante `T = { zoom: 40, click: 62, ... }` para que el guion y el código se lean juntos.
 
@@ -184,15 +184,26 @@ Criterios:
 | Claves de cámara no crecientes | error con los cuadros nombrados | `cameraAt` lanza al renderizar |
 | Imagen o fuente que no carga | timeout `holds pendientes` | `render` (30 s) |
 | Vista general sin espacio arriba | el titular tapa el contenido | hoja de cuadros |
+| Texto claro sobre un color sólido mientras un `Wash` lo cruza | el velo lo deja sin contraste a mitad de camino | hoja de cuadros en los cuadros del velo; dejá el texto fuera del tramo del `Wash` o apartalo antes |
 
 Durante una transición (tarjeta volando sobre otra, cámara en movimiento) `overlap`, `covered` y `offscreen` pueden saltar a propósito: se juzga con la hoja de cuadros. Para silenciar uno que decidiste a propósito: `data-qa-ignore="overlap"` en el elemento (ver `qa/README.md`). Un umbral que no sirve en general se cambia con `--set regla.umbral=valor`.
+
+### Para que no parezca un borrador
+
+Un video puede pasar todas las herramientas y seguir pareciendo un borrador. Reglas concretas, sacadas de un primer video que salió así:
+
+- **En vertical, el sujeto llena el cuadro.** Un teléfono de 460 px en un cuadro de 1080×1920 deja la pantalla vacía alrededor: subí la escala del sujeto (o su zoom) hasta que ocupe casi todo el ancho y apilá lo demás; no reuses la composición horizontal achicada.
+- **Nunca sostengas una interfaz vacía o "cargando" en una vista general.** Si la interfaz entra con datos que aparecen, que la vista general ya los tenga (o que la cámara se acerque recién cuando hay contenido).
+- **La apertura dura al menos unos 4 s** (120 cuadros): menos y el título no alcanza a leerse. Si el presupuesto no da, sacá un tema; no acortes la apertura (ver el presupuesto de cuadros en la skill).
+- **El texto secundario se lee en la vista general o aparece solo con zoom.** Si a tamaño de vista general queda debajo de 18 px de pantalla, es decoración: mostralo cuando la cámara ya se acercó.
+- **Mirá cada hoja como un espectador** antes de mostrarla: ¿se entiende qué es, qué cambia y adónde mirar en cada cuadro?, ¿hay zonas vacías?, ¿algo se corta? Una hoja por formato.
 
 ## 8. Historias: varias escenas en un video
 
 Con 2 a 6 temas usá `defineStory` (ver `stories/README.md` y `templates/story/`): arma la apertura, las vueltas al listado y el cierre desde un `StorySpec`. Cada escena de tema:
 
 - es un componente sin `Stage` (la historia ya lo pone) y de duración fija (`durationInFrames`);
-- puede usar `useTopic()` y `<TopicHeadline start hide />` para el titular con el nombre del tema;
+- puede usar `useTopic()` y `<TopicHeadline start hide />` para el titular con el nombre del tema, pero esos dos solo funcionan dentro de la historia: si la escena también se prueba sola (lo recomendado), pasale el titular por prop y usá `DockedHeadline`, como `templates/scene/Scene.tsx`;
 - termina con `Wash` o atravesando algo;
 - puede pasar un `thumbnail` (lienzo de 560×340) para el cierre.
 
@@ -274,6 +285,7 @@ El mismo video puede salir en 16:9 (1920×1080), vertical (1080×1920) y cuadrad
 - El tamaño del escenario sale de `useVideoConfig()` (`width`, `height`): no supongas 1920×1080 ni escribas `960`/`540` a mano; usá `width / 2`, `height / 2`.
 - `useFormat()` da `{ format, width, height, pick }`. `pick({ horizontal: 4, vertical: 2, cuadrado: 3 })` elige un valor según el formato (lo que falta usa el de `horizontal`). Con eso se cambian columnas, tamaños y posiciones: tarjetas en fila en horizontal y apiladas en vertical, tamaño de punto, zoom de cámara.
 - El texto del tema (`theme.type`) no cambia de tamaño: en vertical hay menos ancho, así que usá más renglones, apilá o achicá la composición, no la letra. El QA mide el tamaño mínimo contra el lado corto del cuadro (en vertical, el ancho).
+- Cada formato extra que se habilita es un diseño más por escena: no alcanza con achicar la composición horizontal. `templates/scene/Scene.tsx` trae un ejemplo horizontal + vertical.
 - Mirá una hoja de cada formato (`npm run sheet -- <id> --format vertical --count 12`) y corré `render --check` y `qa` en cada uno. Un ejemplo completo: `examples/hello` (punto y titular con `pick`) y `examples/story-demo` (la escena cambia de diseño por formato).
 
 ## 12. Probar una escena sola

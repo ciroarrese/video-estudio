@@ -37,6 +37,16 @@ export function deriveFormatSizes(width: number, height: number): Record<FormatN
   return all;
 }
 
+/** Los tamaños tienen que ser pares: H.264 yuv420p no admite lados impares (ffmpeg los rellenaría con una fila negra sin avisar). */
+export function assertEvenSize(where: string, size: FormatSize): void {
+  for (const k of ['width', 'height'] as const) {
+    if (size[k] % 2 !== 0) {
+      const lo = size[k] - 1;
+      throw new Error(`${where}: el tamaño ${size.width}x${size.height} tiene un lado impar (${k} = ${size[k]}); el video H.264 necesita lados pares. Usá ${k} = ${lo} o ${lo + 2}.`);
+    }
+  }
+}
+
 /** Tamaños de los formatos habilitados de un video (siempre incluye el formato base). Lanza un error claro si la opción no vale. */
 export function resolveFormats(id: string, width: number, height: number, formats?: FormatsOption): Partial<Record<FormatName, FormatSize>> {
   const derived = deriveFormatSizes(width, height);
@@ -52,6 +62,11 @@ export function resolveFormats(id: string, width: number, height: number, format
     for (const k of ['width', 'height'] as const) {
       if (!Number.isInteger(s[k]) || s[k] <= 0) throw new Error(`defineVideo(${id}): formats.${name}.${k} tiene que ser un entero positivo (recibido ${String(s[k])})`);
     }
+    // El formato del tamaño base ya existe con `width` x `height`: listarlo con otro tamaño lo pisaría sin avisar.
+    if (name === base && (s.width !== width || s.height !== height)) {
+      throw new Error(`defineVideo(${id}): formats.${name} (${s.width}x${s.height}) es el formato del tamaño base (${width}x${height}) y no puede tener otro tamaño; cambiá width/height de defineVideo, o quitá "${name}" de formats.`);
+    }
+    assertEvenSize(`defineVideo(${id}): formats.${name}`, s);
     out[name] = { width: s.width, height: s.height };
   }
   return out;

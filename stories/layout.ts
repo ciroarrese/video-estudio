@@ -309,20 +309,70 @@ export function closingWall(spec: StorySpec, width = 1920, height = 1080): { inn
 
 export type PanelPlace = { x: number; y: number; z: number; k: number };
 
-/** Disposición de los paneles flotantes del cierre según la cantidad de temas (`k` = escala del lienzo 560x340). */
+/** La píldora de cada panel va sobre su borde superior: su centro queda `PILL_OFF` px (del lienzo, sin escalar) arriba del panel. */
+export const PILL_OFF = -50;
+/** Hueco libre que cada panel necesita arriba para su píldora (px): mitad del alto máximo de la píldora (~76 px) + PILL_OFF. */
+export const PILL_BAND = 90;
+/** Separación vertical mínima entre filas de paneles: cabe la píldora de la fila de abajo y sobra margen para el vaivén y la perspectiva. */
+const ROW_GAP_Y = 140;
+
+/** Letra mínima de la píldora cuando hay que achicarla para que entre en su lugar (relativa a `type.caption`). */
+const PILL_MIN = 0.68;
+
+/**
+ * Tamaño y texto de la píldora del cierre. Sin `maxW`: letra `caption * 1.06` y hasta 560 px de texto. Con `maxW` (ancho total de la
+ * píldora, bordes incluidos): se achica la letra hasta `PILL_MIN * caption` y después se corta con "…", para que dos píldoras vecinas no se pisen.
+ */
+export function pillFit(theme: Theme, name: string, maxW?: number): { text: string; size: number; numSize: number; w: number; h: number } {
+  const base = theme.type.caption * 1.06;
+  const over = (size: number) => 2 * size * 0.9 + 6 + 16 + Math.max(26, size * 0.8) * 0.56 * 2;
+  const t = maxW === undefined ? fitText(name, 560, base, { min: theme.type.caption * 0.8 }) : fitText(name, Math.max(60, maxW - over(base)), base, { min: theme.type.caption * PILL_MIN });
+  return { text: t.text, size: t.size, numSize: Math.max(26, t.size * 0.8), w: Math.round(textWidth(t.text, t.size) + over(t.size)), h: Math.round(t.size * 1.25 + 2 * t.size * 0.42 + 6) };
+}
+
+/**
+ * Ancho máximo de la píldora del panel `i`: la distancia al panel vecino de su fila (menos 24 px de aire) y el doble de lo que
+ * queda entre su centro y el borde del cuadro (menos un margen), con tope en 900 px.
+ */
+export function pillBudget(panels: PanelPlace[], i: number, width: number): number {
+  const c = panels[i]!;
+  let b = Math.min(900, 2 * (Math.min(c.x, width - c.x) - 24));
+  for (const o of panels) if (o !== c && Math.abs(o.y - c.y) < 1) b = Math.min(b, Math.abs(o.x - c.x) - 24);
+  return Math.floor(b);
+}
+
+/** Rectángulo de pantalla (en reposo) del panel `c` y de su píldora. */
+export function panelRects(c: PanelPlace, theme: Theme, name = "", maxW?: number) {
+  const W = 560 * c.k, H = 340 * c.k;
+  const pill = pillFit(theme, name, maxW);
+  const cy = c.y - H / 2 + PILL_OFF;
+  return { panel: { x: c.x - W / 2, y: c.y - H / 2, w: W, h: H }, pill: { x: c.x - pill.w / 2, y: cy - pill.h / 2, w: pill.w, h: pill.h } };
+}
+
+/**
+ * Disposición de los paneles flotantes del cierre según la cantidad de temas (`k` = escala del lienzo 560x340).
+ * Invariante: entre una fila y la siguiente queda un hueco de `ROW_GAP_Y` (>= lo que ocupa la píldora de la fila de abajo),
+ * y sobre la primera fila queda `PILL_BAND`; así ninguna píldora cae sobre el panel de otro tema.
+ */
 export function panelLayout(n: number, width = 1920, height = 1080): PanelPlace[] {
   if (width / height < 1.3) return panelGrid(n, width, height);
-  const k = n === 2 ? 1.4 : n <= 4 ? 1.2 : 0.95;
+  const kBase = n === 2 ? 1.4 : n <= 4 ? 1.2 : 0.95;
   const rows = n === 2 ? [2] : [Math.ceil(n / 2), n - Math.ceil(n / 2)];
+  // alto disponible: sin la banda de la píldora arriba (+24) ni 40 px abajo; la escala baja si no entran las filas con su hueco
+  const top = PILL_BAND + 24, avail = height - top - 40;
+  const k = Math.min(kBase, (avail - (rows.length - 1) * ROW_GAP_Y) / (rows.length * PANEL_H));
+  const H = PANEL_H * k;
+  const block = rows.length * H + (rows.length - 1) * ROW_GAP_Y;
+  const y0 = top + (avail - block) / 2 + H / 2;
   const zs = [30, -90, -60, 50, 0, -40];
   const dx = n === 2 ? 440 : n <= 4 ? 420 : 570;
   const out: PanelPlace[] = [];
   rows.forEach((cnt, r) => {
-    const y = rows.length === 1 ? 570 : r === 0 ? 335 : 800;
+    const y = Math.round(y0 + r * (H + ROW_GAP_Y));
     const step = cnt === 2 && rows[0] === 3 ? dx / 2 : dx;
     for (let j = 0; j < cnt; j++) {
-      const x = cnt === 1 ? 960 : cnt === 2 ? 960 + (j === 0 ? -step : step) : 960 + (j - 1) * step;
-      out.push({ x, y, z: zs[out.length % zs.length]!, k });
+      const x = cnt === 1 ? width / 2 : cnt === 2 ? width / 2 + (j === 0 ? -step : step) : width / 2 + (j - 1) * step;
+      out.push({ x, y, z: zs[out.length % zs.length]!, k: Math.round(k * 1000) / 1000 });
     }
   });
   return out;
@@ -330,24 +380,26 @@ export function panelLayout(n: number, width = 1920, height = 1080): PanelPlace[
 
 /**
  * Paneles en formato vertical o cuadrado: una columna (vertical, hasta 3 temas) o dos columnas, con la escala `k` que
- * entra en el ancho seguro y en el alto (cada panel lleva su píldora asomando ~50 px por arriba).
+ * entra en el ancho seguro y en el alto. Entre filas queda `ROW_GAP_Y` (la píldora del panel de abajo) y arriba `PILL_BAND`.
  */
 function panelGrid(n: number, width: number, height: number): PanelPlace[] {
   const cols = width >= height || n > 3 ? 2 : 1;
   const rows = Math.ceil(n / cols);
-  const gapX = 36, gapY = 96; // el hueco vertical deja lugar a la píldora del panel de abajo
+  const gapX = 36;
   const availW = width - 2 * 80;
-  const availH = height - 2 * 150;
-  const k = Math.min(1.4, (availW - (cols - 1) * gapX) / (cols * PANEL_W), (availH - (rows - 1) * gapY) / (rows * PANEL_H));
+  const top = PILL_BAND + 40, availH = height - top - 80;
+  const k = Math.min(1.4, (availW - (cols - 1) * gapX) / (cols * PANEL_W), (availH - (rows - 1) * ROW_GAP_Y) / (rows * PANEL_H));
   const zs = [30, -90, -60, 50, 0, -40];
   const cw = PANEL_W * k, ch = PANEL_H * k;
+  const block = rows * ch + (rows - 1) * ROW_GAP_Y;
+  const y0 = top + (availH - block) / 2 + ch / 2;
   const out: PanelPlace[] = [];
   for (let r = 0; r < rows; r++) {
     const cnt = Math.min(cols, n - r * cols);
     for (let j = 0; j < cnt; j++) {
       out.push({
         x: Math.round(width / 2 + (j - (cnt - 1) / 2) * (cw + gapX)),
-        y: Math.round(height / 2 + (r - (rows - 1) / 2) * (ch + gapY)),
+        y: Math.round(y0 + r * (ch + ROW_GAP_Y)),
         z: zs[out.length % zs.length]!,
         k: Math.round(k * 1000) / 1000,
       });

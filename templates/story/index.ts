@@ -1,5 +1,6 @@
 // Historia inicial: apertura + (escena -> vuelta al listado) x n + cierre.
 // Se copia con: bash templates/nuevo.sh historia <slug> <escena> (corrige imports e id).
+// Presupuesto de cuadros: ver spec.ts (`timing`) y `storyBudget(spec, scenes)` de stories/.
 // Después reemplazá `escena1`/`escena2` por las escenas reales (una carpeta por escena en videos/<slug>/)
 // (no hace falta registrarla: el runtime descubre toda carpeta videos/<slug>/**/index.ts).
 import React from "react";
@@ -25,5 +26,6 @@ export default defineStory({
   spec,
   scenes,
   theme, // el tema del video (videos/<slug>/theme.ts)
+  formats: ["vertical"], // opt-in: sin esto el video sale solo en horizontal. Cada formato extra exige el diseño de cada escena (useFormat().pick).
   // audio: { src: "music/pista.m4a", startFrom: 0, volume: 0.8 }, // pista que cubre todo el video (archivo en public/ o --assets)
 });

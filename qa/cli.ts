@@ -4,6 +4,7 @@ import { json, num, one, parseArgs, type Parsed } from './args';
 import { formatElement } from './geometry';
 import { makeSheet } from './sheet';
 import { openSession } from './session';
+import { budgetFromScenes, formatStoryBudget } from '../stories/budget';
 import { formatSceneList, parseFormat, suffixOf } from '../render/index';
 import { runPrivacy } from './privacy';
 import { failsAt, runQa } from './run';
@@ -87,7 +88,11 @@ async function main(cmd: string, argv: string[]): Promise<number> {
     if (!id) throw new Error('Falta <videoId>');
     const session = await openSession({ videoId: id, props, format, log });
     try {
-      console.log(formatSceneList(id, await session.scenes(), session.meta.fps));
+      const scenes = await session.scenes();
+      console.log(formatSceneList(id, scenes, session.meta.fps));
+      // si es una historia (defineStory), el presupuesto de cuadros por bloque
+      const budget = budgetFromScenes(scenes, session.meta.fps);
+      if (budget) console.log(`\n${formatStoryBudget(budget)}`);
     } finally {
       await session.close();
     }

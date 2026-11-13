@@ -6,10 +6,12 @@
 //  - Coordenadas del MUNDO dentro de <World>; la cámara se mueve con cuadros clave.
 //  - El titular se aparta solo cuando la cámara se acerca (`hideFromScale`).
 //  - Un efecto del catálogo `fx/` (MaskedRise) para empezar desde piezas hechas; ver docs/animaciones.md.
+//  - Diseño por formato (`useFormat().pick`): una disposición para horizontal y otra para vertical.
+//    El mundo mide width x height del formato (no 1920x1080 a mano) y la cámara arranca en su centro.
 //  - Un acercamiento rápido en la acción clave, un clic, un garabato y un atravesado final.
 //  - Termina atravesando un elemento y con un velo (`Wash`) hacia la escena siguiente.
 import React from "react";
-import { useFrame, useVideoConfig } from "../../engine";
+import { useFormat, useFrame } from "../../engine";
 import {
   Cursor, DockedHeadline, DoodleCircle, Stage, Wash, World,
   cameraAt, hideFromScale, kf, typed, zoomThrough,
@@ -29,12 +31,40 @@ export type SceneProps = {
   subtitle?: string;
 };
 
-// --- Diseño en coordenadas del mundo (1 unidad = 1 px a escala 1, lienzo de 1920x1080) ---
-// Dejamos libre la franja de arriba (y < 170) para el titular en la vista general.
-const PANEL = { x: 260, y: 200, w: 1400, h: 700 };
-const CARD = { w: 400, h: 220 };
-const cardPos = (i: number) => ({ x: PANEL.x + 50 + i * 450, y: PANEL.y + 90 });
-const cardCenter = (i: number) => ({ x: cardPos(i).x + CARD.w / 2, y: cardPos(i).y + CARD.h / 2 });
+// --- Diseño por formato, en coordenadas del mundo (1 unidad = 1 px a escala 1) ---
+// El lienzo mide width x height del formato: 1920x1080 en horizontal, 1080x1920 en vertical. Dejamos libre
+// la franja de arriba (y < 170 en horizontal, y < 300 en vertical) para el titular en la vista general.
+// En vertical el contenido se apila y ocupa casi todo el cuadro: un diseño horizontal achicado quedaría vacío.
+type Layout = {
+  panel: { x: number; y: number; w: number; h: number };
+  card: { w: number; h: number };
+  cardPos: (i: number) => { x: number; y: number };
+  rowsTop: number; // dónde empiezan las filas, relativo al panel
+  rowW: number;
+  cursorHome: { x: number; y: number };
+  zoom: number; // acercamiento a la tarjeta elegida
+  through: { x: number; y: number }; // punto que se atraviesa al final
+};
+const LAYOUTS: { horizontal: Layout; vertical: Layout } = {
+  horizontal: {
+    panel: { x: 260, y: 200, w: 1400, h: 700 },
+    card: { w: 400, h: 220 },
+    cardPos: (i) => ({ x: 310 + i * 450, y: 290 }),
+    rowsTop: 360, rowW: 1300,
+    cursorHome: { x: 1500, y: 880 },
+    zoom: 1.8,
+    through: { x: 260 + 1400 - 140, y: 200 + 540 },
+  },
+  vertical: {
+    panel: { x: 60, y: 400, w: 960, h: 1120 },
+    card: { w: 860, h: 220 },
+    cardPos: (i) => ({ x: 110, y: 500 + i * 250 }),
+    rowsTop: 880, rowW: 860,
+    cursorHome: { x: 900, y: 1500 },
+    zoom: 1.15, // la tarjeta ya ocupa casi todo el ancho
+    through: { x: 540, y: 400 + 880 + 30 },
+  },
+};
 const PICK = 1; // tarjeta que se destaca
 const FILAS = ["Elemento alfa", "Elemento beta", "Elemento gamma"]; // contenido ficticio
 
@@ -47,29 +77,30 @@ const T = {
   wash: [133, 149] as [number, number],
 };
 
-// Tres cuadros clave: vista general -> acercamiento rápido -> sostener.
-const KEYS: CameraKey[] = [
-  { f: 0, x: 960, y: 540, scale: 1 },
-  { f: T.zoom, x: cardCenter(PICK).x, y: cardCenter(PICK).y, scale: 1.8 },
-  { f: 110, x: cardCenter(PICK).x, y: cardCenter(PICK).y, scale: 1.8 },
-];
-
-// El final atraviesa un punto del panel; el desenfoque se apaga en ese tramo.
-const THROUGH_TARGET = { x: PANEL.x + PANEL.w - 140, y: PANEL.y + 540 };
-const camera = (f: number) =>
-  cameraAt(f, KEYS, {
-    map: (fr, c) => zoomThrough(fr, T.through, c, THROUGH_TARGET, 40),
+// Cámara: vista general -> acercamiento rápido -> sostener -> atravesado final (el desenfoque se apaga en ese tramo).
+const makeCamera = (f: number, L: Layout, cx: number, cy: number) => {
+  const c = { x: L.cardPos(PICK).x + L.card.w / 2, y: L.cardPos(PICK).y + L.card.h / 2 };
+  const keys: CameraKey[] = [
+    { f: 0, x: cx, y: cy, scale: 1 },
+    { f: T.zoom, x: c.x, y: c.y, scale: L.zoom },
+    { f: 110, x: c.x, y: c.y, scale: L.zoom },
+  ];
+  return cameraAt(f, keys, {
+    map: (fr, cam) => zoomThrough(fr, T.through, cam, L.through, 40),
     noBlurFrom: T.through[0],
   });
+};
 
 /** Contenido de la escena SIN `Stage`: es lo que usa la historia (que ya trae su propio `Stage`). */
 export function SceneBody({ title, subtitle }: SceneProps) {
   const f = useFrame();
   const t = useTheme();
-  const { width, height } = useVideoConfig();
-  const cam = camera(f);
+  const { width, height, pick } = useFormat();
+  const L = pick(LAYOUTS); // cuadrado cae en horizontal: si lo habilitás, agregale su diseño
+  const { panel: PANEL, card: CARD } = L;
+  const cam = makeCamera(f, L, width / 2, height / 2);
   const picked = f >= T.click;
-  const target = cardCenter(PICK);
+  const target = { x: L.cardPos(PICK).x + CARD.w / 2, y: L.cardPos(PICK).y + CARD.h / 2 };
 
   return (
     <>
@@ -95,7 +126,7 @@ export function SceneBody({ title, subtitle }: SceneProps) {
             <div
               key={i}
               style={{
-                position: "absolute", left: cardPos(i).x, top: cardPos(i).y + (1 - a) * 30,
+                position: "absolute", left: L.cardPos(i).x, top: L.cardPos(i).y + (1 - a) * 30,
                 width: CARD.w, height: CARD.h, boxSizing: "border-box", padding: 30, opacity: a,
                 background: t.color.surfaceAlt, borderRadius: t.radius.panel,
                 border: `2px solid ${sel ? t.color.accent : t.color.border}`,
@@ -113,7 +144,7 @@ export function SceneBody({ title, subtitle }: SceneProps) {
           <div
             key={r}
             style={{
-              position: "absolute", left: PANEL.x + 50, top: PANEL.y + 360 + i * 76, width: PANEL.w - 100, height: 58,
+              position: "absolute", left: PANEL.x + 50, top: PANEL.y + L.rowsTop + i * 76, width: L.rowW, height: 58,
               boxSizing: "border-box", display: "flex", alignItems: "center", padding: "0 24px",
               background: t.color.bg, border: `1px solid ${t.color.border}`, borderRadius: t.radius.md,
               fontSize: t.type.eyebrow, color: t.color.text, opacity: kf(f, [30 + i * 5, 48 + i * 5], [0, 1]),
@@ -127,7 +158,7 @@ export function SceneBody({ title, subtitle }: SceneProps) {
         <DoodleCircle start={T.doodle} end={105} id="tpl-circle" cx={target.x} cy={target.y} rx={CARD.w / 2 + 20} ry={CARD.h / 2 + 16} />
 
         {/* Un clic: el cursor viaja en coordenadas del mundo y la onda sale en cada cuadro de `clicks`. */}
-        <Cursor show={[20, 100]} keys={[[20, 1500, 880], [T.click - 2, target.x + 60, target.y + 50]]} clicks={[T.click]} />
+        <Cursor show={[20, 100]} keys={[[20, L.cursorHome.x, L.cursorHome.y], [T.click - 2, target.x + 60, target.y + 50]]} clicks={[T.click]} />
       </World>
 
       {/* Fuera del mundo: no se mueve con la cámara. Se aparta cuando la escala pasa de 1. */}

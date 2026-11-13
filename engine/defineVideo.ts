@@ -1,6 +1,6 @@
 import type { ComponentType } from 'react';
 import type { VideoConfig } from './config';
-import { resolveFormats, type FormatName, type FormatSize, type FormatsOption } from './format';
+import { assertEvenSize, resolveFormats, type FormatName, type FormatSize, type FormatsOption } from './format';
 import type { SceneInfo } from './scenes';
 
 export type VideoDefinition<P = Record<string, unknown>> = Omit<VideoConfig, 'format'> & {
@@ -24,7 +24,12 @@ export type RegisteredVideo<P = Record<string, unknown>> = VideoDefinition<P> & 
 };
 
 /** Error del registro (id repetido, etc.): el runtime lo muestra tal cual. */
-export class VideoRegistryError extends Error {}
+export class VideoRegistryError extends Error {
+  /** `id` repetido y las dos carpetas que lo usan (vacío si el error no es de un id repetido). */
+  constructor(message: string, readonly id?: string, readonly folders: string[] = []) {
+    super(message);
+  }
+}
 
 const registry = new Map<string, RegisteredVideo<any>>();
 let currentSource: string | null = null;
@@ -49,6 +54,7 @@ export function defineVideo<P = Record<string, unknown>>(def: VideoDefinition<P>
     if (!Number.isInteger(def[k]) || def[k] <= 0) throw new Error(`defineVideo(${def.id}): ${k} tiene que ser un entero positivo (recibido ${String(def[k])})`);
   }
   if (!Number.isFinite(def.fps) || def.fps <= 0) throw new Error(`defineVideo(${def.id}): fps tiene que ser un número positivo (recibido ${String(def.fps)})`);
+  assertEvenSize(`defineVideo(${def.id})`, def);
   const formatSizes = resolveFormats(def.id, def.width, def.height, def.formats);
   for (const s of def.scenes ?? []) {
     if (!s.id || !Number.isInteger(s.from) || s.from < 0 || !Number.isInteger(s.durationInFrames) || s.durationInFrames <= 0) {
@@ -57,7 +63,7 @@ export function defineVideo<P = Record<string, unknown>>(def: VideoDefinition<P>
   }
   const prev = registry.get(def.id);
   if (prev?.source && currentSource && prev.source !== currentSource) {
-    throw new VideoRegistryError(`Hay dos videos con el id "${def.id}": ${prev.source} y ${currentSource}. Cambiá el id de uno de los dos (cada video necesita un id único).`);
+    throw new VideoRegistryError(`Hay dos videos con el id "${def.id}": ${prev.source} y ${currentSource}. Cambiá el id de uno de los dos (cada video necesita un id único).`, def.id, [prev.source, currentSource]);
   }
   const reg: RegisteredVideo<P> = { ...def, formatSizes, ...(currentSource ? { source: currentSource } : {}) };
   registry.set(def.id, reg);

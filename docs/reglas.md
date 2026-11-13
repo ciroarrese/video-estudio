@@ -35,13 +35,32 @@ Esta es la lista de referencia; `CLAUDE.md`, `engine/README.md`, `kit/README.md`
 - [ ] **Cada garabato tiene un `id` único.** *Por qué:* el `id` es también la semilla del temblor y el nombre del degradado SVG; dos iguales se pisan.
 - [ ] **Los cuadros clave de cámara, de `kf` y de `interpolate` son estrictamente crecientes.** *Por qué:* si no, lanzan un error que nombra los cuadros.
 
+## Qué hacer cuando --check falla
+
+`npm run render -- <id> --check` dice qué cuadro difiere entre dos renders, el rectángulo (bbox) donde difiere y los elementos que caen ahí. Es el error más caro de arreglar si se lo ataca a ciegas; seguí este orden.
+
+1. **Leé lo que imprime.** Cuadro, bbox y nombres de elementos. El problema está en lo que se dibuja dentro de ese rectángulo, en ese cuadro; lo demás da igual. Repetí en el cuadro vecino: si falla solo en uno, mirá qué empieza o termina ahí (un `start`, un `kf` que cruza un valor, un montaje).
+2. **Bisecá sacando piezas.** Comentá la mitad de los elementos de la escena (o dejá solo los del bbox), corré `--check --frames a-b` sobre el rango del cuadro y volvé a poner de a una hasta que reaparezca. Con `--format` probá cada formato por separado.
+3. **Causas habituales y arreglos:**
+   - **Residuos en elementos quietos:** `scale(1)`, `translate(0px)` u `opacity: 1` que quedan puestos cuando el elemento ya no se anima. Chromium crea una capa distinta con y sin ellos. *Arreglo:* emití el `transform` (y la opacidad) solo mientras anima; al terminar, sin propiedad.
+   - **Texto bajo `scale()`:** el glifo se rasteriza según el historial. *Arreglo:* animá `font-size`, o escalá el contenedor sin texto y poné el texto fuera, o con traslado entero.
+   - **`left`/`top` fraccionarios bajo un ancestro con transform:** *Arreglo:* `Math.round` en las posiciones de layout, y todo el movimiento dentro de `transform`.
+   - **Efectos montados mucho antes de su `start`:** un efecto que está en el árbol desde el cuadro 0 pero arranca en el 90 mantiene capas y cachés vivos. *Arreglo:* montalo cuando empieza (`f >= start && <Efecto start={start} />`).
+   - **Elementos visibles durante `zoomThrough`:** al atravesar, la escala llega a 40 y todo lo que sigue visible se rasteriza enorme. *Arreglo:* ocultá (no montes) lo que sobra desde el cuadro en que empieza el atravesado.
+   - **Escalas pesadas anidadas:** un contenedor con `scale()` dentro de un mundo que ya hace zoom multiplica el error. *Arreglo:* hacé el zoom con la cámara (`cameraAt`) y no escales además el contenedor.
+   - **Fuentes sin cargar:** el cuadro se captura con la tipografía de reserva. *Arreglo:* declarala en `theme.font.files` o con `asset()` para que el motor espere; confirmá que el archivo existe.
+4. **Verificá en todos los formatos** que el video admite y con `--check` completo (no solo el rango): un arreglo en vertical puede mover la causa en horizontal.
+5. Solo después de eso, y si el diferencial es desenfoque o sombra legítimos, ver la tolerancia de `--check` (no la subas para tapar un defecto real).
+
+Ver también el catálogo (`docs/animaciones.md`): los efectos de `fx/` ya cumplen estas reglas mientras se los monte en su `start`.
+
 ## De contenido y privacidad
 
 - [ ] **Cifras emuladas y nombres ficticios por defecto.** Solo van datos reales si la persona lo pidió expresamente y dijo cuáles.
   *Por qué:* un video se comparte más de lo previsto; un número o un nombre real en pantalla no se puede retirar.
 - [ ] **Nunca se imprimen ni se versionan credenciales.** Nada de claves, tokens, correos, dominios ni URLs internas en el código, en `--props`, en los registros ni en el chat.
   *Por qué:* el repo es público y el código queda en el historial para siempre. *Se revisa con:* `npm run privacy -- <id> --deny <lista> --scan-source videos/<slug>` (correos, teléfonos, dominios que no sean de ejemplo y términos prohibidos).
-- [ ] **Cada video trae su lista de términos prohibidos** (`videos/<slug>/prohibidos.txt`), armada en el cuestionario con lo que la persona dijo que no puede salir, y se corre en cada escena y en el video final.
+- [ ] **Cada video trae su lista de términos prohibidos** (`videos/<slug>/prohibidos.txt`, un término o `/regex/flags` por línea), armada en el cuestionario con lo que la persona dijo que no puede salir, y se corre en cada escena y en el video final.
 - [ ] **Nada de nombres de empresas, clientes o personas reales** en lo que se sube al repo: ni en el código, ni en los textos, ni en los ejemplos.
 - [ ] **Licencias del lugar de exhibición.** Antes de agregar una fuente, una música, un efecto de sonido, un logo o una marca de terceros, verificar que su licencia permita usarlos donde se va a mostrar el video (interno, web pública, redes, evento) y redistribuirlos si se suben al repo.
   *Por qué:* lo que sirve para una reunión interna puede no servir en un canal público. El repo no incluye fuentes, música ni marcas; la responsabilidad de lo que se agrega es de quien lo agrega.

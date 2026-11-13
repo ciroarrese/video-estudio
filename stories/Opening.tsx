@@ -5,7 +5,8 @@ import { fitText, listLayout, openingWall, rigTransform } from "./layout";
 import { Chip, HeadlineRow, HighlightedTitle, StoryStage, scaler, useEase } from "./shared";
 import type { StorySpec } from "./types";
 
-export const OPENING_FRAMES = 300;
+import { OPENING_FRAMES } from "./durations";
+export { OPENING_FRAMES };
 export const openingFrames = (spec: StorySpec) => spec.timing?.opening ?? OPENING_FRAMES;
 
 const WALL_P = 1400;

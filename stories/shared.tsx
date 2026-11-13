@@ -4,7 +4,7 @@ import { CloudBackground, GradientText, Stage, kf } from "../kit";
 import { themeEasing } from "../kit/util";
 import { useTheme, withAlpha } from "../themes";
 import type { ListLayout } from "./layout";
-import { ROW_GAP, fitText } from "./layout";
+import { ROW_GAP, fitText, pillFit } from "./layout";
 
 
 /**
@@ -51,9 +51,9 @@ export function Chip({ text, lit, pop, faint }: { text: string; lit: number; pop
 }
 
 /** Píldora con el número y el nombre del tema (cierre, ~34 px de letra). */
-export function Pill({ index, name, scale = 1, glow = 0 }: { index: number; name: string; scale?: number; glow?: number }) {
+export function Pill({ index, name, scale = 1, glow = 0, maxW }: { index: number; name: string; scale?: number; glow?: number; /** Ancho total máximo (px): achica la letra y corta con "…" (ver `pillFit`). */ maxW?: number }) {
   const theme = useTheme();
-  const t = fitText(name, 560, theme.type.caption * 1.06, { min: theme.type.caption * 0.8 });
+  const t = pillFit(theme, name, maxW);
   return (
     <div
       style={{
@@ -70,7 +70,7 @@ export function Pill({ index, name, scale = 1, glow = 0 }: { index: number; name
         transformOrigin: "50% 50%",
       }}
     >
-      <GradientText style={{ fontSize: Math.max(26, t.size * 0.8), fontWeight: theme.font.weights.stat }}>{String(index + 1).padStart(2, "0")}</GradientText>
+      <GradientText style={{ fontSize: t.numSize, fontWeight: theme.font.weights.stat }}>{String(index + 1).padStart(2, "0")}</GradientText>
       <span style={{ fontSize: t.size, fontWeight: theme.font.weights.semibold, color: theme.color.text }}>{t.text}</span>
     </div>
   );

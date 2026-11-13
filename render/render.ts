@@ -1,13 +1,14 @@
 import { spawn } from 'node:child_process';
 import { createHash, randomBytes } from 'node:crypto';
 import { cpus } from 'node:os';
-import { createReadStream, existsSync, mkdirSync, readFileSync, readdirSync, renameSync, rmSync, statSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, readdirSync, renameSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { writeFile } from 'node:fs/promises';
 import { dirname, join, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { comparePngs, DEFAULT_TOLERANCE, formatDiff, withinTolerance, type CheckTolerance } from './compare';
 import { buildAudioGraph, resolveSrc, windowTracks, type Track } from './audio';
 import { launchChromium, type PwBrowser, type PwPage } from './browser';
+import { FileHashCache } from './filehash';
 import { trackChild, trackCloser, trackPath, untrackPath } from './cleanup';
 import { digestFiles, ENCODER_SETTINGS, evenFrames, frameFile, framePattern, planSegments, planShards, segmentKey } from './plan';
 import { serveStatic } from './server';
@@ -81,18 +82,14 @@ const walk = (dir: string, acc: string[] = [], skip: (name: string, depth: numbe
   return acc;
 };
 
-const hashFiles = async (base: string, files: string[]): Promise<string> => {
+const hashFiles = async (base: string, files: string[], cache: FileHashCache = new FileHashCache()): Promise<string> => {
   const h = createHash('sha256');
-  for (const f of files.sort()) {
-    h.update(relative(base, f)).update('\0');
-    await new Promise<void>((res, rej) => createReadStream(f).on('data', (d) => h.update(d)).on('end', res).on('error', rej));
-    h.update('\0');
-  }
+  for (const f of [...files].sort()) h.update(relative(base, f)).update('\0').update(await cache.hashOf(f)).update('\0');
   return h.digest('hex');
 };
 
 /** Content hash of every file of a directory (the built bundle). */
-export const hashDir = (dir: string) => hashFiles(dir, walk(dir));
+export const hashDir = (dir: string, cache?: FileHashCache) => hashFiles(dir, walk(dir), cache);
 
 /** path+size+mtime digest of extra asset directories. */
 export function assetsDigest(dirs: string[]): string {
@@ -102,15 +99,35 @@ export function assetsDigest(dirs: string[]): string {
   return digestFiles(entries);
 }
 
+/** Carpeta que hace de `videos/` (VE_VIDEOS_DIR, para pruebas); `null` = el `videos/` real del proyecto. */
+export const videosDirFromEnv = (): string | null => (process.env.VE_VIDEOS_DIR ? resolve(process.env.VE_VIDEOS_DIR) : null);
+
+// vite.config.ts lee VE_VIDEOS_DIR al cargarse: dos compilaciones en el mismo proceso con carpetas distintas se serializan.
+let buildChain: Promise<unknown> = Promise.resolve();
+
 /**
  * Build the runtime bundle with vite into a content-addressed directory under the cache
  * (`bundles/<hash of all project inputs>`). It is never modified once built, so concurrent runs
  * (or `npm run build` writing dist/) cannot corrupt a render in progress, and no lock is needed.
+ *
+ * Con `videosDir` (o VE_VIDEOS_DIR) los videos salen de esa carpeta y el `videos/` real del proyecto NI SE COMPILA NI
+ * entra en el hash: un video a medio hacer no contamina las pruebas.
+ *
+ * Si la compilación falla por un archivo de un video (sintaxis, import que no existe), no se pierden los demás: ese
+ * archivo se reemplaza por un módulo que lanza el error al cargarse y se compila de nuevo. El runtime lo informa por
+ * carpeta (`__ve.loadErrors`) y solo falla para ese video.
  */
-export async function ensureBundle(root: string, cacheDir: string, runId: string, log: (m: string) => void): Promise<string> {
+export async function ensureBundle(root: string, cacheDir: string, runId: string, log: (m: string) => void, opts: { videosDir?: string | null } = {}): Promise<string> {
+  const videosDir = opts.videosDir === undefined ? videosDirFromEnv() : opts.videosDir ? resolve(opts.videosDir) : null;
   const skipTop = new Set(['node_modules', 'dist', 'out', 'render', 'docs']);
+  if (videosDir) skipTop.add('videos');
   const files = walk(root, [], (name, depth) => name.startsWith('.') || (depth === 0 && skipTop.has(name)) || name.endsWith('.md'));
-  const key = (await hashFiles(root, files)).slice(0, 16); // includes package-lock.json, tsconfig.json, vite config
+  const ext = videosDir && existsSync(videosDir) ? walk(videosDir, [], (name) => name.startsWith('.') || name.endsWith('.md')) : [];
+  const cache = new FileHashCache(join(cacheDir, 'filehash.json'));
+  const h = createHash('sha256').update(await hashFiles(root, files, cache));
+  if (videosDir) h.update('videos-dir\0').update(await hashFiles(videosDir, ext, cache));
+  cache.save();
+  const key = h.digest('hex').slice(0, 16); // includes package-lock.json, tsconfig.json, vite config
   const dir = join(cacheDir, 'bundles', key);
   if (existsSync(join(dir, 'index.html'))) {
     log(`bundle: ${key} en cache, se reutiliza`);
@@ -119,9 +136,46 @@ export async function ensureBundle(root: string, cacheDir: string, runId: string
   log('bundle: compilando con vite...');
   const tmp = join(cacheDir, 'bundles', `.tmp-${runId}`);
   trackPath(tmp);
-  try {
+  const build = async () => {
     const vite = await import('vite');
-    await vite.build({ configFile: join(root, 'vite.config.ts'), logLevel: 'warn', build: { outDir: tmp, emptyOutDir: true } });
+    const saved = process.env.VE_VIDEOS_DIR;
+    if (videosDir) process.env.VE_VIDEOS_DIR = videosDir;
+    else delete process.env.VE_VIDEOS_DIR;
+    try {
+      const stubbed = new Map<string, string>(); // archivo -> error de compilación
+      const stub = {
+        name: 've-stub-broken',
+        enforce: 'pre' as const,
+        load: (id: string) => {
+          const msg = stubbed.get(id.split('?')[0]!);
+          return msg === undefined ? null : `throw new Error(${JSON.stringify(msg)});`;
+        },
+      };
+      for (let attempt = 0; ; attempt++) {
+        try {
+          await vite.build({ configFile: join(root, 'vite.config.ts'), logLevel: 'silent', plugins: [stub], build: { outDir: tmp, emptyOutDir: true } });
+          return;
+        } catch (e) {
+          const err = e as Error & { id?: string; loc?: { file?: string }; file?: string };
+          const bad = err.id ?? err.loc?.file ?? err.file;
+          const abs = bad ? resolve(bad.split('?')[0]!) : null;
+          const inVideo = abs !== null && (abs.startsWith(resolve(root, 'videos') + '/') || abs.startsWith(resolve(root, 'examples') + '/') || (videosDir !== null && abs.startsWith(videosDir + '/')));
+          if (!inVideo || stubbed.has(abs!) || attempt >= 8 || !existsSync(abs!)) throw e;
+          const where = videosDir && abs!.startsWith(videosDir + '/') ? `videos/${relative(videosDir, abs!)}` : relative(root, abs!);
+          const first = String(err.message).split('\n').filter(Boolean).slice(0, 3).join(' | ');
+          log(`bundle: "${where}" no compila (${first}); se compila el resto sin ese archivo`);
+          stubbed.set(abs!, `${where} no compila: ${first}`);
+        }
+      }
+    } finally {
+      if (saved === undefined) delete process.env.VE_VIDEOS_DIR;
+      else process.env.VE_VIDEOS_DIR = saved;
+    }
+  };
+  try {
+    const run = buildChain.then(build, build);
+    buildChain = run.catch(() => {});
+    await run;
     try {
       renameSync(tmp, dir);
     } catch (e) {
@@ -136,24 +190,33 @@ export async function ensureBundle(root: string, cacheDir: string, runId: string
 
 /**
  * Huella del código que puede cambiar los cuadros de UN video: los fuentes que usa el runtime y la carpeta del video
- * (`ve-deps.json`, que arma vite.config.ts siguiendo los imports), todos los archivos de esa carpeta (por si carga
- * recursos con `new URL(...)`), `public/` entero y la configuración de compilación. Un cambio en otro video no la toca.
- * Sin `ve-deps.json` o sin carpeta conocida devuelve `null` (se usa el hash de todo el bundle).
+ * (`ve-deps.json`, que arma vite.config.ts siguiendo imports estáticos y dinámicos, `import.meta.glob` y los
+ * `new URL('...', import.meta.url)` con literal, estén donde estén), todos los archivos de la carpeta del video,
+ * `public/` entero y la configuración de compilación. Un cambio en otro video no la toca.
+ * Devuelve `null` (se usa el hash de todo el bundle) si falta `ve-deps.json`, si la carpeta no figura o si el video (o el
+ * runtime) usa algo que no se puede seguir (`new URL(variable, import.meta.url)`, `import(variable)`): ante la duda, todo.
+ * El contenido se hashea con una cache por tamaño+mtime+ctime+inodo (ver render/filehash.ts), así que no se relee `public/`.
  */
-export async function videoCodeHash(root: string, bundleDir: string, source: string | null | undefined): Promise<string | null> {
+export async function videoCodeHash(root: string, bundleDir: string, source: string | null | undefined, opts: { videosDir?: string | null; cache?: FileHashCache } = {}): Promise<string | null> {
   if (!source) return null;
-  let deps: { runtime: string[]; videos: Record<string, string[]> };
+  let deps: { runtime: string[]; videos: Record<string, string[]>; opaque?: string[] };
   try {
     deps = JSON.parse(readFileSync(join(bundleDir, 've-deps.json'), 'utf8'));
   } catch {
     return null;
   }
   const own = deps.videos[source];
-  if (!own) return null;
+  if (!own || deps.opaque?.includes(source)) return null;
+  const videosDir = opts.videosDir === undefined ? videosDirFromEnv() : opts.videosDir;
+  const at = (f: string) => (videosDir && (f === 'videos' || f.startsWith('videos/')) ? join(videosDir, f.slice('videos/'.length)) : join(root, f));
   const files = new Set<string>();
-  for (const f of [...deps.runtime, ...own, 'package-lock.json', 'tsconfig.json', 'vite.config.ts', 'engine/runtime/index.html']) files.add(join(root, f));
-  for (const dir of [join(root, source), join(root, 'public')]) if (existsSync(dir)) for (const f of walk(dir)) files.add(f);
-  return (await hashFiles(root, [...files].filter((f) => existsSync(f)))).slice(0, 32);
+  for (const f of [...deps.runtime, ...own, 'package-lock.json', 'tsconfig.json', 'vite.config.ts', 'engine/runtime/index.html']) files.add(at(f));
+  for (const dir of [at(source), join(root, 'public')]) if (existsSync(dir)) for (const f of statSync(dir).isDirectory() ? walk(dir) : [dir]) files.add(f);
+  const present = [...files].filter((f) => existsSync(f) && statSync(f).isFile());
+  const h = createHash('sha256');
+  const cache = opts.cache ?? new FileHashCache();
+  for (const f of present.sort()) h.update(relative(root, f)).update('\0').update(await cache.hashOf(f)).update('\0');
+  return h.digest('hex').slice(0, 32);
 }
 
 type Shared = { error: Error | null };

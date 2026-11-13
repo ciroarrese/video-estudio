@@ -132,5 +132,5 @@ scenes[1] = {
   },
 };
 
-export const storyDemo = defineStory({ id: "story-demo", spec, scenes });
+export const storyDemo = defineStory({ id: "story-demo", spec, scenes, formats: ["vertical", "cuadrado"] });
 export { scenes as demoScenes };

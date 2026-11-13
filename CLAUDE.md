@@ -1,6 +1,6 @@
 # video-estudio: convenciones para agentes
 
-Herramienta para producir videos animados con un motor propio (TypeScript + React 18). Para hacer un video seguí la skill `.claude/skills/video-estudio/SKILL.md`; las reglas están en `docs/reglas.md`, la guía de escenas en `docs/guia-escenas.md` y el catálogo de efectos listos (`fx/`) en `docs/animaciones.md`: usalo antes de escribir una animación desde cero.
+Herramienta para producir videos animados con un motor propio (TypeScript + React 18). Para hacer un video seguí la skill `.claude/skills/video-estudio/SKILL.md`; las reglas están en `docs/reglas.md`, la guía de escenas en `docs/guia-escenas.md`, el sonido en `docs/audio.md` y el catálogo de efectos listos (`fx/`) en `docs/animaciones.md`: usalo antes de escribir una animación desde cero.
 
 ## Idioma
 

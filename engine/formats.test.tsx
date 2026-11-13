@@ -79,3 +79,16 @@ describe('escenas', () => {
     expect(() => defineVideo({ id: 's-mal', ...base, width: 10, height: 10, scenes: [{ id: '', from: 0, durationInFrames: 1 }] })).toThrow(/escena/);
   });
 });
+
+describe('validación de tamaños de formato', () => {
+  it('un objeto `formats` que lista el formato base con otro tamaño se rechaza (no pisa el base)', () => {
+    expect(() => defineVideo({ id: 'fv-base', ...base, width: 1920, height: 1080, formats: { horizontal: { width: 1280, height: 720 } } })).toThrow(/formats\.horizontal.*1280x720.*tamaño base.*1920x1080/);
+    // con el mismo tamaño no hay conflicto
+    const d = defineVideo({ id: 'fv-base-ok', ...base, width: 1920, height: 1080, formats: { horizontal: { width: 1920, height: 1080 } } });
+    expect(d.formatSizes!.horizontal).toEqual({ width: 1920, height: 1080 });
+  });
+  it('un lado impar (base o explícito) se rechaza con un mensaje que propone los pares cercanos', () => {
+    expect(() => defineVideo({ id: 'fv-impar', ...base, width: 1000, height: 563, formats: ['cuadrado'] })).toThrow(/1000x563.*impar.*height = 563.*562 o 564/);
+    expect(() => defineVideo({ id: 'fv-impar2', ...base, width: 1920, height: 1080, formats: { vertical: { width: 1081, height: 1920 } } })).toThrow(/formats\.vertical.*1081x1920.*impar.*width = 1081/);
+  });
+});

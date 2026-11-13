@@ -11,6 +11,9 @@ export default defineVideo({
   fps: 30,
   width: 1920,
   height: 1080,
+  // El formato base (1920x1080) siempre existe. Cada formato extra exige diseñar su disposición en Scene.tsx
+  // (`useFormat().pick`); agregá "cuadrado" solo cuando la tengas. Se mira con --format vertical.
+  formats: ["vertical"],
   durationInFrames: DURACION,
   defaultProps: { title: "Título de la escena", subtitle: "Una línea que lo explica" },
 });

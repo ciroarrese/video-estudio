@@ -1,6 +1,7 @@
 import { checkDeterminism, createStage, scanAudio, getVideo, getVideos, waitForHolds, collectAudio, resolveScenes, isFormatName, FORMAT_NAMES, formatOf } from '../index';
 import type { DeterminismResult, FormatName, FormatSize, SceneInfo, Stage } from '../index';
 import { videosReady } from './videos';
+import type { LoadError } from './discover';
 
 /** `formats`: tamaño de cada formato habilitado; `format`: el que corresponde a width x height (el base). `source`: carpeta de la que salió. */
 type VideoMeta = { id: string; fps: number; width: number; height: number; durationInFrames: number; format: FormatName; formats: Partial<Record<FormatName, FormatSize>>; source: string | null };
@@ -12,8 +13,10 @@ declare global {
     __ve: {
       ready: Promise<void>;
       readonly videos: VideoMeta[];
-      /** Mensaje si falló la carga de las carpetas de video (id repetido, archivo roto); null si todo cargó. */
+      /** Mensajes de las carpetas que no cargaron (id repetido, archivo roto), uno por línea; null si todo cargó. Solo informa: el video pedido falla únicamente si es uno de los afectados. */
       readonly loadError: string | null;
+      /** Lo mismo, por carpeta: `{folder, folders, ids, message}`. */
+      readonly loadErrors: LoadError[];
       setFrame(n: number): Promise<void>;
       audio(): WireTrack[];
       scanAudio(): Promise<WireTrack[]>;
@@ -42,18 +45,14 @@ const wire = (tracks: ReturnType<typeof collectAudio>): WireTrack[] =>
 const params = new URLSearchParams(location.search);
 
 let meta: VideoMeta[] = [];
-let loadError: Error | null = null;
+let loadErrors: LoadError[] = [];
 let setupError: Error | null = null;
 let stage: Stage | null = null;
 
 // `window.__ve` existe desde el primer momento (la página puede leerlo apenas carga); todo lo que depende de que las
 // carpetas de video hayan cargado espera a `init`, que nunca rechaza (los errores quedan en `setupError`).
 const init = (async () => {
-  try {
-    await videosReady;
-  } catch (e) {
-    loadError = e as Error;
-  }
+  loadErrors = await videosReady;
   const videos = getVideos();
   meta = videos.map(({ id, fps, width, height, durationInFrames, formatSizes, source }) => ({
     id, fps, width, height, durationInFrames, format: formatOf(width, height), formats: formatSizes ?? { [formatOf(width, height)]: { width, height } }, source: source ?? null,
@@ -61,7 +60,9 @@ const init = (async () => {
   const videoId = params.get('video') ?? videos[0]?.id;
   const def = videoId ? getVideo(videoId) : undefined;
 
-  setupError = loadError;
+  // Una carpeta rota o un id repetido solo afecta al video pedido si es uno de los comprometidos.
+  const involved = def ? loadErrors.filter((e) => e.ids.includes(def.id)) : [];
+  if (involved.length) setupError = new Error(involved.map((e) => e.message).join('\n'));
   let inputProps: object = {};
   const propsParam = params.get('props');
   if (propsParam) {
@@ -74,7 +75,8 @@ const init = (async () => {
     }
   }
   if (!setupError && !def) {
-    setupError = new Error(`Unknown video "${videoId}". Available: ${meta.map((m) => m.id).join(', ')}`);
+    // Si hay carpetas con errores, el video pedido puede ser justamente uno que no cargó: se las muestra.
+    setupError = new Error(`Unknown video "${videoId}". Available: ${meta.map((m) => m.id).join(', ')}${loadErrors.length ? `\nCarpetas con errores (puede ser una de ellas):\n${loadErrors.map((e) => e.message).join('\n')}` : ''}`);
   }
   let format: FormatName | undefined;
   const formatParam = params.get('format');
@@ -106,7 +108,10 @@ window.__ve = {
     return meta;
   },
   get loadError() {
-    return loadError ? loadError.message : null;
+    return loadErrors.length ? loadErrors.map((e) => e.message).join('\n') : null;
+  },
+  get loadErrors() {
+    return loadErrors;
   },
   ready: init.then(async () => {
     const s = need();

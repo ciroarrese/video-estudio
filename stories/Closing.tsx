@@ -1,11 +1,12 @@
 import { Easing, random, useFrame, useVideoConfig } from "../engine";
 import { GradientText, kf } from "../kit";
 import { useTheme, withAlpha } from "../themes";
-import { closingWall, fitText, panelLayout, rigProject, rigTransform } from "./layout";
+import { PILL_OFF, closingWall, fitText, panelLayout, pillBudget, pillFit, rigProject, rigTransform } from "./layout";
 import { Chip, Logo, Pill, StoryStage, scaler, useEase } from "./shared";
 import type { StorySpec, TopicScene } from "./types";
 
-export const CLOSING_FRAMES = 480;
+import { CLOSING_FRAMES } from "./durations";
+export { CLOSING_FRAMES };
 export const closingFrames = (spec: StorySpec) => spec.timing?.closing ?? CLOSING_FRAMES;
 
 const PANEL = { w: 560, h: 340 };
@@ -32,7 +33,6 @@ export function DefaultThumbnail({ index, name }: { index: number; name: string 
 }
 
 const WALL_PILL = 1.5;
-const PILL_OFF = -50; // la píldora de cada panel va sobre su borde superior (centro, en px del panel)
 
 /** Valor que sigue entre dos puntos. */
 const mix = (a: number, b: number, p: number) => a + (b - a) * p;
@@ -144,7 +144,7 @@ export function Closing({ spec, scenes }: { spec: StorySpec; scenes: TopicScene[
               </div>
               {!titleGone && (
                 <div style={{ position: "absolute", left: Math.round(W / 2), top: PILL_OFF, transform: "translate(-50%, -50%)" }}>
-                  <Pill index={i} name={spec.topics[i]!.name} />
+                  <Pill index={i} name={spec.topics[i]!.name} maxW={pillBudget(panels, i, width)} />
                 </div>
               )}
             </div>
@@ -157,7 +157,10 @@ export function Closing({ spec, scenes }: { spec: StorySpec; scenes: TopicScene[
         if (p <= 0 || p >= 1) return null;
         const H = PANEL.h * c.k;
         const pc = rigProject((c.x - cx) * cam.s, (c.y - cy + bobOf(i) - H / 2 + PILL_OFF) * cam.s, c.z * cam.s, { dz: 0, rx: cam.rx, ry: cam.ry }, CARD_P)!;
-        const from = { x: cx + pc.x, y: cy + pc.y, s: pc.s * cam.s, rx: cam.rx, ry: cam.ry };
+        // la píldora en vuelo es la del muro (tamaño completo); arranca achicada al ancho de la del panel para que no haya salto
+        const name = spec.topics[i]!.name;
+        const ratio = pillFit(theme, name, pillBudget(panels, i, width)).w / pillFit(theme, name).w;
+        const from = { x: cx + pc.x, y: cy + pc.y, s: pc.s * cam.s * ratio, rx: cam.rx, ry: cam.ry };
         const w = rigProject(slots[i]!.x, slots[i]!.y, 0, wallCam, WALL_P)!;
         const to = { x: cx + w.x, y: cy + w.y, s: w.s * WALL_PILL, rx: 0, ry: wallCam.ry };
         const arc = Math.sin(p * Math.PI);

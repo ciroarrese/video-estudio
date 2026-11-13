@@ -8,7 +8,8 @@ import type { StorySpec } from "./types";
 /** Opacidad de las filas ya vistas (el resto del texto atenuado llega al contraste mínimo con ella). */
 const QUIET_DONE = 0.75;
 
-export const INTERLUDE_FRAMES = 120;
+import { INTERLUDE_FRAMES } from "./durations";
+export { INTERLUDE_FRAMES };
 export const interludeFrames = (spec: StorySpec) => spec.timing?.interlude ?? INTERLUDE_FRAMES;
 
 /**

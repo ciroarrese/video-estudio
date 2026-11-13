@@ -10,5 +10,8 @@ export const spec: StorySpec = {
   ], // de 2 a 6 temas, mismo orden que las escenas
   labels: ["Resumen", "Metas", "Pedidos", "Alertas", "Historial", "Exportar"], // palabras del muro de la apertura
   signoff: { text: "Gracias por mirar", tagline: "Video de ejemplo con datos ficticios" },
-  // timing: { opening: 300, interlude: 120, closing: 450 }, // opcional, en cuadros (mínimo 60)
+  // Presupuesto: total = apertura + suma de escenas + (vueltas al listado = nº de temas) x interlude + cierre.
+  // Por defecto (300 / 120 / 480) ya son 780 + 120 por tema antes de sumar las escenas: un video corto exige bajarlos.
+  // Acá: 120 + 2 x (150 + 60) + 120 = 660 cuadros (22 s). Mínimo 60 cada uno; la apertura, al menos ~120 para que el título se lea.
+  timing: { opening: 120, interlude: 60, closing: 120 },
 };

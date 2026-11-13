@@ -21,11 +21,12 @@ npm run privacy -- kit-demo --deny lista.txt   # chequeo de privacidad (lista.tx
 npm run dev                                # vista en el navegador: /?video=kit-demo (y &format=vertical)
 npm run render -- --list                   # videos descubiertos (examples/* y videos/*), con tamaños y formatos
 npm run render -- hello --format vertical  # vertical (1080x1920 / 720x1280); también cuadrado
+npm run sheet -- hello --format vertical --count 8   # out/hello-vertical-sheet.png
 npm run render -- story-demo --list-scenes # escenas con nombre; --scene <id|índice> renderiza solo una
 npm run sheet -- fx-text --count 8         # galería del catálogo de efectos (también fx-3d y fx-data-ui-art)
 ```
 
-Catálogo de efectos listos (texto, 3D, datos, interfaz y arte): [docs/animaciones.md](docs/animaciones.md), con tres galerías para verlos: `fx-text`, `fx-3d` y `fx-data-ui-art` (`/?video=fx-3d&props={"theme":"dark"}`). Otros ejemplos: `hello`, `story-demo` (historia con apertura, vueltas al listado y cierre), `qa-defects` (defectos sembrados para probar el QA). Cada comando y sus opciones: [render/README.md](render/README.md) y [qa/README.md](qa/README.md). Pruebas y tipos: `npm test`, `npm run typecheck`.
+Catálogo de efectos listos (texto, 3D, datos, interfaz y arte): [docs/animaciones.md](docs/animaciones.md), con tres galerías para verlos: `fx-text`, `fx-3d` y `fx-data-ui-art` (`/?video=fx-3d&props={"theme":"dark"}`). Sonido (tempo, empalme al compás, efectos propios y mezcla): [docs/audio.md](docs/audio.md). Otros ejemplos: `hello`, `story-demo` (historia con apertura, vueltas al listado y cierre), `qa-defects` (defectos sembrados para probar el QA). Cada comando y sus opciones: [render/README.md](render/README.md) y [qa/README.md](qa/README.md). Pruebas y tipos: `npm test`, `npm run typecheck`.
 
 ## Mapa de carpetas
 
@@ -36,13 +37,14 @@ Catálogo de efectos listos (texto, 3D, datos, interfaz y arte): [docs/animacion
 | `themes/` | Tema neutro y oscuro, adaptador de tokens de un design system, chequeo de contraste |
 | `fx/` | Catálogo de efectos listos y deterministas: texto, 3D, datos, interfaz y arte (`docs/animaciones.md`) |
 | `stories/` | Apertura, vuelta al listado y cierre armados desde un solo objeto de configuración |
+| `audio/` | `tempo`, `empalme`, `efectos` y `mezcla` (`npm run audio -- <comando>`); ver `docs/audio.md` |
 | `render/` | `ve-render`: captura con Chromium y MP4 con ffmpeg, en paralelo y por partes |
 | `qa/` | `ve-qa`, `ve-sheet`, `ve-privacy`: control de calidad, hoja de cuadros y privacidad |
 | `examples/` | Videos cortos genéricos con datos ficticios y las galerías del catálogo (`fx-text`, `fx-3d`, `fx-data-ui-art`) |
 | `templates/` | Escena e historia de arranque (con `nuevo.sh` para copiarlas) |
-| `docs/` | Reglas de producción (con la lista de determinismo), guía de escenas, catálogo de animaciones, origen del motor |
+| `docs/` | Reglas de producción (con la lista de determinismo), guía de escenas, catálogo de animaciones, sonido, origen del motor |
 | `.claude/` | Skill `video-estudio` (cuestionario y etapas con aprobación) |
-| `videos/` | Los videos que se producen (`videos/<slug>/`); lo crea la skill y se descubre solo |
+| `videos/` | Los videos que se producen (`videos/<slug>/`). No existe en un clon nuevo: lo crea la skill (o `templates/nuevo.sh`) y se descubre solo |
 | `public/` | Fuentes, imágenes y música con licencia, referenciadas con `asset()` |
 
 ## Hacer un video nuevo
@@ -54,9 +56,11 @@ Abrí el repo con Claude Code y pedí lo que necesitás: "haceme un video de pre
 2. **Tema**: el design system pasado a tokens, con informe de contraste.
 3. **Guion** por escena (tiempos, qué se ve, efecto, texto, fuente).
 4. **Escenas de a una**, con QA, privacidad, hoja de cuadros y un MP4 de esa escena.
-5. **Armado**: apertura, vueltas al listado, cierre, música, render final y verificación.
+5. **Armado**: apertura, vueltas al listado, cierre, sonido (efectos, música, mezcla), render final y verificación.
 
-Las reglas de producción y sus motivos: [docs/reglas.md](docs/reglas.md). Cómo se escribe una escena: [docs/guia-escenas.md](docs/guia-escenas.md). Qué efecto usar: [docs/animaciones.md](docs/animaciones.md). Convenciones para agentes en este repo: [CLAUDE.md](CLAUDE.md).
+Cada etapa exige lo anterior aprobado: sobre todo, el guion (con su presupuesto de cuadros) antes que cualquier escena.
+
+Las reglas de producción y sus motivos: [docs/reglas.md](docs/reglas.md) (con "Qué hacer cuando --check falla"). Cómo se escribe una escena: [docs/guia-escenas.md](docs/guia-escenas.md). Qué efecto usar: [docs/animaciones.md](docs/animaciones.md). Convenciones para agentes en este repo: [CLAUDE.md](CLAUDE.md).
 
 ## Licencias
 

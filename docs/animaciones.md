@@ -96,7 +96,7 @@ SVG puros; colores, tipografía y radios del tema.
 | `BarsGrow` | Barras comunes que crecen escalonadas, con valores. | Comparar categorías de forma clara. | `data`, `labels`, `singleColor`, `format` |
 | `FlowSteps` | Pasos en escalera unidos por un conector que se dibuja. | Un proceso en pasos. | `steps` (`{title, caption?, state?}`), `activeIndex` |
 
-Nota: `Bars3D` ocupa casi todo el cuadro que le das (barras más anchas y altas, rótulos del tamaño `eyebrow`); aun así la proyección isométrica de una fila deja aire a los lados: usá `BarsGrow` si necesitás lectura de valores a distancia.
+Nota: `DonutRing` muestra siempre el número animado `value` (no el porcentaje de `max`) seguido de `unit`, que por defecto es `%`, y debajo `label`, que por defecto es "Avance". Con otro `max` o una unidad distinta, pasá `unit` (y `label`) a propósito; con `unit=""` o `label=""` se apagan. Nota: `Bars3D` ocupa casi todo el cuadro que le das (barras más anchas y altas, rótulos del tamaño `eyebrow`); aun así la proyección isométrica de una fila deja aire a los lados: usá `BarsGrow` si necesitás lectura de valores a distancia.
 
 ## Interfaz (`fx/ui`, galería `fx-data-ui-art`)
 
@@ -113,6 +113,8 @@ Interfaces recreadas con el tema (no capturas). Se pueden poner dentro de `World
 | `BeforeAfter` | Manija que revela el "después" sobre el "antes" (por defecto, alambre a diseño). | Comparación antes/después. | `before`, `after`, `rest`, `beforeLabel`, `afterLabel` |
 | `TileGrid` | Baldosas que se dan vuelta y se encienden con escalonado sembrado. | Progreso de muchas cosas a la vez. | `cols`, `rows`, `lit`, `seed` |
 | `TileDone` | Baldosa que pasa a "hecha" con onda en `start`. | Marcar una tarea como completada junto a un `Cursor`. | `label`, `pendingText`, `doneText` |
+
+Ayudas de tamaño de la interfaz (se importan de `fx/`): `phoneScreen(width, height, bezel?)` da la caja `{ x, y, width, height }` de la pantalla de un `PhoneFrame` (para dimensionar tu contenido: el marco no lo hace por vos); `stackOffsets(arrivals, pitch)` da el desplazamiento vertical de cada tarjeta de `NotificationStack`. En vertical, calculá el `width`/`height` del teléfono para que llene el cuadro (ver "Para que no parezca un borrador" en `docs/guia-escenas.md`).
 
 ## Arte y transiciones (`fx/art`, galería `fx-data-ui-art`)
 
@@ -141,7 +143,8 @@ Notas: **`PixelBuild` muestrea la cobertura de los glifos en un canvas fuera de 
 3. **Corte seco entre palabras** (`KineticWords`): el movimiento ocurre dentro de cada palabra, no entre ellas.
 4. **El último cuadro es un still.** Todo efecto termina compuesto y legible; se puede congelar para una miniatura o como primera imagen de la escena siguiente.
 5. **Oclusión pintando de lejos a cerca** y **profundidad con opacidad y grosor**: lo lejano se desvanece y se afina; lo cercano es más grande y más opaco. En `fx/three` la perspectiva se proyecta a mano.
-6. **Raster estable.** Para que el render sea idéntico según el historial de cuadros, ver la lista única en `docs/reglas.md` (traslados enteros, `scale()` sobre texto solo si la pieza pasa `--check` completo, CSS 3D solo como `perspective()` propio de cada elemento, sin sombras bajo `rotate()`).
+6. **Si `--check` falla con un efecto, montalo cuando empieza** (no desde el cuadro 0) y seguí `docs/reglas.md`, sección "Qué hacer cuando --check falla".
+7. **Raster estable.** Para que el render sea idéntico según el historial de cuadros, ver la lista única en `docs/reglas.md` (traslados enteros, `scale()` sobre texto solo si la pieza pasa `--check` completo, CSS 3D solo como `perspective()` propio de cada elemento, sin sombras bajo `rotate()`).
 
 ## Base común
 

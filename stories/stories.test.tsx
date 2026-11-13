@@ -6,10 +6,11 @@ import { ThemeProvider, dark, neutral } from "../themes";
 import type { Theme } from "../themes";
 import { demoScenes, spec as demoSpec, storyDemo } from "../examples/story-demo/StoryDemo";
 import {
-  CLOSING_FRAMES, Closing, INTERLUDE_FRAMES, Interlude, OPENING_FRAMES, Opening, composeStory, fitText, useTopic, validateSpec,
+  CLOSING_FRAMES, Closing, INTERLUDE_FRAMES, Interlude, OPENING_FRAMES, Opening, budgetFromScenes, composeStory, defineStory, fitText, formatStoryBudget, storyBudget, useTopic, TopicHeadline, validateSpec,
 } from "./index";
 import type { StorySpec, TopicScene } from "./index";
-import { closingWall, labelAt, listLayout, panelLayout, reservedSlots, textWidth } from "./layout";
+import { TopicContext } from "./topic";
+import { closingWall, labelAt, listLayout, panelLayout, panelRects, pillBudget, reservedSlots, textWidth } from "./layout";
 
 const config = { fps: 30, width: 1920, height: 1080, durationInFrames: 1000 };
 const html = (node: React.ReactNode, theme: Theme, frame: number) =>
@@ -318,5 +319,99 @@ describe("formatos vertical y cuadrado", () => {
     expect(storyDemo.formatSizes!.vertical).toEqual({ width: 1080, height: 1920 });
     expect(storyDemo.scenes!.map((s) => s.id)).toEqual(["opening", "ventas", "interlude-1", "inventario", "interlude-2", "atencion", "interlude-3", "closing"]);
     expect(storyDemo.scenes![1]).toMatchObject({ name: "Panel de ventas", from: 300, durationInFrames: 150 });
+  });
+});
+
+describe("cierre: píldoras y paneles", () => {
+  const SIZES: [string, number, number][] = [["horizontal", 1920, 1080], ["vertical", 1080, 1920], ["cuadrado", 1080, 1080]];
+  const hit = (a: { x: number; y: number; w: number; h: number }, b: { x: number; y: number; w: number; h: number }) => a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.h && b.y < a.y + a.h;
+  it("ninguna píldora toca el panel de otro tema (ni el propio), de 2 a 6 temas, en los tres formatos", () => {
+    for (const theme of [neutral, dark]) {
+      for (const [name, w, h] of SIZES) {
+        for (let n = 2; n <= 6; n++) {
+          const p = panelLayout(n, w, h);
+          const long = "Un nombre de tema bastante largo para la píldora";
+          const rects = p.map((c, i) => panelRects(c, theme, long, pillBudget(p, i, w)));
+          rects.forEach((r, i) => {
+            rects.forEach((o, j) => expect(hit(r.pill, o.panel), `${name} n=${n}: píldora ${i + 1} sobre el panel ${j + 1}`).toBe(false));
+            // todo el conjunto entra en el cuadro
+            expect(r.pill.y, `${name} n=${n} píldora ${i + 1} arriba`).toBeGreaterThanOrEqual(0);
+            expect(r.pill.x).toBeGreaterThanOrEqual(0);
+            expect(r.pill.x + r.pill.w).toBeLessThanOrEqual(w);
+            expect(r.panel.y + r.panel.h).toBeLessThanOrEqual(h);
+          });
+          // entre píldoras vecinas de una misma fila hay aire
+          rects.forEach((r, i) => rects.forEach((o, j) => { if (j > i) expect(hit(r.pill, o.pill), `${name} n=${n}: píldoras ${i + 1} y ${j + 1}`).toBe(false); }));
+          // margen: la píldora de una fila queda a >= 30 px de los paneles de la fila de arriba
+          rects.forEach((r, i) => rects.forEach((o, j) => {
+            if (i !== j && o.panel.y < r.panel.y) expect(r.pill.y - (o.panel.y + o.panel.h), `${name} n=${n} ${i + 1} vs ${j + 1}`).toBeGreaterThanOrEqual(30);
+          }));
+        }
+      }
+    }
+  });
+  it("el caso del video con tres temas en horizontal: la píldora 03 no cae bajo el panel 1", () => {
+    const [a, b, c] = panelLayout(3).map((q, i, all) => panelRects(q, neutral, "Panel de ventas", pillBudget(all, i, 1920)));
+    expect(hit(c!.pill, a!.panel)).toBe(false);
+    expect(hit(c!.pill, b!.panel)).toBe(false);
+  });
+});
+
+describe("storyBudget", () => {
+  it("por defecto: apertura 300, vuelta 120, cierre 480; 3 temas = 1140 cuadros de bloques generados", () => {
+    const b = storyBudget(demoSpec, [150, 150, 150]);
+    expect(b.opening.frames).toBe(300);
+    expect(b.interlude).toMatchObject({ frames: 120, count: 3 });
+    expect(b.closing.frames).toBe(480);
+    expect(b.generated).toBe(300 + 360 + 480);
+    expect(b.total).toBe(b.generated + 450);
+    expect(b.minTotal).toBe(60 * 5 + 450);
+    expect(b.minTotal).toBeLessThan(b.total);
+  });
+  it("respeta timing e interludes: false, y coincide con la línea de tiempo real", () => {
+    const spec = { ...demoSpec, timing: { opening: 90, interlude: 60, closing: 120 } };
+    const { durationInFrames } = composeStory(spec, demoScenes, { interludes: false });
+    const b = storyBudget(spec, demoScenes, { interludes: false });
+    expect(b.interlude.count).toBe(0);
+    expect(b.total).toBe(durationInFrames);
+    const full = composeStory(spec, demoScenes);
+    expect(storyBudget(spec, demoScenes).total).toBe(full.durationInFrames);
+  });
+  it("budgetFromScenes (metadatos de --list-scenes) da lo mismo", () => {
+    const { timeline } = composeStory(demoSpec, demoScenes);
+    const b = budgetFromScenes(timeline, 30)!;
+    expect(b.total).toBe(storyBudget(demoSpec, demoScenes).total);
+    expect(b.interlude.count).toBe(3);
+    expect(budgetFromScenes([{ id: "a", durationInFrames: 10 }], 30)).toBeNull();
+    expect(formatStoryBudget(b)).toMatch(/apertura +300 cuadros/);
+  });
+  it("defineStory: solo el formato base salvo que se pida", () => {
+    const solo = defineStory({ id: "story-solo-base", spec: demoSpec, scenes: demoScenes });
+    expect(Object.keys(solo.formatSizes ?? {})).toEqual(["horizontal"]);
+  });
+});
+
+describe("escena sola (fuera de composeStory)", () => {
+  const cfg = { fps: 30, width: 1920, height: 1080, durationInFrames: 200 };
+  const alone = (node: React.ReactNode) => renderToString(<ThemeProvider theme={neutral}><FrameProvider frame={30} config={cfg}>{node}</FrameProvider></ThemeProvider>);
+  it("TopicHeadline usa title y number cuando no hay historia", () => {
+    const out = alone(<TopicHeadline title="Panel de ventas" number={2} />);
+    expect(out).toContain("Panel de ventas");
+    expect(out).toContain("02");
+    expect(alone(<TopicHeadline title="Solo" />)).toContain("01");
+  });
+  it("sin title ni historia no dibuja nada y no lanza", () => {
+    expect(alone(<TopicHeadline />)).toBe("");
+  });
+  it("useTopic sin historia lanza un error que dice cómo resolverlo; con fallback funciona", () => {
+    const Bare = () => <span>{useTopic().name}</span>;
+    expect(() => alone(<Bare />)).toThrow(/useTopic\(\{ name/);
+    const Fb = () => <span>{useTopic({ name: "Prueba" }).name}</span>;
+    expect(alone(<Fb />)).toContain("Prueba");
+  });
+  it("dentro de la historia el titular sigue saliendo del tema", () => {
+    const out = alone(<TopicContext.Provider value={{ index: 2, name: "Atención", line: "x" }}><TopicHeadline /></TopicContext.Provider>);
+    expect(out).toContain("Atención");
+    expect(out).toContain("03");
   });
 });
