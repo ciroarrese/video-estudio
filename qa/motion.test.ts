@@ -56,4 +56,15 @@ describe('motion', () => {
     applyMotion(c2, [page([w('Chau', 0.9)])]);
     expect(c2.runs[0]!.fade).toBe(0);
   });
+  it('empareja por etiqueta + testid + texto cuando cambia la ruta del DOM (un hermano que se monta corre los índices)', () => {
+    const t = (path: string, x: number, o: number, text = 'Cena en la plaza') => ({ ...run(`${path}|span||#0`, x, null, o), tag: 'span', testid: null, text }) as TextRun;
+    const cur = page([t('0.1.2', 100, 0.5)]);
+    applyMotion(cur, [page([t('0.1.1', 130, 0.4)]), page([t('0.1.2', 100, 0.52)])]);
+    expect(cur.runs[0]!.motion).toBe(30);
+    expect(cur.runs[0]!.fade).toBeCloseTo(0.1);
+    // texto repetido en el cuadro vecino: ambiguo, no se empareja
+    const dup = page([t('0.1.2', 100, 0.5)]);
+    applyMotion(dup, [page([t('0.1.1', 130, 0.4), t('0.1.3', 300, 0.9)])]);
+    expect(dup.runs[0]!.motion).toBe(0);
+  });
 });

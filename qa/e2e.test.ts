@@ -66,9 +66,42 @@ describe.skipIf(!chromium)('qa on the qa-defects video (e2e)', () => {
     expect(at(F.veilStaticB)[0]!.message).toMatch(/QUIETO/);
   }, 180_000);
 
+  it('leniencies for transitions, each with its strict counterpart (same situation but static: still an error)', async () => {
+    const { findings } = await runQa({ videoId: 'qa-defects', frames: '25-54' });
+    const sev = (frame: number, rule: string, testid: string) => {
+      const hit = findings.filter((f) => f.frame === frame && f.rule === rule && [f.element.testid, f.other?.testid].includes(testid));
+      expect(hit.length, `${rule} @${frame}`).toBeLessThanOrEqual(1);
+      return hit[0]?.severity ?? null;
+    };
+    // fundido lento al final del easing: no hay hallazgo; el mismo texto quieto al 51 % es error
+    expect(sev(F.slowFadeB, 'contrast', 'slow-fade')).toBeNull();
+    expect(sev(F.slowStaticB, 'contrast', 'slow-fade')).toBe('error');
+    // texto en movimiento sobre una banda oscura: info; quieto: error
+    expect(sev(F.crossMoveB, 'contrast', 'cross-text')).toBe('info');
+    expect(sev(F.crossStillB, 'contrast', 'cross-text')).toBe('error');
+    // dos textos que se cruzan a 6 px por cuadro: info; quietos: error
+    expect(sev(F.overlapMoveB, 'overlap', 'drift-a')).toBe('info');
+    expect(sev(F.overlapStillB, 'overlap', 'drift-a')).toBe('error');
+    // pastilla opaca que se desliza sobre un texto: info; quieta: error
+    expect(sev(F.coverMoveB, 'covered', 'slow-pill')).toBe('info');
+    expect(sev(F.coverStillB, 'covered', 'slow-pill')).toBe('error');
+    // rebaba de 5 px bajo una camara que se mueve: info; con la camara quieta: error
+    expect(sev(F.camMoveB, 'offscreen', 'sliver-text')).toBe('info');
+    expect(sev(F.camStillB, 'offscreen', 'sliver-text')).toBe('error');
+    // los cuadros de transicion no suman errores de otras reglas
+    for (const fr of [F.slowFadeB, F.crossMoveB, F.overlapMoveB, F.coverMoveB, F.camMoveB]) expect(findings.filter((f) => f.frame === fr && f.severity === 'error'), `frame ${fr}`).toEqual([]);
+  }, 180_000);
+
   it('privacy: a term and an e-mail built from one span per letter / per part are still caught', async () => {
     const r = await runPrivacy({ videoId: 'qa-defects', frames: `${F.split}`, deny: 'Acme Corp\n' });
-    expect(r.findings.map((f) => `${f.kind}:${f.value}`).sort()).toEqual(['deny:acme corp', 'deny:acmecorp', 'email:persona@dominio-ficticio.com']);
+    expect(r.findings.map((f) => `${f.kind}:${f.value}`).sort()).toEqual(['deny-joined:acme corp', 'deny-joined:acmecorp', 'email:persona@dominio-ficticio.com']);
+  }, 180_000);
+
+  it('privacy: texts of different elements glued together do not match a term ("Supermercado" + "Pagó"); the same term in one line of spans does, as deny-joined', async () => {
+    const apart = await runPrivacy({ videoId: 'qa-defects', frames: `${F.splitBlocks}`, deny: 'mercado pago\n' });
+    expect(apart.findings).toEqual([]);
+    const line = await runPrivacy({ videoId: 'qa-defects', frames: `${F.splitLine}`, deny: 'mercado pago\n' });
+    expect(line.findings.map((f) => `${f.kind}:${f.value}`).sort()).toEqual(['deny-joined:mercado pago', 'deny-joined:mercadopago']);
   }, 180_000);
 
   it('privacy: e-mail and real-looking domain are caught, example.com is not; a deny term fails', async () => {

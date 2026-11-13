@@ -143,7 +143,8 @@ export function detectPhones(text: string): string[] {
   return out;
 }
 
-export type HitKind = 'deny' | 'email' | 'domain' | 'phone';
+/** `deny-joined`: el termino solo aparece al juntar textos de nodos o elementos distintos (nunca dentro de un solo nodo). */
+export type HitKind = 'deny' | 'deny-joined' | 'email' | 'domain' | 'phone';
 export type Hit = { kind: HitKind; value: string; term?: string };
 
 const allowed = (value: string, allow: Term[]): boolean =>
@@ -169,6 +170,43 @@ export function scanText(text: string, deny: Term[], allow: Term[] = [], opts: {
   }
   if (opts.phones !== false) {
     for (const p of detectPhones(f)) if (!allowed(p, allow)) hits.push({ kind: 'phone', value: p });
+  }
+  return hits;
+}
+
+const isWordChar = (c: string | undefined) => c !== undefined && /[\p{L}\p{N}_]/u.test(c);
+
+/**
+ * Texto armado de un bloque (o del escenario) tal como lo devuelve `collectAllText`: \u0001 separa bloques (no se cruza), \u0002 separa
+ * items de un flex/grid (se lee como espacio; un termino partido en una letra por item sigue coincidiendo).
+ * Una coincidencia de la deny-list en este texto tiene que empezar y terminar en limite de palabra: asi "mercado pago" no sale de
+ * "Super" + "mercado" ni de "...mercado" + "Pagó" de dos elementos distintos pegados. Se devuelve como `deny-joined`.
+ * Correos y dominios se buscan en cada segmento (sin cruzar bloques); los telefonos no (los numeros de vecinos se pegarian).
+ */
+export function scanJoined(text: string, deny: Term[], allow: Term[] = [], opts: { domains?: boolean } = {}): Hit[] {
+  const hits: Hit[] = [];
+  for (const seg of text.split('\u0001')) {
+    const spaced = seg.replace(/\u0002+/g, ' ').replace(/\s+/g, ' ').trim();
+    if (!spaced) continue;
+    const f = fold(spaced);
+    const ok = (index: number, len: number) => !isWordChar(f[index - 1]) && !isWordChar(f[index + len]);
+    for (const t of deny) {
+      if (t.kind === 'regex') {
+        for (const m of matchTerms(spaced, [t])) hits.push({ kind: 'deny-joined', value: m.match, term: m.term });
+        continue;
+      }
+      for (const m of matchTerms(spaced, [t])) if (ok(m.index, m.match.length)) hits.push({ kind: 'deny-joined', value: m.match, term: m.term });
+      // un span por letra o por palabra: sin espacios; el limite de palabra se mira en el texto con espacios
+      if (!t.squashed || t.squashed.length < SQUASH_MIN) continue;
+      const map: number[] = []; // posicion en `f` de cada caracter de `g`
+      let g = '';
+      for (let i = 0; i < f.length; i++) if (!/\s/.test(f[i]!)) { g += f[i]; map.push(i); }
+      for (let i = g.indexOf(t.squashed); i >= 0; i = g.indexOf(t.squashed, i + t.squashed.length)) {
+        const start = map[i]!, end = map[i + t.squashed.length - 1]! + 1;
+        if (ok(start, end - start)) hits.push({ kind: 'deny-joined', value: t.squashed, term: t.raw });
+      }
+    }
+    for (const h of scanText(spaced, [], allow, { phones: false, domains: opts.domains })) hits.push(h);
   }
   return hits;
 }

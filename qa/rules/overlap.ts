@@ -24,8 +24,8 @@ export const overlapRule: Rule = {
         if (reported.has(key)) continue;
         reported.add(key);
         out.push({
-          rule: 'overlap', severity: Math.max(a.motion ?? 0, b.motion ?? 0) > thresholds.motion.px ? 'info' : 'error', frame,
-          message: `dos textos se pisan (${Math.round(best * 100)}% del menor)`,
+          rule: 'overlap', severity: Math.max(a.motion ?? 0, b.motion ?? 0) > thresholds.motion.crossPx ? 'info' : 'error', frame,
+          message: `dos textos se pisan (${Math.round(best * 100)}% del menor)${Math.max(a.motion ?? 0, b.motion ?? 0) > thresholds.motion.crossPx ? '; uno de los dos se mueve entre cuadros: se cruzan en una transicion' : ''}`,
           element: describe(a), other: describe(b), data: { ratio: Math.round(best * 100) / 100 },
         });
       }

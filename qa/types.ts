@@ -74,13 +74,14 @@ export type Finding = {
 
 export type Thresholds = {
   clip: { tolerancePx: number; minHiddenFraction: number; minOpacity: number; maxFrames: number };
-  offscreen: { tolerancePx: number; minOpacity: number; maxFrames: number; slipPct: number };
+  offscreen: { tolerancePx: number; minOpacity: number; maxFrames: number; slipPct: number; /** Rebaba (px) que, con la cámara en movimiento, se informa como info. */ sliverPx: number; /** Desplazamiento mínimo (px) entre cuadros para decir que la cámara se mueve. */ cameraPx: number };
   'safe-area': { margin: number; minOpacity: number };
   overlap: { ratio: number; minOpacity: number; inkHeight: number; maxFrames: number };
   'min-size': { minPx1080: number; minOpacity: number; tolerancePx: number };
   contrast: { error: number; warn: number; largePx1080: number; minOpacity: number };
   covered: { minOpacity: number; maxCoverFraction: number; hiddenFully: number };
-  motion: { px: number };
+  /** `px`: movimiento que baja a info los recortes del cuadro y el tamaño; `crossPx` (menor): movimiento con el que dos elementos que se cruzan (superposición, tapado, contraste) son una transición. */
+  motion: { px: number; crossPx: number };
 };
 
 export type RuleContext = { frame: number; width: number; height: number; runs: TextRun[]; thresholds: Thresholds };

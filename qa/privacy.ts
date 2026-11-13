@@ -1,7 +1,7 @@
 import { readdirSync, readFileSync, realpathSync, statSync } from 'node:fs';
 import { basename, extname, join, relative } from 'node:path';
 import { collectAllText } from './page';
-import { collectStrings, parseTermList, scanText, type Hit, type Term } from './privacyCore';
+import { collectStrings, parseTermList, scanJoined, scanText, type Hit, type Term } from './privacyCore';
 import { sampleFrames, type SampleSpec } from './sampling';
 import { openSession, sceneFrames } from './session';
 import type { FormatName } from '../engine';
@@ -84,18 +84,22 @@ export async function runPrivacy(o: PrivacyOptions): Promise<PrivacyResult> {
       for (const f of frames) {
         await vp.setFrame(f);
         const all = await collectAllText(vp);
+        const seen = new Set<string>(); // terminos ya encontrados en un nodo suelto de este cuadro
         for (const t of all.nodes) {
           scannedTexts++;
-          for (const h of scanText(t, deny, allow)) add(h, 'pantalla', ctx(t, h.value), f);
+          for (const h of scanText(t, deny, allow)) {
+            if (h.kind === 'deny') seen.add(h.term!);
+            add(h, 'pantalla', ctx(t, h.value), f);
+          }
         }
-        // texto por bloque / escenario completo: atrapa lo armado con spans; sin telefonos (los numeros de bloques vecinos se pegarian)
+        // texto por bloque / escenario completo: atrapa lo armado con spans (una letra o una palabra por elemento). Sin cruzar bloques,
+        // con limite de palabra al empezar y terminar, y como tipo aparte (`deny-joined`); sin telefonos
         for (const t of all.joined) {
           scannedTexts++;
-          for (const h of scanText(t, deny, allow, { phones: false })) add(h, 'pantalla', ctx(t, h.value), f);
-        }
-        for (const t of all.squashed) {
-          scannedTexts++;
-          for (const h of scanText(t, deny, allow, { squash: true })) add(h, 'pantalla', ctx(t, h.value), f);
+          for (const h of scanJoined(t, deny, allow)) {
+            if (h.kind === 'deny-joined' && seen.has(h.term!)) continue;
+            add(h, 'pantalla', ctx(t.replace(/[\u0001\u0002]+/g, ' '), h.value), f);
+          }
         }
       }
     } finally {

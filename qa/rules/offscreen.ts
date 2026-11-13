@@ -4,6 +4,8 @@ import type { Finding, Rule } from '../types';
 /**
  * Text partly outside the frame. The decision, spelled out in every message:
  *  - info:  the text is moving between neighbouring frames (camera pan/zoom or a flying card): it is on its way in or out.
+ *  - info:  a sliver (<= `sliverPx`) under a camera/zoom that is moving (the text shifts more than `cameraPx` between neighbouring
+ *           frames): the framing settles by itself. The same sliver with a still camera stays an error.
  *  - error: not under a camera/zoom (it spills over the frame edge), or a small sliver (<= `slipPct` %) under a camera, or it
  *           APPEARS/fades while cropped (the camera is still: the viewer sees text pop in already cut).
  *  - warn:  under a camera/zoom, still and steady, cropped more than `slipPct` %: framing (the camera holds on a part of a larger layout).
@@ -35,6 +37,9 @@ export const offscreenRule: Rule = {
         if (moving) {
           severity = 'info';
           why = 'info porque el texto se mueve entre cuadros (camara o transicion): entra o sale del cuadro';
+        } else if (r.transformed && px <= t.sliverPx && (r.motion ?? 0) > t.cameraPx) {
+          severity = 'info';
+          why = `info porque es una rebaba de ${Math.round(px)}px (<= ${t.sliverPx}px) y la camara se mueve (el texto se desplaza ${(r.motion ?? 0).toFixed(1)}px entre cuadros): el encuadre se acomoda solo. Con la camara quieta seria un error`;
         } else if (!r.transformed) {
           severity = 'error';
           why = 'error porque no hay camara/zoom que lo explique: el texto desborda el borde del cuadro. Arreglo: moverlo adentro (o achicarlo o acortarlo)';

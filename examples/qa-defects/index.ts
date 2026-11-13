@@ -7,5 +7,5 @@ export default defineVideo({
   fps: 30,
   width: 1280,
   height: 720,
-  durationInFrames: 26,
+  durationInFrames: 57,
 });

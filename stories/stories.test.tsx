@@ -2,15 +2,15 @@ import React from "react";
 import { renderToString } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 import { FrameProvider, createStage, defineVideo } from "../engine";
-import { ThemeProvider, dark, neutral } from "../themes";
+import { ThemeProvider, dark, neutral, useTheme } from "../themes";
 import type { Theme } from "../themes";
 import { demoScenes, spec as demoSpec, storyDemo } from "../examples/story-demo/StoryDemo";
 import {
-  CLOSING_FRAMES, Closing, INTERLUDE_FRAMES, Interlude, OPENING_FRAMES, Opening, budgetFromScenes, composeStory, defineStory, fitText, formatStoryBudget, storyBudget, useTopic, TopicHeadline, validateSpec,
+  CLOSING_FRAMES, Closing, DefaultThumbnail, INTERLUDE_COMPACT_FRAMES, INTERLUDE_FRAMES, InterludeCompact, MIN_COMPACT_FRAMES, Interlude, OPENING_FRAMES, Opening, budgetFromScenes, composeStory, defineStory, fitText, formatStoryBudget, storyBudget, useTopic, TopicHeadline, validateSpec,
 } from "./index";
 import type { StorySpec, TopicScene } from "./index";
 import { TopicContext } from "./topic";
-import { closingWall, labelAt, listLayout, panelEntryLift, panelLayout, panelRects, pillBudget, reservedSlots, textWidth } from "./layout";
+import { closingCamStart, closingWall, labelAt, listLayout, panelEntryLift, panelLayout, panelRects, pillBudget, reservedSlots, textWidth } from "./layout";
 
 const config = { fps: 30, width: 1920, height: 1080, durationInFrames: 1000 };
 const html = (node: React.ReactNode, theme: Theme, frame: number) =>
@@ -216,7 +216,7 @@ describe("no hard-coded colours leak (sentinel theme)", () => {
   });
   it("sentinel colours actually show up", () => {
     const out = html(<Closing spec={specN(3)} scenes={scenesN(3)} />, sentinel, 150);
-    for (const needle of [C(11), C(31), C(61), C(141), "SentinelFont"]) expect(out).toContain(needle);
+    for (const needle of [C(11), C(31), "61, 62, 63", C(121), C(141), "SentinelFont"]) expect(out).toContain(needle); // el acento puede venir con alfa (rgba)
   });
 });
 
@@ -431,5 +431,134 @@ describe("escena sola (fuera de composeStory)", () => {
     const out = alone(<TopicContext.Provider value={{ index: 2, name: "Atención", line: "x" }}><TopicHeadline /></TopicContext.Provider>);
     expect(out).toContain("Atención");
     expect(out).toContain("03");
+  });
+});
+
+describe("defineStory: el tema como nombre o como objeto, y por props", () => {
+  // La historia completa SIN ThemeProvider afuera: el tema lo pone defineStory.
+  const scenes: TopicScene[] = [0, 1].map((i) => ({
+    id: `th${i}`, durationInFrames: 100,
+    component: () => { const t = useThemeSentinel(); return <span style={{ color: t.color.text }}>x</span>; },
+  }));
+  const frameHtml = (def: ReturnType<typeof defineStory>, props: object, frame: number) =>
+    renderToString(<FrameProvider frame={frame} config={{ ...config, durationInFrames: def.durationInFrames }}><def.component {...(def.defaultProps ?? {})} {...props} /></FrameProvider>);
+  const every = (def: ReturnType<typeof defineStory>, props: object = {}) => {
+    const { timeline } = composeStory(specN(2), scenes);
+    return timeline.map((e) => ({ kind: e.kind, out: frameHtml(def, props, e.from + Math.min(40, e.durationInFrames - 1)) }));
+  };
+  it("un objeto Theme se usa en la apertura, la vuelta, el cierre y dentro de las escenas (no cae al neutro)", () => {
+    const def = defineStory({ id: "story-theme-object", spec: specN(2), scenes, theme: sentinel });
+    expect(def.defaultProps).toEqual({});
+    for (const { kind, out } of every(def)) {
+      expect(out, kind).toContain("SentinelFont");
+      expect(out, kind).toContain("rgb(1, 2, 3)"); // fondo del tema
+      expect(out, kind).not.toContain(neutral.font.family);
+    }
+    expect(every(def).find((e) => e.kind === "topic")!.out).toContain(C(31)); // el color de texto que usa la propia escena
+  });
+  it("--props '{\"theme\":\"dark\"}' pisa el objeto en el render", () => {
+    const def = defineStory({ id: "story-theme-object-2", spec: specN(2), scenes, theme: sentinel });
+    for (const { kind, out } of every(def, { theme: "dark" })) {
+      expect(out, kind).not.toContain("SentinelFont");
+      expect(out, kind).toContain(dark.font.family.replace(/"/g, "&quot;"));
+    }
+  });
+  it("un nombre sigue funcionando: por defecto y por props", () => {
+    const def = defineStory({ id: "story-theme-name", spec: specN(2), scenes, theme: "dark" });
+    expect(def.defaultProps).toEqual({ theme: "dark" });
+    for (const { out } of every(def)) expect(out).toContain(dark.color.bg);
+    for (const { out } of every(def, { theme: "neutral" })) expect(out).toContain(neutral.color.bg);
+  });
+});
+function useThemeSentinel() { return useTheme(); }
+
+describe("vuelta compacta (interludes: \"compact\")", () => {
+  it("dura 40 cuadros por defecto (<= 45), se cambia con timing.interludeCompact (mínimo 24) y la línea de tiempo la usa", () => {
+    expect(INTERLUDE_COMPACT_FRAMES).toBeLessThanOrEqual(45);
+    const { timeline, durationInFrames } = composeStory(specN(3), scenesN(3), { interludes: "compact" });
+    expect(timeline.filter((e) => e.kind === "interlude").map((e) => e.durationInFrames)).toEqual([40, 40, 40]);
+    expect(durationInFrames).toBe(OPENING_FRAMES + CLOSING_FRAMES + 3 * 40 + scenesN(3).reduce((a, s) => a + s.durationInFrames, 0));
+    const custom = composeStory(specN(2, { timing: { interludeCompact: 30 } }), scenesN(2), { interludes: "compact" });
+    expect(custom.timeline.find((e) => e.kind === "interlude")!.durationInFrames).toBe(30);
+    expect(() => validateSpec(specN(2, { timing: { interludeCompact: MIN_COMPACT_FRAMES - 1 } }))).toThrow(/>= 24/);
+    expect(() => validateSpec(specN(2, { timing: { interludeCompact: MIN_COMPACT_FRAMES } }))).not.toThrow();
+  });
+  it("el presupuesto la cuenta (duración y mínimo) y coincide con la línea de tiempo real y con --list-scenes", () => {
+    const spec = specN(3);
+    const scenes = scenesN(3);
+    const b = storyBudget(spec, scenes, { interludes: "compact" });
+    expect(b.interlude).toMatchObject({ frames: 40, count: 3, min: 24, compact: true });
+    expect(b.total).toBe(composeStory(spec, scenes, { interludes: "compact" }).durationInFrames);
+    expect(b.minTotal).toBe(60 * 2 + 24 * 3 + scenes.reduce((a, s) => a + s.durationInFrames, 0));
+    expect(formatStoryBudget(b)).toMatch(/vueltas compactas ×3/);
+    const fromScenes = budgetFromScenes(composeStory(spec, scenes, { interludes: "compact" }).timeline, 30)!;
+    expect(fromScenes.interlude).toMatchObject({ compact: true, min: 24 });
+    expect(fromScenes.total).toBe(b.total);
+    expect(storyBudget(spec, scenes).interlude.compact).toBe(false);
+  });
+  it("se dibuja en los tres formatos con nombres de 40 caracteres, solo con valores del tema, de 2 a 6 temas", () => {
+    const name = "Armar el itinerario entre todos ahora ya";
+    expect(name.length).toBe(40);
+    for (const [w, h] of [[1920, 1080], [1080, 1920], [1080, 1080]] as const) {
+      for (let n = 2; n <= 6; n++) {
+        const s = specN(n, { topics: Array.from({ length: n }, (_, i) => ({ id: `t${i}`, name, line: "x" })) });
+        for (let d = 1; d <= n; d++) {
+          for (const f of [0, 5, 12, 20, 33, 39]) {
+            const out = renderToString(<FrameProvider frame={f} config={{ ...config, width: w, height: h }}><ThemeProvider theme={sentinel}><InterludeCompact spec={s} done={d} /></ThemeProvider></FrameProvider>);
+            assertThemed(out);
+          }
+        }
+      }
+    }
+  });
+  it("muestra el tema visto y el que sigue (y el resumen al final)", () => {
+    const s = specN(3);
+    const out = (d: number) => html(<InterludeCompact spec={s} done={d} />, neutral, 30);
+    expect(out(1)).toContain("Tema número 1");
+    expect(out(1)).toContain("Tema número 2");
+    expect(out(3)).toContain("Sigue el resumen");
+  });
+});
+
+describe("cierre: despedida, miniatura por defecto y píldoras largas", () => {
+  it("signoff.slot reemplaza al logo y se dibuja; sin marca la despedida usa h1 y lleva la barra de degradado", () => {
+    const s = specN(3, { signoff: { text: "Hasta la próxima", slot: <b data-x="sello">sello</b> } });
+    const withSlot = html(<Closing spec={s} scenes={scenesN(3)} />, neutral, 470);
+    expect(withSlot).toContain("sello");
+    const bare = html(<Closing spec={specN(3)} scenes={scenesN(3)} />, neutral, 470);
+    expect(bare).toContain(`font-size:${neutral.type.h1}px`);
+    expect(withSlot).toContain(`font-size:${neutral.type.h2}px`);
+  });
+  it("la miniatura por defecto es distinta por tema (número, composición y color) y no usa valores fijos", () => {
+    const thumbs = [0, 1, 2, 3, 4, 5].map((i) => html(<DefaultThumbnail index={i} name={`Tema ${i}`} />, sentinel, 10));
+    expect(new Set(thumbs).size).toBe(6);
+    for (const t of thumbs) assertThemed(t);
+    // mismo índice y nombre: mismo resultado (función pura)
+    expect(html(<DefaultThumbnail index={2} name="Tema 2" />, sentinel, 99)).toBe(thumbs[2]);
+    // las cuatro composiciones difieren en estructura, no solo en color
+    const shapes = thumbs.slice(0, 4).map((t) => t.replace(/rgb\(\d+, \d+, \d+\)/g, "C").replace(/\d+(\.\d+)?/g, "0"));
+    expect(new Set(shapes).size).toBe(4);
+  });
+  it("nombres de 40 caracteres: cada píldora (con la cámara inicial) entra en el cuadro en los tres formatos, de 2 a 6 temas", () => {
+    const name = "Armar el itinerario entre todos ahora ya";
+    for (const theme of [neutral, dark]) {
+      for (const [fmt, w, h] of [["horizontal", 1920, 1080], ["vertical", 1080, 1920], ["cuadrado", 1080, 1080]] as const) {
+        for (let n = 2; n <= 6; n++) {
+          const p = panelLayout(n, w, h);
+          const names = p.map(() => name);
+          const s0 = closingCamStart(p, theme, names, w, h);
+          expect(s0, `${fmt} n=${n}`).toBeGreaterThan(0.5);
+          expect(s0).toBeLessThanOrEqual(1.1);
+          p.forEach((c, i) => {
+            const { pill, panel } = panelRects(c, theme, name, pillBudget(p, i, w));
+            const z = (x: number, o: number) => o + (x - o) * s0;
+            expect(z(pill.y, h / 2), `${fmt} n=${n} píldora ${i + 1} arriba`).toBeGreaterThanOrEqual(0);
+            expect(z(pill.x, w / 2), `${fmt} n=${n} píldora ${i + 1} izquierda`).toBeGreaterThanOrEqual(0);
+            expect(z(pill.x + pill.w * 1.12 - (pill.w * 0.12) / 2, w / 2), `${fmt} n=${n} píldora ${i + 1} derecha`).toBeLessThanOrEqual(w);
+            expect(z(panel.y + panel.h, h / 2)).toBeLessThanOrEqual(h);
+          });
+        }
+      }
+    }
   });
 });

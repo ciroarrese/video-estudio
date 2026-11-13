@@ -59,7 +59,7 @@ export function InterludeCompact({ spec, done }: { spec: StorySpec; done: number
         <div style={{ textAlign: "center", opacity: nextIn, transform: `translateY(${Math.round((1 - nextIn) * 14)}px)`, color: theme.color.textMuted, fontSize: theme.type.body }}>
           {nextFit ? (
             <>
-              <div style={{ fontSize: theme.type.eyebrow, letterSpacing: "0.08em", textTransform: "uppercase", fontWeight: theme.font.weights.medium }}>{`Sigue · ${done + 1} de ${n}`}</div>
+              <div style={{ fontSize: theme.type.caption * 0.9, letterSpacing: "0.08em", textTransform: "uppercase", fontWeight: theme.font.weights.medium }}>{`Sigue · ${done + 1} de ${n}`}</div>
               <div style={{ fontSize: nextFit.size, color: theme.color.text, fontWeight: theme.font.weights.medium, marginTop: 6, whiteSpace: "nowrap" }}>{nextFit.text}</div>
             </>
           ) : (

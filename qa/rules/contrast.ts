@@ -18,7 +18,8 @@ export const isLargeText = (screenPx: number, bold: boolean, shortSide: number, 
 export const toRgb = (c: { r: number; g: number; b: number }) => `rgb(${c.r},${c.g},${c.b})`;
 
 const STILL_PX = 1;
-const STILL_FADE = 0.02;
+/** Cambio de opacidad por cuadro con el que el texto ya no es "quieto": el tramo final de un fundido con easing cambia menos de 0.02 por cuadro, pero nunca 0 (un texto quieto da exactamente 0). */
+const STILL_FADE = 0.003;
 /** Cambio minimo de opacidad del velo entre cuadros vecinos para decir que esta cruzando. */
 const VEIL_FADE = 0.02;
 
@@ -56,10 +57,14 @@ export const contrastRule: Rule = {
       // mezclado con el de atras y el texto tambien, asi que el cuadro es una transicion, no un defecto. Un panel quieto sigue juzgandose.
       const surfaceFading = !!r.fadingBg && (r.fade ?? 0) > STILL_FADE;
       if (surfaceFading) sev = 'info';
+      // Texto en movimiento (una tarjeta que vuela, un titular que entra): el fondo que tiene debajo cambia de un cuadro al siguiente, asi que
+      // el cuadro es parte de una transicion. Quieto sigue juzgandose (un texto fijo con mal contraste es un defecto).
+      const crossing = (r.motion ?? 0) > thresholds.motion.crossPx;
+      if (crossing) sev = 'info';
       seen.add(r.elId);
       out.push({
         rule: 'contrast', severity: sev, frame,
-        message: `contraste ${ratio.toFixed(2)}:1 (${ratio < t.error ? `minimo ${t.error}` : `recomendado ${t.warn}`}:1)${r.opacity < t.minOpacity ? ` con opacidad ${r.opacity.toFixed(2)} (muy tenue)` : still && r.opacity < 0.99 ? ` con opacidad ${r.opacity.toFixed(2)} (quieto, se juzga como se ve)` : ''} ${r.color} sobre ${toRgb(r.bg)}${surfaceFading ? '; el texto y la superficie de su fondo estan en fundido a la vez: transicion, no se juzga' : ''}${veilCrossing ? `; bajo un velo de cuadro completo que cruza (opacidad ${r.veil!.opacity.toFixed(2)}, cambia ${(r.veil!.fade ?? 0).toFixed(2)} por cuadro): transicion, no se juzga` : r.veil ? `; bajo un velo de cuadro completo QUIETO (opacidad ${r.veil.opacity.toFixed(2)}): el texto se ve asi; aclarar el velo, subir el contraste o quitarlo` : ''}`,
+        message: `contraste ${ratio.toFixed(2)}:1 (${ratio < t.error ? `minimo ${t.error}` : `recomendado ${t.warn}`}:1)${r.opacity < t.minOpacity ? ` con opacidad ${r.opacity.toFixed(2)} (muy tenue)` : still && r.opacity < 0.99 ? ` con opacidad ${r.opacity.toFixed(2)} (quieto, se juzga como se ve)` : ''} ${r.color} sobre ${toRgb(r.bg)}${crossing ? '; el texto se mueve entre cuadros (transicion), no se juzga' : ''}${surfaceFading ? '; el texto y la superficie de su fondo estan en fundido a la vez: transicion, no se juzga' : ''}${veilCrossing ? `; bajo un velo de cuadro completo que cruza (opacidad ${r.veil!.opacity.toFixed(2)}, cambia ${(r.veil!.fade ?? 0).toFixed(2)} por cuadro): transicion, no se juzga` : r.veil ? `; bajo un velo de cuadro completo QUIETO (opacidad ${r.veil.opacity.toFixed(2)}): el texto se ve asi; aclarar el velo, subir el contraste o quitarlo` : ''}`,
         element: describe(r), data: { ratio: Math.round(ratio * 100) / 100 },
       });
     }

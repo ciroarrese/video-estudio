@@ -14,11 +14,11 @@ import { ALL_RULES, type Finding, type RuleId } from './types';
 
 const USAGE = {
   sheet: `Uso: ve-sheet <videoId> [--frames 0,60,120 | --every N | --count 12] [--props json] [--format horizontal|vertical|cuadrado] [--scene id|índice] [--list-scenes]
-             [--cols 4] [--scale 0.25] [--out out/<id>-sheet.png] [--no-labels]`,
-  qa: `Uso: ve-qa <videoId> [--frames 0,60,120 | --every N | --count 24] [--props json] [--format horizontal|vertical|cuadrado] [--scene id|índice] [--list-scenes] [--json salida.json] [--fail-on error|warn] [--verbose] [--max 40]
+             [--cols 4] [--scale 0.25] [--out out/<id>[-<formato>]-sheet.png] [--no-labels]   (--out acepta cualquier ruta, se crean las carpetas)`,
+  qa: `Uso: ve-qa <videoId> [--frames 0,60,120 | --every N | --count 24] [--props json] [--format horizontal|vertical|cuadrado] [--scene id|índice] [--list-scenes] [--json salida.json | --out salida.json] [--fail-on error|warn] [--verbose] [--max 40]
              [--rules clip,overlap,...] [--skip regla,...] [--set regla.umbral=valor]... [--concurrency N]
 Reglas: ${ALL_RULES.join(', ')}  (silenciar: data-qa-ignore="regla" en el elemento o un ancestro)`,
-  privacy: `Uso: ve-privacy [<videoId>] --deny lista.txt [--allow lista.txt] [--frames … | --every N | --count 24] [--props json] [--format …] [--scene id|índice] [--scan-source dir]... [--json salida.json]`,
+  privacy: `Uso: ve-privacy [<videoId>] --deny lista.txt [--allow lista.txt] [--frames … | --every N | --count 24] [--props json] [--format …] [--scene id|índice] [--scan-source dir]... [--json salida.json | --out salida.json]`,
 };
 
 const sample = (p: Parsed) => ({ frames: one(p, 'frames'), every: num(p, 'every'), count: num(p, 'count') });
@@ -73,6 +73,15 @@ function printQa(findings: Finding[], sampled: number[], o: { verbose: boolean; 
   if (more) console.log(`\n… ${more} más (--max N o --verbose)`);
 }
 
+/** Escribe el informe JSON (`--out` o `--json`, cualquier ruta; crea las carpetas) y dice dónde quedó. */
+function writeReport(out: string | undefined, data: unknown) {
+  if (!out) return;
+  const abs = resolve(out);
+  mkdirSync(dirname(abs), { recursive: true });
+  writeFileSync(abs, JSON.stringify(data, null, 2));
+  console.log(`informe: ${abs}`);
+}
+
 async function main(cmd: string, argv: string[]): Promise<number> {
   const usage = USAGE[cmd as keyof typeof USAGE];
   if (!usage) throw new Error(`Comando desconocido: ${cmd}`);
@@ -121,11 +130,7 @@ async function main(cmd: string, argv: string[]): Promise<number> {
     const s = r.summary;
     const per = Object.entries(s.byRule).map(([k, v]) => `${k}=${v}`).join(' ') || 'ninguno';
     console.log(`\n${id}: ${s.frames.length} cuadros revisados en ${s.seconds}s; ${s.errors} errores, ${s.warnings} avisos, ${s.infos} info${p.bools.has('verbose') ? '' : ' (ocultos; --verbose)'} (${per})`);
-    const out = one(p, 'json');
-    if (out) {
-      mkdirSync(dirname(resolve(out)), { recursive: true });
-      writeFileSync(out, JSON.stringify(r, null, 2));
-    }
+    writeReport(one(p, 'out') ?? one(p, 'json'), r);
     return failsAt(r, failOn) ? 1 : 0;
   }
 
@@ -139,14 +144,11 @@ async function main(cmd: string, argv: string[]): Promise<number> {
     videoId: id, props, format, scene, ...sample(p), deny: readFileSync(denyFile, 'utf8'), allow: allowFile ? readFileSync(allowFile, 'utf8') : '', scanSource: dirs, skipFiles: [denyFile, ...(allowFile ? [allowFile] : [])], log,
   });
   for (const f of r.findings) {
-    console.log(`${f.kind.toUpperCase().padEnd(6)} "${f.value}"${f.term ? ` (termino: ${f.term})` : ''}  en ${f.where}${f.frames ? ` cuadros ${f.frames.join(',')}` : ''}\n       ...${f.context}...`);
+    console.log(`${f.kind.toUpperCase().padEnd(11)} "${f.value}"${f.term ? ` (termino: ${f.term})` : ''}  en ${f.where}${f.frames ? ` cuadros ${f.frames.join(',')}` : ''}\n       ...${f.context}...`);
+    if (f.kind === 'deny-joined') console.log('       (solo aparece al juntar textos de elementos o letras sueltas de la misma linea: no esta en ningun nodo de texto entero; si en pantalla se lee como dos cosas distintas, es un falso positivo: ajustar la lista o usar --allow)');
   }
   console.log(`\nprivacidad: ${r.ok ? 'OK' : `FALLO (${r.findings.length} hallazgos)`}; ${r.scannedTexts} textos, ${r.scannedFiles} archivos, ${r.frames.length} cuadros`);
-  const out = one(p, 'json');
-  if (out) {
-    mkdirSync(dirname(resolve(out)), { recursive: true });
-    writeFileSync(out, JSON.stringify(r, null, 2));
-  }
+  writeReport(one(p, 'out') ?? one(p, 'json'), r);
   return r.ok ? 0 : 1;
 }
 

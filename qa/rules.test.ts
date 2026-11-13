@@ -280,3 +280,31 @@ describe('thresholds', () => {
     expect(() => parseOverrides(['bad'])).toThrow();
   });
 });
+
+describe('transiciones con movimiento lento y fundidos al final del easing', () => {
+  const rect = { x: 1700, y: 300, w: 240, h: 40 }; // sobresale 20 px
+  const sliver = { x: 1700, y: 300, w: 224, h: 40 }; // sobresale 4 px
+  it('offscreen: una rebaba chica bajo camara en movimiento es info; con la camara quieta, error; una grande en movimiento lento, sigue el criterio de antes', () => {
+    expect(check([run({ rect: sliver, transformed: true, motion: 3 })], ['offscreen'])[0]!.severity).toBe('info');
+    expect(check([run({ rect: sliver, transformed: true, motion: 0 })], ['offscreen'])[0]!.severity).toBe('error');
+    expect(check([run({ rect: sliver, transformed: false, motion: 3 })], ['offscreen'])[0]!.severity).toBe('error'); // sin camara no hay excusa
+    expect(check([run({ rect, transformed: true, motion: 3 })], ['offscreen'])[0]!.severity).not.toBe('info');
+  });
+  it('overlap y covered: un elemento que se mueve mas de motion.crossPx (menos que motion.px) es una transicion', () => {
+    const a = { x: 100, y: 100, w: 300, h: 40 };
+    const pair = (motion: number) => check([run({ rect: a, motion }), run({ rect: a, motion: 0 })], ['overlap'])[0]!.severity;
+    expect(pair(6)).toBe('info');
+    expect(pair(0)).toBe('error');
+    const cover = (motion: number) => ({ id: 99, key: 'c', tag: 'div', testid: 'c', text: '', rect: a, ignore: [], motion });
+    expect(check([run({ rect: a, cover: cover(6), motion: 0 })], ['covered'])[0]!.severity).toBe('info');
+    expect(check([run({ rect: a, cover: cover(0), motion: 0 })], ['covered'])[0]!.severity).toBe('error');
+  });
+  it('contrast: texto en movimiento es info; quieto, error; un fundido lento (0.01 por cuadro) se juzga por su color, no por la opacidad compuesta', () => {
+    const bad = { color: 'rgba(210,210,210,1)', bg: { r: 242, g: 242, b: 242, samples: 9 } };
+    expect(check([run({ ...bad, motion: 8 })], ['contrast'])[0]!.severity).toBe('info');
+    expect(check([run({ ...bad, motion: 0, fade: 0 })], ['contrast'])[0]!.severity).toBe('error');
+    const gray = { color: 'rgba(107,107,107,1)', bg: { r: 255, g: 255, b: 255, samples: 9 }, opacity: 0.5 };
+    expect(check([run({ ...gray, motion: 0, fade: 0 })], ['contrast'])[0]!.severity).toBe('error');
+    expect(check([run({ ...gray, motion: 0, fade: 0.01 })], ['contrast'])).toEqual([]);
+  });
+});
