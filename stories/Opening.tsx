@@ -1,8 +1,8 @@
 import { Easing, useFrame, useVideoConfig } from "../engine";
-import { Stage, Wash, World, cameraAt, kf, zoomThrough } from "../kit";
+import { Wash, World, cameraAt, kf, zoomThrough } from "../kit";
 import { useTheme, withAlpha } from "../themes";
 import { fitText, listLayout, openingWall, rigTransform } from "./layout";
-import { Chip, HeadlineRow, HighlightedTitle, scaler, useEase } from "./shared";
+import { Chip, HeadlineRow, HighlightedTitle, StoryStage, scaler, useEase } from "./shared";
 import type { StorySpec } from "./types";
 
 export const OPENING_FRAMES = 300;
@@ -24,7 +24,7 @@ export function Opening({ spec }: { spec: StorySpec }) {
   const u = scaler(dur, OPENING_FRAMES);
   const n = spec.topics.length;
   const L = listLayout(spec, theme, width, height);
-  const wall = openingWall(spec, height);
+  const wall = openingWall(spec, height, width);
   const cx = width / 2, cy = height / 2;
 
   const gap = Math.min(16, 64 / n) * (dur / OPENING_FRAMES);
@@ -55,7 +55,7 @@ export function Opening({ spec }: { spec: StorySpec }) {
   const othersOut = kf(f, [T.fly[0] - u(6), T.fly[0] + u(14)], [1, 0]);
 
   return (
-    <Stage frame={f}>
+    <StoryStage frame={f}>
       <div style={{ position: "absolute", inset: 0, zIndex: 0, opacity: wallFade }}>
         {wall.map((c, i) => {
           const lit = kf(f, [u(c.on), u(c.on) + 3], [0, 1], Easing.linear);
@@ -66,7 +66,7 @@ export function Opening({ spec }: { spec: StorySpec }) {
             <div
               key={i}
               data-qa-ignore="min-size contrast overlap covered offscreen safe-area"
-              style={{ position: "absolute", left: 0, top: 0, transformOrigin: "0 0", transform: rigTransform(c.x, c.y, c.z, rig, WALL_P, cx, cy, " translate(-50%, -50%)"), zIndex: 1000 + c.z, opacity: appear, filter: blur > 0 ? `blur(${blur}px)` : undefined }}
+              style={{ position: "absolute", left: 0, top: 0, transformOrigin: "0 0", transform: rigTransform(c.x, c.y, c.z, rig, WALL_P, cx, cy, `${c.k === 1 ? "" : ` scale(${c.k})`} translate(-50%, -50%)`), zIndex: 1000 + c.z, opacity: appear, filter: blur > 0 ? `blur(${blur}px)` : undefined }}
             >
               <Chip text={c.text} lit={lit} pop={pop} />
             </div>
@@ -120,6 +120,6 @@ export function Opening({ spec }: { spec: StorySpec }) {
       </World>
 
       <Wash range={[T.fly[1] - u(16), T.fly[1] - u(2)]} />
-    </Stage>
+    </StoryStage>
   );
 }

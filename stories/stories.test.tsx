@@ -308,7 +308,7 @@ describe("formatos vertical y cuadrado", () => {
         for (const c of inner) for (const s of slots) expect(Math.abs(c.x - s.x) < 480 && Math.abs(c.y - s.y) < 120).toBe(false);
         const L = listLayout(specN(n), neutral, w, h);
         expect(L.left).toBeGreaterThanOrEqual(0);
-        expect(L.left + L.rowW).toBeLessThanOrEqual(w - neutral.safe.x + 1);
+        expect(L.left + L.rowW).toBeLessThanOrEqual(w - (h / w > 1.3 ? w * 0.08 : neutral.safe.x) + 1); // en vertical la lista usa más ancho que el seguro
         expect(L.top + n * L.rowH).toBeLessThanOrEqual(h);
       }
     }

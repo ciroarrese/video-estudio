@@ -1,8 +1,8 @@
 import { Easing, useFrame, useVideoConfig } from "../engine";
-import { GradientText, Stage, Wash, World, cameraAt, kf, zoomThrough } from "../kit";
+import { GradientText, Wash, World, cameraAt, kf, zoomThrough } from "../kit";
 import { useTheme, withAlpha } from "../themes";
 import { listLayout } from "./layout";
-import { CheckMark, HeadlineRow, scaler, useEase } from "./shared";
+import { CheckMark, HeadlineRow, StoryStage, scaler, useEase } from "./shared";
 import type { StorySpec } from "./types";
 
 /** Opacidad de las filas ya vistas (el resto del texto atenuado llega al contraste mínimo con ella). */
@@ -39,7 +39,7 @@ export function Interlude({ spec, done }: { spec: StorySpec; done: number }) {
   const others = next >= 0 ? 1 - kf(f, [T.fly[0] - u(6), T.fly[0] + u(12)], [0, 1]) : 1;
 
   return (
-    <Stage frame={f}>
+    <StoryStage frame={f}>
       <World camera={cam} width={width} height={height}>
         <div style={{ position: "absolute", left: 0, top: 0, opacity: appear * (1 - end) }}>
           {spec.topics.map((_, i) => {
@@ -86,6 +86,6 @@ export function Interlude({ spec, done }: { spec: StorySpec; done: number }) {
         </div>
       </World>
       {next >= 0 && <Wash range={[T.fly[1] - u(26), T.fly[1] - u(10)]} />}
-    </Stage>
+    </StoryStage>
   );
 }

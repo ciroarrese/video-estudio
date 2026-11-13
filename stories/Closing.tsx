@@ -1,8 +1,8 @@
 import { Easing, random, useFrame, useVideoConfig } from "../engine";
-import { GradientText, Stage, kf } from "../kit";
+import { GradientText, kf } from "../kit";
 import { useTheme, withAlpha } from "../themes";
 import { closingWall, fitText, panelLayout, rigProject, rigTransform } from "./layout";
-import { Chip, Logo, Pill, scaler, useEase } from "./shared";
+import { Chip, Logo, Pill, StoryStage, scaler, useEase } from "./shared";
 import type { StorySpec, TopicScene } from "./types";
 
 export const CLOSING_FRAMES = 480;
@@ -100,7 +100,7 @@ export function Closing({ spec, scenes }: { spec: StorySpec; scenes: TopicScene[
   const tagline = signLines.tagline ? fitText(signLines.tagline, Math.min(1500, signW), theme.type.body, { min: theme.type.caption, avg: 0.5, lines: 2 }) : null;
 
   return (
-    <Stage frame={f}>
+    <StoryStage frame={f}>
       {/* muro: desenfocado hasta que llegan las píldoras; con el lavado de la firma ya opaco se desmonta en vez de quedar debajo */}
       {wash < 1 && (
         <div style={{ position: "absolute", inset: 0, zIndex: 0, opacity: wallIn * (0.55 + focus * 0.45), filter: blur > 0 ? `blur(${blur}px)` : undefined }}>
@@ -190,6 +190,6 @@ export function Closing({ spec, scenes }: { spec: StorySpec; scenes: TopicScene[
           </div>
         )}
       </div>
-    </Stage>
+    </StoryStage>
   );
 }

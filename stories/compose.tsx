@@ -1,9 +1,9 @@
 import React from "react";
 import { Audio, Fill, Sequence } from "../engine";
-import { Stage } from "../kit";
 import { Closing, closingFrames } from "./Closing";
 import { Interlude, interludeFrames } from "./Interlude";
 import { Opening, openingFrames } from "./Opening";
+import { StoryStage } from "./shared";
 import { TopicContext } from "./topic";
 import { isReservedSceneId, validateSpec } from "./types";
 import type { StorySpec, TopicScene } from "./types";
@@ -68,9 +68,9 @@ export function composeStory(
             const Scene = scenes[topic]!.component;
             body = (
               <TopicContext.Provider value={{ index: topic, name: t.name, line: t.line }}>
-                <Stage>
+                <StoryStage>
                   <Scene />
-                </Stage>
+                </StoryStage>
               </TopicContext.Provider>
             );
           }

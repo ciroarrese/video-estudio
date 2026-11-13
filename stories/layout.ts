@@ -88,7 +88,84 @@ export type ListLayout = {
   lines: string[];
   /** Punto del mundo donde se atraviesa la fila `i` (sobre las primeras letras del nombre). */
   target: (i: number) => Pt;
+  /** Formato alto: la fila se apila (número arriba, nombre grande, línea en hasta 2 renglones). */
+  stacked: boolean;
+  /** Alto de la línea del número (solo apilada), separación hasta el nombre y renglones de la línea (cortados a mano). */
+  numH: number;
+  numGap: number;
+  lineRows: string[][];
+  /** Arriba y a la izquierda del subrayado dentro de la fila. */
+  barTop: number;
+  barLeft: number;
 };
+
+/** Parte un texto en renglones de a lo sumo `maxW` px (estimado sin medir); si pasa de `maxLines`, corta el último con "…". */
+export function wrapText(text: string, maxW: number, size: number, maxLines: number, avg = AVG_REG): string[] {
+  const words = text.split(/\s+/).filter(Boolean);
+  const rows: string[] = [];
+  let cur = "";
+  for (const w of words) {
+    const next = cur ? `${cur} ${w}` : w;
+    if (cur && textWidth(next, size, avg) > maxW) { rows.push(cur); cur = w; } else cur = next;
+  }
+  if (cur) rows.push(cur);
+  if (rows.length <= maxLines) return rows;
+  const kept = rows.slice(0, maxLines);
+  const last = Array.from(kept[maxLines - 1]!.replace(/[….,;]+$/, "")).join("");
+  kept[maxLines - 1] = last + "…";
+  return kept;
+}
+
+/**
+ * Lista apilada para formato vertical (alto/ancho > 1,3): ocupa casi todo el ancho y buena parte del alto. Cada fila:
+ * número (o tilde) arriba, nombre grande (~h1) y la línea debajo en hasta 2 renglones. Los tamaños salen de `theme.type`.
+ */
+function stackedLayout(spec: StorySpec, theme: Theme, width: number, height: number): ListLayout {
+  const n = spec.topics.length;
+  const marginX = Math.round(width * 0.085);
+  const region = width - 2 * marginX;
+  const H = height - 2 * Math.round(height * 0.07);
+  const GAP = { num: 14, pad: 30 };
+  const build = (sc: number) => {
+    let nameSize = Math.round(theme.type.hero * sc);
+    const floor = Math.round(Math.max(48, nameSize * 0.6));
+    for (const t of spec.topics) nameSize = Math.min(nameSize, fitText(t.name, region, nameSize, { min: floor }).size);
+    nameSize = Math.floor(nameSize);
+    const names = spec.topics.map((t) => fitText(t.name, region, nameSize, { min: nameSize }).text);
+    const base = Math.round(Math.max(30, theme.type.body * 1.15 * sc));
+    let lineSize = base;
+    // el mismo tamaño para todas: el más grande con el que cada línea entra en 2 renglones
+    for (const t of spec.topics) {
+      while (lineSize > 30 && wrapText(t.line, region, lineSize, 3).length > 2) lineSize -= 2;
+    }
+    const lineRows = spec.topics.map((t) => wrapText(t.line, region, lineSize, 2));
+    const rowsN = Math.max(...lineRows.map((r) => r.length));
+    const numSize = Math.round(Math.max(36, nameSize * 0.62));
+    const numH = Math.round(numSize * 1.1);
+    const nameH = Math.round(nameSize * 1.1);
+    const lineH = Math.round(lineSize * 1.25);
+    const blockH = numH + GAP.num + nameH + ROW_GAP.a + lineH * rowsN + ROW_GAP.b + ROW_GAP.bar;
+    return { nameSize, names, lineSize, lineRows, rowsN, numSize, numH, nameH, lineH, blockH };
+  };
+  let sc = 1;
+  let b = build(sc);
+  for (let k = 0; k < 6 && b.blockH + GAP.pad > H / n; k++) {
+    sc *= Math.max(0.5, (H / n - GAP.pad) / b.blockH);
+    b = build(sc);
+  }
+  const rowH = Math.floor(Math.min(H / n, b.blockH * 1.8));
+  const blockTop = Math.floor((rowH - b.blockH) / 2);
+  const top = Math.round((height - n * rowH) / 2);
+  const nameTop = blockTop + b.numH + GAP.num;
+  const barTop = nameTop + b.nameH + ROW_GAP.a + b.lineH * b.rowsN + ROW_GAP.b;
+  const left = marginX;
+  return {
+    left, top, rowW: region, rowH, nameSize: b.nameSize, lineSize: b.lineSize, numSize: b.numSize, numW: 0, nameH: b.nameH, lineH: b.lineH,
+    blockTop, blockH: b.blockH, barW: region, names: b.names, lines: b.lineRows.map((r) => r.join(" ")),
+    target: (i) => ({ x: left + b.nameSize * 0.8, y: top + i * rowH + nameTop + b.nameH / 2 }),
+    stacked: true, numH: b.numH, numGap: GAP.num, lineRows: b.lineRows, barTop, barLeft: 0,
+  };
+}
 
 /**
  * Lista de titulares: es lo más grande de la pantalla. Nombre ~0.8 × h1 y línea ~0.9 × body con filas de ~170 px hasta
@@ -96,6 +173,7 @@ export type ListLayout = {
  * fraccionarias de capas compuestas se rasterizan según el historial de cuadros.
  */
 export function listLayout(spec: StorySpec, theme: Theme, width: number, height: number): ListLayout {
+  if (height / width > 1.3) return stackedLayout(spec, theme, width, height);
   const n = spec.topics.length;
   const region = Math.max(600, width - 2 * theme.safe.x);
   const H = Math.max(300, height - 2 * theme.safe.y - 20);
@@ -133,6 +211,7 @@ export function listLayout(spec: StorySpec, theme: Theme, width: number, height:
   return {
     left, top, rowW, rowH, nameSize, lineSize, numSize, numW, nameH, lineH, blockTop, blockH, barW, names, lines,
     target: (i) => ({ x: left + numW + nameSize * 0.3, y: top + i * rowH + blockTop + nameH / 2 }),
+    stacked: false, numH: nameH, numGap: 0, lineRows: [], barTop: blockTop + nameH + ROW_GAP.a + lineH + ROW_GAP.b, barLeft: numW,
   };
 }
 
@@ -140,21 +219,38 @@ export function listLayout(spec: StorySpec, theme: Theme, width: number, height:
 
 export type WallChip = { x: number; y: number; text: string };
 
+/** Formato alto: el muro de la apertura es más denso y con piezas más grandes. */
+export const isTall = (width: number, height: number) => height / width > 1.3;
+
 /** Muro de la apertura: 6 columnas × 6 filas en ladrillo; el azar solo mueve un poco cada pieza y le da su profundidad. */
-export function openingWall(spec: StorySpec, height = 1080): (WallChip & { z: number; on: number })[] {
+export function openingWall(spec: StorySpec, height = 1080, width = 1920): (WallChip & { z: number; on: number; k: number })[] {
   const fallback = spec.topics.map((t) => t.name);
   // En formatos altos las filas se separan más (el muro llena el alto); el ancho se corta solo (las piezas de afuera no se ven).
   const ky = height / 1080 > 1.2 ? height / 1080 : 1;
-  const out: (WallChip & { z: number; on: number })[] = [];
+  const out: (WallChip & { z: number; on: number; k: number })[] = [];
+  const tall = isTall(width, height);
   for (let i = 0; i < 36; i++) {
-    const col = i % 6;
-    const row = Math.floor(i / 6);
+    const col = tall ? i % 3 : i % 6;
+    const row = tall ? Math.floor(i / 3) : Math.floor(i / 6);
+    if (tall) {
+      // 3 columnas × 12 filas en ladrillo, piezas a escala 1,15 que cubren el alto del cuadro
+      out.push({
+        text: labelAt(spec.labels, i, fallback),
+        x: Math.round((col - 1) * 410 + (row % 2 ? 100 : -100) + (random(`x${i}`) - 0.5) * 30),
+        y: Math.round((row - 5.5) * (height / 12.2) + (random(`y${i}`) - 0.5) * 20),
+        z: Math.round(-250 + random(`z${i}`) * 360),
+        on: 10 + random(`on${i}`) * 60,
+        k: 1.15,
+      });
+      continue;
+    }
     out.push({
       text: labelAt(spec.labels, i, fallback),
       x: Math.round((col - 2.5) * 400 + (row % 2) * 200 - 100 + (random(`x${i}`) - 0.5) * 40),
       y: Math.round((-420 + row * 168) * ky + (random(`y${i}`) - 0.5) * 24),
       z: Math.round(-300 + random(`z${i}`) * 440),
       on: 10 + random(`on${i}`) * 60,
+      k: 1,
     });
   }
   return out;
