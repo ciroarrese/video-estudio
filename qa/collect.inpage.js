@@ -76,6 +76,8 @@
     }
     return { decor: decor, main: main };
   }
+  // data-qa-fixed-scale en el elemento o un ancestro: reproduccion a escala fija; solo la prueba de estres de tipografia la saltea.
+  function fixedScaleOf(el) { return !!(el.closest && el.closest('[data-qa-fixed-scale]')); }
   function pathOf(el) {
     var p = [];
     for (var e = el; e && e !== stage; e = e.parentElement) p.push(Array.prototype.indexOf.call(e.parentElement.children, e));
@@ -202,7 +204,7 @@
       rect: { x: x0, y: y0, w: x1 - x0, h: y1 - y0 }, lines: rects,
       opacity: opacityUp(el), fontPx: fontPx, scale: scale, transformed: transformed, screenPx: fontPx * scale, bold: weight >= 700,
       color: 'rgba(' + fill.r + ',' + fill.g + ',' + fill.b + ',' + fill.a + ')', transparentFill: fill.a < 0.05,
-      fadingBg: fadingSurface(el), ignore: ignoreOf(el), decor: decorOf(el).decor, decorMain: decorOf(el).main, clips: clips,
+      fadingBg: fadingSurface(el), ignore: ignoreOf(el), decor: decorOf(el).decor, decorMain: decorOf(el).main, fixedScale: fixedScaleOf(el), clips: clips,
       own: {
         sw: el.scrollWidth, cw: el.clientWidth, sh: el.scrollHeight, ch: el.clientHeight,
         ox: cs.overflowX, oy: cs.overflowY, ellipsis: cs.textOverflow === 'ellipsis',
@@ -311,5 +313,7 @@
   var opac = {};
   (opts.elemKeys || []).forEach(function (k) { var e = resolveKey(k); if (e) { elems[k] = rectOf(e.getBoundingClientRect()); opac[k] = veilAlpha(e); } });
   probe.remove();
-  return { width: W, height: H, runs: runs, elems: elems, opac: opac };
+  var fixedRoots = [];
+  Array.prototype.forEach.call(stage.querySelectorAll('[data-qa-fixed-scale]'), function (e) { fixedRoots.push(rectOf(e.getBoundingClientRect())); });
+  return { width: W, height: H, runs: runs, elems: elems, opac: opac, fixedRoots: fixedRoots };
 })

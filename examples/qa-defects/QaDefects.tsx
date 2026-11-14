@@ -38,9 +38,12 @@ import { Fill, useFrame } from '../../engine';
  * velo que cruza, el error de `contrast` se mantiene en los tres. 85-87 un lavado liso marcado `covered` a medio fundido (0,45 / 0,55 / 0,65) sobre texto claro: `contrast` es `info`;
  * 88-90 el mismo lavado quieto (0,55): error en el 89. 91 un lavado liso, marcado y cerrado del todo sobre todo el cuadro: el texto de abajo NO se ve, no hay hallazgos (el resumen lo cuenta como
  * tapado); 92 el contrapunto: un degradado de cuadro completo con el centro transparente SIN marca sobre dos rótulos que se pisan: el error `overlap` se informa.
+ * Frames 93-95 son `data-qa-fixed-scale` (reproduccion de una herramienta a tamanos fijos), SOLO con `--font-scale 1.25` (sin estres los tres estan limpios): 93 un rotulo que entra justo
+ * en su caja dentro de la marca (sin hallazgo, el resumen cuenta el texto exento del estres); 94 el MISMO rotulo sin la marca (error `clip` con el estres); 95 la marca puesta en el escenario entero,
+ * sin otro texto fuera de ella: la exencion se RECHAZA (aviso, `summary.fixedScale.refused`), el estres se aplica y el rotulo da `clip`.
  * Frame 18 builds a term and an e-mail out of one span per letter / per part: only the privacy check cares (block-level scan).
  */
-export const QA_DEFECT_FRAMES = { clean: 0, clip: 1, offscreen: 2, overlap: 3, tiny: 4, contrast: 5, covered: 6, privacy: 7, wash: 8, flyingA: 9, flyingB: 10, faint: 11, leavingA: 12, leavingB: 13, leavingC: 14, stillFaint: 15, sideCover: 16, hiddenStatic: 17, split: 18, veilCrossA: 19, veilCrossB: 20, veilCrossC: 21, veilStaticA: 22, veilStaticB: 23, veilStaticC: 24, slowFadeA: 25, slowFadeB: 26, slowFadeC: 27, slowStaticA: 28, slowStaticB: 29, slowStaticC: 30, crossMoveA: 31, crossMoveB: 32, crossMoveC: 33, crossStillA: 34, crossStillB: 35, crossStillC: 36, overlapMoveA: 37, overlapMoveB: 38, overlapMoveC: 39, overlapStillA: 40, overlapStillB: 41, overlapStillC: 42, coverMoveA: 43, coverMoveB: 44, coverMoveC: 45, coverStillA: 46, coverStillB: 47, coverStillC: 48, camMoveA: 49, camMoveB: 50, camMoveC: 51, camStillA: 52, camStillB: 53, camStillC: 54, splitBlocks: 55, splitLine: 56, zoomOut: 57, zoomIn: 59, neverReadable: 61, svgFillDark: 63, svgFillPale: 64, svgStroke: 65, hiddenCovers: 66, inheritedHidden: 67, visibleCanvas: 68, decorOk: 69, decorStrict: 70, decorClip: 71, decorOverlap: 72, decorOffscreen: 73, decorMainOffscreen: 74, ignoreCounted: 75, vigContrastA: 76, vigContrastB: 77, vigOverlapA: 78, vigOverlapB: 79, vigCoveredA: 80, vigCoveredB: 81, vigFadeA: 82, vigFadeB: 83, vigFadeC: 84, washCrossA: 85, washCrossB: 86, washCrossC: 87, washStillA: 88, washStillB: 89, washStillC: 90, washClosed: 91, gradientOverlap: 92 } as const;
+export const QA_DEFECT_FRAMES = { clean: 0, clip: 1, offscreen: 2, overlap: 3, tiny: 4, contrast: 5, covered: 6, privacy: 7, wash: 8, flyingA: 9, flyingB: 10, faint: 11, leavingA: 12, leavingB: 13, leavingC: 14, stillFaint: 15, sideCover: 16, hiddenStatic: 17, split: 18, veilCrossA: 19, veilCrossB: 20, veilCrossC: 21, veilStaticA: 22, veilStaticB: 23, veilStaticC: 24, slowFadeA: 25, slowFadeB: 26, slowFadeC: 27, slowStaticA: 28, slowStaticB: 29, slowStaticC: 30, crossMoveA: 31, crossMoveB: 32, crossMoveC: 33, crossStillA: 34, crossStillB: 35, crossStillC: 36, overlapMoveA: 37, overlapMoveB: 38, overlapMoveC: 39, overlapStillA: 40, overlapStillB: 41, overlapStillC: 42, coverMoveA: 43, coverMoveB: 44, coverMoveC: 45, coverStillA: 46, coverStillB: 47, coverStillC: 48, camMoveA: 49, camMoveB: 50, camMoveC: 51, camStillA: 52, camStillB: 53, camStillC: 54, splitBlocks: 55, splitLine: 56, zoomOut: 57, zoomIn: 59, neverReadable: 61, svgFillDark: 63, svgFillPale: 64, svgStroke: 65, hiddenCovers: 66, inheritedHidden: 67, visibleCanvas: 68, decorOk: 69, decorStrict: 70, decorClip: 71, decorOverlap: 72, decorOffscreen: 73, decorMainOffscreen: 74, ignoreCounted: 75, vigContrastA: 76, vigContrastB: 77, vigOverlapA: 78, vigOverlapB: 79, vigCoveredA: 80, vigCoveredB: 81, vigFadeA: 82, vigFadeB: 83, vigFadeC: 84, washCrossA: 85, washCrossB: 86, washCrossC: 87, washStillA: 88, washStillB: 89, washStillC: 90, washClosed: 91, gradientOverlap: 92, fixedOk: 93, fixedStrict: 94, fixedWhole: 95 } as const;
 
 const font: CSSProperties = { fontFamily: 'Arial, Helvetica, sans-serif', color: '#1b1f2a' };
 const abs = (left: number, top: number, extra: CSSProperties = {}): CSSProperties => ({ position: 'absolute', left, top, margin: 0, whiteSpace: 'nowrap', ...font, ...extra });
@@ -476,6 +479,30 @@ export function QaDefects() {
         </>
       );
       break;
+    case 93:
+    case 94:
+    case 95: {
+      // el rotulo de 20 px entra justo en 215 px; con letra x1.25 se corta
+      const marca = f === 94 ? {} : { 'data-qa-fixed-scale': '' };
+      const tool = (
+        <div data-testid="fixed-label" style={{ position: 'absolute', left: f === 95 ? 128 : 32, top: f === 95 ? 240 : 40, width: 215, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontSize: 20, ...font }}>
+          Presupuesto trimestral
+        </div>
+      );
+      if (f === 95) {
+        return (
+          <Fill style={{ background: '#eef1f6' }}>
+            <div {...marca} style={{ position: 'absolute', inset: 0 }}>{tool}</div>
+          </Fill>
+        );
+      }
+      body = (
+        <Card>
+          <div {...marca}>{tool}</div>
+        </Card>
+      );
+      break;
+    }
     default:
       body = (
         <Card>

@@ -76,13 +76,14 @@ describe("fx/text", () => {
     const b = html(el, 15);
     const c = html(el, 100);
     // mismo numero de ranuras (anchos fijos) en todos los cuadros
-    const slots = (h: string) => (h.match(/data-qa-ignore/g) ?? []).length;
+    const slots = (h: string) => (h.match(/display:inline-block;position:relative/g) ?? []).length;
     expect(slots(a)).toBe(5);
     expect(slots(b)).toBe(5);
     expect(slots(c)).toBe(5);
-    expect(c).toContain("translateY(-792px)");
-    expect(c).not.toContain("translateY(0px)"); // la rueda en 0 no deja traslado
-    expect(text(c)).toContain("%");
+    expect(b).toContain("translateY(-"); // a mitad de la cuenta las ruedas giran
+    expect(c).not.toContain("translateY"); // en reposo el dígito se dibuja quieto: sin rueda ni traslado
+    expect(text(c)).toBe("48.250%"); // número final exacto, una sola vez cada dígito
+    expect(text(a).length).toBeGreaterThan(text(c).length); // en movimiento la rueda lleva los dígitos vecinos
   });
   it("MarqueeBands: opposite directions, loops, frozen after duration", () => {
     expect(marqueeShift(0, 100, -1)).toBeCloseTo(0);

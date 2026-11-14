@@ -174,6 +174,12 @@ async function main(cmd: string, argv: string[]): Promise<number> {
       const s = r.summary;
       if (s.detailSmallText) console.log(`\ninfo: ${s.detailSmallText.texts} ${s.detailSmallText.texts === 1 ? 'texto' : 'textos'} por debajo del mínimo en el plano general ${s.detailSmallText.texts === 1 ? 'se lee' : 'se leen'} al acercar dentro de su escena (detalle, no es error; ${s.detailSmallText.frames} ${s.detailSmallText.frames === 1 ? 'cuadro afectado' : 'cuadros afectados'}; --verbose lo muestra por cuadro)`);
       if (s.decor) console.log(`\ninfo: ${s.decor.texts} ${s.decor.texts === 1 ? 'texto de adorno' : 'textos de adorno'} (data-qa-decor) quedaron fuera de min-size y contrast (${s.decor.frames} ${s.decor.frames === 1 ? 'cuadro' : 'cuadros'}); clip, overlap contra texto normal y offscreen (si es data-qa-decor="main") siguen aplicando`);
+      if (s.fixedScale) {
+        const fx = s.fixedScale;
+        console.log(fx.refused
+          ? `\nADVERTENCIA: data-qa-fixed-scale RECHAZADA: cubre todo el escenario y no hay otro texto fuera de la marca en ningun cuadro revisado; apagaria el estres de todo el video. Se aplico el estres igual (${fx.texts} ${fx.texts === 1 ? 'texto habria quedado' : 'textos habrian quedado'} exento${fx.texts === 1 ? '' : 's'}). Marcar solo la reproduccion, no el escenario entero`
+          : `\ninfo: ${fx.texts} ${fx.texts === 1 ? 'texto' : 'textos'} fuera del estres de tipografia por data-qa-fixed-scale (${fx.frames} ${fx.frames === 1 ? 'cuadro' : 'cuadros'}); el resto de las reglas los sigue juzgando`);
+      }
       if (s.silenced) {
         const parts = Object.entries(s.silenced).map(([rule, c]) => `${rule}: ${[c.ignore ? `${c.ignore} por data-qa-ignore` : '', c.decor ? `${c.decor} por data-qa-decor` : ''].filter(Boolean).join(', ')}`);
         console.log(`\ncallados (no cuentan arriba): ${parts.join('; ')}`);

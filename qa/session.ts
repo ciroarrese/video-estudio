@@ -42,8 +42,12 @@ export const FALLBACK_STACKS: Record<'wide' | 'narrow', string> = {
   narrow: '"Arial Narrow", "Liberation Sans Narrow", "DejaVu Sans Condensed", "Nimbus Sans Narrow", sans-serif',
 };
 
-/** Se evalua en la pagina despues de cada `setFrame`: restaura el tamano de letra que puso el estres antes y vuelve a aplicarlo. Plain JS. */
-const APPLY_FONT_SCALE = `(function(scale){
+/**
+ * Se evalua en la pagina despues de cada `setFrame`: restaura el tamano de letra que puso el estres antes y vuelve a aplicarlo. Plain JS.
+ * `honorFixed`: los elementos bajo `data-qa-fixed-scale` no se escalan. `mine` se lee DE VUELTA del estilo despues de escribirlo (el navegador
+ * normaliza `55.000px` a `55px`): comparar contra el texto escrito nunca coincidia y la escala se componia de un cuadro al siguiente.
+ */
+const APPLY_FONT_SCALE = `(function(scale, honorFixed){
   var S = window.__qaStress || (window.__qaStress = { els: [] });
   S.els.forEach(function (rec) {
     var el = rec.el;
@@ -61,12 +65,13 @@ const APPLY_FONT_SCALE = `(function(scale){
     var el = n.parentElement;
     if (!el || seen.has(el)) continue;
     seen.add(el);
+    if (honorFixed && el.closest('[data-qa-fixed-scale]')) continue;
     list.push([el, parseFloat(getComputedStyle(el).fontSize)]);
   }
   list.forEach(function (p) {
-    var el = p[0], mine = (p[1] * scale).toFixed(3) + 'px';
-    S.els.push({ el: el, val: el.style.getPropertyValue('font-size'), pri: el.style.getPropertyPriority('font-size'), mine: mine });
-    el.style.setProperty('font-size', mine, 'important');
+    var el = p[0], val = el.style.getPropertyValue('font-size'), pri = el.style.getPropertyPriority('font-size');
+    el.style.setProperty('font-size', (p[1] * scale).toFixed(3) + 'px', 'important');
+    S.els.push({ el: el, val: val, pri: pri, mine: el.style.getPropertyValue('font-size') });
   });
 })`;
 
@@ -81,6 +86,8 @@ export type SessionOptions = {
   allowMissingFonts?: boolean;
   /** Estres de tipografia (ver `Stress`). */
   stress?: Stress;
+  /** `false`: el estres escala tambien lo que lleva `data-qa-fixed-scale` (por defecto se respeta la marca). */
+  honorFixedScale?: boolean;
   log?: (m: string) => void;
 };
 
@@ -122,7 +129,7 @@ export async function openSession(o: SessionOptions): Promise<Session> {
       await (page.evaluate as unknown as (e: string) => Promise<unknown>)(`(()=>{const s=document.createElement('style');s.id='__qa_fallback';s.textContent=${JSON.stringify(css)};document.head.appendChild(s);})()`);
     }
     const scale = o.stress?.fontScale;
-    const applyScale = async () => { if (scale !== undefined && scale !== 1) await (page.evaluate as unknown as (e: string) => Promise<unknown>)(`(${APPLY_FONT_SCALE})(${scale})`); };
+    const applyScale = async () => { if (scale !== undefined && scale !== 1) await (page.evaluate as unknown as (e: string) => Promise<unknown>)(`(${APPLY_FONT_SCALE})(${scale}, ${o.honorFixedScale !== false})`); };
     const cdp = await context.newCDPSession(page);
     const vp: VideoPage = {
       page, context, cdp,

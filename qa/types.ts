@@ -46,6 +46,8 @@ export type TextRun = {
   /** El texto está bajo `data-qa-decor` (adorno de una interfaz recreada) y, si el valor es `main`, es el contenido principal del cuadro. */
   decor?: boolean;
   decorMain?: boolean;
+  /** El texto está bajo `data-qa-fixed-scale` (reproducción a escala fija): queda fuera del estrés de tipografía, no de las reglas. */
+  fixedScale?: boolean;
   clips: ClipBox[];
   own: { sw: number; cw: number; sh: number; ch: number; ox: string; oy: string; ellipsis: boolean };
   /**
@@ -75,7 +77,7 @@ export type TextRun = {
   skippedCovers?: number;
 };
 
-export type PageData = { frame: number; width: number; height: number; runs: TextRun[]; elems: Record<string, Rect>; /** Coverage alpha of the elements in `elems` (same keys). */ opac?: Record<string, number> };
+export type PageData = { frame: number; width: number; height: number; runs: TextRun[]; elems: Record<string, Rect>; /** Cajas de los elementos `data-qa-fixed-scale` del cuadro. */ fixedRoots?: Rect[]; /** Coverage alpha of the elements in `elems` (same keys). */ opac?: Record<string, number> };
 
 /**
  * Resumen de lo que `min-size` reclasificó como "detalle que se lee al acercar" (info): textos por debajo del mínimo en el cuadro
@@ -111,6 +113,12 @@ export type JudgedSummary = {
 
 /** Textos de adorno (`data-qa-decor`) que quedaron fuera de `min-size` y `contrast`: cuántos textos distintos y en cuántos cuadros. */
 export type DecorSummary = { texts: number; frames: number };
+
+/**
+ * Textos que `data-qa-fixed-scale` dejó fuera del estrés de tipografía (`--font-scale`): cuántos textos distintos y en cuántos cuadros.
+ * `refused`: la marca cubre todo el escenario sin que haya otro texto juzgado en ningún cuadro; se rechazó (el estrés se aplicó igual) y `texts` cuenta lo que se habría eximido.
+ */
+export type FixedScaleSummary = { texts: number; frames: number; refused?: boolean };
 
 export type Finding = {
   rule: RuleId;

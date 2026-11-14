@@ -12,7 +12,7 @@ Las piezas con forma, superficie, texto, fondo o movimiento leen `theme.style` p
 
 | Pieza | Qué toma del estilo |
 |---|---|
-| `Stage` | `background.kind` (nubes, liso, grilla, puntos, degradado, grano) e `intensity`; las nubes solo con `kind: clouds` o si la escena pasa `cloud` |
+| `Stage` | props `clouds` (por defecto sí), `cloudOpacity`, `cloud` (`CloudOptions`: colores, cantidad, semilla, manchas, opacidad) y `frame`; el fondo sale de `theme.style.background` (nubes, liso, grilla, puntos, degradado, grano) y las nubes solo se dibujan si ese estilo las pide o si la escena pasa `cloud` |
 | `CloudBackground` | opacidad por defecto = `theme.cloud.opacity * background.intensity`; desenfoque por defecto = `theme.cloud.blur` (110 px si el tema no lo declara); lo leen también `Stage` y `StoryStage` |
 | `DockedHeadline` | `surfaceStyle("headline")`, `textStyle("title")` y `("caption")` (el subtítulo; sigue al eyebrow salvo que el design system fije `type.caption*`), número por `Numeral`, `entrance(native: slide, 30 px)`; el tamaño exterior no cambia con el borde |
 | `GradientText` | `decor.gradientLoop` cuando no recibe `loop` ni `pan` |

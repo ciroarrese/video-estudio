@@ -58,11 +58,12 @@ describe("estilo en fx/text y fx/three", () => {
     expect(rest(<Typewriter text="Hola" />, neon)).toMatch(/width:0\.52em;height:1em/); // bloque
     expect(rest(<Typewriter text="Hola" />, neutral)).toContain("width:0.09em;height:1em");
     for (const t of [editorial, neon, papel]) {
-      expect(rest(<MaskedRise text="Hola mundo" />, t)).toContain("data-qa-decor");
-      expect(rest(<ScrambleDecode text="Hola" />, t)).toContain("data-qa-decor");
-      expect(rest(<DigitRoll value={48} />, t)).toContain("data-qa-decor");
+      // el adorno del tema (subrayado, marcador o recuadro) es un `span` sin texto marcado `covered`: no cuenta como tapa de su anfitrión
+      expect(rest(<MaskedRise text="Hola mundo" />, t)).toContain('aria-hidden="true" data-qa-ignore="covered"');
+      expect(rest(<ScrambleDecode text="Hola" />, t)).toContain('aria-hidden="true" data-qa-ignore="covered"');
+      expect(rest(<DigitRoll value={48} />, t)).toContain('aria-hidden="true" data-qa-ignore="covered"');
     }
-    for (const t of [neutral, dark]) expect(rest(<MaskedRise text="Hola mundo" />, t)).not.toContain("data-qa-decor");
+    for (const t of [neutral, dark]) expect(rest(<MaskedRise text="Hola mundo" />, t)).not.toContain('data-qa-ignore="covered"');
     // Losetas de SplitFlap: sin bisagra con `outline` y `flat`; con `card`, la de siempre.
     expect(rest(<SplitFlap text="AB" />, neutral)).toContain("height:2px");
     expect(rest(<SplitFlap text="AB" />, editorial)).not.toContain("height:2px");
