@@ -5,6 +5,7 @@ import type { ColorRole, FxProps } from "../core";
 import { textLook } from "../../themes";
 import { baseText } from "./shared";
 import { decoration, decorationHost, landStyle } from "./look";
+import { measureWidth } from "./measure";
 
 export type DigitRollProps = FxProps & {
   value: number;
@@ -41,7 +42,18 @@ export function DigitRoll(props: DigitRollProps) {
   const v = lerp(from, value, p);
   const N = Math.max(digitCount(value), digitCount(from));
   const vis = digitCount(v);
-  const slotW = fs * 0.62;
+  // Ranura de cada dígito: 0,62 de la letra, o el ancho del dígito más ancho de la tipografía si pasa de ahí en más de un 15 % (una fuente
+  // más ancha ensancha la ranura en vez de pisar al vecino). Si el dígito pasa de 0,62 por poco (la tipografía de siempre), en reposo el
+  // avance sigue siendo 0,62: `squeeze` descuenta ese poco, así la cifra mide lo mismo que cuando la rueda recorta la ranura.
+  const digitW = Math.max(...Array.from("0123456789", (d) => measureWidth(d, fs, { family: theme.font.family, weight: props.weight ?? theme.font.weights.stat })));
+  const base = fs * 0.62;
+  const wide = digitW > base * 1.15;
+  const slotW = wide ? digitW : base;
+  const digitFont = { family: theme.font.family, weight: props.weight ?? theme.font.weights.stat };
+  // El separador igual: ranura de 0,3 de la letra, con el mismo descuento si la tipografía lo dibuja apenas más ancho.
+  const sepW = thousands ? measureWidth(thousands, fs, digitFont) : 0;
+  const sepSqueeze = sepW > fs * 0.3 * 1.25 ? 0 : Math.max(0, sepW - fs * 0.3);
+  const squeezeOf = (d: number) => (wide ? 0 : Math.max(0, measureWidth(String(d), fs, digitFont) - base));
   const lineH = fs * 1.1;
   const rest = p >= 1 && Number.isInteger(value);
   const sufP = progress(local, duration - 6, 16, Easing.lands);
@@ -50,9 +62,10 @@ export function DigitRoll(props: DigitRollProps) {
     const shown = k < vis || k === 0;
     // En reposo (la cuenta terminó y el valor es entero) el dígito se dibuja quieto, sin rueda ni recorte: se juzga como cualquier texto.
     if (rest) {
+      const dig = Math.floor(value / Math.pow(10, k)) % 10;
       slots.push(
-        <span key={k} style={{ display: "inline-block", position: "relative", minWidth: slotW, height: lineH, lineHeight: `${lineH}px`, textAlign: "center", opacity: shown ? 1 : 0 }}>
-          {Math.floor(value / Math.pow(10, k)) % 10}
+        <span key={`${k}r`} style={{ display: "inline-block", position: "relative", minWidth: slotW, marginRight: -squeezeOf(dig), height: lineH, lineHeight: `${lineH}px`, textAlign: "center", opacity: shown ? 1 : 0 }}>
+          {dig}
         </span>,
       );
     } else {
@@ -81,7 +94,7 @@ export function DigitRoll(props: DigitRollProps) {
     }
     if (thousands && k > 0 && k % 3 === 0) {
       slots.push(
-        <span key={`s${k}`} style={{ display: "inline-block", minWidth: fs * 0.3, height: lineH, lineHeight: `${lineH}px`, textAlign: "center", opacity: k < vis ? 1 : 0 }}>
+        <span key={`s${k}`} style={{ display: "inline-block", minWidth: fs * 0.3, marginRight: -sepSqueeze, height: lineH, lineHeight: `${lineH}px`, textAlign: "center", opacity: k < vis ? 1 : 0 }}>
           {thousands}
         </span>,
       );

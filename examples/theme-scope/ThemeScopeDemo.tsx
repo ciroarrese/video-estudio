@@ -31,7 +31,7 @@ function Stat({ label, value, to }: { label: string; value: string; to: number }
 }
 
 /** Ancho de la ventana de la herramienta y alto mínimo (la ventana crece si el contenido lo pide). */
-const WIN = { w: 860, h: 660 };
+const WIN = { w: 1060, h: 660 };
 const TITULO = "Herramienta de ejemplo";
 
 function Tool({ inner }: { inner: Theme }) {
@@ -54,23 +54,33 @@ function Tool({ inner }: { inner: Theme }) {
           </div>
         )}
       </div>
-      <div style={{ minHeight: 44, fontSize: theme.type.caption, lineHeight: 1.2, color: theme.color.textMuted }}>
-        <Typewriter frame={frame} start={8} duration={40} text="Tablero con su propio tema" fontSize={theme.type.caption} />
+      {/* Cuerpo en flujo, en dos filas (si no hay ancho para dos cosas una al lado de la otra, la segunda baja): arriba, subtítulo y tarjetas con el anillo al costado;
+          abajo, la esfera y la nota anidada. Nada va a un x o un y fijo: lo que crece con otra tipografía empuja a lo que tiene debajo y la ventana se alarga. */}
+      <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
+        <div style={{ display: "flex", flexWrap: "wrap", columnGap: 24, rowGap: 16, alignItems: "flex-start" }}>
+          <div style={{ flex: "1 1 600px", minWidth: 0 }}>
+            <div style={{ minHeight: 44, fontSize: theme.type.caption, lineHeight: 1.2, color: theme.color.textMuted }}>
+              <Typewriter frame={frame} start={8} duration={40} text="Tablero con su propio tema" fontSize={theme.type.caption} />
+            </div>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 24, minHeight: 150 }}>
+              <Stat label="Nuevos" value=" %" to={128} />
+              <Stat label="Cerrados" value=" %" to={87} />
+            </div>
+          </div>
+          <div style={{ flex: "0 0 250px" }}>
+            <DonutRing frame={frame} start={10} duration={60} width={250} height={250} value={72} label="Avance" />
+          </div>
+        </div>
+        <div style={{ display: "flex", flexWrap: "wrap", columnGap: 24, rowGap: 16, alignItems: "flex-start" }}>
+          <div style={{ flex: "0 0 300px", height: 300, borderRadius: cornerRadius(theme, "panel"), overflow: "hidden", background: theme.color.surfaceAlt, border: `1px solid ${theme.color.border}`, boxSizing: "content-box" }}>
+            <ParticleSphere frame={frame} start={0} duration={75} width={300} height={300} />
+          </div>
+          {/* Subárbol anidado: vuelve al otro tema, dentro de la herramienta. */}
+          <ThemeScope theme={inner} paint style={{ flex: "1 1 360px", minWidth: 0, minHeight: 240, borderRadius: cornerRadius(inner, "panel"), border: `1px solid ${inner.color.border}`, padding: 28, boxSizing: "border-box" }}>
+            <InnerNote />
+          </ThemeScope>
+        </div>
       </div>
-      <div style={{ display: "flex", gap: 24, minHeight: 150, marginTop: 0 }}>
-        <Stat label="Nuevos" value=" %" to={128} />
-        <Stat label="Cerrados" value=" %" to={87} />
-      </div>
-      <div style={{ marginTop: 30, width: 330, height: 330, borderRadius: cornerRadius(theme, "panel"), overflow: "hidden", background: theme.color.surfaceAlt, border: `1px solid ${theme.color.border}`, boxSizing: "content-box" }}>
-        <ParticleSphere frame={frame} start={0} duration={75} width={330} height={330} />
-      </div>
-      <div style={{ position: "absolute", left: 560, top: 70, width: 260, height: 260 }}>
-        <DonutRing frame={frame} start={10} duration={60} width={260} height={260} value={72} label="Avance" />
-      </div>
-      {/* Subárbol anidado: vuelve al otro tema, dentro de la herramienta. */}
-      <ThemeScope theme={inner} paint style={{ position: "absolute", left: 400, top: 340, width: 420, minHeight: 280, borderRadius: cornerRadius(inner, "panel"), border: `1px solid ${inner.color.border}`, padding: 28, boxSizing: "border-box" }}>
-        <InnerNote />
-      </ThemeScope>
       <Cursor frame={frame} show={[30, 120]} keys={[[30, 700, 560], [80, 330, 160], [120, 340, 170]]} clicks={[82]} />
     </div>
   );
@@ -101,7 +111,7 @@ function Scene({ scoped, inner }: { scoped: Theme; inner: Theme }) {
         <ThemeScope theme={scoped} paint style={{ marginLeft: 500 - theme.safe.x, width: WIN.w, borderRadius: cornerRadius(scoped, "window"), border: `1px solid ${scoped.color.border}`, boxShadow: scoped.shadow.lg, overflow: "hidden" }}>
           <Tool inner={inner} />
         </ThemeScope>
-        <div style={{ marginTop: 48, fontSize: theme.type.caption, lineHeight: 1.2, color: theme.color.textMuted }}>Fuera del ámbito: tema del video ({theme.name})</div>
+        <div style={{ marginTop: 20, fontSize: theme.type.caption, lineHeight: 1.2, color: theme.color.textMuted }}>Fuera del ámbito: tema del video ({theme.name})</div>
       </div>
     </Stage>
   );

@@ -167,7 +167,8 @@ function stackedLayout(spec: StorySpec, theme: Theme, width: number, height: num
   return {
     left, top, rowW: region, rowH, nameSize: b.nameSize, lineSize: b.lineSize, numSize: b.numSize, numW: 0, nameH: b.nameH, lineH: b.lineH,
     blockTop, blockH: b.blockH, barW: region, names: b.names, lines: b.lineRows.map((r) => r.join(" ")),
-    target: (i) => ({ x: left + b.nameSize * 0.8, y: top + i * rowH + nameTop + b.nameH / 2 }),
+    // Lista apilada: se atraviesa por el centro del ancho de la fila (no por las primeras letras del nombre), así el zoom no empuja la línea hacia fuera del cuadro angosto.
+    target: (i) => ({ x: left + region / 2, y: top + i * rowH + nameTop + b.nameH / 2 }),
     stacked: true, numH: b.numH, numGap: GAP.num, lineRows: b.lineRows, barTop, barLeft: 0,
   };
 }

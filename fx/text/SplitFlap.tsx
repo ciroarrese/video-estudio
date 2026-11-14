@@ -106,11 +106,11 @@ export function SplitFlap(props: SplitFlapProps) {
         const B = settled ? ch : waiting ? plan.seq[0]! : plan.seq[k + 1]!; // nuevo
         const upperA = waiting ? plan.seq[0]! : A;
         const upper = p < 0.5;
-        // La loseta toma su tamaño de un glifo ancho (`W`) escondido: `w` y `h` son el mínimo, y con una letra más grande o una tipografía más
+        // La loseta toma su tamaño de su propia letra (una copia escondida): `w` y `h` son el mínimo, y con una letra más grande o una tipografía más
         // ancha la loseta crece con ella en vez de dejar la letra afuera (tinta de loseta sobre el fondo: contraste 1:1).
         return (
           <div key={i} style={{ position: "relative", minWidth: w, minHeight: h, fontWeight: props.weight ?? theme.font.weights.stat, ...(look.glow > 0 ? { boxShadow: `0 0 ${(fs * 0.3 * look.glow).toFixed(1)}px ${mix(roleColor(theme, tileColor), roleColor(theme, "bg"), 0.45)}` } : {}) }}>
-            <span aria-hidden="true" style={{ display: "block", visibility: "hidden", lineHeight: 1.5, whiteSpace: "pre" }}>W</span>
+            <span aria-hidden="true" style={{ display: "block", visibility: "hidden", lineHeight: 1.5, whiteSpace: "pre", padding: "0 0.06em" }}>{ch === " " ? " " : ch}</span>
             {settled ? (
               // En reposo la letra se dibuja entera, una sola vez (sin las dos mitades): se juzga como cualquier texto.
               <Half ch={ch} half="whole" h={h} fs={fs} color={color} bg={bg} round={round} ring={ring} scaleY={1} origin="50% 50%" />

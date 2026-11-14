@@ -31,11 +31,13 @@ export function CardFlip(p: CardFlipProps) {
   const grow = 1 + 0.1 * s; // la tarjeta se "acerca" mientras gira
   const lift = Math.round(lerp(0, 26 * sc, s));
   const shadeA = 0.28 * s;
+  // Los rótulos de relleno bajan con la tarjeta cuando es más chica que el diseño base (620 x 400); en tamaños normales (escala >= 1) quedan en el tamaño del tema.
+  const fit = Math.min(1, sc);
   const placeholder = (title: string, hint: string, accent: boolean) => (
     <div style={{ padding: Math.round(36 * sc), display: "flex", flexDirection: "column", gap: Math.round(14 * sc), height: "100%", boxSizing: "border-box", justifyContent: "center" }}>
       <div style={{ width: Math.round(64 * sc), height: Math.round(64 * sc), borderRadius: cornerRadius(theme, "control"), background: accent ? pal.accent : pal.line, opacity: accent ? 1 : 0.5 }} />
-      <div style={{ fontSize: theme.type.h1, fontWeight: theme.font.weights.stat, color: pal.ink, lineHeight: 1.05 }}>{title}</div>
-      <div style={{ fontSize: theme.type.body, color: theme.color.textMuted }}>{hint}</div>
+      <div style={{ fontSize: theme.type.h1 * fit, fontWeight: theme.font.weights.stat, color: pal.ink, lineHeight: 1.05 }}>{title}</div>
+      <div style={{ fontSize: theme.type.body * fit, color: theme.color.textMuted }}>{hint}</div>
     </div>
   );
   // La transformación solo se emite mientras la tarjeta se mueve o gira (en reposo no queda `translateY(0px) scale(1, 1)`).

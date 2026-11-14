@@ -21,8 +21,9 @@ export const DURATION = 300;
 const THROUGH: [number, number] = [236, 299];
 const WASH: [number, number] = [276, 299];
 
-// Celdas de 900 x 560 en una grilla de 3 x 3 (coordenadas del mundo).
-const CW = 900, CH = 560, GX = 1000, GY = 640;
+// Celdas de 900 x 560 en una grilla de 3 x 3 (coordenadas del mundo). La separación es mayor que el cuadro (1920 x 1080) menos media celda:
+// con la cámara quieta sobre una celda, ninguna vecina entra al encuadre ni queda cortada por el borde (solo se ve de pasada, en movimiento).
+const CW = 900, CH = 560, GX = 1500, GY = 900;
 const cell = (c: number, r: number) => ({ x: c * GX + 60, y: r * GY + 100 });
 const center = (c: number, r: number) => ({ x: cell(c, r).x + CW / 2, y: cell(c, r).y + CH / 2 });
 
@@ -63,6 +64,10 @@ function Scene() {
   const { width, height } = useVideoConfig();
   const cam = camera(frame);
   const screen = phoneScreen(300, 600);
+  // Caras propias de la tarjeta: la tarjeta es chica (250 x 200) y los rótulos de relleno bajarían de 18 px; el rótulo va en el escalón `caption` del tema y se parte si no entra.
+  const cara = (texto: string) => (
+    <div style={{ height: "100%", boxSizing: "border-box", padding: 16, display: "flex", alignItems: "center", justifyContent: "center", textAlign: "center", fontSize: theme.type.caption, lineHeight: 1.2, fontWeight: theme.font.weights.semibold, color: theme.color.text }}>{texto}</div>
+  );
   return (
     <Stage>
       {/* Sin `data-qa-ignore`: lo que está fuera del encuadre de cada tramo de la cámara no se juzga porque `qa` lo ve fuera del cuadro (la grilla de 3 x 3 tiene
@@ -113,7 +118,7 @@ function Scene() {
           <Slot c={2} r={2} x={270} y={100}><DonutRing start={214} width={360} height={360} value={4} max={4} unit=" de 4" label="tareas" duration={30} /></Slot>
           <Slot c={2} r={2}><TileGrid start={214} width={250} height={190} /></Slot>
           <Slot c={2} r={2} y={360}><LogoLand start={216} width={200} height={200} /></Slot>
-          <Slot c={2} r={2} x={650} y={360}><CardFlip start={222} width={250} height={200} /></Slot>
+          <Slot c={2} r={2} x={650} y={360}><CardFlip start={222} width={250} height={200} front={cara("Anverso")} back={cara("Reverso")} /></Slot>
           <Slot c={2} r={2} x={650}><TypeRing text="Anillo" start={224} width={250} height={190} /></Slot>
         </World>
       </div>

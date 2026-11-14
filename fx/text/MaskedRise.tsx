@@ -94,7 +94,7 @@ export function MaskedRise(props: MaskedRiseProps) {
               const resting = p >= 1;
               return (
                 <span
-                  key={ci}
+                  key={`${ci}${resting ? "r" : ""}`}
                   data-qa-ignore={resting ? undefined : "clip overlap offscreen"}
                   style={{ display: "inline-block", overflow: resting ? "visible" : "hidden", ...(resting ? {} : { width: measureWidth(ch, fs, font) }), height: `${(fs * 1.15).toFixed(2)}px`, lineHeight: `${(fs * 1.15).toFixed(2)}px`, padding: "0.04em 0.12em 0.14em", margin: "-0.04em -0.12em -0.14em", whiteSpace: "nowrap" }}
                 >

@@ -89,7 +89,7 @@ export function MarqueeBands(props: MarqueeBandsProps) {
               <div style={{ position: "absolute", left: 0, top: 0, height: bh, width: span, display: "flex", alignItems: "center", transform: `translateX(${Math.round(x)}px)`, fontFamily: theme.font.family, fontWeight: font.weight, fontSize: fs, whiteSpace: "nowrap" }}>
                 {Array.from({ length: reps }, (_, r) => (
                   <span
-                    key={r}
+                    key={`${r}${r === real ? "r" : ""}`}
                     aria-hidden={r === real ? undefined : "true"}
                     data-qa-ignore={r === real ? undefined : "all"}
                     style={{ display: "inline-block", flex: "none", width: unit, paddingLeft: gap, boxSizing: "border-box" }}
