@@ -13,13 +13,13 @@ Las piezas con forma, superficie, texto, fondo o movimiento leen `theme.style` p
 | Pieza | Qué toma del estilo |
 |---|---|
 | `Stage` | `background.kind` (nubes, liso, grilla, puntos, degradado, grano) e `intensity`; las nubes solo con `kind: clouds` o si la escena pasa `cloud` |
-| `CloudBackground` | opacidad por defecto = `theme.cloud.opacity * background.intensity` |
-| `DockedHeadline` | `surfaceStyle("headline")`, `textStyle("title")` y `("eyebrow")`, número por `Numeral`, `entrance(native: slide, 30 px)`; el tamaño exterior no cambia con el borde |
+| `CloudBackground` | opacidad por defecto = `theme.cloud.opacity * background.intensity`; desenfoque por defecto = `theme.cloud.blur` (110 px si el tema no lo declara); lo leen también `Stage` y `StoryStage` |
+| `DockedHeadline` | `surfaceStyle("headline")`, `textStyle("title")` y `("caption")` (el subtítulo; sigue al eyebrow salvo que el design system fije `type.caption*`), número por `Numeral`, `entrance(native: slide, 30 px)`; el tamaño exterior no cambia con el borde |
 | `GradientText` | `decor.gradientLoop` cuando no recibe `loop` ni `pan` |
 | `Numeral`, `Highlight` | `type.numerals` y `type.highlight` (con `decor.gradientLoop`) |
 | `Eyebrow` | `type.eyebrowCase` y `eyebrowTracking` |
 | `Wash` | `motion.transition`: `wash`, `wipe` (cortina), `cut` (escalón) o `through` (sin velo); conserva `data-qa-veil` |
-| `Vignette` | `strength * decor.vignette` |
+| `Vignette` | `strength * decor.vignette`; color por defecto = `decor.vignetteColor` (el acento) |
 | `DoodleCircle/Arrow/Underline` | `decor.doodles: false` no dibuja; `doodleStroke: geometric` = trazo sin temblor (elipse cerrada, raya recta, remates rectos) |
 | `useCameraAt` | `cameraAt` con `cameraOptions(theme)` por defecto (`cameraBlur`, `cameraTilt`); lo explícito en `opts` gana |
 
@@ -29,7 +29,7 @@ Sin cambios (no tienen forma ni superficie): `Cursor`, `FlyingCard` (dibuja lo q
 
 - **Ayudas**: `kf(frame, claves, valores, easing?)` cuadros clave; `track(frame, [[f, x, y], ...])` trayectos 2D; `typed(texto, frame, inicio, cps)` texto que se escribe.
 - **Cámara**: `cameraAt(frame, claves, opts?)` devuelve `{x, y, scale, rx, ry, blur}` con inclinación y desenfoque según la velocidad (cámara quieta = sin inclinación ni desenfoque; topes configurables). `<World camera width height>` aplica la transformación y el desenfoque a sus hijos (coordenadas del mundo). `zoomThrough(frame, [ini, fin], cam, objetivo, power?)` convierte la cámara en un atravesado de un punto (se pasa por `opts.map`). `<Wash frame range color?>` velo de cierre de escena; `useCameraAt(frame, claves, opts?)` es `cameraAt` con los valores del estilo.
-- **Cursor y viñeta**: `<Cursor frame keys clicks show>` con onda de clic en el acento; `<Vignette amount color? strength?>` (acento por defecto; `color` es un rol del tema o `data.<nombre>`).
+- **Cursor y viñeta**: `<Cursor frame keys clicks show>` con onda de clic en el acento; `<Vignette amount color? strength?>` (color del design system, el acento por defecto; `color` es un rol del tema o `data.<nombre>`).
 - **Profundidad**: `flyInZ(progress, { from, perspective, x, y, rotateX, rotateY, fade })` devuelve el `style` de una entrada en profundidad para un elemento (ver abajo).
 - **Garabatos** (trazo a mano que "hierve": el temblor se vuelve a sortear cada `boil` cuadros, 3 por defecto): `<DoodleCircle>`, `<DoodleArrow>`, `<DoodleUnderline>`; se dibujan y se desvanecen por cuadro; el trazo usa acento → acento 2 del tema. Cada uno necesita un `id` único.
 - **Texto y fondo**: `<Eyebrow>`, `<Numeral>`, `<Highlight>` (rótulo, número de paso y palabra resaltada según el estilo), `<GradientText>` (degradado del tema, `pan` o `loop` opcionales), `<CloudBackground>` (manchas de `theme.cloud`, con `colors`, `count`, `seed`, `blobs`, `opacity` y `blur` para pisarlas), `<CountUp from to start duration format?>`.
@@ -55,8 +55,8 @@ Props exactas de las piezas que más se usan (todas aceptan `frame?` para fijar 
 | `ThemeScope` | `theme: Theme`, `paint = false`, `style?`, `children` | Cambia el tema de un subárbol. Con `paint`, pinta una superficie (el `style` le da posición, tamaño, radio y sombra). Ver `docs/guia-escenas.md`, sección 10. |
 | `World` | `camera`, `width`, `height`, `perspective = 2400`, `children` | `width`/`height` del formato (`useFormat()`), no 1920x1080 escritos a mano. |
 | `Stage` | `clouds = true`, `cloudOpacity?`, `cloud?: CloudOptions`, `children` | Fondo, tipografía y nubes del tema. `cloud` (`colors`, `count`, `seed`, `blobs`, `opacity`, `blur`) pisa lo que declara `theme.cloud` solo en esa escena. |
-| `CloudBackground` | `colors?`, `count?`, `seed?`, `blobs?`, `opacity?`, `blur = 110`, `width?`, `height?` | Cada propiedad pisa a `theme.cloud`. `colors` y `blobs[].color` aceptan roles (`"accent2"`, `"data.estado"`, `"chart[2]"`) o colores del tema. `blobs: { x, y, size? }[]` (x, y en fracciones del cuadro) reemplaza el reparto sembrado. |
-| `Vignette` | `amount: number` (0 a 1), `color = "accent"`, `strength = 1` | Oscurece los bordes; usala con el zoom. `color`: rol del tema (`"bg"`, `"text"`, `"data.x"`) o color sacado del tema; en una interfaz oscura, `color="bg"` y un `strength` bajo evitan teñirla. Opacidad del borde: `0,22 * strength * amount`. |
+| `CloudBackground` | `colors?`, `count?`, `seed?`, `blobs?`, `opacity?`, `blur?` (por defecto `theme.cloud.blur`, y si no, 110), `width?`, `height?` | Cada propiedad pisa a `theme.cloud`. `colors` y `blobs[].color` aceptan roles (`"accent2"`, `"data.estado"`, `"chart[2]"`) o colores del tema. `blobs: { x, y, size? }[]` (x, y en fracciones del cuadro) reemplaza el reparto sembrado. |
+| `Vignette` | `amount: number` (0 a 1), `color?` (por defecto `decor.vignetteColor`: el acento), `strength = 1` | Oscurece los bordes; usala con el zoom. `color`: rol del tema (`"bg"`, `"text"`, `"data.x"`) o color sacado del tema; en una interfaz oscura, `color="bg"` y un `strength` bajo evitan teñirla. Opacidad del borde: `0,22 * strength * amount`. |
 | `flyInZ` | `(progress, { from = 900, perspective = 1400, x, y, rotateX, rotateY, fade = true })` | Devuelve un `style` (no un componente). Ver "Entrada en profundidad". |
 | `CountUp` | `from = 0`, `to`, `start`, `duration`, `format?`, `style?` | Número que cuenta. |
 | `GradientText` | `children`, `pan = 0`, `loop?` (por defecto `decor.gradientLoop`), `style?` | Texto con el degradado del tema. `loop` = cuadros de un vaivén completo (vuelve exacto al terminar el ciclo); `pan` = velocidad sin ciclo exacto. Ambos salen del cuadro. |

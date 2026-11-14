@@ -48,6 +48,8 @@ const { theme, report } = themeFromTokensWithReport(CSS, base, {
     estadoOk: "data-estado-ok",                    // nombre de un token (o un color, si no hay token con ese nombre)
     estadoBajo: { token: "severity-1", on: ["bg", "surface"], min: 4.5 }, // texto: 4.5 sobre bg y surface
     ficha: { color: "#22252b", on: ["surface"], min: 1.1 },               // valor propio
+    // `on` también acepta otro color de datos o un color (las superficies propias de una interfaz recreada) y `scope` anota dónde aparece:
+    // estadoOk: { token: "ok", on: ["data.ficha"], min: 4.5, scope: "dentro de la ficha oscura" },
   },
   acknowledge: ["accent/bg"],
 });
@@ -71,7 +73,9 @@ Entre `body` (44) y `h2` (72) había un hueco para textos grandes que no son tit
 
 ## Nubes
 
-`theme.cloud` trae `colors` (lista), `opacity` y, opcionales, `count` (reparto sembrado, 6 por defecto), `seed` y `blobs` (manchas explícitas `{ x, y, size?, color? }`, con `x`/`y` como fracción del cuadro: se acomodan solas a cada formato). Tokens: `--cloud-color-1..12` o `--cloud-colors: a, b, c`, `--cloud-count`, `--cloud-opacity` (`0.22` o `22%`), `--cloud-seed`, `--cloud-blob-1..24: x y [tamaño]` (entre comillas o sin ellas: `0.1 0.2 800` y `"0.1 0.2 800"` valen igual). Sin tokens de color, las nubes se derivan del acento (y de `accent2` si lo hay). `Stage` y `CloudBackground` permiten elegirlas por escena (ver `kit/README.md`).
+Más tokens de movimiento: `--ease-standard|out|in-out` (`cubic-bezier(...)` o cuatro números) y `--duration-fast|base|slow` (cuadros, o `ms` / `s` a 30 fps); ver `docs/estilo.md`.
+
+`theme.cloud` trae `colors` (lista), `opacity` y, opcionales, `count` (reparto sembrado, 6 por defecto), `seed` y `blobs` (manchas explícitas `{ x, y, size?, color? }`, con `x`/`y` como fracción del cuadro: se acomodan solas a cada formato). Tokens: `--cloud-color-1..12` o `--cloud-colors: a, b, c`, `--cloud-count`, `--cloud-opacity` (`0.22` o `22%`), `--cloud-seed`, `--cloud-blur` (desenfoque en px, 110 por defecto), `--cloud-blob-1..24: x y [tamaño]` (entre comillas o sin ellas: `0.1 0.2 800` y `"0.1 0.2 800"` valen igual). Sin tokens de color, las nubes se derivan del acento (y de `accent2` si lo hay). `Stage` y `CloudBackground` permiten elegirlas por escena (ver `kit/README.md`).
 
 ## Texto legible sobre un relleno cualquiera: `readableOn`
 
@@ -110,13 +114,13 @@ Un design system no es solo una paleta: cambia la forma de las esquinas, el tipo
 
 | Grupo | Campos (valores; el primero es el por defecto salvo que se indique) |
 |---|---|
-| `shape` | `corners` `pill`/`rounded`/`sharp`; `border` 0 a 6 px (1); `outlined` `true`/`false` |
+| `shape` | `corners` `pill`/`rounded`/`sharp`; `border` 0 a 6 px (1); `outlined` `true`/`false`; `heroScale` 0,5 a 4 o vacío (radio del cartel, múltiplo de `radius.lg`) |
 | `surface` | `kind` `solid`/`glass`/`outline`/`tinted`; `elevation` `shadow`/`flat`/`border`/`glow`; `opacity` 0,3 a 1 (0,74, del vidrio) |
-| `type` | `titleWeight` y `labelWeight` `regular`/`medium`/`semibold`/`stat` (`semibold` y `medium`); `titleTracking` -0,1 a 0,2 em (0); `eyebrowCase` `as-is`/`upper`; `eyebrowTracking` 0 a 0,4 em (0); `numerals` `gradient`/`solid`/`outline`/`muted`; `highlight` `gradient`/`underline`/`marker`/`accent` |
+| `type` | `titleWeight` y `labelWeight` `regular`/`medium`/`semibold`/`stat` (`semibold` y `medium`); `titleTracking` -0,1 a 0,2 em (0); `eyebrowCase` `as-is`/`upper`; `eyebrowTracking` 0 a 0,4 em (0); `captionCase` `eyebrow`/`as-is`/`upper`/`lower` (`eyebrow` = sigue al eyebrow), `captionTracking` 0 a 0,4 em o vacío, `captionWeight` `auto`/`regular`/`medium`/`semibold`/`stat` (subtítulos y líneas de apoyo); `numerals` `gradient`/`solid`/`outline`/`muted`; `highlight` `gradient`/`underline`/`marker`/`accent` |
 | `background` | `kind` `clouds`/`plain`/`grid`/`dots`/`gradient`/`noise`; `intensity` 0 a 1 (1) |
-| `motion` | `entrance` `auto`/`rise`/`fade`/`scale`/`slide`/`wipe`; `overshoot` 0 a 0,3 (0); `stagger` 0 a 12 cuadros (4); `cameraBlur` `true`/`false`; `cameraTilt` 0 a 3 (1); `transition` `wash`/`through`/`cut`/`wipe` |
-| `decor` | `doodles` `true`/`false`; `doodleStroke` `hand`/`geometric`; `vignette` 0 a 2 (1); `accent` `bar`/`underline`/`dot`/`none`; `gradientLoop` 0 o entero >= 2 (0 = quieto) |
-| `story` | `titleCard` `solid`/`glass`; `listLayout` `stacked`/`inline`; `listUnderline` `row`/`name`; `handoff` `wash`/`dock`/`through`; `headlineSize` `md`/`sm`; `closingBg` rol de color (`bg`); `signoffBar` `true`/`false`; `wallColumns` y `wallRows` 2 a 12 o vacío (según el formato); `wallChipScale` 0,5 a 3 (1); `wallDolly` -240 a 2000 (0); `wallDepth` 0 a 3 (1); `wallBlurOpening` y `wallBlurClosing` `true`/`false` |
+| `motion` | `entrance` `auto`/`rise`/`fade`/`scale`/`slide`/`wipe`/`depth`; `overshoot` 0 a 0,3 (0); `stagger` 0 a 12 cuadros (4); `staggerList`, `staggerRows`, `staggerItems` 0 a 60 o vacío y `staggerChips` 0 a 10 o vacío (pasos por contexto); `cameraBlur` `true`/`false`; `cameraTilt` 0 a 3 (1); `transition` `wash`/`through`/`cut`/`wipe` |
+| `decor` | `doodles` `true`/`false`; `doodleStroke` `hand`/`geometric`; `vignette` 0 a 2 (1); `vignetteColor` rol de color (`accent`); `accent` `bar`/`underline`/`dot`/`none`; `accentThickness` 0,25 a 4 (1); `gradientLoop` 0 o entero >= 2 (0 = quieto) |
+| `story` | `titleCard` `solid`/`glass`; `listLayout` `stacked`/`inline`; `listUnderline` `row`/`name`; `handoff` `wash`/`dock`/`through`; `headlineSize` `md`/`sm`; `closingBg` rol de color (`bg`); `signoffBar` `true`/`false`; `wallColumns` y `wallRows` 2 a 12 o vacío (según el formato); `wallChipScale` 0,5 a 3 (1); `wallDolly` -240 a 2000 (0); `wallDepth` 0 a 3 (1); `wallGapX` y `wallGapY` 0,4 a 3 (1); `wallBrick` 0 a 3 (1); `wallJitter` 0 a 4 (1); `wallBlurOpening` y `wallBlurClosing` `true`/`false` |
 | `chart` | `barRadius` `none`/`sm`/`md`/`lg`/`pill` (`md`); `lineWidth` 1 a 12 px (5); `grid` `auto`/`on`/`off`; `fill` `solid`/`gradient`/`hatched` |
 
 | `line` | `weight` `regular`/`hairline`/`bold` (x1, x0,5, x1,8 sobre los trazos); `dash` `solid`/`dashed`/`dotted` (solo las líneas guía); `cap` `round`/`square`; `glow` 0 a 1 (0); `dotShape` `round`/`square`/`cross`; `accentUse` `balanced`/`sparse`/`rich`; `sketch` 0 a 1 (0, temblor de mano fijo por posición) |
@@ -143,7 +147,7 @@ Un valor inválido (o un `--style-...` que no existe) no lanza: se ignora, queda
 
 ### Ayudas para las piezas
 
-Las piezas no leen cadenas de `theme.style`: llaman a estas ayudas (puras, deterministas, sin valores identidad en el estilo que devuelven): `cornerRadius`, `borderWidth`, `surfaceStyle`, `textStyle`, `numeralStyle`, `highlightStyle`, `backgroundLayer`, `entrance`, `settle`, `staggerFrames`, `staggerScale`, `transitionVeil`, `cameraOptions`, `doodleStyle`, `vignetteStrength`, `accentMark`, `chartStyle`, `chartFill`, `storyDefaults`, `withStoryDefaults`; para `fx/`: `lineLook`, `solidLook`, `depthLook`, `textLook` y `sketchOffset` (`themes/styleLine.ts`). Además: `surfaceParts` (lo mismo que `surfaceStyle`, en datos, para SVG), `borderWidth(theme, rol, { bold })`, `surfaceStyle(..., { bold, corner, titleCard })`, `entrance(..., { curve, offset })` y `textStyle(theme, "label", { strong })`. Cuál usa cada pieza y qué rol corresponde a qué radio: `docs/estilo.md`.
+Las piezas no leen cadenas de `theme.style`: llaman a estas ayudas (puras, deterministas, sin valores identidad en el estilo que devuelven): `cornerRadius`, `borderWidth`, `surfaceStyle`, `textStyle`, `numeralStyle`, `highlightStyle`, `backgroundLayer`, `entrance`, `settle`, `staggerFrames`, `staggerOverride`, `staggerScale`, `transitionVeil`, `cameraOptions`, `doodleStyle`, `vignetteStrength`, `vignetteColor`, `accentMark`, `chartStyle`, `chartFill`, `storyDefaults`, `withStoryDefaults`; para `fx/`: `lineLook`, `solidLook`, `depthLook`, `textLook` y `sketchOffset` (`themes/styleLine.ts`). Además: `surfaceParts` (lo mismo que `surfaceStyle`, en datos, para SVG), `borderWidth(theme, rol, { bold })`, `surfaceStyle(..., { bold, corner, titleCard })`, `entrance(..., { curve, offset })` y `textStyle(theme, "label", { strong })` y `textStyle(theme, "caption", { follow })`. Cuál usa cada pieza y qué rol corresponde a qué radio: `docs/estilo.md`.
 
 ### `checkTheme` y el estilo
 
