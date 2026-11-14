@@ -8,6 +8,7 @@ export const DEFAULT_THRESHOLDS: Thresholds = {
   'min-size': { minPx1080: 18, minOpacity: 0.35, tolerancePx: 0.5, probeFrames: 24 },
   contrast: { error: 3, warn: 4.5, largePx1080: 24, minOpacity: 0.35 },
   covered: { minOpacity: 0.2, maxCoverFraction: 0.9, hiddenFully: 0.97 },
+  unjudged: { minFraction: 0.02 },
   motion: { px: 12, crossPx: 4 },
 };
 

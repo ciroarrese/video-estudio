@@ -10,15 +10,17 @@ import { salidaPorDefecto } from '../render/dirs';
 import { runPrivacy } from './privacy';
 import { failsAt, runQa } from './run';
 import { RULES } from './rules';
-import { diffReports } from './repeat';
+import { canonicalReport as canonical, diffReports } from './repeat';
 import { parseOverrides } from './thresholds';
-import { ALL_RULES, type Finding, type RuleId } from './types';
+import { ALL_RULES, type Finding, type JudgedSummary, type RuleId } from './types';
+import { buildMatrix, formatDifferences, formatMatrix, parseThemes, runQaThemes } from './themes';
 
 const USAGE = {
   sheet: `Uso: ve-sheet <videoId> [--frames 0,60,120 | --every N | --count 12] [--props json] [--format horizontal|vertical|cuadrado] [--scene id|índice] [--list-scenes]
              [--assets dir]... [--allow-missing-fonts] [--cols 4] [--scale 0.25] [--out out/<id>[-<formato>]-sheet.png] [--no-labels]   (--out acepta cualquier ruta, se crean las carpetas)`,
   qa: `Uso: ve-qa <videoId> [--frames 0,60,120 | --every N | --count 24] [--props json] [--format horizontal|vertical|cuadrado] [--scene id|índice] [--list-scenes] [--json salida.json | --out salida.json] [--fail-on error|warn] [--verbose] [--max 40]
              [--assets dir]... [--allow-missing-fonts] [--rules clip,overlap,...] [--skip regla,...] [--set regla.umbral=valor]... [--concurrency N] [--repeat N]
+             [--themes neutral,dark,editorial,neon,papel|all] [--font-scale 1.2] [--font-fallback wide|narrow]
 Reglas: ${ALL_RULES.join(', ')}  (silenciar: data-qa-ignore="regla" en el elemento o un ancestro; adorno de interfaz: data-qa-decor)`,
   privacy: `Uso: ve-privacy [<videoId>] --deny lista.txt [--allow lista.txt] [--frames … | --every N | --count 24] [--props json] [--format …] [--scene id|índice] [--scan-source dir]... [--assets dir]... [--allow-missing-fonts] [--json salida.json | --out salida.json]`,
 };
@@ -78,6 +80,28 @@ function printQa(findings: Finding[], sampled: number[], o: { verbose: boolean; 
   if (more) console.log(`\n… ${more} más (--max N o --verbose)`);
 }
 
+const n = (x: number) => String(x);
+
+/** La linea que dice cuanto texto juzgo el control y cuanto no (y por que): hace imposible no ver la ceguera. */
+export function formatJudged(j: JudgedSummary): string[] {
+  const out: string[] = [];
+  const pct = j.texts ? Math.round((100 * j.judged) / j.texts) : 100;
+  const nj = j.notJudged;
+  const why = [
+    nj.hidden ? `tapados por una capa opaca de cuadro completo ${nj.hidden}` : '', nj.outside ? `fuera del cuadro ${nj.outside}` : '', nj.invisible ? `casi transparentes ${nj.invisible}` : '',
+    nj.ignoredAll ? `excluidos por data-qa-ignore de todas las reglas ${nj.ignoredAll}` : '',
+  ].filter(Boolean);
+  out.push(`juzgados: ${n(j.judged)} de ${n(j.texts)} textos x cuadros (${pct}%); NO juzgados: ${n(nj.total)}${why.length ? ` (${why.join('; ')})` : ''}`);
+  const part = [j.partial.decor ? `adorno (sin min-size ni contrast) ${j.partial.decor}` : '', j.partial.veil ? `bajo un velo de transicion (contrast baja a info) ${j.partial.veil}` : '', j.partial.gradientText ? `con relleno de degradado (contrast no los puede juzgar) ${j.partial.gradientText}` : '',
+    j.partial.ignoredSome ? `con marcas data-qa-ignore de algunas reglas ${j.partial.ignoredSome} (${Object.entries(j.ignoredByRule).sort(([a], [b]) => a.localeCompare(b)).map(([r, c]) => `${r}: ${c}`).join(', ')})` : ''].filter(Boolean);
+  if (part.length) out.push(`  juzgados solo en parte: ${part.join('; ')}`);
+  if (j.coverMarkerSkipped) out.push(`  ${n(j.coverMarkerSkipped)} textos x cuadros tenian encima una capa solida con data-qa-ignore="covered" (no se informa como tapa)`);
+  if (j.hiddenButVisible) out.push(`  ATENCION: ${n(j.hiddenButVisible)} textos x cuadros que el control creia tapados por una capa de cuadro completo SE VEN en pantalla; se juzgaron igual (revisar la capa que los tapa)`);
+  if (j.texts && nj.hidden / j.texts >= 0.5) out.push(`  ATENCION: mas de la mitad del texto (${Math.round((100 * nj.hidden) / j.texts)}%) quedo sin juzgar por estar bajo una capa opaca: un "0 errores" aca no dice nada; revisar con --verbose y la hoja`);
+  if (j.unjudgedVisible) out.push(`  ERROR del control: ${n(j.unjudgedVisible)} textos x cuadros se ven en pantalla y no los juzgo ninguna regla (regla unjudged)`);
+  return out;
+}
+
 /** Escribe el informe JSON (`--out` o `--json`, cualquier ruta; crea las carpetas) y dice dónde quedó. */
 function writeReport(out: string | undefined, data: unknown) {
   if (!out) return;
@@ -129,10 +153,63 @@ async function main(cmd: string, argv: string[]): Promise<number> {
     if (failOn !== 'error' && failOn !== 'warn') throw new Error('--fail-on debe ser error o warn');
     const repeat = num(p, 'repeat') ?? 1;
     if (!Number.isInteger(repeat) || repeat < 1) throw new Error('--repeat debe ser un entero >= 1');
+    const fontScale = num(p, 'font-scale');
+    if (fontScale !== undefined && !(fontScale > 0 && fontScale <= 4)) throw new Error('--font-scale debe ser un numero entre 0 y 4 (1.2 = letra 20 % mas grande)');
+    const fallback = one(p, 'font-fallback');
+    if (fallback !== undefined && fallback !== 'wide' && fallback !== 'narrow') throw new Error('--font-fallback debe ser wide o narrow');
+    const stress = fontScale !== undefined || fallback !== undefined ? { ...(fontScale !== undefined ? { fontScale } : {}), ...(fallback ? { fontFallback: fallback as 'wide' | 'narrow' } : {}) } : undefined;
+    const themesSpec = one(p, 'themes');
+    const themes = themesSpec !== undefined ? parseThemes(themesSpec) : undefined;
+    if (themes && props && 'theme' in props) throw new Error('--themes y --props con "theme" se pisan: dejá solo uno');
     const qaOpts = {
       videoId: id, props, format, scene, ...sample(p), rules: (only ?? ALL_RULES).filter((x) => !skip.includes(x)),
-      thresholds: parseOverrides(p.flags.get('set') ?? []), concurrency: num(p, 'concurrency'), ...common(p), log,
+      thresholds: parseOverrides(p.flags.get('set') ?? []), concurrency: num(p, 'concurrency'), stress, ...common(p), log,
     };
+    const verbose = p.bools.has('verbose');
+    const max = verbose && one(p, 'max') === undefined ? Infinity : num(p, 'max') ?? 40;
+
+    // Resumen de un informe (lo mismo en un solo sistema que en cada uno de --themes).
+    const printSummary = (r: Awaited<ReturnType<typeof runQa>>, label = '') => {
+      printQa(r.findings, r.summary.frames, { verbose, max });
+      const s = r.summary;
+      if (s.detailSmallText) console.log(`\ninfo: ${s.detailSmallText.texts} ${s.detailSmallText.texts === 1 ? 'texto' : 'textos'} por debajo del mínimo en el plano general ${s.detailSmallText.texts === 1 ? 'se lee' : 'se leen'} al acercar dentro de su escena (detalle, no es error; ${s.detailSmallText.frames} ${s.detailSmallText.frames === 1 ? 'cuadro afectado' : 'cuadros afectados'}; --verbose lo muestra por cuadro)`);
+      if (s.decor) console.log(`\ninfo: ${s.decor.texts} ${s.decor.texts === 1 ? 'texto de adorno' : 'textos de adorno'} (data-qa-decor) quedaron fuera de min-size y contrast (${s.decor.frames} ${s.decor.frames === 1 ? 'cuadro' : 'cuadros'}); clip, overlap contra texto normal y offscreen (si es data-qa-decor="main") siguen aplicando`);
+      if (s.silenced) {
+        const parts = Object.entries(s.silenced).map(([rule, c]) => `${rule}: ${[c.ignore ? `${c.ignore} por data-qa-ignore` : '', c.decor ? `${c.decor} por data-qa-decor` : ''].filter(Boolean).join(', ')}`);
+        console.log(`\ncallados (no cuentan arriba): ${parts.join('; ')}`);
+      }
+      console.log('');
+      for (const l of formatJudged(s.judged)) console.log(l);
+      const per = Object.entries(s.byRule).map(([k, v]) => `${k}=${v}`).join(' ') || 'ninguno';
+      console.log(`\n${label}${id}: ${s.frames.length} cuadros revisados en ${s.seconds}s; ${s.errors} errores, ${s.warnings} avisos, ${s.infos} info${verbose ? '' : ' (ocultos; --verbose)'} (${per})`);
+    };
+    if (stress) console.log(`estres de tipografia: ${[stress.fontScale !== undefined ? `letra x${stress.fontScale}` : '', stress.fontFallback ? `fuente de reemplazo ${stress.fontFallback}` : ''].filter(Boolean).join(', ')}`);
+
+    // --themes: el mismo control bajo cada design system, con una matriz y las diferencias entre ellos.
+    if (themes) {
+      const reports = await runQaThemes(qaOpts, themes);
+      let unstable = false;
+      for (let i = 2; i <= repeat; i++) {
+        const again = await runQaThemes(qaOpts, themes);
+        for (const t of themes) {
+          const diff = diffReports(reports[t]!, again[t]!);
+          if (diff.length) {
+            unstable = true;
+            console.log(`\nREPETICION ${i}/${repeat} [${t}]: el informe difiere de la primera corrida (${diff.length} ${diff.length === 1 ? 'diferencia' : 'diferencias'}):`);
+            for (const d of diff.slice(0, 40)) console.log(`  ${d}`);
+          }
+        }
+      }
+      for (const t of themes) { console.log(`\n===== sistema: ${t} =====`); printSummary(reports[t]!, `[${t}] `); }
+      const matrix = buildMatrix(reports);
+      console.log(`\n===== matriz (${id}) =====\n${formatMatrix(matrix)}\n\n${formatDifferences(matrix, max === Infinity ? 1e9 : max)}`);
+      if (themes.length > 1 && themes.every((t) => canonical(reports[t]!) === canonical(reports[themes[0]!]!))) console.log('\nnota: los informes de todos los sistemas son iguales; si el video no lee props.theme, la matriz no prueba nada (hello y audio-check no lo leen)');
+      writeReport(one(p, 'out') ?? one(p, 'json'), { themes, reports, matrix });
+      if (repeat > 1) console.log(unstable ? `\nrepeticiones: NO reproducible (algún informe de ${repeat} difiere del primero)` : `\nrepeticiones: ${repeat} corridas con informes idénticos (salvo el tiempo)`);
+      if (unstable) return 3;
+      return themes.some((t) => failsAt(reports[t]!, failOn)) ? 1 : 0;
+    }
+
     const r = await runQa(qaOpts);
     // --repeat N: autocomprobación. Corre el mismo control N veces; si algún informe difiere del primero, imprime qué hallazgos
     // cambian y falla (código 3): el control tiene que ser determinista. Sin diferencias, sigue como siempre con el primer informe.
@@ -147,16 +224,7 @@ async function main(cmd: string, argv: string[]): Promise<number> {
         if (diff.length > 40) console.log(`  … ${diff.length - 40} más`);
       }
     }
-    printQa(r.findings, r.summary.frames, { verbose: p.bools.has('verbose'), max: p.bools.has('verbose') && one(p, 'max') === undefined ? Infinity : num(p, 'max') ?? 40 });
-    const s = r.summary;
-    if (s.detailSmallText) console.log(`\ninfo: ${s.detailSmallText.texts} ${s.detailSmallText.texts === 1 ? 'texto' : 'textos'} por debajo del mínimo en el plano general ${s.detailSmallText.texts === 1 ? 'se lee' : 'se leen'} al acercar dentro de su escena (detalle, no es error; ${s.detailSmallText.frames} ${s.detailSmallText.frames === 1 ? 'cuadro afectado' : 'cuadros afectados'}; --verbose lo muestra por cuadro)`);
-    if (s.decor) console.log(`\ninfo: ${s.decor.texts} ${s.decor.texts === 1 ? 'texto de adorno' : 'textos de adorno'} (data-qa-decor) quedaron fuera de min-size y contrast (${s.decor.frames} ${s.decor.frames === 1 ? 'cuadro' : 'cuadros'}); clip, overlap contra texto normal y offscreen (si es data-qa-decor="main") siguen aplicando`);
-    if (s.silenced) {
-      const parts = Object.entries(s.silenced).map(([rule, c]) => `${rule}: ${[c.ignore ? `${c.ignore} por data-qa-ignore` : '', c.decor ? `${c.decor} por data-qa-decor` : ''].filter(Boolean).join(', ')}`);
-      console.log(`\ncallados (no cuentan arriba): ${parts.join('; ')}`);
-    }
-    const per = Object.entries(s.byRule).map(([k, v]) => `${k}=${v}`).join(' ') || 'ninguno';
-    console.log(`\n${id}: ${s.frames.length} cuadros revisados en ${s.seconds}s; ${s.errors} errores, ${s.warnings} avisos, ${s.infos} info${p.bools.has('verbose') ? '' : ' (ocultos; --verbose)'} (${per})`);
+    printSummary(r);
     writeReport(one(p, 'out') ?? one(p, 'json'), r);
     if (repeat > 1) console.log(unstable ? `\nrepeticiones: NO reproducible (algún informe de ${repeat} difiere del primero)` : `\nrepeticiones: ${repeat} corridas con informes idénticos (salvo el tiempo)`);
     if (unstable) return 3;

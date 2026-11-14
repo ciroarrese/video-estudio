@@ -96,3 +96,31 @@ export function sampleRects(img: Raster, rects: Rect[]): (BgSample | null)[] {
     return { r: median(R), g: median(G), b: median(B), samples: R.length };
   });
 }
+
+/** Diferencia (maximo por canal, 0 a 255) a partir de la cual un pixel cuenta como "tinta": el texto de abajo de una capa casi opaca (0.9) cambia menos que esto. */
+export const INK_DIFF = 40;
+
+/**
+ * Para cada texto (sus rectangulos de linea), la fraccion de pixeles que cambian entre la captura normal y la captura con el texto
+ * oculto: evidencia de que el texto SE VE en pantalla (o no), independiente de la heuristica de tapados. `null` si todos los
+ * rectangulos quedan fuera de la imagen o las capturas no tienen el mismo tamano. Aritmetica pura sobre bytes: misma captura, mismo resultado.
+ */
+export function inkFractions(normal: Raster, hidden: Raster, texts: Rect[][]): ({ frac: number } | null)[] {
+  if (normal.width !== hidden.width || normal.height !== hidden.height) return texts.map(() => null);
+  return texts.map((lines) => {
+    let seen = 0, changed = 0;
+    for (const r of lines.slice(0, 8)) {
+      const x0 = Math.max(0, Math.floor(r.x)), y0 = Math.max(0, Math.floor(r.y));
+      const x1 = Math.min(normal.width, Math.ceil(r.x + r.w)), y1 = Math.min(normal.height, Math.ceil(r.y + r.h));
+      if (x1 <= x0 || y1 <= y0) continue;
+      const step = Math.max(1, Math.ceil(Math.sqrt(((x1 - x0) * (y1 - y0)) / 6000)));
+      for (let y = y0; y < y1; y += step) for (let x = x0; x < x1; x += step) {
+        const o = (y * normal.width + x) * 4;
+        const d = Math.max(Math.abs(normal.data[o]! - hidden.data[o]!), Math.abs(normal.data[o + 1]! - hidden.data[o + 1]!), Math.abs(normal.data[o + 2]! - hidden.data[o + 2]!));
+        seen++;
+        if (d >= INK_DIFF) changed++;
+      }
+    }
+    return seen ? { frac: changed / seen } : null;
+  });
+}

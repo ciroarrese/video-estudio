@@ -31,12 +31,30 @@ import { Fill, useFrame } from '../../engine';
  * sin contraste dentro de `data-qa-decor` (sin hallazgos; resumen info con la cuenta) vs 70 los mismos textos sin la marca (errores `min-size` y `contrast`);
  * 71 un rótulo de adorno cortado (error `clip`: la marca no lo exime); 72 un adorno que pisa un texto normal (error `overlap`); 73 un adorno que sale del cuadro (sin hallazgo)
  * vs 74 el mismo con `data-qa-decor="main"` (error `offscreen`); 75 un texto con `data-qa-ignore="contrast"` (sin hallazgo, pero cuenta en `summary.silenced`).
+ * Frames 76-92 son la CEGUERA bajo una capa de cuadro completo marcada `data-qa-ignore="covered"` (lo que llevan `Vignette`, `Wash` y la capa de fondo del escenario): ninguna capa de
+ * estas puede hacer que el control deje de mirar el texto de abajo. 76 + 77, 78 + 79 y 80 + 81 son tres pares IDENTICOS salvo por la viñeta (degradado de cuadro completo con el
+ * centro transparente y `data-qa-ignore="covered"`): texto de bajo contraste (error `contrast`), dos rótulos que se pisan (error `overlap`) y un rótulo bajo una pastilla opaca
+ * (error `covered`); el hallazgo tiene que ser el mismo con y sin viñeta. 82-84 la misma viñeta con la opacidad cambiando entre cuadros (0,6 / 0,7 / 0,8) sobre un texto quieto: no es un
+ * velo que cruza, el error de `contrast` se mantiene en los tres. 85-87 un lavado liso marcado `covered` a medio fundido (0,45 / 0,55 / 0,65) sobre texto claro: `contrast` es `info`;
+ * 88-90 el mismo lavado quieto (0,55): error en el 89. 91 un lavado liso, marcado y cerrado del todo sobre todo el cuadro: el texto de abajo NO se ve, no hay hallazgos (el resumen lo cuenta como
+ * tapado); 92 el contrapunto: un degradado de cuadro completo con el centro transparente SIN marca sobre dos rótulos que se pisan: el error `overlap` se informa.
  * Frame 18 builds a term and an e-mail out of one span per letter / per part: only the privacy check cares (block-level scan).
  */
-export const QA_DEFECT_FRAMES = { clean: 0, clip: 1, offscreen: 2, overlap: 3, tiny: 4, contrast: 5, covered: 6, privacy: 7, wash: 8, flyingA: 9, flyingB: 10, faint: 11, leavingA: 12, leavingB: 13, leavingC: 14, stillFaint: 15, sideCover: 16, hiddenStatic: 17, split: 18, veilCrossA: 19, veilCrossB: 20, veilCrossC: 21, veilStaticA: 22, veilStaticB: 23, veilStaticC: 24, slowFadeA: 25, slowFadeB: 26, slowFadeC: 27, slowStaticA: 28, slowStaticB: 29, slowStaticC: 30, crossMoveA: 31, crossMoveB: 32, crossMoveC: 33, crossStillA: 34, crossStillB: 35, crossStillC: 36, overlapMoveA: 37, overlapMoveB: 38, overlapMoveC: 39, overlapStillA: 40, overlapStillB: 41, overlapStillC: 42, coverMoveA: 43, coverMoveB: 44, coverMoveC: 45, coverStillA: 46, coverStillB: 47, coverStillC: 48, camMoveA: 49, camMoveB: 50, camMoveC: 51, camStillA: 52, camStillB: 53, camStillC: 54, splitBlocks: 55, splitLine: 56, zoomOut: 57, zoomIn: 59, neverReadable: 61, svgFillDark: 63, svgFillPale: 64, svgStroke: 65, hiddenCovers: 66, inheritedHidden: 67, visibleCanvas: 68, decorOk: 69, decorStrict: 70, decorClip: 71, decorOverlap: 72, decorOffscreen: 73, decorMainOffscreen: 74, ignoreCounted: 75 } as const;
+export const QA_DEFECT_FRAMES = { clean: 0, clip: 1, offscreen: 2, overlap: 3, tiny: 4, contrast: 5, covered: 6, privacy: 7, wash: 8, flyingA: 9, flyingB: 10, faint: 11, leavingA: 12, leavingB: 13, leavingC: 14, stillFaint: 15, sideCover: 16, hiddenStatic: 17, split: 18, veilCrossA: 19, veilCrossB: 20, veilCrossC: 21, veilStaticA: 22, veilStaticB: 23, veilStaticC: 24, slowFadeA: 25, slowFadeB: 26, slowFadeC: 27, slowStaticA: 28, slowStaticB: 29, slowStaticC: 30, crossMoveA: 31, crossMoveB: 32, crossMoveC: 33, crossStillA: 34, crossStillB: 35, crossStillC: 36, overlapMoveA: 37, overlapMoveB: 38, overlapMoveC: 39, overlapStillA: 40, overlapStillB: 41, overlapStillC: 42, coverMoveA: 43, coverMoveB: 44, coverMoveC: 45, coverStillA: 46, coverStillB: 47, coverStillC: 48, camMoveA: 49, camMoveB: 50, camMoveC: 51, camStillA: 52, camStillB: 53, camStillC: 54, splitBlocks: 55, splitLine: 56, zoomOut: 57, zoomIn: 59, neverReadable: 61, svgFillDark: 63, svgFillPale: 64, svgStroke: 65, hiddenCovers: 66, inheritedHidden: 67, visibleCanvas: 68, decorOk: 69, decorStrict: 70, decorClip: 71, decorOverlap: 72, decorOffscreen: 73, decorMainOffscreen: 74, ignoreCounted: 75, vigContrastA: 76, vigContrastB: 77, vigOverlapA: 78, vigOverlapB: 79, vigCoveredA: 80, vigCoveredB: 81, vigFadeA: 82, vigFadeB: 83, vigFadeC: 84, washCrossA: 85, washCrossB: 86, washCrossC: 87, washStillA: 88, washStillB: 89, washStillC: 90, washClosed: 91, gradientOverlap: 92 } as const;
 
 const font: CSSProperties = { fontFamily: 'Arial, Helvetica, sans-serif', color: '#1b1f2a' };
 const abs = (left: number, top: number, extra: CSSProperties = {}): CSSProperties => ({ position: 'absolute', left, top, margin: 0, whiteSpace: 'nowrap', ...font, ...extra });
+
+/** Viñeta de cuadro completo como la del kit: degradado radial con el centro transparente y `data-qa-ignore="covered"` (no es una tapa). */
+function Vignette({ opacity }: { opacity?: number }) {
+  return (
+    <div
+      data-testid="vignette"
+      data-qa-ignore="covered"
+      style={{ position: 'absolute', left: 0, top: 0, width: '100%', height: '100%', pointerEvents: 'none', opacity, background: 'radial-gradient(ellipse at center, transparent 45%, rgba(20,30,60,0.22) 100%)' }}
+    />
+  );
+}
 
 function Heading({ children }: { children: ReactNode }) {
   return <h1 data-testid="heading" style={abs(96, 64, { fontSize: 44, fontWeight: 700 })}>{children}</h1>;
@@ -372,6 +390,90 @@ export function QaDefects() {
           {/* contraste bajo a propósito: es un rótulo de acompañamiento que repite el color de estado (decisión de diseño) */}
           <p data-testid="ignored-contrast" data-qa-ignore="contrast" style={abs(40, 100, { fontSize: 36, color: '#d2d2d2' })}>Estado en gris</p>
         </Card>
+      );
+      break;
+    case 76:
+    case 77:
+      // contraste bajo, con (77) y sin (76) viñeta: el texto esta en la zona transparente de la viñeta, asi que el hallazgo (y la razon medida) son los mismos
+      body = (
+        <>
+          <div style={{ position: 'absolute', left: 400, top: 240, width: 480, height: 200, background: '#f2f2f2', borderRadius: 16 }}>
+            <p data-testid="vig-low" style={abs(32, 70, { fontSize: 36, color: '#d2d2d2' })}>Texto casi invisible</p>
+          </div>
+          {f === 77 && <Vignette />}
+        </>
+      );
+      break;
+    case 78:
+    case 79:
+      body = (
+        <>
+          <p data-testid="vig-a" style={abs(400, 260, { fontSize: 48, fontWeight: 700 })}>Ventas del mes</p>
+          <p data-testid="vig-b" style={abs(440, 285, { fontSize: 48, fontWeight: 700, color: '#2b4a8c' })}>Costos del mes</p>
+          {f === 79 && <Vignette />}
+        </>
+      );
+      break;
+    case 80:
+    case 81:
+      body = (
+        <>
+          <p data-testid="vig-covered" style={abs(400, 300, { fontSize: 36, fontWeight: 600 })}>Total pendiente</p>
+          <div data-testid="vig-pill" style={{ position: 'absolute', left: 430, top: 292, width: 190, height: 56, borderRadius: 28, background: '#d7dbe6' }} />
+          {f === 81 && <Vignette />}
+        </>
+      );
+      break;
+    case 82:
+    case 83:
+    case 84:
+      // la viñeta cambia de opacidad entre cuadros (0,6 / 0,7 / 0,8) y el texto de abajo esta quieto: no es un velo que cruza, el error se mantiene
+      body = (
+        <>
+          <div style={{ position: 'absolute', left: 400, top: 240, width: 480, height: 200, background: '#f2f2f2', borderRadius: 16 }}>
+            <p data-testid="vig-fade-text" style={abs(32, 70, { fontSize: 36, color: '#d2d2d2' })}>Texto casi invisible</p>
+          </div>
+          <Vignette opacity={0.6 + (f - 82) * 0.1} />
+        </>
+      );
+      break;
+    case 85:
+    case 86:
+    case 87:
+    case 88:
+    case 89:
+    case 90: {
+      // como 19-24 pero con el lavado MARCADO `data-qa-ignore="covered"` (el `Wash` del kit): cruza (info en el 86) o queda quieto (error en el 89)
+      const veil = f <= 87 ? 0.45 + (f - 85) * 0.1 : 0.55;
+      body = (
+        <>
+          <div style={{ position: 'absolute', left: 96, top: 200, width: 640, height: 200, background: '#2b4a8c', borderRadius: 16 }}>
+            <p data-testid="wash-text" style={abs(32, 70, { fontSize: 36, fontWeight: 700, color: '#ffffff' })}>Texto claro sobre acento</p>
+          </div>
+          <div data-testid="marked-wash" data-qa-veil={veil.toFixed(3)} data-qa-ignore="covered" style={{ position: 'absolute', left: 0, top: 0, width: '100%', height: '100%', background: '#ffffff', opacity: veil }} />
+        </>
+      );
+      break;
+    }
+    case 91:
+      // lavado liso, marcado y cerrado del todo: lo de abajo no se ve (nada que juzgar), y el resumen lo cuenta
+      body = (
+        <>
+          <p data-testid="closed-a" style={abs(400, 260, { fontSize: 48, fontWeight: 700 })}>Ventas del mes</p>
+          <p data-testid="closed-b" style={abs(440, 285, { fontSize: 48, fontWeight: 700, color: '#2b4a8c' })}>Costos del mes</p>
+          <p data-testid="closed-low" style={abs(400, 420, { fontSize: 36, color: '#d2d2d2' })}>Texto casi invisible</p>
+          <div data-testid="closed-wash" data-qa-ignore="covered" style={{ position: 'absolute', left: 0, top: 0, width: '100%', height: '100%', background: '#ffffff' }} />
+        </>
+      );
+      break;
+    case 92:
+      // contrapunto: degradado de cuadro completo con el centro transparente SIN marca; no tapa nada, los rotulos que se pisan se informan
+      body = (
+        <>
+          <p data-testid="grad-a" style={abs(400, 260, { fontSize: 48, fontWeight: 700 })}>Ventas del mes</p>
+          <p data-testid="grad-b" style={abs(440, 285, { fontSize: 48, fontWeight: 700, color: '#2b4a8c' })}>Costos del mes</p>
+          <div data-testid="plain-gradient" style={{ position: 'absolute', left: 0, top: 0, width: '100%', height: '100%', pointerEvents: 'none', background: 'radial-gradient(ellipse at center, transparent 45%, rgba(20,30,60,0.22) 100%)' }} />
+        </>
       );
       break;
     default:

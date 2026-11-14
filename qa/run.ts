@@ -1,10 +1,10 @@
 import { cpus } from 'node:os';
 import { applyMotion, coverKeys } from './motion';
 import { collectRuns, sampleBackgrounds } from './page';
-import { ALL_RULES, type DecorSummary, type DetailSummary, type SilencedSummary, type Finding, type RuleId, type Severity } from './types';
-import { runRulesCounted } from './rules';
+import { ALL_RULES, type DecorSummary, type DetailSummary, type JudgedSummary, type SilencedSummary, type Finding, type RuleId, type Severity } from './types';
+import { addJudged, emptyJudged, runRulesCounted } from './rules';
 import { sampleFrames, type SampleSpec } from './sampling';
-import { openSession, sceneFrames } from './session';
+import { openSession, sceneFrames, type Stress } from './session';
 import type { FormatName } from '../engine';
 import { mergeThresholds, type ThresholdOverrides } from './thresholds';
 import { candidatesOf, probeReadable, reclassifyDetail } from './zoom';
@@ -24,6 +24,8 @@ export type QaOptions = SampleSpec & {
   assets?: string[];
   /** Borrador: una fuente que no carga solo avisa. */
   allowMissingFonts?: boolean;
+  /** Prueba de estres de tipografia (`--font-scale`, `--font-fallback`): ver qa/session.ts `Stress`. */
+  stress?: Stress;
   log?: (m: string) => void;
 };
 
@@ -41,6 +43,10 @@ export type QaSummary = {
   silenced?: SilencedSummary;
   /** Textos de adorno (`data-qa-decor`) que se dejaron fuera de `min-size` y `contrast`. */
   decor?: DecorSummary;
+  /** Cuanto texto juzgo el control y cuanto no (y por que): el control que "da 0 errores" sin mirar nada tiene que notarse. */
+  judged: JudgedSummary;
+  /** Estres de tipografia con el que se corrio (si hubo). */
+  stress?: Stress;
   seconds: number;
 };
 export type QaResult = { findings: Finding[]; summary: QaSummary };
@@ -49,7 +55,7 @@ export async function runQa(o: QaOptions): Promise<QaResult> {
   const t0 = Date.now();
   const thresholds = mergeThresholds(o.thresholds);
   const rules = o.rules ?? ALL_RULES;
-  const session = await openSession({ videoId: o.videoId, props: o.props, format: o.format, assets: o.assets, allowMissingFonts: o.allowMissingFonts, log: o.log });
+  const session = await openSession({ videoId: o.videoId, props: o.props, format: o.format, assets: o.assets, allowMissingFonts: o.allowMissingFonts, stress: o.stress, log: o.log });
   try {
     const { meta } = session;
     const frames = sampleFrames(o, meta.durationInFrames, 24, await sceneFrames(session, o.scene));
@@ -57,6 +63,7 @@ export async function runQa(o: QaOptions): Promise<QaResult> {
     const queue = [...frames];
     const findings: Finding[] = [];
     const silenced: SilencedSummary = {};
+    const judged = emptyJudged();
     const decorTexts = new Set<string>();
     const decorFrames = new Set<number>();
     await Promise.all(
@@ -65,7 +72,8 @@ export async function runQa(o: QaOptions): Promise<QaResult> {
         for (let f = queue.shift(); f !== undefined; f = queue.shift()) {
           await vp.setFrame(f);
           const data = await collectRuns(vp, meta.width, meta.height);
-          if (rules.includes('contrast')) await sampleBackgrounds(vp, data.runs);
+          // Capturas (normal y con el texto oculto): el fondo para `contrast` y la evidencia de que el texto se ve para `visibleRuns` y `unjudged`.
+          if (rules.includes('contrast') || rules.includes('unjudged')) await sampleBackgrounds(vp, data.runs, { bg: rules.includes('contrast'), ink: true });
           // Motion: compare with the neighbouring frames (f-1, f+1) to tell transitions from static defects.
           const keys = coverKeys(data);
           const neighbours = [];
@@ -77,6 +85,7 @@ export async function runQa(o: QaOptions): Promise<QaResult> {
           applyMotion(data, neighbours);
           const r = runRulesCounted({ frame: f, width: meta.width, height: meta.height, runs: data.runs, thresholds }, rules);
           findings.push(...r.findings);
+          addJudged(judged, r.judged);
           for (const [rule, c] of Object.entries(r.silenced)) {
             const t = (silenced[rule] ??= { ignore: 0, decor: 0 });
             t.ignore += c.ignore;
@@ -112,7 +121,7 @@ export async function runQa(o: QaOptions): Promise<QaResult> {
         byRule, ...(detail ? { detailSmallText: detail } : {}),
         // Las claves de `silenced` se insertan en el orden en que terminan los cuadros (según el paralelismo): se ordenan para que el informe sea idéntico entre corridas.
         ...(Object.keys(silenced).length ? { silenced: Object.fromEntries(Object.entries(silenced).sort(([a], [b]) => a.localeCompare(b))) } : {}),
-        ...(decorTexts.size ? { decor: { texts: decorTexts.size, frames: decorFrames.size } } : {}), seconds: Math.round((Date.now() - t0) / 100) / 10,
+        ...(decorTexts.size ? { decor: { texts: decorTexts.size, frames: decorFrames.size } } : {}), judged, ...(o.stress ? { stress: o.stress } : {}), seconds: Math.round((Date.now() - t0) / 100) / 10,
       },
     };
   } finally {
