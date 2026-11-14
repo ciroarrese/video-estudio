@@ -82,8 +82,11 @@ describe('efectos sintetizados', () => {
 });
 
 describe('variantes del clic', () => {
-  const variantes = Object.keys(CLICS).filter((n) => n !== 'actual');
+  // Los clics de mouse (`mouse*`) son de otra familia: dos eventos y más largos; tienen sus propias pruebas en `mouse.test.ts`.
+  const esMouse = (n: string) => n.startsWith('mouse');
+  const variantes = Object.keys(CLICS).filter((n) => n !== 'actual' && !esMouse(n));
   const todas = Object.keys(CLICS);
+  const sinMouse = todas.filter((n) => !esMouse(n));
   const sc = Object.fromEntries(todas.map((n) => [n, CLICS[n].generar(sr)]));
 
   /** Centroide espectral (Hz) y tiempo (ms) hasta que la envolvente de 1 ms cae 20 dB bajo su máximo por última vez. */
@@ -144,11 +147,11 @@ describe('variantes del clic', () => {
   });
 
   it('cada par se distingue: espectro por tercios de octava con correlación < 0,9 y, además, centroide a más de 0,25 octavas o duración a más de 0,3 octavas', () => {
-    const sp = Object.fromEntries(todas.map((n) => [n, espectroPorBandas(sc[n], sr)]));
-    const r = Object.fromEntries(todas.map((n) => [n, rasgos(sc[n])]));
-    for (let i = 0; i < todas.length; i++) {
-      for (let j = i + 1; j < todas.length; j++) {
-        const [a, b] = [todas[i], todas[j]];
+    const sp = Object.fromEntries(sinMouse.map((n) => [n, espectroPorBandas(sc[n], sr)]));
+    const r = Object.fromEntries(sinMouse.map((n) => [n, rasgos(sc[n])]));
+    for (let i = 0; i < sinMouse.length; i++) {
+      for (let j = i + 1; j < sinMouse.length; j++) {
+        const [a, b] = [sinMouse[i], sinMouse[j]];
         expect(correlacion(sp[a], sp[b]), `${a} y ${b}`).toBeLessThan(0.9);
         const dc = Math.abs(Math.log2(r[a].centroide / r[b].centroide));
         const dt = Math.abs(Math.log2(r[a].t20 / r[b].t20));

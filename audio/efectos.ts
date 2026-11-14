@@ -4,6 +4,7 @@
 import { join } from 'node:path';
 import { analizarEfecto } from './dinamica';
 import { escribirWav16 } from './ffmpeg';
+import { generarMouse } from './mouse';
 
 export const EFECTOS_SR = 48000;
 
@@ -193,7 +194,7 @@ export interface Clic {
 
 /**
  * Variantes del clic de interfaz. Cada una es un sonido distinto (no el mismo con otro filtro): todas
- * sintetizadas con fórmulas propias, mono, de 15 a 120 ms, con pico cerca de -3 dBFS. `actual` es el `clic`
+ * sintetizadas con fórmulas propias, mono, de 15 a 120 ms (el doble clic de mouse dura unos 280), con pico cerca de -3 dBFS. `actual` es el `clic`
  * original (el que se escribe como `clic` si no se elige otro con `efectos --clic <nombre>`).
  */
 export const CLICS: Record<string, Clic> = {
@@ -301,6 +302,31 @@ export const CLICS: Record<string, Clic> = {
       }
       return terminar(x, sr, PICO_CLIC);
     },
+  },
+  mouse: {
+    descripcion: 'Clic de mouse de oficina: bajada y subida del botón (95 ms entre una y otra), cada una un chasquido seco con el repiqueteo de la carcasa.',
+    cuando: 'El clic del cursor en demos de software: es el sonido de un mouse de verdad, no un aviso de interfaz.',
+    generar: (sr) => generarMouse(sr, 'normal'),
+  },
+  'mouse-suave': {
+    descripcion: 'Clic de mouse silencioso: bajada y subida más sordas, con menos agudos y el ataque blando.',
+    cuando: 'Música tranquila o muchos clics seguidos: se siente como un mouse con interruptor silencioso y no cansa.',
+    generar: (sr) => generarMouse(sr, 'suave'),
+  },
+  'mouse-marcado': {
+    descripcion: 'Clic de microinterruptor mecánico: más agudo y seco, con la subida tan fuerte como la bajada, o un poco más.',
+    cuando: 'Cuando el clic tiene que oírse entre música con percusión, o para un mouse gamer.',
+    generar: (sr) => generarMouse(sr, 'marcado'),
+  },
+  'mouse-apretar': {
+    descripcion: 'Solo la bajada del botón de un mouse de oficina: un chasquido seco sin la subida.',
+    cuando: 'Clics rápidos del cursor, en ráfaga o sobre un cuadro corto, donde la subida embarraría.',
+    generar: (sr) => generarMouse(sr, 'normal', { subida: false }),
+  },
+  'mouse-doble': {
+    descripcion: 'Doble clic de mouse de oficina: dos clics completos separados por unos 200 ms.',
+    cuando: 'Abrir un archivo o una carpeta, o seleccionar una palabra.',
+    generar: (sr) => generarMouse(sr, 'normal', { clics: 2, entreClicsMs: 200 }),
   },
   cinta: {
     descripcion: 'Clic de cinta: ráfaga acotada en banda, con un poco de saturación y sin agudos ni graves extremos.',

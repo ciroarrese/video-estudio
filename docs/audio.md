@@ -66,7 +66,7 @@ Todas las opciones numéricas se validan: un valor que no es número, una bander
 npm run audio -- efectos --out videos/<slug>/audio/sfx --clic thock    # clic.wav es ahora el "thock"
 ```
 
-Todas son mono, duran entre 35 y 110 ms, tienen el pico cerca de -3 dBFS (`actual`, -2 dBFS), empiezan y terminan en cero y no tienen continua. `efectos --lista` las describe.
+Todas son mono, duran entre 35 y 110 ms (salvo las de mouse, que van más abajo), tienen el pico cerca de -3 dBFS (`actual`, -2 dBFS), empiezan y terminan en cero y no tienen continua. `efectos --lista` las describe.
 
 | Nombre | Cómo suena | Cuándo va bien |
 | --- | --- | --- |
@@ -79,6 +79,26 @@ Todas son mono, duran entre 35 y 110 ms, tienen el pico cerca de -3 dBFS (`actua
 | `digital` | Blip de triángulo cerca de 1 kHz, filtrado, sin filo. | Software y música lo-fi: electrónico pero amable. |
 | `thock` | Tecla amortiguada: cuerpo cerca de 180 Hz y un hueco a 420 Hz. | Escritura, listas y formularios; el más cálido. |
 | `cinta` | Ráfaga acotada en banda y un poco saturada, sin extremos. | Música lo-fi cálida: se mezcla con el grano en lugar de destacar. |
+
+### Clic de mouse
+
+Un clic de mouse real no es un aviso de interfaz: son **dos golpes** (la bajada y la subida del botón, a unos 70 a 130 ms), cada uno un chasquido de banda ancha de pocos milisegundos seguido del repiqueteo seco de la carcasa de plástico, sin tono y casi sin graves. Las variantes `mouse*` lo sintetizan con un modelo físico chico (`audio/mouse.ts`): una ráfaga de ruido con semilla excita un banco de resonadores amortiguados (los modos inarmónicos de la carcasa, de 1,5 a 7 kHz, que se apagan en 5 a 20 ms) y se le suma un tic de banda ancha. La subida sale más baja de nivel y más aguda que la bajada, y cada evento lleva pequeñas irregularidades de nivel, de tiempo y de frecuencia. Son deterministas, mono, con el pico cerca de -3 dBFS, empiezan y terminan en cero y no tienen continua.
+
+| Nombre | Qué es | Cuándo va |
+| --- | --- | --- |
+| `mouse` | Mouse de oficina común: bajada y subida a unos 95 ms. | El clic del cursor en una demo de software; la opción por defecto para "esto es un clic de mouse". |
+| `mouse-suave` | Mouse de interruptor silencioso: más sordo, menos agudos, ataque blando. | Música tranquila o muchos clics seguidos. |
+| `mouse-marcado` | Microinterruptor mecánico: más agudo y seco, con la subida tan fuerte como la bajada. | Música con percusión (es de los que mejor se abren paso) o un mouse "gamer". |
+| `mouse-apretar` | Solo la bajada. | Clics rápidos del cursor o en ráfaga, donde la subida embarra. |
+| `mouse-doble` | Dos clics completos, a unos 200 ms entre bajadas. | Abrir un archivo o una carpeta, seleccionar una palabra. |
+
+```bash
+npm run audio -- efectos --out videos/<slug>/audio/sfx --clic mouse    # clic.wav pasa a ser el clic de mouse
+```
+
+Un cue lo pide por su nombre de archivo: `{"frame": 120, "sfx": "clic-mouse"}` (o `clic-mouse-doble`, etc.). Ojo con el nivel: son transitorios de pocos milisegundos y por energía casi no suman a una música a 0,6 de ganancia, aunque se oyen bien por encima de 2 kHz; con música con percusión, `mouse-marcado` o un `gain` de 1,3 a 1,6 en el cue, y evitá que caiga sobre el bombo (el contratiempo, el "y" del pulso, queda libre).
+
+Si preferís un sonido grabado de un mouse de verdad, no hace falta tocar el repo: apuntá el `sfx` del cue a un archivo (`{"frame": 120, "sfx": "/ruta/a/mi-clic.wav"}`). Verificá antes que su licencia permita usarlo donde se va a mostrar el video y redistribuirlo (ver "Licencias"); el archivo queda en la carpeta del video, nunca en el repo.
 
 Con música, un clic suave puede quedar tapado si cae justo sobre el bombo; subile el `gain` del cue (1,2 a 1,5 con ducking) o corré el cue unas décimas de pulso. El set y la forma de medir las diferencias están en `audio/efectos.ts` (`CLICS`) y `audio/efectos.test.ts`.
 
@@ -159,4 +179,4 @@ Los sonidos se generan a pedido con fórmulas propias (sin muestras de terceros)
 
 ## Pruebas
 
-`audio/*.test.ts` usan señales sintéticas generadas en la prueba (trenes de clics, colchones, un patrón de bombo y platillos, senos), sin archivos externos ni música de nadie. Hay pruebas puras (planificadores, argumentos, `beats.ts`, ducking, limitador, sonoridad, efectos) y pruebas de punta a punta con ffmpeg (se omiten con un aviso si ffmpeg no está en el PATH) que verifican la duración (±1 cuadro), que los empalmes caen sobre pulsos y dentro del cuerpo, que el escalón de nivel en un empalme es comparable al de un pulso común, que el ducking baja lo pedido (±1 dB) y se recupera, que un impulso cae en la muestra exacta del cue, que el pico verdadero queda bajo el techo y que `--lufs` llega al objetivo. `audio/medidas.ts` reúne las medidas (FFT, RMS, espectro por bandas, pico verdadero) que usan las pruebas.
+`audio/mouse.test.ts` mide el clic de mouse sin archivos de nadie: dos eventos (o uno, o cuatro) a la separación documentada con un detector de onsets, 90 % de la energía de cada evento en menos de 25 ms, planitud espectral por bandas de tercio de octava (1 a 8 kHz) de al menos 0,15 por evento frente a menos de 0,1 de un tono amortiguado de control, menos de 5 % de la energía bajo 300 Hz y variantes distinguibles. `audio/*.test.ts` usan señales sintéticas generadas en la prueba (trenes de clics, colchones, un patrón de bombo y platillos, senos), sin archivos externos ni música de nadie. Hay pruebas puras (planificadores, argumentos, `beats.ts`, ducking, limitador, sonoridad, efectos) y pruebas de punta a punta con ffmpeg (se omiten con un aviso si ffmpeg no está en el PATH) que verifican la duración (±1 cuadro), que los empalmes caen sobre pulsos y dentro del cuerpo, que el escalón de nivel en un empalme es comparable al de un pulso común, que el ducking baja lo pedido (±1 dB) y se recupera, que un impulso cae en la muestra exacta del cue, que el pico verdadero queda bajo el techo y que `--lufs` llega al objetivo. `audio/medidas.ts` reúne las medidas (FFT, RMS, espectro por bandas, pico verdadero) que usan las pruebas.

@@ -24,7 +24,8 @@ const USO = `Uso: tsx audio/cli.ts <comando>
 
   efectos [--out public/sfx] [--lista] [--clic <nombre>]
       Sintetiza el set de efectos originales (golpe, clic, barrido, campanita, tilde, aviso) y las variantes
-      clic-<nombre> (actual, suave, mecanico, madera, cristal, burbuja, digital, thock, cinta).
+      clic-<nombre> (actual, suave, mecanico, madera, cristal, burbuja, digital, thock, cinta y los de mouse:
+      mouse, mouse-suave, mouse-marcado, mouse-apretar, mouse-doble).
       --clic elige cuál variante se escribe como "clic" (por defecto actual).
       --lista muestra cada uno con el instante de su pico (para "ancla": "pico" en un cue) y cada variante de clic.
 
