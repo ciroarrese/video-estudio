@@ -1,9 +1,9 @@
 import { readFileSync } from 'node:fs';
 import type { PageData, TextRun } from './types';
 import type { VideoPage } from './session';
+import { decodePng, inkFractions, sampleRects } from './png';
 
 const collectSrc = readFileSync(new URL('./collect.inpage.js', import.meta.url), 'utf8');
-const sampleSrc = readFileSync(new URL('./sample.inpage.js', import.meta.url), 'utf8');
 
 // Page.evaluate accepts a string expression at runtime; the shared type only declares functions.
 const evalStr = <R>(vp: VideoPage, expr: string) => (vp.page.evaluate as unknown as (e: string) => Promise<R>)(expr);
@@ -16,23 +16,35 @@ export async function collectRuns(vp: VideoPage, width: number, height: number, 
   return { ...d, frame: -1 };
 }
 
-/** Fills `run.bg` for every run that needs it by screenshotting the frame with all text made transparent. */
-export async function sampleBackgrounds(vp: VideoPage, runs: TextRun[]): Promise<void> {
-  const need = runs.filter((r) => !r.transparentFill);
-  if (!need.length) return;
-  await evalStr(vp, `(()=>{const s=document.createElement('style');s.id='__qa_hide';s.textContent=${JSON.stringify(HIDE_TEXT)};document.head.appendChild(s);})()`);
+/**
+ * Completa `run.bg` (fondo bajo el texto, para `contrast`) y `run.ink` (evidencia de pixeles de que el texto se ve, para `visibleRuns` y la regla
+ * `unjudged`): captura el cuadro tal cual y otra vez con todo el texto transparente. `bg` es la mediana de los pixeles bajo cada caja en la
+ * segunda; `ink` es la fraccion de pixeles de las lineas que cambian entre las dos. Las capturas se decodifican y se muestrean en Node
+ * (qa/png.ts), no en la página: el canvas de la página daba, para el mismo PNG, colores distintos de una corrida a otra y el contraste saltaba.
+ * `want.bg` / `want.ink` eligen que se calcula (con ninguno no hace nada).
+ */
+export async function sampleBackgrounds(vp: VideoPage, runs: TextRun[], want: { bg: boolean; ink: boolean } = { bg: true, ink: true }): Promise<void> {
+  const needBg = want.bg ? runs.filter((r) => !r.transparentFill) : [];
+  if (!needBg.length && !(want.ink && runs.length)) return;
+  // Captura normal (con texto): solo para la evidencia de tinta.
+  const shown = want.ink ? decodePng(await vp.shot(1)) : null;
+  // Se espera a que el estilo que oculta el texto quede pintado (dos cuadros de animación) antes de capturar.
+  await evalStr(vp, `(()=>{const s=document.createElement('style');s.id='__qa_hide';s.textContent=${JSON.stringify(HIDE_TEXT)};document.head.appendChild(s);return new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(()=>r())));})()`);
   let png: Buffer;
   try {
     png = await vp.shot(1);
   } finally {
     await evalStr(vp, `document.getElementById('__qa_hide')?.remove()`);
   }
-  const rects = need.map((r) => r.rect);
-  const res = await evalStr<({ r: number; g: number; b: number; samples: number } | null)[]>(
-    vp,
-    `${sampleSrc}(${JSON.stringify(`data:image/png;base64,${png.toString('base64')}`)},${JSON.stringify(rects)})`,
-  );
-  need.forEach((r, i) => (r.bg = res[i] ?? null));
+  const img = decodePng(png);
+  if (needBg.length) {
+    const res = sampleRects(img, needBg.map((r) => r.rect));
+    needBg.forEach((r, i) => (r.bg = res[i] ?? null));
+  }
+  if (shown) {
+    const ink = inkFractions(shown, img, runs.map((r) => r.lines));
+    runs.forEach((r, i) => (r.ink = ink[i] ?? null));
+  }
 }
 
 export type PageText = {

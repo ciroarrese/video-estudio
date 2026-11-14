@@ -15,3 +15,5 @@ export * from "./styleLine";
 export { editorial } from "./editorial";
 export { neon } from "./neon";
 export { papel } from "./papel";
+export { dimOpacity, dimmedColor } from "./dim";
+export type { DimOptions } from "./dim";

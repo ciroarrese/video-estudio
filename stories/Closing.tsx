@@ -178,7 +178,7 @@ export function Closing({ spec: specIn, scenes = [] }: { spec: StorySpec; scenes
   const wash = kf(f, T.wash, [0, 1], Easing.linear);
   const logo = kf(f, [T.logo, T.logo + u(26)], [0, 1], ease.out);
   const sign = kf(f, [T.sign, T.sign + u(22)], [0, 1], ease.out);
-  const flyStart = (i: number) => T.fly[0] + u(staggerFrames(theme, i, { base: stagger }));
+  const flyStart = (i: number) => T.fly[0] + u(staggerFrames(theme, i, { base: stagger, context: "items" }));
   const flyOf = (i: number) => kf(f, [flyStart(i), flyStart(i) + u(40)], [0, 1], Easing.inOut);
   const bobOf = (i: number) => Math.sin(f / 28 + i * 1.7) * 10;
   const blur = !wallOptions(spec.design).blurClosing ? 0 : Math.round((1 - focus) * 90) / 10;
@@ -188,7 +188,9 @@ export function Closing({ spec: specIn, scenes = [] }: { spec: StorySpec; scenes
   const panelSurface: React.CSSProperties = resolveStyle(theme).surface.elevation === "shadow"
     ? { borderRadius: panelSurf.borderRadius, boxShadow: `0 44px 80px -28px ${withAlpha(theme.color.text, 0.42)}` }
     : { borderRadius: panelSurf.borderRadius, boxShadow: panelSurf.boxShadow };
-  const ignore = "min-size contrast overlap covered offscreen safe-area";
+  // Muro de fondo: adorno (`data-qa-decor`: sin min-size ni contraste; sí se juzgan recorte y choque con texto normal). Las fichas pasan por
+  // detrás de los paneles (`covered`; su texto queda bajo el de los paneles: `overlap`) y llegan hasta los bordes del cuadro (`safe-area`) a propósito.
+  const ignore = "covered overlap safe-area";
   const chipFor = (c: { x: number; y: number; text: string }, i: number, faint: boolean) => {
     const on = faint ? T.light + u(10) + random(`o${i}`) * u(50) : Math.min(T.wall + random(`con${i}`) * u(70), T.light + random(`l2${i}`) * u(30));
     const lit = f >= on ? 1 : 0;
@@ -196,6 +198,7 @@ export function Closing({ spec: specIn, scenes = [] }: { spec: StorySpec; scenes
     return (
       <div
         key={`${faint ? "o" : "i"}${i}`}
+        data-qa-decor=""
         data-qa-ignore={ignore}
         style={{ position: "absolute", left: 0, top: 0, transformOrigin: "0 0", transform: rigTransform(c.x, c.y, 0, wallCam, WALL_P, cx, cy, " scale(1.1) translate(-50%, -50%)"), opacity: faint ? 0.6 : 1 }}
       >
@@ -246,7 +249,7 @@ export function Closing({ spec: specIn, scenes = [] }: { spec: StorySpec; scenes
       {/* paneles flotantes con su título: cada uno lleva su propia perspectiva y se ordena por profundidad */}
       {fold < 1 &&
         panels.map((c, i) => {
-          const st = staggerFrames(theme, i, { base: 8 }); // el paso entre paneles lo escala el tema
+          const st = staggerFrames(theme, i, { base: 8, context: "items" }); // el paso entre paneles lo escala el tema, o es el de `motion.staggerItems`
           const a = kf(f, [u(st), u(st + 24)], [0, 1], ease.out);
           if (a <= 0) return null;
           const W = Math.round(PANEL.w * c.k);
@@ -262,6 +265,7 @@ export function Closing({ spec: specIn, scenes = [] }: { spec: StorySpec; scenes
           return (
             <div key={`${i}-${styleKey(card)}`} style={card}>
               <div style={{ width: PANEL.w, height: PANEL.h, transform: xform({ scaleX: c.k, scaleY: Math.max(0.001, c.k * (1 - fold)) }), transformOrigin: "0 0" }}>
+                {/* miniatura de la escena a escala de panel: su texto es detalle que se lee al acercar, no se le pide el tamaño mínimo (`min-size`); el resto de las reglas sí */}
                 <div data-qa-ignore="min-size" style={{ width: PANEL.w, height: PANEL.h, ...panelSurface }}>
                   {Thumb ? <Thumb /> : <DefaultThumbnail index={i} name={spec.topics[i]!.name} />}
                 </div>

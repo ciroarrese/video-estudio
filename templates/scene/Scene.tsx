@@ -116,8 +116,10 @@ export function SceneBody({ title, subtitle }: SceneProps) {
     noBlurFrom: T.through[0],
   });
   const picked = f >= T.click;
-  // Con zoom, las tarjetas vecinas quedan cortadas por el borde a propósito (encuadre): solo durante el zoom se silencia `offscreen`.
-  const zoomed = cam.scale > 1.05;
+  // Con zoom, el título, las tarjetas vecinas y las filas quedan cortados por el borde a propósito (es el encuadre: la cámara sostiene una parte de un
+  // diseño más grande). Solo durante el zoom, solo `offscreen` y solo en esos elementos: la tarjeta elegida (el sujeto del zoom) NO lleva la marca, así que si
+  // algún día queda cortada, `qa` lo informa. Una marca va siempre con su comentario y nunca en un contenedor más ancho que lo que justifica (docs/reglas.md).
+  const framing = cam.scale > 1.05 ? "offscreen" : undefined;
   const target = { x: L.cards[PICK]!.x + CARD.w / 2, y: L.cards[PICK]!.y + CARD.h / 2 };
 
   return (
@@ -131,7 +133,7 @@ export function SceneBody({ title, subtitle }: SceneProps) {
           }}
         >
           {/* Efecto del catálogo (docs/animaciones.md): el rótulo sube desde una máscara. Probá también BarsGrow o DigitRoll. */}
-          <div style={{ padding: "22px 50px" }}>
+          <div data-qa-ignore={framing} style={{ padding: "22px 50px" }}>
             <MaskedRise text="Panel de ejemplo" start={4} fontSize={t.type.body} by="word" />
           </div>
         </div>
@@ -147,16 +149,17 @@ export function SceneBody({ title, subtitle }: SceneProps) {
           return (
             <div
               key={i}
-              data-qa-ignore={zoomed ? "offscreen" : undefined}
+              data-qa-ignore={i === PICK ? undefined : framing}
               style={{
+                // `minHeight`, no `height`: con otra tipografía o letra más grande la tarjeta crece en vez de desbordar y pisar a la fila de abajo.
                 position: "absolute", left: pos.x, top: pos.y,
-                width: CARD.w, height: CARD.h, boxSizing: "border-box", padding: 30,
+                width: CARD.w, minHeight: CARD.h, boxSizing: "border-box", padding: 30,
                 ...card, ...(sel && w > 0 ? { border: `${w}px solid ${t.color.accent}` } : {}),
                 ...entrance(t, a, i, { native: "rise", distance: 30 }),
               }}
             >
-              <Eyebrow size={fs.label}>Indicador {i + 1}</Eyebrow>
-              <div style={{ fontSize: fs.value, fontWeight: t.font.weights.stat, color: t.color.chart[i % t.color.chart.length] }}>
+              <Eyebrow size={fs.label} style={{ display: "block", lineHeight: 1.2 }}>Indicador {i + 1}</Eyebrow>
+              <div style={{ fontSize: fs.value, lineHeight: 1.2, fontWeight: t.font.weights.stat, color: t.color.chart[i % t.color.chart.length] }}>
                 {(i + 1) * 21}
               </div>
             </div>
@@ -166,12 +169,12 @@ export function SceneBody({ title, subtitle }: SceneProps) {
         {FILAS.map((r, i) => (
           <div
             key={r}
-            data-qa-ignore={zoomed ? "offscreen" : undefined}
+            data-qa-ignore={framing}
             style={{
-              position: "absolute", left: L.rows[i]!.x, top: L.rows[i]!.y, width: L.row.w, height: L.row.h,
+              position: "absolute", left: L.rows[i]!.x, top: L.rows[i]!.y, width: L.row.w, minHeight: L.row.h,
               boxSizing: "border-box", display: "flex", alignItems: "center", padding: "0 24px",
               ...surfaceStyle(t, "card", { level: "sm", corner: "control" }),
-              fontSize: fs.row, color: t.color.text, opacity: kf(f, [6 + staggerFrames(t, i, { base: 4 }), 18 + staggerFrames(t, i, { base: 4 })], [0, 1]),
+              fontSize: fs.row, lineHeight: 1.2, color: t.color.text, opacity: kf(f, [6 + staggerFrames(t, i, { base: 4 }), 18 + staggerFrames(t, i, { base: 4 })], [0, 1]),
             }}
           >
             {r}

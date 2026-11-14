@@ -5,7 +5,7 @@ import { deepClone, deepFreeze } from "./util";
 
 /**
  * Design system de ejemplo "neón": oscuro, píldoras de vidrio con halo, números con degradado que se mueve, fondo de puntos,
- * movimiento enérgico (escala con rebote, cámara inclinada) y pasos de una escena a otra sin velo. Inventado y genérico.
+ * movimiento enérgico (entradas en profundidad con rebote, cámara inclinada), un muro suelto y disperso y pasos de una escena a otra sin velo. Inventado y genérico.
  */
 export const neon: ResolvedTheme = deepFreeze(resolveTheme({
   ...deepClone(neutral),
@@ -40,17 +40,17 @@ export const neon: ResolvedTheme = deepFreeze(resolveTheme({
     easing: { standard: [0.2, 0.9, 0.2, 1], out: [0.1, 0.8, 0.2, 1], inOut: [0.7, 0, 0.2, 1] },
     duration: { fast: 6, base: 12, slow: 24 },
   },
-  cloud: { colors: ["#1b6a85", "#8a2a77", "#3a3fa0"], opacity: 0.3 },
+  cloud: { colors: ["#1b6a85", "#8a2a77", "#3a3fa0"], opacity: 0.3, blur: 140 },
   style: {
-    shape: { corners: "pill", border: 1, outlined: true },
+    shape: { corners: "pill", border: 1, outlined: true, heroScale: 1.4 },
     surface: { kind: "glass", elevation: "glow", opacity: 0.72 },
     type: { titleWeight: "stat", labelWeight: "medium", titleTracking: -0.03, eyebrowCase: "upper", eyebrowTracking: 0.16, numerals: "gradient", highlight: "gradient" },
     background: { kind: "dots", intensity: 0.7 },
-    motion: { entrance: "scale", overshoot: 0.12, stagger: 2, cameraBlur: true, cameraTilt: 1.6, transition: "through" },
-    decor: { doodles: true, doodleStroke: "geometric", vignette: 0.6, accent: "bar", gradientLoop: 90 },
+    motion: { entrance: "depth", overshoot: 0.12, stagger: 2, staggerList: 6, staggerChips: 0.35, cameraBlur: true, cameraTilt: 1.6, transition: "through" },
+    decor: { doodles: true, doodleStroke: "geometric", vignette: 0.6, vignetteColor: "accent2", accent: "bar", gradientLoop: 90 },
     story: {
       titleCard: "glass", listLayout: "stacked", listUnderline: "name", handoff: "through", headlineSize: "md", closingBg: "bg", signoffBar: true,
-      wallColumns: 8, wallRows: 7, wallChipScale: 0.85, wallDolly: 300, wallDepth: 1.5, wallBlurOpening: true, wallBlurClosing: true,
+      wallColumns: 8, wallRows: 7, wallChipScale: 0.85, wallDolly: 300, wallDepth: 1.5, wallGapX: 1.2, wallGapY: 1.15, wallBrick: 1.5, wallJitter: 2.2, wallBlurOpening: true, wallBlurClosing: true,
     },
     line: { weight: "bold", dash: "solid", cap: "round", glow: 0.8, dotShape: "round", accentUse: "rich", sketch: 0 },
     solid: { fill: "translucent", contrast: 1, edge: "accent" },

@@ -3,7 +3,7 @@ import { readFileSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { leerCortes, leerFase, leerFinal, leerInicio, leerNum, parsear, type RestriccionNum } from './args';
 import { empalmar } from './empalme';
-import { EFECTOS, generarEfectos, picosDeEfectos } from './efectos';
+import { CLICS, CLIC_POR_DEFECTO, EFECTOS, generarEfectos, nombreDeClic, picosDeEfectos } from './efectos';
 import { avisoMp3SinEtiqueta, decodificar, hayFfmpeg } from './ffmpeg';
 import { mezclar, type Cue } from './mezcla';
 import { avisoDeFase, chequearConfianza, pulsoMasCercano, tempoReport, TEMPO_SR, type TempoReport } from './tempo';
@@ -22,9 +22,11 @@ const USO = `Uso: tsx audio/cli.ts <comando>
       Arma una pista de la duración exacta del video con inicio y empalmes sobre pulsos, dentro del
       cuerpo de la pista (sin la intro baja ni la caída final).
 
-  efectos [--out public/sfx] [--lista]
-      Sintetiza el set de efectos originales (golpe, clic, barrido, campanita, tilde, aviso).
-      --lista muestra cada uno con el instante de su pico (para "ancla": "pico" en un cue).
+  efectos [--out public/sfx] [--lista] [--clic <nombre>]
+      Sintetiza el set de efectos originales (golpe, clic, barrido, campanita, tilde, aviso) y las variantes
+      clic-<nombre> (actual, suave, mecanico, madera, cristal, burbuja, digital, thock, cinta).
+      --clic elige cuál variante se escribe como "clic" (por defecto actual).
+      --lista muestra cada uno con el instante de su pico (para "ancla": "pico" en un cue) y cada variante de clic.
 
   mezcla --cues cues.json --fps F --frames N --out audio.wav
          [--sfx public/sfx] [--musica archivo] [--musica-gain 0.6] [--musica-desde seg]
@@ -134,11 +136,14 @@ function main(): Promise<void> {
       if (op.get('lista') !== undefined) {
         const picos = picosDeEfectos();
         for (const [n, e] of Object.entries(EFECTOS)) console.log(`${n}\t(pico a ${Math.round(picos[n] * 1000)} ms)\t${e.descripcion}`);
+        for (const [n, c] of Object.entries(CLICS)) console.log(`${nombreDeClic(n)}\t${c.descripcion} ${c.cuando}`);
         return Promise.resolve();
       }
       const dir = op.get('out') || 'public/sfx';
-      const rutas = generarEfectos(resolve(dir));
-      console.log(`Efectos generados en ${dir}:\n${rutas.map((r) => '  ' + r).join('\n')}\nNo se versionan: generalos a pedido.`);
+      const clic = op.get('clic');
+      if (op.has('clic') && !clic) throw new Error(`Falta el valor de --clic; las opciones son: ${Object.keys(CLICS).join(', ')}`);
+      const rutas = generarEfectos(resolve(dir), undefined, { clic: clic ?? CLIC_POR_DEFECTO });
+      console.log(`Efectos generados en ${dir}${clic ? ` (clic = ${clic})` : ''}:\n${rutas.map((r) => '  ' + r).join('\n')}\nNo se versionan: generalos a pedido.`);
       return Promise.resolve();
     }
     case 'mezcla':
@@ -185,7 +190,7 @@ if (!hayFfmpeg()) {
   console.error('No se encontró ffmpeg en el PATH.');
   process.exit(1);
 }
-main().catch((e: unknown) => {
+Promise.resolve().then(main).catch((e: unknown) => {
   console.error('Error: ' + (e instanceof Error ? e.message : String(e)));
   process.exit(1);
 });

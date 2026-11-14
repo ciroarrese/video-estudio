@@ -1,5 +1,6 @@
 export { runQa, failsAt } from './run';
 export type { QaOptions, QaResult, QaSummary } from './run';
+export { runQaThemes, buildMatrix, parseThemes } from './themes';
 export { makeSheet, sheetLayout, timecode } from './sheet';
 export type { SheetOptions, SheetResult, Layout } from './sheet';
 export { runPrivacy } from './privacy';

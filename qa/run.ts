@@ -1,10 +1,10 @@
 import { cpus } from 'node:os';
 import { applyMotion, coverKeys } from './motion';
 import { collectRuns, sampleBackgrounds } from './page';
-import { ALL_RULES, type DecorSummary, type DetailSummary, type SilencedSummary, type Finding, type RuleId, type Severity } from './types';
-import { runRulesCounted } from './rules';
+import { ALL_RULES, type DecorSummary, type DetailSummary, type FixedScaleSummary, type JudgedSummary, type SilencedSummary, type Finding, type RuleId, type Severity } from './types';
+import { addJudged, emptyJudged, runRulesCounted } from './rules';
 import { sampleFrames, type SampleSpec } from './sampling';
-import { openSession, sceneFrames } from './session';
+import { openSession, sceneFrames, type Stress } from './session';
 import type { FormatName } from '../engine';
 import { mergeThresholds, type ThresholdOverrides } from './thresholds';
 import { candidatesOf, probeReadable, reclassifyDetail } from './zoom';
@@ -24,6 +24,8 @@ export type QaOptions = SampleSpec & {
   assets?: string[];
   /** Borrador: una fuente que no carga solo avisa. */
   allowMissingFonts?: boolean;
+  /** Prueba de estres de tipografia (`--font-scale`, `--font-fallback`): ver qa/session.ts `Stress`. */
+  stress?: Stress;
   log?: (m: string) => void;
 };
 
@@ -41,15 +43,34 @@ export type QaSummary = {
   silenced?: SilencedSummary;
   /** Textos de adorno (`data-qa-decor`) que se dejaron fuera de `min-size` y `contrast`. */
   decor?: DecorSummary;
+  /** Textos que `data-qa-fixed-scale` dejó fuera del estrés de tipografía (solo con `--font-scale`); `refused` si la marca se rechazó. */
+  fixedScale?: FixedScaleSummary;
+  /** Cuanto texto juzgo el control y cuanto no (y por que): el control que "da 0 errores" sin mirar nada tiene que notarse. */
+  judged: JudgedSummary;
+  /** Estres de tipografia con el que se corrio (si hubo). */
+  stress?: Stress;
   seconds: number;
 };
 export type QaResult = { findings: Finding[]; summary: QaSummary };
 
+/**
+ * `data-qa-fixed-scale` exime a un subárbol solo del estrés de `--font-scale`. Se rechaza (el estrés se aplica igual y el resumen lo dice con
+ * `fixedScale.refused`) si la marca cubre todo el escenario y en ningún cuadro revisado queda otro texto fuera de ella: sería apagar el estrés del video entero.
+ */
 export async function runQa(o: QaOptions): Promise<QaResult> {
+  const scaled = o.stress?.fontScale !== undefined && o.stress.fontScale !== 1;
+  const first = await runQaPass(o, true);
+  if (!scaled || !first.fixed || !first.fixed.refuse) return first.result;
+  const again = await runQaPass(o, false);
+  again.result.summary.fixedScale = { texts: first.fixed.texts, frames: first.fixed.frames, refused: true };
+  return again.result;
+}
+
+async function runQaPass(o: QaOptions, honorFixedScale: boolean): Promise<{ result: QaResult; fixed: { texts: number; frames: number; refuse: boolean } | null }> {
   const t0 = Date.now();
   const thresholds = mergeThresholds(o.thresholds);
   const rules = o.rules ?? ALL_RULES;
-  const session = await openSession({ videoId: o.videoId, props: o.props, format: o.format, assets: o.assets, allowMissingFonts: o.allowMissingFonts, log: o.log });
+  const session = await openSession({ videoId: o.videoId, props: o.props, format: o.format, assets: o.assets, allowMissingFonts: o.allowMissingFonts, stress: o.stress, honorFixedScale, log: o.log });
   try {
     const { meta } = session;
     const frames = sampleFrames(o, meta.durationInFrames, 24, await sceneFrames(session, o.scene));
@@ -57,15 +78,21 @@ export async function runQa(o: QaOptions): Promise<QaResult> {
     const queue = [...frames];
     const findings: Finding[] = [];
     const silenced: SilencedSummary = {};
+    const judged = emptyJudged();
     const decorTexts = new Set<string>();
     const decorFrames = new Set<number>();
+    const scaled = o.stress?.fontScale !== undefined && o.stress.fontScale !== 1;
+    const fixedTexts = new Set<string>();
+    const fixedFrames = new Set<number>();
+    let otherText = false, fullCover = false;
     await Promise.all(
       Array.from({ length: workers }, async () => {
         const vp = await session.openPage();
         for (let f = queue.shift(); f !== undefined; f = queue.shift()) {
           await vp.setFrame(f);
           const data = await collectRuns(vp, meta.width, meta.height);
-          if (rules.includes('contrast')) await sampleBackgrounds(vp, data.runs);
+          // Capturas (normal y con el texto oculto): el fondo para `contrast` y la evidencia de que el texto se ve para `visibleRuns` y `unjudged`.
+          if (rules.includes('contrast') || rules.includes('unjudged')) await sampleBackgrounds(vp, data.runs, { bg: rules.includes('contrast'), ink: true });
           // Motion: compare with the neighbouring frames (f-1, f+1) to tell transitions from static defects.
           const keys = coverKeys(data);
           const neighbours = [];
@@ -77,10 +104,17 @@ export async function runQa(o: QaOptions): Promise<QaResult> {
           applyMotion(data, neighbours);
           const r = runRulesCounted({ frame: f, width: meta.width, height: meta.height, runs: data.runs, thresholds }, rules);
           findings.push(...r.findings);
+          addJudged(judged, r.judged);
           for (const [rule, c] of Object.entries(r.silenced)) {
             const t = (silenced[rule] ??= { ignore: 0, decor: 0 });
             t.ignore += c.ignore;
             t.decor += c.decor;
+          }
+          if (scaled) {
+            for (const run of data.runs) {
+              if (run.fixedScale) { fixedTexts.add(run.key); fixedFrames.add(f); } else if (run.opacity >= 0.05 && !run.ignore.includes('all')) otherText = true;
+            }
+            if ((data.fixedRoots ?? []).some((r) => r.w * r.h >= 0.9 * meta.width * meta.height)) fullCover = true;
           }
           for (const run of data.runs) if (run.decor) { decorTexts.add(run.key); decorFrames.add(f); }
         }
@@ -102,7 +136,8 @@ export async function runQa(o: QaOptions): Promise<QaResult> {
     findings.sort((a, b) => a.frame - b.frame || a.rule.localeCompare(b.rule));
     const byRule: Record<string, number> = {};
     for (const f of findings) byRule[f.rule] = (byRule[f.rule] ?? 0) + 1;
-    return {
+    const fixed = scaled && fixedTexts.size ? { texts: fixedTexts.size, frames: fixedFrames.size, refuse: fullCover && !otherText } : null;
+    const result: QaResult = {
       findings,
       summary: {
         videoId: o.videoId, frames: frames.slice().sort((a, b) => a - b), total: findings.length,
@@ -110,10 +145,13 @@ export async function runQa(o: QaOptions): Promise<QaResult> {
         warnings: findings.filter((f) => f.severity === 'warn').length,
         infos: findings.filter((f) => f.severity === 'info').length,
         byRule, ...(detail ? { detailSmallText: detail } : {}),
-        ...(Object.keys(silenced).length ? { silenced } : {}),
-        ...(decorTexts.size ? { decor: { texts: decorTexts.size, frames: decorFrames.size } } : {}), seconds: Math.round((Date.now() - t0) / 100) / 10,
+        // Las claves de `silenced` se insertan en el orden en que terminan los cuadros (según el paralelismo): se ordenan para que el informe sea idéntico entre corridas.
+        ...(Object.keys(silenced).length ? { silenced: Object.fromEntries(Object.entries(silenced).sort(([a], [b]) => a.localeCompare(b))) } : {}),
+        ...(decorTexts.size ? { decor: { texts: decorTexts.size, frames: decorFrames.size } } : {}), judged, ...(o.stress ? { stress: o.stress } : {}),
+        ...(fixed && !fixed.refuse ? { fixedScale: { texts: fixed.texts, frames: fixed.frames } } : {}), seconds: Math.round((Date.now() - t0) / 100) / 10,
       },
     };
+    return { result, fixed };
   } finally {
     await session.close();
   }

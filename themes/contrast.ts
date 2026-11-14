@@ -78,6 +78,18 @@ export const ROLE_USAGE: Record<string, { text?: string[]; graphic?: string[] }>
 
 const SURFACES = ["bg", "surface", "surfaceAlt"] as const;
 
+/**
+ * Color de una superficie declarada en `DataCheck.on`: un rol de superficie (`bg`...), un color de datos (`data.fichaFondo`) o un color.
+ * `undefined` si no es ninguno de los tres.
+ */
+export function surfaceColor(theme: Theme, on: string): string | undefined {
+  const c = theme.color as unknown as Record<string, unknown>;
+  const v = c[on];
+  if (typeof v === "string") return v;
+  if (on.startsWith("data.")) return theme.data?.[on.slice(5)];
+  return parseColor(on) ? on : undefined;
+}
+
 /** Tono más cercano del mismo matiz (cambia solo la luminosidad HSL) que llega a `required` sobre `bg`; `undefined` si ninguno llega. */
 export function suggestShade(fg: string, bg: string, required: number): string | undefined {
   const c = parseColor(fg);
@@ -130,7 +142,7 @@ export function pairColors(theme: Theme, pair: string): [string, string] | undef
   const [fgRef, bgRef] = pair.split("/");
   if (!fgRef || !bgRef) return undefined;
   const c = theme.color as unknown as Record<string, unknown>;
-  const bg = c[bgRef];
+  const bg = surfaceColor(theme, bgRef);
   if (typeof bg !== "string") return undefined;
   let fg: unknown;
   const chart = /^chart\[(\d+)\]$/.exec(fgRef);
@@ -167,7 +179,7 @@ export function checkTheme(theme: Theme): ContrastWarning[] {
   const seen = new Set<string>();
   /** reconocimientos con pin cuyos colores cambiaron: par -> descripción */
   const vencidos = new Map<string, string>();
-  const check = (pair: string, fg: string, bg: string, required = 4.5, role?: string) => {
+  const check = (pair: string, fg: string, bg: string, required = 4.5, role?: string, scope?: string) => {
     seen.add(pair);
     let ratio: number;
     try {
@@ -193,6 +205,7 @@ export function checkTheme(theme: Theme): ContrastWarning[] {
       vencidos.delete(pair); // ya quedó dicho en este aviso
     }
     if (usedBy.length) message += `. Se usa ${usedBy.join("; ")}`;
+    if (scope) message += `. Ámbito declarado: ${scope} (el control de calidad, qa, juzga igual el texto real en pantalla contra su fondo real)`;
     if (suggestion) message += `. Tono más cercano que pasa: ${suggestion}`;
     out.push({
       pair,
@@ -220,7 +233,14 @@ export function checkTheme(theme: Theme): ContrastWarning[] {
   const data = theme.data ?? {};
   for (const name of Object.keys(data)) {
     const spec = theme.dataChecks?.[name];
-    for (const on of spec?.on ?? ["surface"]) check(`data.${name}/${on}`, data[name]!, c[on], spec?.min ?? 3);
+    for (const on of spec?.on ?? ["surface"]) {
+      const bg = surfaceColor(theme, on);
+      if (bg === undefined) {
+        out.push({ pair: `data.${name}/${on}`, ratio: 0, required: spec?.min ?? 3, severity: "error", message: `data.${name}/${on}: la superficie "${on}" no es un rol de superficie, un color de datos ni un color válido` });
+        continue;
+      }
+      check(`data.${name}/${on}`, data[name]!, bg, spec?.min ?? 3, undefined, spec?.scope);
+    }
   }
   out.push(...styleWarnings(theme, contrastRatio));
   for (const [pair, msg] of vencidos) {

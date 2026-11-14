@@ -240,7 +240,7 @@ Durante una transición (tarjeta volando sobre otra, cámara en movimiento, fund
   <div data-qa-ignore={zoomed ? "offscreen" : undefined}>…filas vecinas cortadas por el borde…</div>
   ```
 
-  Se puede poner en un ancestro (alcanza a todo lo de adentro), con varias reglas separadas por espacios o `all`. Hacelo en el elemento mínimo y con la condición más angosta posible; decí en el mensaje de entrega qué silenciaste y por qué.
+  Se puede poner en un ancestro (alcanza a todo lo de adentro), con varias reglas separadas por espacios o `all`. Hacelo en el elemento mínimo (nunca en el sujeto del zoom ni en un contenedor más ancho que lo que justifica) y con la condición más angosta posible, con un comentario que diga por qué; decí en el mensaje de entrega qué silenciaste y por qué.
 - **Falsos errores de `contrast` con texto que entra.** Un texto que se escribe (`typed`) mientras su contenedor está en fundido (entrada del titular, o `hide` al acercar) puede dar `contrast` como "quieto" con opacidad intermedia: cada cuadro tiene un texto distinto y no se empareja con el vecino. Escribilo cuando el contenedor ya terminó de entrar y de apartarse, o mostralo entero con el contenedor.
 - **Cortado por el zoom a propósito.** Las tarjetas o filas vecinas que la cámara deja cortadas por el borde dan `offscreen` (aviso si el recorte es grande y estable). Si es el encuadre que querés, la condición `zoomed` de arriba lo silencia solo durante el zoom (con la cámara en movimiento ya es `info`); si no, alejá la cámara o usá el zoom máximo de la sección 13.
 
@@ -559,3 +559,56 @@ npm run render -- <id> --check --props '{"theme":"papel"}'
 ```
 
 Lo que tiene que pasar: el video se ve distinto con cada uno (esquinas, superficies, números, fondo, movimiento) y `qa` da 0 errores. Si una escena se ve igual en los tres, hay decisiones escritas a mano; si da errores de contraste solo con un tema, lo que dibuja usa un color que no sale de un rol.
+
+## 15. Escenas que sobreviven a otro design system
+
+Un video que pasa `qa` con un solo design system puede esconder defectos que aparecen con otro (otra tipografía, otro fondo, sin viñeta, letra más grande). Un video real "pasó" `qa` con 0 errores mientras tenía 114 ocultos de unas pocas clases que se repiten: la causa más grande era una viñeta de cuadro completo que dejaba ciego al control; ya está arreglado, pero las clases de defecto son de maquetación y se evitan al escribir la escena. Cada regla trae el patrón malo y el robusto; las ayudas están en `kit/README.md` ("Disposición y medidas") y `themes/README.md` ("Texto atenuado").
+
+### 1. El texto atenuado se calcula contra el fondo real, nunca con una `opacity` fija baja
+
+Malo: `<div style={{ opacity: 0.4 }}>texto</div>` para "pasar a segundo plano". Con la superficie con la que se probó queda a 3,1:1; con otra baja a 1,8:1 y `qa` da error de `contrast`.
+Robusto: `dimOpacity(theme.color.text, fondo, { min: 3 })` (la opacidad más baja que todavía llega a `min`) o `dimmedColor(theme, "text", "surface")` (el color ya mezclado, como `color` y sin `opacity`). Para texto chico, `min: 4.5`. Si lo que querés atenuar es el **panel** (el foco en otra cosa), atenuá solo su superficie, que es un hermano del contenido, no el contenedor del texto (`examples/kit-demo`, `Panel`). Un fundido de entrada o de salida no cuenta: la regla es para lo que **se queda** atenuado.
+
+### 2. Nada se pone sobre otra etiqueta a píxeles fijos
+
+Malo: una burbuja en `left: 820, top: 310` porque "ahí había lugar" con la tipografía de prueba; con otra, el número de al lado se le mete debajo.
+Robusto: `Callout` (o `placeBeside` si la pieza es tuya): se ubica en el lugar libre al lado del objetivo, esquivando la lista `avoid` (las demás etiquetas), dentro de `within` (el área segura o `cameraView(cam, formato)`). Si no hay lugar libre se pone sobre lo menos importante y devuelve `covers`: la escena apaga lo tapado mientras la pieza está (`coveredOpacity(calloutState(frame, rango))`, texto que se funde del todo, no a medias).
+
+### 3. Las tablas y listas llevan alto de fila y de encabezado explícitos
+
+Malo: `top: 360 + i * 64` con filas de `height: 52` que suponen una interlínea. Con letra 25 % más grande la fila crece, se pisa con la siguiente y el texto se corta.
+Robusto: una columna en flujo (`display: flex; flexDirection: column; gap`) con `minHeight` por fila (el valor de siempre) y `lineHeight` explícito: con la tipografía de prueba queda igual y con otra la fila crece y empuja a la siguiente. Lo mismo con un contenedor cuyo contenido es texto: `minHeight`, no `height`.
+
+### 4. Las pastillas y los chips llevan interlínea
+
+Malo: `padding: "2px 12px"` sin `lineHeight`; el alto sale de la fuente (`normal` cambia de una tipografía a otra) y el chip choca con lo de arriba.
+Robusto: `lineHeight: 1.25` (o el valor que corresponda), `whiteSpace: "nowrap"`, y el ancho por contenido o por `textWidth(theme, texto, { size, weight })` cuando hay que repartir lugar. Un `minWidth` en vez de un `width` fijo.
+
+### 5. La franja del titular se mantiene libre, y las claves de cámara salen de ella
+
+Malo: el panel arranca en `y = 120` porque "el titular es chico"; con otro tema el titular baja y lo tapa en la vista general.
+Robusto: `headlineStrip(theme, { width, height })` da la franja que el titular ocupa mientras se ve (la cámara en escala 1 hasta `hideFromScale`: pasando de 1,08 se aparta). El contenido de la vista general empieza en `strip.y + strip.h`, y las claves de cámara se eligen con `cameraKeepClear(clave, rectángulo del sujeto, { strip, format })`: corre el foco lo mínimo para que el sujeto quede entero y debajo del titular, o avisa con `fits: false` que no cabe a esa escala.
+
+### 6. Los colores salen de roles o de `readableOn`
+
+Malo: `#hex` en la escena, o un color de estado pensado para un fondo y puesto sobre otro (una "alerta" naranja a 4,4:1 sobre la ficha clara que tenía debajo).
+Robusto: roles de `theme.color`, `theme.data.<nombre>` para los colores propios de la interfaz recreada (y declarar contra qué fondos se verifican: `on: ["surface", "bg", "data.fichaFondo"]`, ver `examples/theme-scope/estados.ts`: el color que pasa contra `surface` y falla contra su propia ficha da un falso "pasa"), y `readableOn(theme, relleno)` para el texto sobre un relleno cualquiera.
+
+### 7. Un efecto de cuadro completo no puede ser la razón de que algo "pase"
+
+Una viñeta (`Vignette`), un velo o una capa a medio fundido de cuadro completo cae sobre el texto. Un control que por eso deja de mirarlo "da 0 errores" sin mirar nada. Leé siempre la línea `juzgados` del informe de `qa` (ver `qa/README.md`, "Qué se juzga y qué no"): cuánto texto se juzgó de verdad y por qué motivo no se juzgó el resto (fuera del cuadro, casi transparente, tapado por una capa opaca, `data-qa-ignore="all"`). Si juzgó menos de la mitad, ese 0 no dice nada (puede ser legítimo: una escena de 3 x 3 pantallas tiene casi todo fuera del cuadro en cada instante; `examples/fx-in-scene` juzga 7 %, y es así por diseño). Una marca `data-qa-ignore` que mira para otro lado tiene que estar justificada y ser angosta (`docs/reglas.md`).
+
+### 8. Probá primero con el sistema más estricto, y con todos
+
+`editorial` es el más duro: sin viñeta (nada que oculte un defecto), con serif (otras medidas de letra), mayúsculas y interletrado en los rótulos. Si la escena aguanta ahí, aguanta casi en cualquiera. Antes de entregar un video pensado para más de un design system:
+
+```bash
+npm run qa -- <id> --themes all --count 40                         # los cinco design systems, con matriz y diferencias
+npm run qa -- <id> --count 40 --font-fallback wide --font-scale 1.25   # estrés: tipografía ancha y letra 25 % más grande
+```
+
+La matriz muestra qué hallazgos aparecen en unos sistemas y en otros no: ahí se esconden las maquetaciones que suponen los colores o las medidas de uno solo. El estrés de tipografía encuentra posiciones y alturas que suponen una fuente (límites en `qa/README.md`, "Otros sistemas y estrés de tipografía"). `--repeat 2` corre el control dos veces y falla (salida 3) si los informes difieren: sirve para sospechar de un hallazgo que va y viene.
+
+**Lo que dejaron los ejemplos de `examples/`** (todos dan 0 errores y 0 avisos con `--themes all`; con el estrés de tipografía, `theme-scope` y la plantilla dan 0 y `kit-demo` 0 errores con avisos de las filas vecinas que el zoom corta): las pilas de `fx-in-scene` (cada elemento con `minHeight` en una columna, no `y` fijos, y celdas de la grilla separadas más que el cuadro para que ninguna vecina entre cortada), la ventana de `theme-scope` (columnas y filas en flujo con `flex-wrap`, pastillas a una distancia medida del título, pie en flujo bajo la ventana), el panel de `kit-demo` (todo en flujo bajo la franja del título, contador con tamaño calculado por su ancho medido, superficie atenuada aparte del texto), `story-demo` y la plantilla (la marca `offscreen` solo en lo que el zoom corta a propósito, con comentario, nunca en el sujeto del zoom).
+
+**Trampa de `--font-scale` con tamaños redondos.** Mientras `qa` no lo corrija, un `--font-scale 1.25` repetido sobre cuadros seguidos puede acumular la escala en elementos cuyo tamaño por 1,25 da un entero (44 px a 55 px): el navegador devuelve `55px` y el control no restaura el valor, así que el texto crece más a cada cuadro y aparecen falsos errores. Si el estrés da errores que crecen con el número de cuadro, repetí con `--font-scale 1.2501`.

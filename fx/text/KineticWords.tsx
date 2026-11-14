@@ -34,7 +34,8 @@ export function KineticWords(props: KineticWordsProps) {
   const word = words[i] ?? "";
   const pair = pairs[i % pairs.length]!;
   const w = weight ?? theme.font.weights.stat;
-  const fs = fitText(word, box.width * 0.8, { font: { family: theme.font.family, weight: w }, max: maxFontSize ?? theme.type.hero * 2, min: 24 });
+  // 78 % del ancho: con letra 25 % más grande o una fuente ancha la palabra más larga sigue dentro del área segura
+  const fs = fitText(word, box.width * 0.78, { font: { family: theme.font.family, weight: w }, max: maxFontSize ?? theme.type.hero * 2, min: 24 });
   const startOfSlice = Math.round(i * slice);
   return (
     <div

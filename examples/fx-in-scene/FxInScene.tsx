@@ -21,8 +21,9 @@ export const DURATION = 300;
 const THROUGH: [number, number] = [236, 299];
 const WASH: [number, number] = [276, 299];
 
-// Celdas de 900 x 560 en una grilla de 3 x 3 (coordenadas del mundo).
-const CW = 900, CH = 560, GX = 1000, GY = 640;
+// Celdas de 900 x 560 en una grilla de 3 x 3 (coordenadas del mundo). La separación es mayor que el cuadro (1920 x 1080) menos media celda:
+// con la cámara quieta sobre una celda, ninguna vecina entra al encuadre ni queda cortada por el borde (solo se ve de pasada, en movimiento).
+const CW = 900, CH = 560, GX = 1500, GY = 900;
 const cell = (c: number, r: number) => ({ x: c * GX + 60, y: r * GY + 100 });
 const center = (c: number, r: number) => ({ x: cell(c, r).x + CW / 2, y: cell(c, r).y + CH / 2 });
 
@@ -47,25 +48,38 @@ const Slot = ({ c, r, x = 0, y = 0, children }: { c: number; r: number; x?: numb
   <div style={{ position: "absolute", left: cell(c, r).x + x, top: cell(c, r).y + y }}>{children}</div>
 );
 
+/**
+ * Pila vertical en flujo dentro de una celda: cada elemento ocupa al menos `min` px de alto (lo que antes era una posición fija: 170, 190...)
+ * y, si su contenido es más alto con otra tipografía, empuja al siguiente en vez de pisarlo.
+ */
+const Stack = ({ items }: { items: { min: number; node: React.ReactNode }[] }) => (
+  <div style={{ display: "flex", flexDirection: "column" }}>
+    {items.map((it, i) => <div key={i} style={{ minHeight: it.min }}>{it.node}</div>)}
+  </div>
+);
+
 function Scene() {
   const frame = useFrame();
   const theme = useTheme();
   const { width, height } = useVideoConfig();
   const cam = camera(frame);
   const screen = phoneScreen(300, 600);
+  // Caras propias de la tarjeta: la tarjeta es chica (250 x 200) y los rótulos de relleno bajarían de 18 px; el rótulo va en el escalón `caption` del tema y se parte si no entra.
+  const cara = (texto: string) => (
+    <div style={{ height: "100%", boxSizing: "border-box", padding: 16, display: "flex", alignItems: "center", justifyContent: "center", textAlign: "center", fontSize: theme.type.caption, lineHeight: 1.2, fontWeight: theme.font.weights.semibold, color: theme.color.text }}>{texto}</div>
+  );
   return (
     <Stage>
-      {/* Todo lo que está fuera del encuadre de cada tramo de la cámara es intencional. */}
-      <div data-qa-ignore="offscreen safe-area clip">
+      {/* Sin `data-qa-ignore`: lo que está fuera del encuadre de cada tramo de la cámara no se juzga porque `qa` lo ve fuera del cuadro (la grilla de 3 x 3 tiene
+          casi todo afuera en cada cuadro: ver la línea "juzgados" del informe), y lo que la cámara recorta mientras se mueve baja solo a `info`. */}
+      <div>
         <World camera={cam} width={width} height={height}>
           <Slot c={0} r={0}>
-            <MaskedRise text="Hola mundo" start={30} fontSize={theme.type.h1} dot />
-          </Slot>
-          <Slot c={0} r={0} y={170}>
-            <DigitRoll value={1284} start={44} suffix="+" />
-          </Slot>
-          <Slot c={0} r={0} y={360}>
-            <MaskedRise text="Palabra por palabra" by="word" start={52} fontSize={theme.type.h2} />
+            <Stack items={[
+              { min: 170, node: <MaskedRise text="Hola mundo" start={30} fontSize={theme.type.h1} dot /> },
+              { min: 190, node: <DigitRoll value={1284} start={44} suffix="+" /> },
+              { min: 0, node: <MaskedRise text="Palabra por palabra" by="word" start={52} fontSize={theme.type.h2} /> },
+            ]} />
           </Slot>
 
           <Slot c={1} r={0}><DonutRing value={4} max={4} start={58} width={420} height={420} label="Tareas" unit=" de 4" /></Slot>
@@ -84,11 +98,19 @@ function Scene() {
 
           <Slot c={0} r={1}><LineDraw start={156} width={900} height={520} /></Slot>
 
-          <Slot c={0} r={2}><Typewriter text="Escribiendo una idea." start={180} fontSize={theme.type.h2} duration={40} /></Slot>
-          <Slot c={0} r={2} y={140}><ScrambleDecode text="Texto descifrado" start={184} fontSize={theme.type.h2} /></Slot>
-          <Slot c={0} r={2} y={270}><SplitFlap text="LISTO" start={188} fontSize={theme.type.h2} /></Slot>
-          <Slot c={0} r={2} y={390}><TileDone start={196} width={420} height={150} /></Slot>
-          <Slot c={0} r={2} y={400} x={460}><MarkerDraw text="Resaltado" start={198} width={420} height={120} /></Slot>
+          <Slot c={0} r={2}>
+            <Stack items={[
+              { min: 140, node: <Typewriter text="Escribiendo una idea." start={180} fontSize={theme.type.h2} duration={40} /> },
+              { min: 130, node: <ScrambleDecode text="Texto descifrado" start={184} fontSize={theme.type.h2} /> },
+              { min: 120, node: <SplitFlap text="LISTO" start={188} fontSize={theme.type.h2} /> },
+              { min: 0, node: (
+                <div style={{ display: "flex", alignItems: "flex-start", gap: 40 }}>
+                  <TileDone start={196} width={420} height={150} />
+                  <div style={{ marginTop: 10 }}><MarkerDraw text="Resaltado" start={198} width={440} height={100} /></div>
+                </div>
+              ) },
+            ]} />
+          </Slot>
 
           <Slot c={1} r={2}><FlowSteps start={206} width={900} height={500} /></Slot>
 
@@ -96,7 +118,7 @@ function Scene() {
           <Slot c={2} r={2} x={270} y={100}><DonutRing start={214} width={360} height={360} value={4} max={4} unit=" de 4" label="tareas" duration={30} /></Slot>
           <Slot c={2} r={2}><TileGrid start={214} width={250} height={190} /></Slot>
           <Slot c={2} r={2} y={360}><LogoLand start={216} width={200} height={200} /></Slot>
-          <Slot c={2} r={2} x={650} y={360}><CardFlip start={222} width={250} height={200} /></Slot>
+          <Slot c={2} r={2} x={650} y={360}><CardFlip start={222} width={250} height={200} front={cara("Anverso")} back={cara("Reverso")} /></Slot>
           <Slot c={2} r={2} x={650}><TypeRing text="Anillo" start={224} width={250} height={190} /></Slot>
         </World>
       </div>

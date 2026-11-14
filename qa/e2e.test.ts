@@ -4,6 +4,8 @@ import { launchChromium } from '../render/browser';
 import { QA_DEFECT_FRAMES as F } from '../examples/qa-defects/QaDefects';
 import { runQa } from './run';
 import { runPrivacy } from './privacy';
+import { canonicalReport, diffReports } from './repeat';
+import { buildMatrix, runQaThemes } from './themes';
 
 const chromium = await launchChromium().then(
   (b) => b.close().then(() => true),
@@ -168,4 +170,77 @@ describe.skipIf(!chromium)('qa on the qa-defects video (e2e)', () => {
     const allowed = await runPrivacy({ videoId: 'qa-defects', frames: `${F.privacy}`, deny: '', allow: 'dominio-ficticio.com' });
     expect(allowed.ok).toBe(true);
   }, 180_000);
+
+
+  // La ceguera: una capa de cuadro completo marcada `data-qa-ignore="covered"` (viñeta, lavado, fondo del escenario) tapaba "todos los puntos" de
+  // un texto, ganaba la eleccion de la tapa y dejaba al control sin mirar el texto de abajo (hasta 114 errores reales con "0 errores" informados).
+  describe('ceguera bajo una capa de cuadro completo marcada data-qa-ignore="covered"', () => {
+    const sinCuadro = (fs: { frame: number }[], frame: number) => JSON.stringify(fs.filter((f) => f.frame === frame).map(({ frame: _f, ...rest }) => rest));
+
+    it('la viñeta no cambia NINGUN hallazgo: contraste, rotulos que se pisan y rotulo bajo una pastilla dan lo mismo con y sin ella (mensaje, medidas y cajas incluidos)', async () => {
+      const { findings, summary } = await runQa({ videoId: 'qa-defects', frames: '76-84,92' });
+      for (const [sin, con, rule] of [[F.vigContrastA, F.vigContrastB, 'contrast'], [F.vigOverlapA, F.vigOverlapB, 'overlap'], [F.vigCoveredA, F.vigCoveredB, 'covered']] as const) {
+        const a = findings.filter((f) => f.frame === sin);
+        expect(a.map((f) => [f.rule, f.severity]), `cuadro ${sin}`).toEqual([[rule, 'error']]);
+        expect(sinCuadro(findings, con), `cuadro ${con} contra ${sin}`).toBe(sinCuadro(findings, sin));
+      }
+      // la viñeta que cambia de opacidad sobre un texto quieto no es un velo que cruza: error en los tres cuadros
+      for (const fr of [F.vigFadeA, F.vigFadeB, F.vigFadeC]) expect(findings.filter((f) => f.frame === fr).map((f) => [f.rule, f.severity, f.element.testid]), `cuadro ${fr}`).toEqual([['contrast', 'error', 'vig-fade-text']]);
+      // un degradado de cuadro completo con el centro transparente, sin marca, tampoco tapa
+      expect(findings.filter((f) => f.frame === F.gradientOverlap).map((f) => [f.rule, f.severity])).toEqual([['overlap', 'error']]);
+      expect(findings.filter((f) => f.rule === 'unjudged')).toEqual([]);
+      expect(summary.judged.unjudgedVisible).toBe(0);
+    }, 180_000);
+
+    it('un lavado liso marcado a medio fundido es info (documentado); el mismo lavado quieto es error; cerrado del todo, lo de abajo no se ve y no hay hallazgos', async () => {
+      const { findings, summary } = await runQa({ videoId: 'qa-defects', frames: '85-91' });
+      const sev = (fr: number) => findings.filter((f) => f.frame === fr && f.rule === 'contrast').map((f) => f.severity);
+      for (const fr of [F.washCrossA, F.washCrossB, F.washCrossC]) expect(sev(fr), `cuadro ${fr}`).toEqual(['info']);
+      expect(sev(F.washStillB)).toEqual(['error']);
+      expect(findings.filter((f) => f.frame === F.washClosed)).toEqual([]);
+      // el resumen cuenta lo que no se juzgo y por que: los cuatro textos del cuadro 91 (el titulo y tres) quedan tapados por el lavado cerrado
+      expect(summary.judged.notJudged.hidden).toBe(4);
+      expect(summary.judged.coverMarkerSkipped).toBeGreaterThanOrEqual(4);
+      expect(summary.judged.judged + summary.judged.notJudged.total).toBe(summary.judged.texts);
+    }, 180_000);
+
+    it('el resumen dice cuanto texto se juzgo (nada ciego): en el cuadro limpio se juzgan todos', async () => {
+      const { summary } = await runQa({ videoId: 'qa-defects', frames: '0' });
+      expect(summary.judged.texts).toBe(4);
+      expect(summary.judged.judged).toBe(4);
+      expect(summary.judged.notJudged.total).toBe(0);
+    }, 180_000);
+  });
+
+  it('--themes: el mismo control bajo cada sistema, con matriz; un video que no lee props.theme da lo mismo en todos', async () => {
+    const reports = await runQaThemes({ videoId: 'qa-defects', frames: '3,5' }, ['neutral', 'dark', 'neon']);
+    const m = buildMatrix(reports);
+    expect(m.themes).toEqual(['neutral', 'dark', 'neon']);
+    expect(m.differences).toEqual([]);
+    expect(m.cells['dark']!.errors).toBe(m.cells['neutral']!.errors);
+  }, 300_000);
+
+  it('estres de tipografia: --font-scale agranda la letra (el texto de 10 px deja de ser error) y --font-fallback cambia las medidas', async () => {
+    const base = await runQa({ videoId: 'qa-defects', frames: `${F.tiny},${F.overlap}` });
+    expect(base.findings.filter((f) => f.frame === F.tiny && f.rule === 'min-size' && f.severity === 'error')).toHaveLength(1);
+    const big = await runQa({ videoId: 'qa-defects', frames: `${F.tiny}`, stress: { fontScale: 2 } });
+    expect(big.findings.filter((f) => f.rule === 'min-size' && f.severity === 'error')).toEqual([]);
+    expect(big.summary.stress).toEqual({ fontScale: 2 });
+    const wide = await runQa({ videoId: 'qa-defects', frames: `${F.overlap}`, stress: { fontFallback: 'wide' } });
+    const w = (r: typeof base, fr: number) => r.findings.find((f) => f.frame === fr && f.rule === 'overlap')?.element.rect.w;
+    expect(w(wide, F.overlap)).toBeGreaterThan(w(base, F.overlap)!);
+  }, 300_000);
+
+  // Reproducibilidad: el control es una función determinista del video y las opciones. Antes el muestreo de fondos corría en el canvas de
+  // la página y devolvía colores distintos para el mismo PNG: el contraste saltaba entre corridas (fx-in-scene con neon, cuadros 184/192/222).
+  it('reproducible: dos corridas del mismo control dan informes idénticos (hallazgos y medidas), con paralelismo y con vecinos', async () => {
+    const a = await runQa({ videoId: 'qa-defects', frames: '0-24', concurrency: 3 });
+    const b = await runQa({ videoId: 'qa-defects', frames: '0-24', concurrency: 3 });
+    expect(diffReports(a, b)).toEqual([]);
+    expect(canonicalReport(a)).toBe(canonicalReport(b));
+    const o = { videoId: 'fx-in-scene', props: { theme: 'neon' }, frames: [169, 184, 192, 222, 253], concurrency: 3 };
+    const c = await runQa(o);
+    const d = await runQa(o);
+    expect(diffReports(c, d)).toEqual([]);
+  }, 300_000);
 });

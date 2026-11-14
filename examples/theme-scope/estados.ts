@@ -6,7 +6,7 @@ import type { ResolvedTheme, Theme } from "../../themes";
 const CLARO = `:root {
   --name: neutral;
   --data-estado-ok: #1b7a47;
-  --data-estado-alerta: #a35f00;
+  --data-estado-alerta: #8f5300;
   --data-estado-fallo: #c92a2a;
   --data-ficha-fondo: #e3f4ea;
 }`;
@@ -22,9 +22,10 @@ const OSCURO = `:root {
 export function conEstados(base: Theme): ResolvedTheme {
   return themeFromTokens(base === dark || base === neon || base.name === "dark" || base.name === "neon" ? OSCURO : CLARO, base, {
     data: {
-      estadoOk: { on: ["surface", "bg"], min: 4.5 },
-      estadoAlerta: { on: ["surface", "bg"], min: 4.5 },
-      estadoFallo: { on: ["surface", "bg"], min: 4.5 },
+      // También sobre la ficha (`fichaFondo`): es el fondo real donde se pinta el texto de estado. Un color que pasa contra `surface` y falla contra su propia ficha da un falso "pasa".
+      estadoOk: { on: ["surface", "bg", "data.fichaFondo"], min: 4.5 },
+      estadoAlerta: { on: ["surface", "bg", "data.fichaFondo"], min: 4.5 },
+      estadoFallo: { on: ["surface", "bg", "data.fichaFondo"], min: 4.5 },
       fichaFondo: { on: ["surface"], min: 1.05 },
     },
   });

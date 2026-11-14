@@ -2,9 +2,8 @@ import { random } from "../../engine";
 import { Easing, clamp, progress, roleColor, useFx } from "../core";
 import { textLook } from "../../themes";
 import { decoration, decorationHost, frontCaretStyle, hasFrontCaret } from "./look";
-import { baseText, titleTreatment } from "./shared";
+import { baseText } from "./shared";
 import type { TextFxProps } from "./shared";
-import { measureWidth } from "./measure";
 
 export type ScrambleDecodeProps = TextFxProps & {
   /** Alfabeto de los glifos al azar. */
@@ -44,16 +43,26 @@ export function ScrambleDecode(props: ScrambleDecodeProps) {
   const deco = textLook(theme).decoration !== "none";
   // Cursor de bloque o guion bajo en el primer glifo sin resolver (con la barra, que es lo de siempre, no hay cursor acá).
   const front = hasFrontCaret(theme) ? shown.findIndex((c, i) => c !== finals[i]) : -1;
-  const tt = titleTreatment(theme, props.weight);
-  const font = { family: theme.font.family, weight: tt.weight, letterSpacing: tt.tracking };
   return (
     <div style={{ ...baseText(theme, props, true), display: "flex", ...(deco ? { width: "fit-content", ...decorationHost(theme) } : {}), ...style }}>
       {finals.map((ch, i) => {
-        const w = ch === " " ? measureWidth(" ", fs, font) : measureWidth(ch, fs, font);
         const resolved = shown[i] === ch;
+        const caret = i === front;
+        // Cada ranura mide lo que mide su letra final, con la tipografía que de verdad se dibuja (no con un ancho medido aparte): el texto
+        // no salta al resolverse y una fuente más ancha no hace que las letras se pisen. La letra resuelta va en el flujo; el glifo al azar
+        // se centra encima de una copia invisible de la final (`visibility: hidden`: sin texto para `qa`).
+        if (resolved) {
+          return (
+            <span key={`${i}r${caret ? "c" : ""}`} style={{ display: "inline-block", whiteSpace: "pre", textAlign: "center", opacity: 1, ...(caret ? frontCaretStyle(theme, roleColor(theme, "accent")) : {}) }}>
+              {ch}
+            </span>
+          );
+        }
         return (
-          <span key={`${i}${resolved ? "r" : "s"}${i === front ? "c" : ""}`} data-qa-ignore={resolved ? undefined : "overlap"} style={{ display: "inline-block", width: w, textAlign: "center", opacity: resolved || i === front ? 1 : 0.75, ...(i === front ? frontCaretStyle(theme, roleColor(theme, "accent")) : {}) }}>
-            {shown[i] === " " ? " " : shown[i]}
+          <span key={`${i}s${caret ? "c" : ""}`} style={{ display: "inline-block", position: "relative", whiteSpace: "pre", textAlign: "center", opacity: caret ? 1 : 0.75, ...(caret ? frontCaretStyle(theme, roleColor(theme, "accent")) : {}) }}>
+            <span aria-hidden="true" style={{ visibility: "hidden" }}>{ch}</span>
+            {/* glifo al azar: relleno que dura 2 cuadros y se pisa con los vecinos a propósito (`overlap`); la letra final, ya resuelta, se juzga entera */}
+            <span aria-hidden="true" data-qa-ignore="overlap" style={{ position: "absolute", left: "50%", top: 0, transform: "translateX(-50%)", whiteSpace: "pre" }}>{shown[i] === " " ? " " : shown[i]}</span>
           </span>
         );
       })}

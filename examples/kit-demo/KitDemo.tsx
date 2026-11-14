@@ -4,7 +4,7 @@ import { ThemeProvider, borderWidth, cornerRadius, dark, editorial, entrance, ne
 import type { Theme } from "../../themes";
 import {
   CountUp, Cursor, DockedHeadline, DoodleArrow, DoodleCircle, DoodleUnderline, Eyebrow, FlyingCard,
-  GradientText, Stage, Vignette, Wash, World, flyInZ, hideFromScale, kf, typed, useCameraAt, zoomThrough,
+  GradientText, Stage, Vignette, Wash, World, flyInZ, hideFromScale, kf, textWidth, typed, useCameraAt, zoomThrough,
 } from "../../kit";
 import type { CameraKey } from "../../kit";
 
@@ -21,7 +21,7 @@ const B = { x: 1300, y: 190, w: 520, h: 740 };
 const CARD = { w: 320, h: 210 };
 const cardPos = (i: number) => ({ x: A.x + 40 + i * 350, y: A.y + 100 });
 const cardCenter = (i: number) => ({ x: cardPos(i).x + CARD.w / 2, y: cardPos(i).y + CARD.h / 2 });
-const LANDING = { x: B.x + B.w / 2, y: 690 };
+const LANDING = { x: B.x + B.w / 2, y: 670 };
 const COUNTER = { x: B.x + B.w / 2, y: 420 };
 const PICK = 1;
 
@@ -46,21 +46,31 @@ const KEYS: CameraKey[] = [
 
 const CAMERA_OPTS = { map: (fr: number, c: { x: number; y: number; scale: number }) => zoomThrough(fr, T.through, c, COUNTER, 40), noBlurFrom: T.through[0] };
 
-function Panel({ x, y, w, h, title, opacity = 1, children }: { x: number; y: number; w: number; h: number; title: string; opacity?: number; children?: React.ReactNode }) {
+/**
+ * Panel con título. La superficie (relleno, borde, sombra) es una capa propia, hermana del contenido: se atenúa con `dim` sin tocar el texto
+ * (un texto al 45 % de opacidad queda bajo 3:1 con casi cualquier fondo; ver docs/guia-escenas.md, "Escenas que sobreviven a otro design system").
+ * `fade` apaga el contenido (título y lo de adentro): el texto se funde del todo, no queda a medias. `titleMin` es el alto mínimo de la franja del título: el contenido en flujo empieza debajo, y si el título crece (otra tipografía) lo empuja.
+ */
+function Panel({ x, y, w, h, title, dim = 1, fade = 1, titleMin = 0, children }: { x: number; y: number; w: number; h: number; title: string; dim?: number; fade?: number; titleMin?: number; children?: React.ReactNode }) {
   const theme = useTheme();
   // Superficie del design system (esquinas, relleno, borde, sombra). Con el relleno sólido el panel va un escalón más claro (`surfaceAlt`) que las tarjetas.
   const s = surfaceStyle(theme, "window", { level: "lg" });
   const fill = s.background === theme.color.surface ? theme.color.surfaceAlt : s.background;
   return (
-    <div key={opacity === 1 ? "rest" : "anim"} data-qa-ignore={opacity === 1 ? undefined : "contrast"} /* el panel se atenúa a propósito mientras vuela la tarjeta: es un foco, no texto para leer; `opacity` se emite siempre, como antes, para que el aspecto por defecto sea idéntico al píxel */ style={{ position: "absolute", left: x, top: y, width: w, height: h, background: fill, border: s.border, borderRadius: s.borderRadius, boxShadow: s.boxShadow, opacity }}>
-      <div style={{ padding: "26px 40px", fontSize: theme.type.body, ...textStyle(theme, "title"), color: theme.color.text }}>{title}</div>
-      {children}
+    <div style={{ position: "absolute", left: x, top: y, width: w, height: h }}>
+      {/* `opacity` se emite siempre, como antes, para que el aspecto por defecto sea idéntico al píxel */}
+      <div key={dim === 1 ? "surf-rest" : "surf-anim"} style={{ position: "absolute", inset: 0, background: fill, border: s.border, borderRadius: s.borderRadius, boxShadow: s.boxShadow, opacity: dim }} />
+      <div key={fade >= 1 ? "body-rest" : "body-anim"} style={{ position: "relative", ...(fade >= 1 ? {} : { opacity: fade }) }}>
+        <div style={{ position: "relative", minHeight: titleMin, boxSizing: "border-box", padding: "26px 40px 0", fontSize: theme.type.body, lineHeight: 1.2, ...textStyle(theme, "title"), color: theme.color.text }}>{title}</div>
+        {children}
+      </div>
     </div>
   );
 }
 
 function StatCard({ i, frame, selected }: { i: number; frame: number; selected?: boolean }) {
   const theme = useTheme();
+  // El alto de la tarjeta es un mínimo (210): el contenido se apoya en el relleno de abajo (13 px) y, con otra tipografía, la tarjeta crece.
   const s = STATS[i]!;
   const col = theme.color.chart[i % theme.color.chart.length]!;
   // tarjeta de ficha: borde grueso (`bold`) y las esquinas de un panel
@@ -68,13 +78,13 @@ function StatCard({ i, frame, selected }: { i: number; frame: number; selected?:
   const w = borderWidth(theme, "card", { bold: true });
   const border = selected && w > 0 ? `${w}px solid ${theme.color.accent}` : surf.border;
   return (
-    <div style={{ width: CARD.w, height: CARD.h, boxSizing: "border-box", padding: "22px 28px", background: surf.background, borderRadius: surf.borderRadius, border, boxShadow: surf.boxShadow }}>
-      <Eyebrow style={{ display: "block" }}>{s.label}</Eyebrow>
+    <div style={{ width: CARD.w, minHeight: CARD.h, boxSizing: "border-box", padding: "22px 28px 13px", background: surf.background, borderRadius: surf.borderRadius, border, boxShadow: surf.boxShadow }}>
+      <Eyebrow style={{ display: "block", lineHeight: 1.2 }}>{s.label}</Eyebrow>
       <div style={{ fontSize: 84, lineHeight: 1.1, fontWeight: theme.font.weights.stat, color: theme.color.text }}>{s.value}</div>
       <div style={{ marginTop: 6, height: 10, borderRadius: cornerRadius(theme, "bar"), background: theme.color.surfaceAlt }}>
         <div style={{ width: `${kf(frame, [0, 60], [0, 40 + i * 20])}%`, height: "100%", borderRadius: cornerRadius(theme, "bar"), background: col }} />
       </div>
-      <div style={{ marginTop: 8, fontSize: theme.type.eyebrow - 4, color: s.delta.startsWith("+") ? theme.color.success : theme.color.danger }}>{s.delta}</div>
+      <div style={{ marginTop: 8, fontSize: theme.type.eyebrow - 4, lineHeight: 1.2, color: s.delta.startsWith("+") ? theme.color.success : theme.color.danger }}>{s.delta}</div>
     </div>
   );
 }
@@ -90,49 +100,64 @@ function Scene({ frame }: { frame: number }) {
   const zoomIn = kf(cam.scale, [1.05, 1.45], [0, 1]) * kf(frame, [T.through[0], T.through[0] + 10], [1, 0]);
   const rowDots = [theme.color.success, theme.color.warning, theme.color.success, theme.color.danger, theme.color.success];
   const land = frame >= T.flight[1];
+  // El contador entra en el panel con aire: el tamaño del tema, salvo que el número medido (con un 30 % de margen por si la letra real es más ancha o más grande)
+  // no entre en el ancho útil del panel; en ese caso baja lo justo. Un número no se parte en dos líneas: si no entra, se sale del panel.
+  const counterSize = Math.min(theme.type.stat, Math.floor((B.w - 60) / (textWidth(theme, "1.284", { size: 1, weight: "stat" }) * 1.3)));
   return (
     <Stage frame={frame}>
       <World camera={cam} width={width} height={height}>
-        {/* El panel vuelve a opacidad plena antes de que la cámara termine de acercarse al contador: así sus textos (ya fuera de cuadro) no entran en fundido recortados con la cámara quieta. */}
-        <Panel {...A} title="Panel de ejemplo" opacity={kf(frame, [148, 162, 180, 194], [1, 0.45, 0.45, 1])}>
-          {[0, 1, 2].map((i) => {
-            const p = cardPos(i);
-            const d = staggerFrames(theme, i, { base: 6 });
-            const a = kf(frame, [d - 14, d + 18], [0, 1]);
-            const hidden = i === PICK && left;
-            // Entrada en profundidad: perspective() propio de cada tarjeta, layout entero (ver docs/reglas.md).
-            return (
-              <div key={i} style={{ position: "absolute", left: p.x - A.x, top: p.y - A.y, ...flyInZ(a, { from: 800, x: (i - 1) * 140, y: 60 }) }}>
-                {hidden ? (
-                  <div style={{ width: CARD.w, height: CARD.h, boxSizing: "border-box", borderRadius: cornerRadius(theme, "panel"), border: `2px dashed ${theme.color.border}` }} />
-                ) : (
-                  <StatCard i={i} frame={frame} selected={i === PICK && picked} />
-                )}
-              </div>
-            );
-          })}
-          {ROWS.map((r, i) => {
-            const d = staggerFrames(theme, i, { base: 5 });
-            const a = kf(frame, [d - 10, d + 10], [0, 1]);
-            const row = surfaceStyle(theme, "card", { level: "sm" });
-            // El borde (más grueso o ausente) no cambia la caja: el relleno de la fila lo compensa.
-            const bd = borderWidth(theme, "card") - 1;
-            const ent = entrance(theme, a, i, { native: "fade" });
-            // `key` según las propiedades de la entrada: si aparecen o desaparecen, React las agregaría al final y el marcado dependería del historial.
-            return (
-              <div key={`${r}-${Object.keys(ent).join("-")}`} style={{ position: "absolute", left: 40, top: 360 + i * 64, width: A.w - 80, height: 52, boxSizing: "border-box", display: "flex", alignItems: "center", gap: 18, padding: `0 ${24 - bd}px`, background: row.background, border: row.border, borderRadius: cornerRadius(theme, "control"), ...ent, fontSize: theme.type.caption, color: theme.color.text }}>
-                <span style={{ width: 16, height: 16, borderRadius: cornerRadius(theme, "bar"), background: rowDots[i] }} />
-                {r}
-                <span style={{ marginLeft: "auto", color: theme.color.textMuted, fontSize: theme.type.ui.md }}>{(i + 1) * 7} min</span>
-              </div>
-            );
-          })}
+        {/* Mientras vuela la tarjeta, la superficie del panel baja a 0,45 (foco en el vuelo; el texto sigue entero: ver `Panel`). Cuando la tarjeta aterriza, el sujeto pasa a ser el contador: el contenido del panel se apaga del todo
+            antes de que la cámara llegue (cuadro 200), así ninguna tarjeta queda cortada por el borde con la cámara quieta. */}
+        <Panel {...A} title="Panel de ejemplo" titleMin={100} dim={kf(frame, [148, 162], [1, 0.45])} fade={kf(frame, [176, 198], [1, 0])}>
+          {/* Todo el contenido va en flujo bajo la franja del título (mínimo 100 px): las tarjetas (alto mínimo 210), 50 px de aire y las filas.
+              Con la tipografía de siempre cae donde estaba (tarjetas en y = 100, filas en y = 360); con otra, lo de abajo baja en vez de pisarse. */}
+          <div style={{ paddingLeft: 40, width: A.w - 40, boxSizing: "border-box", display: "flex", flexDirection: "column", gap: 50 }}>
+            <div style={{ display: "flex", gap: 30, alignItems: "flex-start" }}>
+              {[0, 1, 2].map((i) => {
+                const d = staggerFrames(theme, i, { base: 6, context: "items" });
+                const a = kf(frame, [d - 14, d + 18], [0, 1]);
+                const hidden = i === PICK && left;
+                // Entrada en profundidad: perspective() propio de cada tarjeta, layout entero (ver docs/reglas.md).
+                const z = flyInZ(a, { from: 800, x: (i - 1) * 140, y: 60 });
+                const en = Object.keys(z).length > 0;
+                // Sin entrada en curso no hay estilo: `key` distinto para que el marcado no dependa de si antes lo hubo (un `style=""` que queda es una diferencia para `--check`).
+                return (
+                  <div key={`${i}-${en ? "anim" : "rest"}`} style={en ? z : undefined}>
+                    {hidden ? (
+                      <div style={{ width: CARD.w, minHeight: CARD.h, boxSizing: "border-box", borderRadius: cornerRadius(theme, "panel"), border: `2px dashed ${theme.color.border}` }} />
+                    ) : (
+                      <StatCard i={i} frame={frame} selected={i === PICK && picked} />
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+            <div style={{ width: A.w - 80, display: "flex", flexDirection: "column", gap: 12 }}>
+            {ROWS.map((r, i) => {
+              const d = staggerFrames(theme, i, { base: 5, context: "rows" });
+              const a = kf(frame, [d - 10, d + 10], [0, 1]);
+              const row = surfaceStyle(theme, "card", { level: "sm" });
+              // El borde (más grueso o ausente) no cambia la caja: el relleno de la fila lo compensa.
+              const bd = borderWidth(theme, "card") - 1;
+              const ent = entrance(theme, a, i, { native: "fade" });
+              // `key` según las propiedades de la entrada: si aparecen o desaparecen, React las agregaría al final y el marcado dependería del historial.
+              return (
+                <div key={`${r}-${Object.keys(ent).join("-")}`} style={{ minHeight: 52, boxSizing: "border-box", display: "flex", alignItems: "center", gap: 18, padding: `0 ${24 - bd}px`, background: row.background, border: row.border, borderRadius: cornerRadius(theme, "control"), ...ent, fontSize: theme.type.caption, lineHeight: 1.2, color: theme.color.text }}>
+                  <span style={{ width: 16, height: 16, borderRadius: cornerRadius(theme, "bar"), background: rowDots[i] }} />
+                  {r}
+                  <span style={{ marginLeft: "auto", color: theme.color.textMuted, fontSize: theme.type.ui.md }}>{(i + 1) * 7} min</span>
+                </div>
+              );
+            })}
+            </div>
+          </div>
         </Panel>
 
-        <Panel {...B} title="Destino">
-          <div style={{ position: "absolute", left: 0, top: 110, width: B.w, textAlign: "center" }}>
-            <Eyebrow style={{ display: "block", fontWeight: theme.font.weights.regular }}>{typed("Total acumulado", frame, 8, 0.7)}</Eyebrow>
-            <GradientText frame={frame} loop={120} style={{ fontSize: theme.type.stat, fontWeight: theme.font.weights.stat, lineHeight: 1.1 }}>
+        <Panel {...B} title="Destino" titleMin={110}>
+          {/* En flujo bajo la franja del título (mínimo 110 px): si el título crece, empuja al contador en vez de pisarlo. */}
+          <div style={{ textAlign: "center" }}>
+            <Eyebrow style={{ display: "block", lineHeight: 1.2, fontWeight: theme.font.weights.regular }}>{typed("Total acumulado", frame, 8, 0.7)}</Eyebrow>
+            <GradientText frame={frame} loop={120} style={{ fontSize: counterSize, fontWeight: theme.font.weights.stat, lineHeight: 1.1 }}>
               <CountUp frame={frame} from={0} to={1284} start={land ? T.flight[1] + 2 : 9999} duration={40} />
             </GradientText>
           </div>
@@ -152,7 +177,7 @@ function Scene({ frame }: { frame: number }) {
         <Cursor frame={frame} show={[74, 146]} keys={[[74, 1000, 800], [122, cardCenter(PICK).x + 40, cardCenter(PICK).y + 40], [146, cardCenter(PICK).x + 80, cardCenter(PICK).y + 90]]} clicks={[124]} />
       </World>
       <Vignette amount={zoomIn} />
-      <DockedHeadline index={1} title="Panel de ejemplo" subtitle={typed("Vista general", frame, 6, 0.8)} frame={frame} start={0} hide={hideFromScale(cam.scale)} />
+      <DockedHeadline index={1} title="Panel de ejemplo" subtitle={typed("Vista general", frame, 18, 0.8) /* se escribe cuando la píldora ya terminó de entrar (18 cuadros): un texto que se escribe con su contenedor en fundido da falsos avisos de contraste */} frame={frame} start={0} hide={hideFromScale(cam.scale)} />
       <Wash frame={frame} range={T.wash} />
     </Stage>
   );

@@ -1,7 +1,7 @@
 import type React from "react";
 import { Easing, useFrame, useVideoConfig } from "../engine";
 import { Wash, World, kf, useCameraAt, zoomThrough } from "../kit";
-import { entrance, staggerFrames, surfaceStyle, textStyle, useTheme } from "../themes";
+import { entrance, staggerFrames, staggerOverride, surfaceStyle, textStyle, useTheme } from "../themes";
 import { fade, styleKey, xform } from "../fx/core/math";
 import { fitText, listLayout, openingWall, rigTransform } from "./layout";
 import { Chip, HeadlineRow, HighlightedTitle, StoryStage, rowEntrance, scaler, useEase, useStorySpec } from "./shared";
@@ -52,7 +52,10 @@ export function Opening({ spec: specIn, first = 0, dock, through }: { spec: Stor
   const gap = Math.min(16, 64 / n) * (dur / OPENING_FRAMES);
   // con acople la lista se queda hasta DOCK_FRAMES antes del final (la píldora termina de entrar en el último cuadro menos 8)
   const dockAt = Math.max(Math.round(u(120)), dur - DOCK_FRAMES);
-  const heads = (i: number) => staggerFrames(theme, i, { base: gap }); // demora de cada titular (el paso lo escala el tema)
+  // demora de cada titular: el paso propio lo escala el tema (`motion.stagger`); si el design system fija el de la lista (`motion.staggerList`), son esos cuadros
+  const heads = (i: number) => staggerFrames(theme, i, { base: gap, context: "list", scale: dur / OPENING_FRAMES });
+  // cuadros que tarda cada pieza del muro en aparecer respecto de la anterior (0,5 de siempre; `motion.staggerChips` lo cambia)
+  const chipStep = staggerOverride(theme, "chips") ?? 0.5;
   const T = { titleOut: [u(78), u(100)] as [number, number], wallOff: [u(94), u(126)] as [number, number], heads: u(104), fly: (docking ? [dockAt, dockAt + 1] : flying ? [u(246), u(292)] : [u(236), u(282)]) as [number, number] };
   const underStart = T.heads + heads(n - 1) + u(20);
 
@@ -87,11 +90,13 @@ export function Opening({ spec: specIn, first = 0, dock, through }: { spec: Stor
         {wall.map((c, i) => {
           const lit = kf(f, [u(c.on), u(c.on) + 3], [0, 1], Easing.linear);
           const pop = kf(f, [u(c.on), u(c.on) + 5, u(c.on) + 22], [0, 1, 0]);
-          const appear = kf(f, [u(i * 0.5), u(10 + i * 0.5)], [0.5, 1], ease.out);
+          const appear = kf(f, [u(i * chipStep), u(10 + i * chipStep)], [0.5, 1], ease.out);
           const blur = wallBlur ? Math.round(Math.min(2.5, Math.max(0, (60 - (c.z + rig.dz)) / 160)) * 10) / 10 : 0;
           const chip: React.CSSProperties = { position: "absolute", left: 0, top: 0, transformOrigin: "0 0", transform: rigTransform(c.x, c.y, c.z, rig, WALL_P, cx, cy, `${c.k === 1 ? "" : ` scale(${c.k})`} translate(-50%, -50%)`), zIndex: 1000 + c.z, opacity: fade(appear), filter: blur > 0 ? `blur(${blur}px)` : undefined };
           return (
-            <div key={`${i}-${styleKey(chip)}`} data-qa-ignore="min-size contrast overlap covered offscreen safe-area" style={chip}>
+            // Muro de fondo: adorno (`data-qa-decor`: sin min-size ni contraste, son detalle que se lee al acercar; sí se juzgan recorte y choque con el
+            // título y las filas). Las fichas pasan por detrás del cartel (`covered`; su texto queda bajo el del cartel: `overlap`) y llegan hasta los bordes del cuadro (`safe-area`) a propósito.
+            <div key={`${i}-${styleKey(chip)}`} data-qa-decor="" data-qa-ignore="covered overlap safe-area" style={chip}>
               <Chip text={c.text} lit={lit} pop={pop} />
             </div>
           );
@@ -149,7 +154,7 @@ export function Opening({ spec: specIn, first = 0, dock, through }: { spec: Stor
               opacity={a * opacity}
               gradientLoop={design.gradient?.loop}
               underline={isTarget ? kf(f, [underStart, underStart + u(28)], [0, 1], ease.out) : 0}
-              style={{ ...rowEntrance(theme, a, i, { distance: 80, dy }), filter: a < 0.98 ? `blur(${((1 - a) * 8).toFixed(1)}px)` : undefined }}
+              style={{ ...rowEntrance(theme, a, i, { distance: 80, dy, depth: 700 }), filter: a < 0.98 ? `blur(${((1 - a) * 8).toFixed(1)}px)` : undefined }}
             />
           );
         })}

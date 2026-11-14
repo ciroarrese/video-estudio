@@ -86,6 +86,9 @@ Ver también el catálogo (`docs/animaciones.md`): los efectos de `fx/` ya cumpl
   *Por qué:* un flujo sin dirección se lee como desorden.
 - [ ] **Cada escena termina atravesando un elemento** (`zoomThrough` con un punto de destino) **y cierra con un velo** (`Wash`) hacia la siguiente.
   *Por qué:* la transición es continua y nunca hay un corte seco.
+- [ ] **Una marca `data-qa-ignore` lleva un comentario que dice por qué, y nunca va en un contenedor más ancho que el elemento del que habla.** Se pone en el elemento mínimo (el texto cortado a propósito, no el panel que lo contiene), con la condición más angosta posible (`framing ? "offscreen" : undefined`) y jamás en el sujeto del zoom. `data-qa-ignore="all"` saca el texto de todas las reglas: solo para adorno que no se lee.
+  *Por qué:* una marca en un contenedor silencia a todo lo que tiene adentro, incluido el texto que sí dice algo, y `qa` deja de mirarlo (un ejemplo del repo tenía una marca de tres reglas sobre toda la escena y se juzgaba el 13 % del texto). `qa` imprime cuántos hallazgos callaron las marcas y qué parte del texto se juzgó (la línea "juzgados"): léelas.
+- [ ] **El texto atenuado se calcula contra el fondo (`dimOpacity` / `dimmedColor`), no con una `opacity` fija menor que 0,5.** *Por qué:* con otro fondo el contraste cae bajo 3:1. Ver `docs/guia-escenas.md`, sección 15.
 - [ ] **El texto es legible:** letra de al menos 18 px a 1080p (contando el zoom de cámara), contraste mínimo 4.5 en texto chico y todo dentro del área segura. Se usan los tamaños de `theme.type`.
   *Se revisa con:* `qa` (`min-size`, `contrast`, `safe-area`, `clip`, `offscreen`).
   Cómo decide `qa` cada severidad (`offscreen`: error, aviso o info según el movimiento y la cámara; `contrast` bajo un velo en transición contra uno quieto): `qa/README.md`, secciones "Reglas de `ve-qa`" y "`offscreen`: por qué error, aviso o info". Un `Wash` lleva `data-qa-veil` para que `qa` lo distinga.

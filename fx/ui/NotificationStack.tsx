@@ -4,6 +4,7 @@ import { chartColor, fade, fxBox, progress, styleKey, useFx } from "../core";
 import type React from "react";
 import type { FxProps } from "../core";
 import { staggerT } from "../data/geom";
+import { fitText } from "../text/measure";
 
 export type Notice = { title: string; body?: string; time?: string };
 export type NotificationStackProps = FxProps & { items?: Notice[] };
@@ -54,11 +55,15 @@ export function NotificationStack(p: NotificationStackProps) {
         // Traslado y opacidad solo mientras la tarjeta llega o es empujada (en reposo no queda `translateY(0.00px)`). La entrada sube 50 px
         // con el estilo por defecto; el diseño la reemplaza (`motion.entrance`) y le da rebote (`motion.overshoot`).
         const cardSt: React.CSSProperties = {
-          position: "absolute", left: 0, top: 0, width: w, height: ch, boxSizing: "border-box", ...surfaceStyle(theme, "card"),
+          position: "absolute", left: 0, top: 0, width: w, minHeight: ch, boxSizing: "border-box", ...surfaceStyle(theme, "card"),
           display: "flex", alignItems: "center", gap: 20, padding: "0 26px", zIndex: i,
           ...entrance(theme, raw[i]!, i, { native: "rise", distance: -50, curve: Easing.lands, round: false, offset: { y: offs[i]! } }),
           opacity: fade(Math.min(1, a * 1.8)),
         };
+        // Cuerpo en una sola línea: la letra baja (hasta un 20 %) si hace falta para que entre en el ancho que deja la tarjeta, medido con la
+        // tipografía del tema. Si aun así no entra (otra fuente, letra más grande), el texto pasa a otra línea y la tarjeta crece en vez de
+        // recortarlo con `overflow: hidden`.
+        const bodyFs = it.body ? fitText(it.body, w - 2 * 26 - 56 - 20, { font: { family: theme.font.family, weight: theme.font.weights.regular }, max: fs * 0.9, min: fs * 0.9 * 0.8 }) : fs * 0.9;
         return (
           <div key={`${i}:${styleKey(cardSt)}`} style={cardSt}>
             <div style={{ width: 56, height: 56, flex: "none", borderRadius: cornerRadius(theme, "chip"), background: withAlpha(chartColor(theme, i), 0.18), color: theme.color.text, display: "flex", alignItems: "center", justifyContent: "center", fontSize: fs * 1.2, fontWeight: theme.font.weights.stat }}>{it.title.charAt(0)}</div>
@@ -67,7 +72,7 @@ export function NotificationStack(p: NotificationStackProps) {
                 <span style={{ fontSize: fs * 1.15, color: theme.color.text, ...textStyle(theme, "title") }}>{it.title}</span>
                 <span style={{ fontSize: fs * 0.8, color: theme.color.textMuted, ...textStyle(theme, "eyebrow") }}>{it.time}</span>
               </div>
-              {it.body && <div style={{ marginTop: 6, fontSize: fs * 0.9, color: theme.color.textMuted, maxHeight: fs * 1.3, overflow: "hidden" }}>{it.body}</div>}
+              {it.body && <div style={{ marginTop: 6, fontSize: bodyFs, color: theme.color.textMuted }}>{it.body}</div>}
             </div>
           </div>
         );

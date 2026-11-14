@@ -5,7 +5,7 @@ import { deepClone, deepFreeze } from "./util";
 
 /**
  * Design system de ejemplo "editorial": papel claro, esquinas rectas, superficies de contorno y planas, tipografía con serif genérico,
- * subrayados como énfasis, fondo de grilla, movimiento sobrio (fundido y barrido) y cortinas entre escenas. Inventado y genérico: sin marca ni fuentes propias.
+ * subrayados como énfasis, fondo de grilla, movimiento sobrio (fundido y barrido) y cortinas entre escenas. Inventado y genérico: sin marca ni fuentes propias. Muro en grilla ajustada (sin ladrillo ni temblor), eyebrows en mayúsculas con líneas de apoyo en caja normal y marca de acento fina.
  */
 export const editorial: ResolvedTheme = deepFreeze(resolveTheme({
   ...deepClone(neutral),
@@ -44,13 +44,13 @@ export const editorial: ResolvedTheme = deepFreeze(resolveTheme({
   style: {
     shape: { corners: "sharp", border: 1, outlined: true },
     surface: { kind: "outline", elevation: "flat", opacity: 0.9 },
-    type: { titleWeight: "medium", labelWeight: "regular", titleTracking: -0.01, eyebrowCase: "upper", eyebrowTracking: 0.14, numerals: "solid", highlight: "underline" },
+    type: { titleWeight: "medium", labelWeight: "regular", titleTracking: -0.01, eyebrowCase: "upper", eyebrowTracking: 0.14, captionCase: "as-is", captionTracking: 0, numerals: "solid", highlight: "underline" },
     background: { kind: "grid", intensity: 0.45 },
-    motion: { entrance: "fade", overshoot: 0, stagger: 3, cameraBlur: true, cameraTilt: 0.4, transition: "wipe" },
-    decor: { doodles: false, doodleStroke: "geometric", vignette: 0, accent: "underline", gradientLoop: 0 },
+    motion: { entrance: "fade", overshoot: 0, stagger: 3, staggerList: 10, staggerRows: 2, staggerChips: 0.25, cameraBlur: true, cameraTilt: 0.4, transition: "wipe" },
+    decor: { doodles: false, doodleStroke: "geometric", vignette: 0, accent: "underline", accentThickness: 0.5, gradientLoop: 0 },
     story: {
       titleCard: "solid", listLayout: "inline", listUnderline: "name", handoff: "dock", headlineSize: "sm", closingBg: "surface", signoffBar: false,
-      wallColumns: 5, wallRows: 6, wallChipScale: 0.9, wallDolly: 0, wallDepth: 0.5, wallBlurOpening: true, wallBlurClosing: false,
+      wallColumns: 5, wallRows: 6, wallChipScale: 0.9, wallDolly: 0, wallDepth: 0.5, wallGapX: 0.85, wallGapY: 0.9, wallBrick: 0, wallJitter: 0, wallBlurOpening: true, wallBlurClosing: false,
     },
     line: { weight: "hairline", dash: "solid", cap: "square", glow: 0, dotShape: "square", accentUse: "sparse", sketch: 0 },
     solid: { fill: "outline", contrast: 1, edge: "gap" },

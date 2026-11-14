@@ -41,12 +41,12 @@ const entries: Entry[] = [
   },
   { group: "art", name: "BlueprintDraw", w: 900, h: 560, render: (f, w, h) => <BlueprintDraw frame={f} width={w} height={h} duration={D} /> },
   {
-    group: "art", name: "MarkerDraw", w: 560, h: 520,
+    group: "art", name: "MarkerDraw", w: 560, h: 520, // tres trazos de 120 de alto: la letra (0,58 del alto) aguanta una tipografía ancha o 1,25 de escala dentro del ancho
     render: (f, w) => (
       <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
-        <MarkerDraw frame={f} width={w} height={160} duration={30} kind="highlight" text="resaltar" />
-        <MarkerDraw frame={f - 20} width={w} height={160} duration={30} kind="underline" text="subrayar" />
-        <MarkerDraw frame={f - 40} width={w} height={160} duration={30} kind="circle" text="encerrar" />
+        <MarkerDraw frame={f} width={w} height={120} duration={30} kind="highlight" text="resaltar" />
+        <MarkerDraw frame={f - 20} width={w} height={120} duration={30} kind="underline" text="subrayar" />
+        <MarkerDraw frame={f - 40} width={w} height={120} duration={30} kind="circle" text="encerrar" />
       </div>
     ),
   },

@@ -54,7 +54,7 @@ Todos corren desde la raíz del repo. Los `<id>` son ids de video registrados.
 | Tipos | `npm run typecheck` (con `VE_VIDEOS_DIR` definida revisa también esa carpeta de afuera con su `tsconfig.json`; `npm run typecheck:videos` solo esa) |
 | Pruebas del repo (solo si cambiás el toolkit, no para hacer un video) | `npm test` (rápidas, ~1 a 2 min); `npm run test:e2e` (lentas, ~10 min: `--check` por escena de varias historias) |
 | Determinismo | `npm run render -- <id> --check` (con escenas con nombre mira 12 cuadros repartidos + 6 por escena, 3 cerca del inicio de cada una; `--frames a-b` lo limita al rango, `--check-count N`, `--check-per-scene N`, `--check-all`). En una historia, además, `--check --scene opening`, `--scene interlude-1` y `--scene closing` |
-| Control de calidad | `npm run qa -- <id> --count 40` (`--frames 0,60,120`, `--every N`, `--fail-on warn`, `--json out/qa.json`) |
+| Control de calidad | `npm run qa -- <id> --count 40` (`--frames 0,60,120`, `--every N`, `--fail-on warn`, `--json out/qa.json`; `--themes all` bajo los cinco design systems, `--font-fallback wide` y `--font-scale 1.25` de estrés, `--repeat 2` para comprobar que el control es reproducible; leé siempre la línea `juzgados`) |
 | Privacidad | `npm run privacy -- <id> --deny videos/<slug>/prohibidos.txt --scan-source videos/<slug>` (`--allow permitidos.txt`) |
 | Hoja de cuadros | `npm run sheet -- <id> --count 12` (sin `--format`: `out/<id>-sheet.png`; con `--format vertical`: `out/<id>-vertical-sheet.png`; `--frames`, `--cols`, `--scale`, `--out`) |
 | Tempo de una pista | `npm run audio -- tempo <pista.wav> --fps 30 --out videos/<slug>/tempo.json` (`--fase medio` si los golpes caen a contratiempo; `--bpm`/`--offset` para forzarlo) |
@@ -203,8 +203,11 @@ Para cada escena del guion, en orden:
    npm run typecheck
    npm run render -- <slug>-<escena> --check
    npm run qa -- <slug>-<escena> --count 40
+   npm run qa -- <slug>-<escena> --themes all --count 40      # si el video tiene que funcionar con más de un design system (empezá por `editorial`, el más estricto)
+   npm run qa -- <slug>-<escena> --count 40 --font-fallback wide --font-scale 1.25   # prueba de estrés de tipografía: 0 errores
    npm run privacy -- <slug>-<escena> --deny videos/<slug>/prohibidos.txt --scan-source videos/<slug>
    ```
+   **Leé la línea `juzgados` de `qa`** (cuánto texto se juzgó de verdad y por qué no se juzgó el resto): un "0 errores" con la mitad del texto sin juzgar no dice nada, y una marca `data-qa-ignore` que calla a un contenedor entero es una escena que mira para otro lado. `--repeat 2` corre el control dos veces y falla si los informes difieren (si un hallazgo va y viene, es un defecto del control: avisá). Las reglas para que la escena aguante otro design system (texto atenuado calculado, nada pisado a píxeles fijos, filas con alto explícito, franja del titular) están en `docs/guia-escenas.md`, sección 15.
    Los avisos de `qa` que sean a propósito (transiciones) se explican; el texto de marco de una interfaz recreada va bajo `data-qa-decor` (ver `qa/README.md`) y `qa` cuenta lo que callan las marcas; solo se silencian con `data-qa-ignore="regla"` si lo decidiste a propósito y lo decís. Fundidos, elementos que se cruzan en movimiento, rebabas bajo cámara en movimiento y texto bajo un `Wash` a medio fundido ya salen como `info`: no los silencies. Lo que sigue pidiendo `data-qa-ignore` condicionado (p. ej. texto cortado a propósito bajo un zoom quieto: `data-qa-ignore={zoomed ? "offscreen" : undefined}`) y qué transiciones ya no hace falta silenciar: `docs/guia-escenas.md`, sección 7, "Recetas de `qa`". `ve-qa` y `ve-privacy` aceptan `--out <ruta>` para el informe; `ve-privacy` informa `DENY-JOINED` si un término aparece solo en texto unido entre vecinos en línea (con límites de palabra, nunca entre bloques).
 4. Hoja de cuadros: `npm run sheet -- <slug>-<escena> --count 12` (una por formato: `--format vertical` escribe `out/<slug>-<escena>-vertical-sheet.png`). **Mirala como un espectador** (abrí la imagen con Read) y corregí lo que veas mal: titular tapando contenido, vacío arriba en la vista general, cosas fuera de cuadro, interfaces vacías o cargando, el sujeto chico en el cuadro vertical. Repasá `docs/guia-escenas.md`, sección "Para que no parezca un borrador".
 5. MP4 de esa escena sola: `npm run render -- <slug>-<escena> --scale 0.5 --crf 23`. Entregá a la persona la ruta del MP4 y de la hoja, más un resumen de lo que hace cada tramo y de lo que QA y privacidad dijeron (aunque sea "limpio").
@@ -238,6 +241,7 @@ Antes de empezar: todas las escenas aprobadas, cada una con `--check`, `qa` y `p
    npm run render -- <slug> --check          # y con --format vertical (o cuadrado) si el video los admite
    npm run render -- <slug> --check --scene opening   # historia: también por bloque (opening, interlude-1, closing) y por formato
    npm run qa -- <slug> --count 60
+   npm run qa -- <slug> --themes all --count 40     # si el video debe funcionar con más de un design system (y --font-fallback wide como estrés)
    npm run privacy -- <slug> --deny videos/<slug>/prohibidos.txt --scan-source videos/<slug> --every 15
    npm run sheet -- <slug> --count 16        # una hoja por formato
    ```

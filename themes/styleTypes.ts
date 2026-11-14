@@ -11,10 +11,12 @@ export const STYLE_ENUMS = {
   elevation: ["shadow", "flat", "border", "glow"],
   weight: ["regular", "medium", "semibold", "stat"],
   eyebrowCase: ["as-is", "upper"],
+  captionCase: ["eyebrow", "as-is", "upper", "lower"],
+  captionWeight: ["auto", "regular", "medium", "semibold", "stat"],
   numerals: ["gradient", "solid", "outline", "muted"],
   highlight: ["gradient", "underline", "marker", "accent"],
   backgroundKind: ["clouds", "plain", "grid", "dots", "gradient", "noise"],
-  entrance: ["auto", "rise", "fade", "scale", "slide", "wipe"],
+  entrance: ["auto", "rise", "fade", "scale", "slide", "wipe", "depth"],
   transition: ["wash", "through", "cut", "wipe"],
   doodleStroke: ["hand", "geometric"],
   accent: ["underline", "bar", "dot", "none"],
@@ -53,6 +55,8 @@ export type BackgroundKind = Of<"backgroundKind">;
 export type EntranceStyle = Of<"entrance">;
 export type TransitionStyle = Of<"transition">;
 export type AccentDecor = Of<"accent">;
+export type CaptionCase = Of<"captionCase">;
+export type CaptionWeight = Of<"captionWeight">;
 
 export type LineWeight = Of<"lineWeight">;
 export type LineDash = Of<"lineDash">;
@@ -77,6 +81,11 @@ export interface ThemeStyle {
     border: number;
     /** `false`: las superficies no llevan borde (salvo `surface.kind: "outline"`, que es un borde). */
     outlined: boolean;
+    /**
+     * Radio del cartel del título (rol `hero`) como múltiplo de `radius.lg` (0,5 a 4). `null` (por defecto): el de siempre (2 con `pill`, 1,5 con `rounded`).
+     * Con `sharp` no rige: todo es recto.
+     */
+    heroScale: number | null;
   };
   /** Tratamiento de las tarjetas y paneles. */
   surface: {
@@ -97,6 +106,15 @@ export interface ThemeStyle {
     eyebrowCase: "as-is" | "upper";
     /** Interletrado de los eyebrows, en em (0 a 0,4). */
     eyebrowTracking: number;
+    /**
+     * Caja de los subtítulos y de las líneas de apoyo de las historias (rol `caption`, distinto del eyebrow): `eyebrow` (por defecto) sigue a
+     * `eyebrowCase`, como siempre; `as-is`, `upper` y `lower` la deciden aparte. Así un design system con eyebrows en mayúsculas puede dejar las líneas en caja normal.
+     */
+    captionCase: CaptionCase;
+    /** Interletrado de los subtítulos y líneas de apoyo, en em (0 a 0,4). `null` (por defecto): el de `eyebrowTracking`. */
+    captionTracking: number | null;
+    /** Peso de los subtítulos y líneas de apoyo. `auto` (por defecto): el que ya lleva la pieza. */
+    captionWeight: CaptionWeight;
     /** Cómo se dibujan los números de pasos y listas: degradado de marca, acento sólido, solo contorno o atenuado. */
     numerals: NumeralsStyle;
     /** Cómo se resalta una palabra: degradado, subrayado, marcador o color de acento. */
@@ -112,8 +130,16 @@ export interface ThemeStyle {
     entrance: EntranceStyle;
     /** Rebote al asentarse, como fracción (0 = ninguno, hasta 0,3). */
     overshoot: number;
-    /** Cuadros entre un elemento y el siguiente de un conjunto escalonado (0 a 12). */
+    /** Cuadros entre un elemento y el siguiente de un conjunto escalonado (0 a 12). Es la base: los de contexto de abajo la pisan donde se indican. */
     stagger: number;
+    /** Paso (cuadros, 0 a 60) entre las filas grandes de la lista de la apertura. `null` (por defecto): el de siempre, escalado por `stagger`. */
+    staggerList: number | null;
+    /** Paso (cuadros, 0 a 60) entre filas de interfaces y de la vuelta al listado (`Interlude`) y de las filas de `kit-demo`. `null`: el de siempre, escalado por `stagger`. */
+    staggerRows: number | null;
+    /** Paso (cuadros, 0 a 60) entre elementos pequeños (paneles del cierre, tarjetas, ítems sueltos). `null`: el de siempre, escalado por `stagger`. */
+    staggerItems: number | null;
+    /** Paso (cuadros por pieza, 0 a 10, admite decimales) con que aparecen las piezas del muro de la apertura (0,5 de siempre). `null`: el de siempre. */
+    staggerChips: number | null;
     /** `false` apaga el desenfoque de movimiento de la cámara en los viajes. */
     cameraBlur: boolean;
     /** Multiplicador de la inclinación de la cámara (0 a 3; 1 = la de siempre). */
@@ -128,8 +154,12 @@ export interface ThemeStyle {
     doodleStroke: "hand" | "geometric";
     /** Multiplicador de la viñeta (0 = apagada; hasta 2). */
     vignette: number;
+    /** Rol del tema con que se tiñe la viñeta (`accent` por defecto, como siempre). Una escena puede pasar su propio `color`. */
+    vignetteColor: string;
     /** Marca de acento de listas y cierres. */
     accent: AccentDecor;
+    /** Multiplicador del grosor de la marca de acento (0,25 a 4; 1 = el de cada pieza: 8 px en la lista y la firma, 10 px en la vuelta compacta). */
+    accentThickness: number;
     /** Cuadros de un vaivén del degradado de los textos (0 = quieto; si no, entero >= 2). */
     gradientLoop: number;
   };
@@ -151,6 +181,14 @@ export interface ThemeStyle {
     wallChipScale: number;
     wallDolly: number;
     wallDepth: number;
+    /** Multiplicador de la separación horizontal entre columnas del muro de la apertura (0,4 a 3; 1 = la de siempre). */
+    wallGapX: number;
+    /** Multiplicador de la separación vertical entre filas del muro (0,4 a 3; 1 = la de siempre). */
+    wallGapY: number;
+    /** Multiplicador del corrimiento "ladrillo" entre filas alternas (0 a 3; 1 = el de siempre, 200 px; 0 = columnas alineadas, grilla ajustada). */
+    wallBrick: number;
+    /** Multiplicador del temblor de posición de cada pieza del muro (0 a 4; 1 = el de siempre; 0 = sin temblor). Sembrado: determinista. */
+    wallJitter: number;
     wallBlurOpening: boolean;
     wallBlurClosing: boolean;
   };

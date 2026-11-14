@@ -13,13 +13,13 @@ export type CloudOptions = {
   seed?: string;
   /** Manchas explícitas (`x`, `y` en fracciones del cuadro, `size` en px): reemplazan al reparto sembrado. */
   blobs?: CloudBlob[];
-  /** Desenfoque en px (por defecto 110). */
+  /** Desenfoque en px (por defecto el de `theme.cloud.blur`, y si el tema no lo declara, 110). */
   blur?: number;
 };
 
 /**
  * Manchas difuminadas a la deriva con los colores de `theme.cloud`; posición y deriva salen de `random(seed)` y del cuadro.
- * Cada propiedad (`colors`, `count`, `seed`, `blobs`, `opacity`) pisa a la de `theme.cloud`; sin ninguna, el resultado es el de siempre.
+ * Cada propiedad (`colors`, `count`, `seed`, `blobs`, `opacity`, `blur`) pisa a la de `theme.cloud`; sin ninguna, el resultado es el de siempre.
  * Con `blobs` el reparto es explícito y la deriva sigue saliendo de la semilla y el cuadro. Es determinista en todos los casos.
  * La opacidad por defecto es `theme.cloud.opacity` por `style.background.intensity` (`backgroundLayer(theme).cloudOpacity`).
  * `width`/`height` (el área donde se reparten las manchas) son por defecto el tamaño del cuadro del video (`useVideoConfig()`):
@@ -32,7 +32,7 @@ export function CloudBackground({
   seed,
   colors: colorsProp,
   blobs: blobsProp,
-  blur = 110,
+  blur: blurProp,
   width,
   height,
 }: CloudOptions & {
@@ -44,6 +44,7 @@ export function CloudBackground({
   const cfg = useVideoConfig();
   const W = width ?? cfg.width, H = height ?? cfg.height;
   const f = useFrameOr(frame);
+  const blur = blurProp ?? theme.cloud.blur ?? 110;
   const colors = (colorsProp ?? theme.cloud.colors).map((c) => resolveColor(theme, c));
   const sd = seed ?? theme.cloud.seed ?? "clouds";
   const blobs = blobsProp ?? theme.cloud.blobs;

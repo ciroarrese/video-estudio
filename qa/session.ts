@@ -29,6 +29,52 @@ export type VideoPage = {
   close(): Promise<void>;
 };
 
+/**
+ * Prueba de estres de tipografia, hecha solo desde la pagina del control (sin tocar el motor): `fontScale` multiplica el tamano de letra de
+ * todo elemento con texto (despues de cada cambio de cuadro) y `fontFallback` reemplaza la pila de fuentes de todo por una ancha o una angosta,
+ * para encontrar maquetaciones que asumen las medidas de una tipografia. No cubre el texto de canvas ni el que se mide en JS con otra fuente.
+ */
+export type Stress = { fontScale?: number; fontFallback?: 'wide' | 'narrow' };
+
+/** Pilas de reemplazo: `wide` ensancha (Verdana-like, la mas ancha instalada), `narrow` angosta (condensada). */
+export const FALLBACK_STACKS: Record<'wide' | 'narrow', string> = {
+  wide: '"Verdana", "DejaVu Sans", "Bitstream Vera Sans", sans-serif',
+  narrow: '"Arial Narrow", "Liberation Sans Narrow", "DejaVu Sans Condensed", "Nimbus Sans Narrow", sans-serif',
+};
+
+/**
+ * Se evalua en la pagina despues de cada `setFrame`: restaura el tamano de letra que puso el estres antes y vuelve a aplicarlo. Plain JS.
+ * `honorFixed`: los elementos bajo `data-qa-fixed-scale` no se escalan. `mine` se lee DE VUELTA del estilo despues de escribirlo (el navegador
+ * normaliza `55.000px` a `55px`): comparar contra el texto escrito nunca coincidia y la escala se componia de un cuadro al siguiente.
+ */
+const APPLY_FONT_SCALE = `(function(scale, honorFixed){
+  var S = window.__qaStress || (window.__qaStress = { els: [] });
+  S.els.forEach(function (rec) {
+    var el = rec.el;
+    if (!el.isConnected) return;
+    // si React reescribio el tamano en este cuadro, el valor ya no es el nuestro: no se pisa
+    if (el.style.getPropertyValue('font-size') !== rec.mine || el.style.getPropertyPriority('font-size') !== 'important') return;
+    if (rec.val) el.style.setProperty('font-size', rec.val, rec.pri); else el.style.removeProperty('font-size');
+  });
+  S.els = [];
+  var root = document.getElementById('stage') || document.body;
+  var walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+  var seen = new Set(), list = [], n;
+  while ((n = walker.nextNode())) {
+    if (!n.data.trim()) continue;
+    var el = n.parentElement;
+    if (!el || seen.has(el)) continue;
+    seen.add(el);
+    if (honorFixed && el.closest('[data-qa-fixed-scale]')) continue;
+    list.push([el, parseFloat(getComputedStyle(el).fontSize)]);
+  }
+  list.forEach(function (p) {
+    var el = p[0], val = el.style.getPropertyValue('font-size'), pri = el.style.getPropertyPriority('font-size');
+    el.style.setProperty('font-size', (p[1] * scale).toFixed(3) + 'px', 'important');
+    S.els.push({ el: el, val: val, pri: pri, mine: el.style.getPropertyValue('font-size') });
+  });
+})`;
+
 export type SessionOptions = {
   videoId: string;
   props?: Record<string, unknown>;
@@ -38,6 +84,10 @@ export type SessionOptions = {
   assets?: string[];
   /** Borrador: una fuente que no carga solo avisa en vez de fallar. */
   allowMissingFonts?: boolean;
+  /** Estres de tipografia (ver `Stress`). */
+  stress?: Stress;
+  /** `false`: el estres escala tambien lo que lleva `data-qa-fixed-scale` (por defecto se respeta la marca). */
+  honorFixedScale?: boolean;
   log?: (m: string) => void;
 };
 
@@ -74,12 +124,19 @@ export async function openSession(o: SessionOptions): Promise<Session> {
     await page.evaluate(() => (window as any).__ve.ready as Promise<unknown>).then(() => undefined, (e: Error) => {
       throw new Error(`La pagina del video no arranco: ${cleanPageError(e.message)}`);
     });
+    if (o.stress?.fontFallback) {
+      const css = `*,*::before,*::after{font-family:${FALLBACK_STACKS[o.stress.fontFallback]} !important}`;
+      await (page.evaluate as unknown as (e: string) => Promise<unknown>)(`(()=>{const s=document.createElement('style');s.id='__qa_fallback';s.textContent=${JSON.stringify(css)};document.head.appendChild(s);})()`);
+    }
+    const scale = o.stress?.fontScale;
+    const applyScale = async () => { if (scale !== undefined && scale !== 1) await (page.evaluate as unknown as (e: string) => Promise<unknown>)(`(${APPLY_FONT_SCALE})(${scale}, ${o.honorFixedScale !== false})`); };
     const cdp = await context.newCDPSession(page);
     const vp: VideoPage = {
       page, context, cdp,
       async setFrame(n) {
         if (err) throw err;
         await page.evaluate((f: number) => (window as any).__ve.setFrame(f), n);
+        await applyScale();
         if (err) throw err;
       },
       async shot(scale = 1) {

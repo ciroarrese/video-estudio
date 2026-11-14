@@ -24,9 +24,13 @@ npm run typecheck
 npm test
 npm run render -- <id> --check          # determinismo (repetir con --format vertical y cuadrado si el video los admite)
 npm run qa -- <id> --count 40           # control de calidad
+npm run qa -- <id> --themes all --count 40   # si el video debe funcionar con más de un design system (empezar por `editorial`); matriz y diferencias entre sistemas
+npm run qa -- <id> --count 40 --font-fallback wide --font-scale 1.25   # estrés de tipografía: 0 errores (maquetación que no supone las medidas de una fuente)
 npm run privacy -- <id> --deny videos/<slug>/prohibidos.txt --scan-source videos/<slug>
 npm run sheet -- <id> --count 12        # y mirar la hoja
 ```
+
+Cómo leer `qa`: la línea **`juzgados: N de M textos x cuadros (P%)`** dice cuánto texto se juzgó de verdad y por qué no se juzgó el resto (fuera del cuadro, casi transparente, tapado por una capa opaca, excluido con `data-qa-ignore="all"`); con menos de la mitad juzgado, un "0 errores" no dice nada. Mirá también cuántos hallazgos callaron las marcas (`callados`). `--repeat 2` corre el control dos veces y sale con código 3 si los informes difieren. Una marca `data-qa-ignore` lleva un comentario que dice por qué y nunca va en un contenedor más ancho que el elemento del que habla (`docs/reglas.md`). Reglas de maquetación para otro design system: `docs/guia-escenas.md`, sección 15.
 
 ## Si cambiás el toolkit (engine, kit, themes, stories, fx, qa, audio, render)
 

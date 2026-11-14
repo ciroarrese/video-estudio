@@ -102,11 +102,23 @@ export type TypeUi = { xs: number; sm: number; md: number };
 export type Surface = "bg" | "surface" | "surfaceAlt";
 
 export interface DataCheck {
-  /** Superficies sobre las que se dibuja (por defecto `["surface"]`). */
-  on: Surface[];
+  /**
+   * Superficies sobre las que se dibuja (por defecto `["surface"]`). Cada una es un rol (`bg`, `surface`, `surfaceAlt`), otro color de datos (`data.fichaFondo`) o
+   * un color (`#f4f4f4`): sirve para declarar las superficies PROPIAS de una interfaz recreada que vive en un ámbito (`ThemeScope`) con otros fondos.
+   * `checkTheme` juzga el color solo contra estas; con una lista vacía no lo juzga contra nada del tema.
+   */
+  on: DataSurface[];
   /** Contraste mínimo: 3 para rellenos y gráficos (por defecto), 4.5 si se usa como texto. */
   min: number;
+  /**
+   * Nota de dónde aparece el color (por ejemplo "dentro de la ficha de la herramienta recreada"). No cambia el cálculo: queda en `report.data` y en el
+   * aviso de `checkTheme`. Ojo: `qa` sigue juzgando el texto real en pantalla contra su fondo real, con o sin esta declaración.
+   */
+  scope?: string;
 }
+
+/** Superficie declarada de un color de datos: un rol de superficie, `data.<nombre>` o un color. */
+export type DataSurface = Surface | (string & {});
 
 /** Mancha explícita del fondo de nubes. `x` e `y` son fracciones del cuadro (0 a 1), `size` va en px. */
 export interface CloudBlob {
@@ -122,6 +134,8 @@ export interface ThemeCloud {
   /** Colores de las manchas, en orden y en vuelta. */
   colors: string[];
   opacity: number;
+  /** Desenfoque de las manchas, en px (por defecto 110; `--cloud-blur`). `CloudBackground`, `Stage` y `StoryStage` lo leen; una escena puede pasar el suyo en `cloud.blur`. */
+  blur?: number;
   /** Cantidad de manchas del reparto sembrado (por defecto 6). Se ignora si hay `blobs`. */
   count?: number;
   /** Semilla del reparto sembrado (por defecto "clouds"). */
