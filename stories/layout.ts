@@ -215,7 +215,8 @@ function inlineLayout(spec: StorySpec, theme: Theme, width: number, height: numb
   const left = Math.round((width - rowW) / 2);
   return {
     left, top, rowW, rowH, nameSize, lineSize, numSize, numW, nameH, lineH: nameH, blockTop, blockH, barW: rowW - numW, names, lines,
-    target: (i) => ({ x: left + numW + nameSize * 0.3, y: top + i * rowH + blockTop + nameH / 2 }),
+    // el atravesado apunta al medio del texto de la fila (no a su borde izquierdo): así el texto se abre parejo a los dos lados y no se corre hacia el borde derecho al empezar el zoom
+    target: (i) => ({ x: left + numW + Math.round(barW * 0.35), y: top + i * rowH + blockTop + nameH / 2 }),
     stacked: false, numH: nameH, numGap: 0, lineRows: [], barTop: blockTop + nameH + ROW_GAP.b, barLeft: numW, inline: true,
   };
 }
@@ -270,7 +271,8 @@ function baseLayout(spec: StorySpec, theme: Theme, width: number, height: number
   const barW = rowW - numW;
   return {
     left, top, rowW, rowH, nameSize, lineSize, numSize, numW, nameH, lineH, blockTop, blockH, barW, names, lines,
-    target: (i) => ({ x: left + numW + nameSize * 0.3, y: top + i * rowH + blockTop + nameH / 2 }),
+    // el atravesado apunta al medio del texto de la fila (no a su borde izquierdo): así el texto se abre parejo a los dos lados y no se corre hacia el borde derecho al empezar el zoom
+    target: (i) => ({ x: left + numW + Math.round(barW * 0.35), y: top + i * rowH + blockTop + nameH / 2 }),
     stacked: false, numH: nameH, numGap: 0, lineRows: [], barTop: blockTop + nameH + ROW_GAP.a + lineH + ROW_GAP.b, barLeft: numW,
   };
 }

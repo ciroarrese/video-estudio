@@ -12,7 +12,7 @@ npm run audio -- <comando> ...         # es `tsx audio/cli.ts`; en todo el repo 
 | --- | --- | --- |
 | `tempo` | Tenés una pista y necesitás saber dónde caen los pulsos y dónde entra la percusión o cambia la sección. | JSON con BPM, confianza, confianza de la fase, pulsos en segundos y en cuadros, inicio de la percusión y `secciones`. |
 | `empalme` | La pista no dura lo que el video, o querés arrancar justo en la percusión. | Un archivo de audio de la duración exacta, con inicio y empalmes sobre pulsos (dentro del cuerpo de la pista, sin su intro baja ni su caída final), y los cuadros de cada pulso. |
-| `efectos` | Necesitás sonidos cortos (golpe, clic, barrido, campanita, tilde, aviso). | WAV sintetizados, originales, en la carpeta que elijas. |
+| `efectos` | Necesitás sonidos cortos (golpe, clic, barrido, campanita, tilde, aviso), o probar otro clic. | WAV sintetizados, originales, en la carpeta que elijas (con variantes `clic-<nombre>`). |
 | `mezcla` | Tenés una lista de momentos (cues) y, opcionalmente, música. | Un solo archivo de audio listo para usar como pista del video. |
 | `audio/beats.ts` | Querés que una animación caiga sobre el compás. | Funciones puras: `beatAt`, `beatPhase`, `nearestBeat`, `pulse`, `framesPerBeat`. |
 
@@ -55,8 +55,32 @@ Todas las opciones numéricas se validan: un valor que no es número, una bander
 
 - `tempo <archivo> [--fps 30] [--bpm N] [--offset seg] [--fase medio] [--min-bpm 60] [--max-bpm 190] [--out tempo.json]`. Entrega `bpm`, `confidence`, `phaseConfidence`, `beatsSec`, `beatFrames`, `percussionStart`, `percussionBeat` y `secciones` (ver "Fase, percusión y secciones").
 - `empalme <archivo> --out salida.wav (--frames N --fps F | --segundos S) [--inicio percusion|seccion:<n>|<seg>] [--tempo tempo.json | --bpm N --offset seg [--fase medio]] [--lazo-inicio seg] [--lazo-fin seg] [--corte-en seg|f<cuadro>[,...]] [--final fade|real] [--compas 4] [--cruce 0.04] [--fade 2] [--fade-in 0.3] [--sin-cuerpo] [--sr 48000] [--json plan.json]`. El formato de salida lo da la extensión (`.wav`, `.mp3`, `.m4a`); el wav sale en 24 bits. Sin `--tempo` ni `--bpm` analiza la pista él mismo. Si la pista alcanza para la duración, solo recorta (sin empalmes). `--inicio` se ajusta al pulso más cercano. Detalle en "Empalme: el cuerpo de la pista".
-- `efectos [--out public/sfx] [--lista]`. Genera `golpe`, `clic`, `barrido`, `campanita`, `tilde` y `aviso` (WAV mono de 16 bits, 48 kHz). `--lista` los nombra con el instante de su pico.
+- `efectos [--out public/sfx] [--lista] [--clic <nombre>]`. Genera `golpe`, `clic`, `barrido`, `campanita`, `tilde` y `aviso` (WAV mono de 16 bits, 48 kHz) y, además, una variante `clic-<nombre>` por cada clic alternativo (ver "Variantes del clic"). `--clic <nombre>` elige cuál variante se escribe como `clic` a secas (por defecto `actual`). `--lista` nombra los efectos con el instante de su pico y describe las variantes del clic.
 - `mezcla --cues cues.json --fps F --frames N --out audio.wav [--sfx public/sfx] [--musica archivo] [--musica-gain 0.6] [--musica-desde seg] [--fade-in seg] [--fade-out 1] [--duck-db 5] [--duck-ataque 10] [--duck-release 250] [--duck-escala-gain] [--lufs <objetivo>] [--techo -1] [--sr 48000]`. En un cue, `sfx` es un nombre del set (se busca `<--sfx>/<nombre>.wav`) o una ruta a cualquier archivo; `gain` es un multiplicador lineal (1 por defecto); `ancla` es `"inicio"` (por defecto) o `"pico"`. Un cue fuera del video se omite con un aviso; un efecto que no existe corta antes de procesar nada, nombrando el cue. La salida tiene exactamente la duración del video y un limitador de pico verdadero. `--duck N` (la vieja razón de compresión) se sigue aceptando: `--duck 0` apaga el ducking y cualquier otro valor se ignora con un aviso.
+
+## Variantes del clic
+
+`efectos` escribe siempre `clic.wav` y, junto a él, un `clic-<nombre>.wav` por cada variante. Un cue elige la que quiere con `"sfx": "clic-<nombre>"`; para cambiar el `clic` de todo un video sin tocar los cues, generá los efectos con `--clic <nombre>`:
+
+```bash
+npm run audio -- efectos --out videos/<slug>/audio/sfx --clic thock    # clic.wav es ahora el "thock"
+```
+
+Todas son mono, duran entre 35 y 110 ms, tienen el pico cerca de -3 dBFS (`actual`, -2 dBFS), empiezan y terminan en cero y no tienen continua. `efectos --lista` las describe.
+
+| Nombre | Cómo suena | Cuándo va bien |
+| --- | --- | --- |
+| `actual` | Chasquido agudo y seco sobre un cuerpo resonante corto (el original). | Referencia; el que más se oye entre percusión. |
+| `suave` | Golpecito de graves y medios, casi sin agudos ni resonancia. | Interfaces calmas y música tranquila; no cansa si se repite. |
+| `mecanico` | Interruptor: golpe de bajada y, 55 ms después, uno chico de subida. | Botones y llaves con peso; sensación de objeto físico. |
+| `madera` | Toc afinado cerca de 1 kHz, que se apaga rápido. | Interfaces cálidas, artesanales o didácticas. |
+| `cristal` | Tic brillante con una resonancia fina que queda un instante. | Interfaces limpias y modernas; es el más agudo, mejor con música mullida. |
+| `burbuja` | Soplido redondo con el tono bajando de unos 900 a 350 Hz. | Interfaces amables o lúdicas; abrir, seleccionar, tildar. |
+| `digital` | Blip de triángulo cerca de 1 kHz, filtrado, sin filo. | Software y música lo-fi: electrónico pero amable. |
+| `thock` | Tecla amortiguada: cuerpo cerca de 180 Hz y un hueco a 420 Hz. | Escritura, listas y formularios; el más cálido. |
+| `cinta` | Ráfaga acotada en banda y un poco saturada, sin extremos. | Música lo-fi cálida: se mezcla con el grano en lugar de destacar. |
+
+Con música, un clic suave puede quedar tapado si cae justo sobre el bombo; subile el `gain` del cue (1,2 a 1,5 con ducking) o corré el cue unas décimas de pulso. El set y la forma de medir las diferencias están en `audio/efectos.ts` (`CLICS`) y `audio/efectos.test.ts`.
 
 ## Empalme: el cuerpo de la pista
 

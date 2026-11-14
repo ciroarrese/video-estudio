@@ -158,6 +158,181 @@ export const EFECTOS: Record<string, { descripcion: string; generar: Gen }> = {
   },
 };
 
+/** Filtro pasabajos de un polo (suaviza los agudos); `pasadas` lo aplica en cascada para una caída más empinada. */
+function pasaBajos(x: Float32Array, sr: number, fc: number, pasadas = 1): Float32Array {
+  const a = 1 - Math.exp((-TAU * fc) / sr);
+  for (let p = 0; p < pasadas; p++) {
+    let y = 0;
+    for (let i = 0; i < x.length; i++) {
+      y += a * (x[i] - y);
+      x[i] = y;
+    }
+  }
+  return x;
+}
+
+/** Filtro pasaaltos de un polo (saca el grave y la continua). */
+function pasaAltos(x: Float32Array, sr: number, fc: number): Float32Array {
+  const bajos = pasaBajos(Float32Array.from(x), sr, fc);
+  for (let i = 0; i < x.length; i++) x[i] -= bajos[i];
+  return x;
+}
+
+/** Ataque corto en rampa (evita el chasquido de un arranque en seco) por el tiempo `seg`. */
+const ataque = (t: number, seg: number) => Math.min(1, t / seg);
+
+/** Pico de los clics alternativos: unos -3 dBFS. */
+const PICO_CLIC = 0.708;
+
+export interface Clic {
+  descripcion: string;
+  /** Cuándo conviene (una línea). */
+  cuando: string;
+  generar: Gen;
+}
+
+/**
+ * Variantes del clic de interfaz. Cada una es un sonido distinto (no el mismo con otro filtro): todas
+ * sintetizadas con fórmulas propias, mono, de 15 a 120 ms, con pico cerca de -3 dBFS. `actual` es el `clic`
+ * original (el que se escribe como `clic` si no se elige otro con `efectos --clic <nombre>`).
+ */
+export const CLICS: Record<string, Clic> = {
+  actual: {
+    descripcion: 'El clic de siempre: chasquido agudo y seco sobre un cuerpo resonante corto.',
+    cuando: 'Referencia; sirve para música con mucha percusión que lo tape.',
+    generar: EFECTOS.clic.generar,
+  },
+  suave: {
+    descripcion: 'Toque táctil suave: golpecito de graves y medios, casi sin agudos y sin resonancia.',
+    cuando: 'Interfaces calmas y música tranquila; no cansa si se repite mucho.',
+    generar: (sr) => {
+      const x = buf(sr, 0.035);
+      const tic = pasaBajos(ruidoBanda(x.length, sr, 11, () => 2600, 0.7), sr, 4000);
+      for (let i = 0; i < x.length; i++) {
+        const t = i / sr;
+        const f = 280 + 140 * Math.exp(-t / 0.005);
+        x[i] = 1 * Math.sin(TAU * f * t) * Math.exp(-t / 0.006) * ataque(t, 0.0008) + 0.3 * tic[i] * Math.exp(-t / 0.0012);
+      }
+      return terminar(x, sr, PICO_CLIC);
+    },
+  },
+  mecanico: {
+    descripcion: 'Interruptor mecánico: dos golpes secos, el de bajada y, 55 ms después, uno más chico de subida.',
+    cuando: 'Botones y interruptores con peso; da sensación de objeto físico.',
+    generar: (sr) => {
+      const x = buf(sr, 0.095);
+      const ruidoBaja = ruidoBanda(x.length, sr, 21, () => 3200, 0.9);
+      const ruidoSube = ruidoBanda(x.length, sr, 22, () => 4200, 0.9);
+      const i1 = Math.round(0.055 * sr);
+      for (let i = 0; i < x.length; i++) {
+        const t = i / sr;
+        x[i] += 0.9 * ruidoBaja[i] * Math.exp(-t / 0.0015) + 0.5 * Math.sin(TAU * 1500 * t) * Math.exp(-t / 0.004) + 0.35 * Math.sin(TAU * 420 * t) * Math.exp(-t / 0.006);
+        if (i >= i1) {
+          const u = (i - i1) / sr;
+          x[i] += 0.55 * ruidoSube[i] * Math.exp(-u / 0.001) + 0.28 * Math.sin(TAU * 1900 * u) * Math.exp(-u / 0.003);
+        }
+      }
+      return terminar(x, sr, PICO_CLIC);
+    },
+  },
+  madera: {
+    descripcion: 'Golpe de madera: toc afinado cerca de 1 kHz que se apaga rápido, con un segundo parcial inarmónico.',
+    cuando: 'Interfaces cálidas, artesanales o didácticas; combina con guitarras y teclados.',
+    generar: (sr) => {
+      const x = buf(sr, 0.07);
+      nota(x, sr, 0, 1150, 0.009, 1, [[1, 1], [2.45, 0.5, 0.5], [4.1, 0.2, 0.25]]);
+      const tic = pasaBajos(ruidoBanda(x.length, sr, 31, () => 2400, 0.8), sr, 5000);
+      for (let i = 0; i < x.length; i++) x[i] += 0.35 * tic[i] * Math.exp(-i / sr / 0.0015);
+      return terminar(x, sr, PICO_CLIC);
+    },
+  },
+  cristal: {
+    descripcion: 'Toque de cristal: tic brillante y muy corto con una resonancia fina que queda un instante.',
+    cuando: 'Interfaces limpias y modernas; ojo, es el más agudo, mejor con música mullida.',
+    generar: (sr) => {
+      const x = buf(sr, 0.11);
+      // Parciales inarmónicos entre 2,4 y 5,6 kHz (nada por encima, para que no sea estridente).
+      nota(x, sr, 0, 2450, 0.03, 1, [[1, 1], [1.62, 0.7, 0.8], [2.31, 0.35, 0.5]]);
+      const tic = ruidoBanda(x.length, sr, 41, () => 4000, 0.9);
+      for (let i = 0; i < x.length; i++) x[i] += 0.3 * tic[i] * Math.exp(-i / sr / 0.0007);
+      pasaBajos(x, sr, 7000);
+      return terminar(x, sr, PICO_CLIC);
+    },
+  },
+  burbuja: {
+    descripcion: 'Burbuja: soplido redondo cuyo tono baja rápido de unos 900 a 350 Hz.',
+    cuando: 'Interfaces amables o lúdicas; funciona bien para abrir, seleccionar o tildar.',
+    generar: (sr) => {
+      const x = buf(sr, 0.075);
+      let fase = 0;
+      for (let i = 0; i < x.length; i++) {
+        const t = i / sr;
+        fase += (TAU * (350 + 550 * Math.exp(-t / 0.014))) / sr;
+        x[i] = (Math.sin(fase) + 0.18 * Math.sin(2 * fase)) * Math.exp(-t / 0.02) * ataque(t, 0.002);
+      }
+      return terminar(x, sr, PICO_CLIC);
+    },
+  },
+  digital: {
+    descripcion: 'Blip digital suave: triángulo cerca de 1 kHz con ataque y caída rápidos, filtrado para que no tenga filo.',
+    cuando: 'Interfaces de software y música lo-fi: se siente electrónico pero amable.',
+    generar: (sr) => {
+      const x = buf(sr, 0.09);
+      for (let i = 0; i < x.length; i++) {
+        const t = i / sr;
+        const ciclo = (t * 1040) % 1;
+        const tri = 4 * Math.abs(ciclo - 0.5) - 1;
+        x[i] = (tri + 0.25 * Math.sin(TAU * 2080 * t)) * Math.exp(-t / 0.011) * ataque(t, 0.0025);
+      }
+      pasaBajos(x, sr, 3200, 2);
+      return terminar(x, sr, PICO_CLIC);
+    },
+  },
+  thock: {
+    descripcion: 'Tecla amortiguada ("thock"): golpe grave y cálido (cuerpo cerca de 180 Hz y un hueco a 420 Hz).',
+    cuando: 'Teclados, escritura, listas y formularios; es el más grave y cálido.',
+    generar: (sr) => {
+      const x = buf(sr, 0.1);
+      const golpe = pasaBajos(ruidoBanda(x.length, sr, 51, () => 1100, 0.7), sr, 1800);
+      for (let i = 0; i < x.length; i++) {
+        const t = i / sr;
+        const f = 175 + 60 * Math.exp(-t / 0.012);
+        x[i] = 0.4 * Math.sin(TAU * f * t) * Math.exp(-t / 0.026) * ataque(t, 0.0007) + 0.7 * Math.sin(TAU * 420 * t) * Math.exp(-t / 0.014) + 0.7 * golpe[i] * Math.exp(-t / 0.006);
+      }
+      return terminar(x, sr, PICO_CLIC);
+    },
+  },
+  cinta: {
+    descripcion: 'Clic de cinta: ráfaga acotada en banda, con un poco de saturación y sin agudos ni graves extremos.',
+    cuando: 'Música lo-fi cálida: se mezcla con el grano de la música en lugar de destacar.',
+    generar: (sr) => {
+      const x = buf(sr, 0.06);
+      const r = ruidoBanda(x.length, sr, 61, () => 1300, 0.9);
+      for (let i = 0; i < x.length; i++) {
+        const t = i / sr;
+        x[i] = 1.6 * r[i] * Math.exp(-t / 0.0035) + 0.9 * Math.sin(TAU * 520 * t) * Math.exp(-t / 0.008) * ataque(t, 0.0006);
+        x[i] = Math.tanh(1.8 * x[i]);
+      }
+      pasaBajos(x, sr, 2800);
+      pasaAltos(x, sr, 260);
+      return terminar(x, sr, PICO_CLIC);
+    },
+  },
+};
+
+/** Nombre de archivo de una variante: `clic-<nombre>`. */
+export const nombreDeClic = (n: string) => `clic-${n}`;
+
+/** Nombre de la variante que se escribe como `clic` si no se pide otra. */
+export const CLIC_POR_DEFECTO = 'actual';
+
+/** Variante de clic por nombre (error claro si no existe). */
+export function elegirClic(nombre: string): Clic {
+  const c = CLICS[nombre];
+  if (!c) throw new Error(`No hay un clic "${nombre}"; las opciones son: ${Object.keys(CLICS).join(', ')}`);
+  return c;
+}
+
 /**
  * Instante (segundos desde el inicio del archivo) del pico de energía de cada efecto: el centro de
  * la ventana de 10 ms más fuerte. Con `ancla: "pico"` en un cue, el efecto se adelanta ese tiempo
@@ -169,11 +344,22 @@ export function picosDeEfectos(sr: number = EFECTOS_SR): Record<string, number> 
   return out;
 }
 
-/** Genera todos los efectos como WAV mono de 16 bits en `carpeta`; devuelve las rutas. */
-export function generarEfectos(carpeta: string, sr: number = EFECTOS_SR): string[] {
-  return Object.entries(EFECTOS).map(([nombre, e]) => {
+/**
+ * Genera todos los efectos como WAV mono de 16 bits en `carpeta`; devuelve las rutas. Además de `clic` escribe
+ * `clic-<nombre>` por cada variante de `CLICS`. Con `clic` se elige cuál variante se escribe como `clic` a secas
+ * (por defecto `actual`, el original).
+ */
+export function generarEfectos(carpeta: string, sr: number = EFECTOS_SR, opts: { clic?: string } = {}): string[] {
+  const elegido = elegirClic(opts.clic ?? CLIC_POR_DEFECTO);
+  const rutas = Object.entries(EFECTOS).map(([nombre, e]) => {
     const ruta = join(carpeta, `${nombre}.wav`);
-    escribirWav16(ruta, e.generar(sr), sr, 1);
+    escribirWav16(ruta, (nombre === 'clic' ? elegido : e).generar(sr), sr, 1);
     return ruta;
   });
+  for (const [n, c] of Object.entries(CLICS)) {
+    const ruta = join(carpeta, `${nombreDeClic(n)}.wav`);
+    escribirWav16(ruta, c.generar(sr), sr, 1);
+    rutas.push(ruta);
+  }
+  return rutas;
 }
