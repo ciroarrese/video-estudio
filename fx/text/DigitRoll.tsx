@@ -43,30 +43,45 @@ export function DigitRoll(props: DigitRollProps) {
   const vis = digitCount(v);
   const slotW = fs * 0.62;
   const lineH = fs * 1.1;
+  const rest = p >= 1 && Number.isInteger(value);
   const sufP = progress(local, duration - 6, 16, Easing.lands);
   const slots: React.ReactNode[] = [];
   for (let k = N - 1; k >= 0; k--) {
     const shown = k < vis || k === 0;
-    const pos = wheelPos(v, k) % 10;
-    const wheel: React.CSSProperties = { position: "absolute", left: 0, top: 0, width: slotW, transform: xform({ y: -pos * lineH, round: true }) };
-    slots.push(
-      <span
-        key={k}
-        data-qa-ignore="clip overlap covered offscreen safe-area"
-        style={{ display: "inline-block", position: "relative", width: slotW, height: lineH, overflow: "hidden", opacity: shown ? 1 : 0 }}
-      >
-        <span key={styleKey(wheel)} style={wheel}>
-          {Array.from({ length: 11 }, (_, d) => (
-            <span key={d} style={{ display: "block", height: lineH, lineHeight: `${lineH}px`, textAlign: "center" }}>
-              {d % 10}
-            </span>
-          ))}
-        </span>
-      </span>,
-    );
+    // En reposo (la cuenta terminó y el valor es entero) el dígito se dibuja quieto, sin rueda ni recorte: se juzga como cualquier texto.
+    if (rest) {
+      slots.push(
+        <span key={k} style={{ display: "inline-block", position: "relative", minWidth: slotW, height: lineH, lineHeight: `${lineH}px`, textAlign: "center", opacity: shown ? 1 : 0 }}>
+          {Math.floor(value / Math.pow(10, k)) % 10}
+        </span>,
+      );
+    } else {
+      const pos = wheelPos(v, k) % 10;
+      const wheel: React.CSSProperties = { position: "absolute", left: 0, top: 0, width: slotW, transform: xform({ y: -pos * lineH, round: true }) };
+      slots.push(
+        <span
+          key={k}
+          style={{ display: "inline-block", position: "relative", width: slotW, height: lineH, overflow: "hidden", opacity: shown ? 1 : 0 }}
+        >
+          <span key={styleKey(wheel)} style={wheel}>
+            {Array.from({ length: 11 }, (_, d) => {
+              // Mientras rueda, la ranura recorta la rueda a propósito. Los dígitos que quedan del todo fuera de la ventana no se ven (el recorte
+              // los oculta): `qa` no los juzga (`all`; es una copia que no se ve). Los que asoman en la ventana (el actual y, al girar, el
+              // vecino) se juzgan en todo salvo `clip` (se ven partidos a propósito) y `overlap` (el vecino pasa pegado al actual).
+              const visible = Math.abs(d - pos) < 1;
+              return (
+                <span key={d} aria-hidden={visible ? undefined : "true"} data-qa-ignore={visible ? "clip overlap" : "all"} style={{ display: "block", height: lineH, lineHeight: `${lineH}px`, textAlign: "center" }}>
+                  {d % 10}
+                </span>
+              );
+            })}
+          </span>
+        </span>,
+      );
+    }
     if (thousands && k > 0 && k % 3 === 0) {
       slots.push(
-        <span key={`s${k}`} style={{ display: "inline-block", width: fs * 0.3, height: lineH, lineHeight: `${lineH}px`, textAlign: "center", opacity: k < vis ? 1 : 0 }}>
+        <span key={`s${k}`} style={{ display: "inline-block", minWidth: fs * 0.3, height: lineH, lineHeight: `${lineH}px`, textAlign: "center", opacity: k < vis ? 1 : 0 }}>
           {thousands}
         </span>,
       );

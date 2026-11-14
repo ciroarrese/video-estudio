@@ -153,7 +153,7 @@ export function PhoneOrbit(p: PhoneOrbitProps) {
         {content}
       </div>
       {/* Capa delantera del anillo: transparente, no tapa el texto de la pantalla (se lo avisa a `qa`). */}
-      <div data-qa-ignore="covered overlap" style={{ position: "absolute", left: 0, top: 0, width, height, pointerEvents: "none" }}>
+      <div data-qa-ignore="covered" style={{ position: "absolute", left: 0, top: 0, width, height, pointerEvents: "none" }}>
         <FrameCanvas width={width} height={height} frame={p.frame} draw={(ctx) => draw(ctx, "front")} />
       </div>
     </div>

@@ -64,7 +64,8 @@ export function CardFan(p: CardFanProps) {
         const relief = surf.shadow.shadow === "soft" ? 5 : surf.border;
         const cardSt: React.CSSProperties = { position: "absolute", inset: 0, boxSizing: "border-box", transformOrigin: "50% 130%", transform: xform({ x: Math.round(x), y: Math.round(stackY + (1 - enter) * 30) - rise, rotate: a, round: true }), background: surf.fill, border: surf.border > 0 ? `${surf.border}px solid ${surf.edge}` : "none", borderBottom: relief > 0 ? `${relief}px solid ${surf.edge}` : "none", borderRadius: radius, boxShadow: surf.shadow.shadow === "hard" ? String(surf.css.boxShadow) : undefined, padding: 22, overflow: "hidden" };
         return (
-          <div key={`${i}:${styleKey(outerSt)}`} data-qa-ignore="overlap covered" style={outerSt}>
+          <div key={`${i}:${styleKey(outerSt)}`} style={outerSt}>
+          {/* Abanico: cada tarjeta tapa en parte a la de al lado a propósito, y el texto de la de atrás queda bajo la de adelante (`covered`, `overlap`); además `qa` aproxima el texto girado por su caja envolvente. Contraste, tamaño, recorte y borde del cuadro sí se juzgan. */}
           <div key={styleKey(cardSt)} data-qa-ignore="overlap covered" style={cardSt}>
             {kids ? kids[i] : (
               <>

@@ -88,11 +88,15 @@ export function MaskedRise(props: MaskedRiseProps) {
           <span key={wi} style={{ display: "inline-flex", alignItems: "flex-end", ...(decorate ? decorationHost(theme) : {}) }}>
             {chars.map((ch, ci) => {
               const p = rise(by === "word" ? wi : idx++);
+              // Mientras sube, la máscara recorta la letra a propósito (`clip`), la letra que sube pisa a la vecina (`overlap`) y puede
+              // asomar por fuera del cuadro (`offscreen`): esas tres no aplican. En reposo (p >= 1) la máscara ya no recorta nada (`overflow: visible`),
+              // la letra se juzga como cualquier texto y su ranura toma el ancho natural de la letra (no el medido con otra fuente).
+              const resting = p >= 1;
               return (
                 <span
                   key={ci}
-                  data-qa-ignore="clip overlap offscreen"
-                  style={{ display: "inline-block", overflow: "hidden", width: measureWidth(ch, fs, font), height: `${(fs * 1.15).toFixed(2)}px`, lineHeight: `${(fs * 1.15).toFixed(2)}px`, padding: "0 0.12em 0.14em", margin: "0 -0.12em -0.14em", whiteSpace: "nowrap" }}
+                  data-qa-ignore={resting ? undefined : "clip overlap offscreen"}
+                  style={{ display: "inline-block", overflow: resting ? "visible" : "hidden", ...(resting ? {} : { width: measureWidth(ch, fs, font) }), height: `${(fs * 1.15).toFixed(2)}px`, lineHeight: `${(fs * 1.15).toFixed(2)}px`, padding: "0.04em 0.12em 0.14em", margin: "-0.04em -0.12em -0.14em", whiteSpace: "nowrap" }}
                 >
                   <span key={styleKey(inner(p))} style={inner(p)}>
                     {ch}

@@ -98,7 +98,8 @@ export function decoration(theme: Theme, p: number, fs: number, color: string): 
   if (L.decoration === "underline") st = { ...base, left: 0, bottom: "-0.08em", height: px(Math.max(2, fs * 0.04)), width: w, background: color, ...glow };
   else if (L.decoration === "marker") st = { ...base, left: "-0.06em", top: "52%", bottom: "4%", width: p >= 1 ? "calc(100% + 0.12em)" : `calc(${w} + ${+(0.12 * p).toFixed(3)}em)`, background: mix(color, theme.color.bg, 0.72), zIndex: -1 };
   else st = { ...base, left: "-0.18em", top: "-0.04em", height: "calc(100% + 0.08em)", width: p >= 1 ? "calc(100% + 0.36em)" : `calc(${w} + ${+(0.36 * p).toFixed(3)}em)`, boxSizing: "border-box", border: `${px(Math.max(2, fs * 0.03))} solid ${color}`, overflow: "hidden", ...glow };
-  return <span key={styleKey(st)} aria-hidden="true" data-qa-decor="" data-qa-ignore="overlap covered" style={st} />;
+  // Sin texto propio: solo se avisa que el trazo (subrayado, recuadro) pasa por encima del texto de su anfitrión a propósito (`covered`).
+  return <span key={styleKey(st)} aria-hidden="true" data-qa-ignore="covered" style={st} />;
 }
 
 /** Estilo que pide el contenedor de un adorno (para el texto sobre el que se dibuja). Vacío sin adorno: el HTML por defecto no cambia. */

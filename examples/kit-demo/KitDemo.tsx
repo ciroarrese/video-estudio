@@ -46,21 +46,31 @@ const KEYS: CameraKey[] = [
 
 const CAMERA_OPTS = { map: (fr: number, c: { x: number; y: number; scale: number }) => zoomThrough(fr, T.through, c, COUNTER, 40), noBlurFrom: T.through[0] };
 
-function Panel({ x, y, w, h, title, opacity = 1, children }: { x: number; y: number; w: number; h: number; title: string; opacity?: number; children?: React.ReactNode }) {
+/**
+ * Panel con título. La superficie (relleno, borde, sombra) es una capa propia, hermana del contenido: se atenúa con `dim` sin tocar el texto
+ * (un texto al 45 % de opacidad queda bajo 3:1 con casi cualquier fondo; ver docs/guia-escenas.md, "Escenas que sobreviven a otro design system").
+ * `fade` apaga el contenido (título y lo de adentro): el texto se funde del todo, no queda a medias. `titleMin` es el alto mínimo de la franja del título: el contenido en flujo empieza debajo, y si el título crece (otra tipografía) lo empuja.
+ */
+function Panel({ x, y, w, h, title, dim = 1, fade = 1, titleMin = 0, children }: { x: number; y: number; w: number; h: number; title: string; dim?: number; fade?: number; titleMin?: number; children?: React.ReactNode }) {
   const theme = useTheme();
   // Superficie del design system (esquinas, relleno, borde, sombra). Con el relleno sólido el panel va un escalón más claro (`surfaceAlt`) que las tarjetas.
   const s = surfaceStyle(theme, "window", { level: "lg" });
   const fill = s.background === theme.color.surface ? theme.color.surfaceAlt : s.background;
   return (
-    <div key={opacity === 1 ? "rest" : "anim"} data-qa-ignore={opacity === 1 ? undefined : "contrast"} /* el panel se atenúa a propósito mientras vuela la tarjeta: es un foco, no texto para leer; `opacity` se emite siempre, como antes, para que el aspecto por defecto sea idéntico al píxel */ style={{ position: "absolute", left: x, top: y, width: w, height: h, background: fill, border: s.border, borderRadius: s.borderRadius, boxShadow: s.boxShadow, opacity }}>
-      <div style={{ padding: "26px 40px", fontSize: theme.type.body, ...textStyle(theme, "title"), color: theme.color.text }}>{title}</div>
-      {children}
+    <div style={{ position: "absolute", left: x, top: y, width: w, height: h }}>
+      {/* `opacity` se emite siempre, como antes, para que el aspecto por defecto sea idéntico al píxel */}
+      <div key={dim === 1 ? "rest" : "anim"} style={{ position: "absolute", inset: 0, background: fill, border: s.border, borderRadius: s.borderRadius, boxShadow: s.boxShadow, opacity: dim }} />
+      <div key={fade >= 1 ? "rest" : "anim"} style={{ position: "relative", ...(fade >= 1 ? {} : { opacity: fade }) }}>
+        <div style={{ position: "relative", minHeight: titleMin, boxSizing: "border-box", padding: "26px 40px", fontSize: theme.type.body, lineHeight: 1.2, ...textStyle(theme, "title"), color: theme.color.text }}>{title}</div>
+        {children}
+      </div>
     </div>
   );
 }
 
 function StatCard({ i, frame, selected }: { i: number; frame: number; selected?: boolean }) {
   const theme = useTheme();
+  // El alto de la tarjeta es un mínimo (210): el contenido se apoya en el relleno de abajo (13 px) y, con otra tipografía, la tarjeta crece.
   const s = STATS[i]!;
   const col = theme.color.chart[i % theme.color.chart.length]!;
   // tarjeta de ficha: borde grueso (`bold`) y las esquinas de un panel
@@ -68,13 +78,13 @@ function StatCard({ i, frame, selected }: { i: number; frame: number; selected?:
   const w = borderWidth(theme, "card", { bold: true });
   const border = selected && w > 0 ? `${w}px solid ${theme.color.accent}` : surf.border;
   return (
-    <div style={{ width: CARD.w, height: CARD.h, boxSizing: "border-box", padding: "22px 28px", background: surf.background, borderRadius: surf.borderRadius, border, boxShadow: surf.boxShadow }}>
-      <Eyebrow style={{ display: "block" }}>{s.label}</Eyebrow>
+    <div style={{ width: CARD.w, minHeight: CARD.h, boxSizing: "border-box", padding: "22px 28px 13px", background: surf.background, borderRadius: surf.borderRadius, border, boxShadow: surf.boxShadow }}>
+      <Eyebrow style={{ display: "block", lineHeight: 1.2 }}>{s.label}</Eyebrow>
       <div style={{ fontSize: 84, lineHeight: 1.1, fontWeight: theme.font.weights.stat, color: theme.color.text }}>{s.value}</div>
       <div style={{ marginTop: 6, height: 10, borderRadius: cornerRadius(theme, "bar"), background: theme.color.surfaceAlt }}>
         <div style={{ width: `${kf(frame, [0, 60], [0, 40 + i * 20])}%`, height: "100%", borderRadius: cornerRadius(theme, "bar"), background: col }} />
       </div>
-      <div style={{ marginTop: 8, fontSize: theme.type.eyebrow - 4, color: s.delta.startsWith("+") ? theme.color.success : theme.color.danger }}>{s.delta}</div>
+      <div style={{ marginTop: 8, fontSize: theme.type.eyebrow - 4, lineHeight: 1.2, color: s.delta.startsWith("+") ? theme.color.success : theme.color.danger }}>{s.delta}</div>
     </div>
   );
 }
@@ -93,8 +103,9 @@ function Scene({ frame }: { frame: number }) {
   return (
     <Stage frame={frame}>
       <World camera={cam} width={width} height={height}>
-        {/* El panel vuelve a opacidad plena antes de que la cámara termine de acercarse al contador: así sus textos (ya fuera de cuadro) no entran en fundido recortados con la cámara quieta. */}
-        <Panel {...A} title="Panel de ejemplo" opacity={kf(frame, [148, 162, 180, 194], [1, 0.45, 0.45, 1])}>
+        {/* Mientras vuela la tarjeta, la superficie del panel baja a 0,45 (foco en el vuelo; el texto sigue entero: ver `Panel`). Cuando la tarjeta aterriza, el sujeto pasa a ser el contador: el contenido del panel se apaga del todo
+            antes de que la cámara llegue (cuadro 200), así ninguna tarjeta queda cortada por el borde con la cámara quieta. */}
+        <Panel {...A} title="Panel de ejemplo" dim={kf(frame, [148, 162], [1, 0.45])} fade={kf(frame, [176, 198], [1, 0])}>
           {[0, 1, 2].map((i) => {
             const p = cardPos(i);
             const d = staggerFrames(theme, i, { base: 6, context: "items" });
@@ -111,6 +122,8 @@ function Scene({ frame }: { frame: number }) {
               </div>
             );
           })}
+          {/* Las filas van en una columna en flujo (separación de 12 px): su alto lo da el contenido (mínimo 52), no una cuenta de píxeles. */}
+          <div style={{ position: "absolute", left: 40, top: 360, width: A.w - 80, display: "flex", flexDirection: "column", gap: 12 }}>
           {ROWS.map((r, i) => {
             const d = staggerFrames(theme, i, { base: 5, context: "rows" });
             const a = kf(frame, [d - 10, d + 10], [0, 1]);
@@ -120,18 +133,20 @@ function Scene({ frame }: { frame: number }) {
             const ent = entrance(theme, a, i, { native: "fade" });
             // `key` según las propiedades de la entrada: si aparecen o desaparecen, React las agregaría al final y el marcado dependería del historial.
             return (
-              <div key={`${r}-${Object.keys(ent).join("-")}`} style={{ position: "absolute", left: 40, top: 360 + i * 64, width: A.w - 80, height: 52, boxSizing: "border-box", display: "flex", alignItems: "center", gap: 18, padding: `0 ${24 - bd}px`, background: row.background, border: row.border, borderRadius: cornerRadius(theme, "control"), ...ent, fontSize: theme.type.caption, color: theme.color.text }}>
+              <div key={`${r}-${Object.keys(ent).join("-")}`} style={{ minHeight: 52, boxSizing: "border-box", display: "flex", alignItems: "center", gap: 18, padding: `0 ${24 - bd}px`, background: row.background, border: row.border, borderRadius: cornerRadius(theme, "control"), ...ent, fontSize: theme.type.caption, lineHeight: 1.2, color: theme.color.text }}>
                 <span style={{ width: 16, height: 16, borderRadius: cornerRadius(theme, "bar"), background: rowDots[i] }} />
                 {r}
                 <span style={{ marginLeft: "auto", color: theme.color.textMuted, fontSize: theme.type.ui.md }}>{(i + 1) * 7} min</span>
               </div>
             );
           })}
+          </div>
         </Panel>
 
-        <Panel {...B} title="Destino">
-          <div style={{ position: "absolute", left: 0, top: 110, width: B.w, textAlign: "center" }}>
-            <Eyebrow style={{ display: "block", fontWeight: theme.font.weights.regular }}>{typed("Total acumulado", frame, 8, 0.7)}</Eyebrow>
+        <Panel {...B} title="Destino" titleMin={110}>
+          {/* En flujo bajo la franja del título (mínimo 110 px): si el título crece, empuja al contador en vez de pisarlo. */}
+          <div style={{ textAlign: "center" }}>
+            <Eyebrow style={{ display: "block", lineHeight: 1.2, fontWeight: theme.font.weights.regular }}>{typed("Total acumulado", frame, 8, 0.7)}</Eyebrow>
             <GradientText frame={frame} loop={120} style={{ fontSize: theme.type.stat, fontWeight: theme.font.weights.stat, lineHeight: 1.1 }}>
               <CountUp frame={frame} from={0} to={1284} start={land ? T.flight[1] + 2 : 9999} duration={40} />
             </GradientText>

@@ -9,6 +9,7 @@ Capa que permite renderizar el mismo kit con cualquier design system. Solo depen
 - `themeFromTokensWithReport(input, base)`: igual, y devuelve `{ theme, report }` con `mapped` (roles tomados de los tokens), `fallback` (roles que quedaron con el valor del tema base), `derived` (calculados, p. ej. `onAccent`) y `warnings` (colores inválidos ignorados y fallas de contraste).
 - `ThemeProvider`, `useTheme()` (devuelve `neutral` sin proveedor) y `withAlpha(color, alpha)`.
 - `checkTheme(theme)`: avisos WCAG (texto/fondo, texto atenuado/fondo, `onAccent`/`accent`, acentos y estados, serie `chart` y colores de `theme.data`). Cada aviso trae `usedBy` y `suggestion` (ver "Informe de contraste").
+- `dimOpacity(fg, bg, opts)` y `dimmedColor(theme, rol, bg, opts)`: la atenuación más débil que conserva el contraste (ver "Texto atenuado").
 - `resolveColor(theme, ref)`: resuelve un rol (`"accent"`), `"chart[2]"`, `"data.estado"` o un color válido; si no es ninguno, lanza un error que lista los roles.
 
 ## Crear un tema desde los tokens de un design system
@@ -80,6 +81,21 @@ Más tokens de movimiento: `--ease-standard|out|in-out` (`cubic-bezier(...)` o c
 ## Texto legible sobre un relleno cualquiera: `readableOn`
 
 `readableOn(theme, bg, { candidates? })` devuelve, entre los candidatos, el color con más contraste sobre `bg` (por defecto `text`, `onAccent` y `surface` del tema). Sirve para celdas de color (amarillo, naranja, verde) donde ni `text` ni `onAccent` son seguros: `color: readableOn(theme, fill)`. No reemplaza a `qa`, que sigue juzgando el texto real.
+
+## Texto atenuado: `dimOpacity` y `dimmedColor`
+
+Atenuar texto con una `opacity` fija (0,3, 0,45) funciona con el fondo con el que se probó y falla con otro: sobre una superficie clara el gris al 40 % queda en 1,8:1 y `qa` lo marca; sobre una oscura puede pasar. La regla: **no se pone `opacity` menor que 0,5 sobre texto**; se calcula contra el fondo real.
+
+- `dimOpacity(fg, bg, { min = 3, floor = 0 })`: la opacidad **más baja** con la que `fg` sigue llegando a `min` de contraste contra `bg`, medido sobre el color ya mezclado (lo que se ve). Si ni con 1 llega (el color ya es flojo ahí), devuelve 1. `floor` pone un piso a la atenuación. Para texto chico, `min: 4.5`.
+- `dimmedColor(theme, rol | color, bg, { min, floor })`: el color opaco equivalente (`rol` y `bg` aceptan lo mismo que `resolveColor`: rol, `chart[n]`, `data.x` o un color ya sacado del tema). Va como `color`, sin `opacity`.
+
+```tsx
+const op = dimOpacity(theme.color.text, theme.color.surface);   // segundo plano: lo más tenue que sigue leyéndose
+<Fila style={{ opacity: kf(frame, [60, 75], [1, op]) }} />
+<span style={{ color: dimmedColor(theme, "text", "surface") }}>detalle</span>
+```
+
+Un fundido de entrada o de salida no cuenta (el texto aparece o se apaga, y `qa` lo trata como transición): la regla es para el texto que se **queda** atenuado.
 
 ## Informe de contraste accionable y `acknowledge`
 

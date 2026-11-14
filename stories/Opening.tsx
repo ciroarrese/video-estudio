@@ -94,7 +94,9 @@ export function Opening({ spec: specIn, first = 0, dock, through }: { spec: Stor
           const blur = wallBlur ? Math.round(Math.min(2.5, Math.max(0, (60 - (c.z + rig.dz)) / 160)) * 10) / 10 : 0;
           const chip: React.CSSProperties = { position: "absolute", left: 0, top: 0, transformOrigin: "0 0", transform: rigTransform(c.x, c.y, c.z, rig, WALL_P, cx, cy, `${c.k === 1 ? "" : ` scale(${c.k})`} translate(-50%, -50%)`), zIndex: 1000 + c.z, opacity: fade(appear), filter: blur > 0 ? `blur(${blur}px)` : undefined };
           return (
-            <div key={`${i}-${styleKey(chip)}`} data-qa-ignore="min-size contrast overlap covered offscreen safe-area" style={chip}>
+            // Muro de fondo: adorno (`data-qa-decor`: sin min-size ni contraste, son detalle que se lee al acercar; sí se juzgan recorte y choque con el
+            // título y las filas). Las fichas pasan por detrás del cartel (`covered`; su texto queda bajo el del cartel: `overlap`) y llegan hasta los bordes del cuadro (`safe-area`) a propósito.
+            <div key={`${i}-${styleKey(chip)}`} data-qa-decor="" data-qa-ignore="covered overlap safe-area" style={chip}>
               <Chip text={c.text} lit={lit} pop={pop} />
             </div>
           );

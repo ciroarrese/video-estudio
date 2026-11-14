@@ -43,7 +43,8 @@ export function PhoneScroll(p: PhoneScrollProps) {
   const scrollSt: React.CSSProperties = { position: "absolute", left: 0, top: 0, width: scr.width, height: contentH, transform: xform({ y: -s.offset }) };
   return (
     <PhoneFrame {...p} width={w} height={h}>
-      <div key={styleKey(scrollSt)} data-qa-ignore="offscreen covered" style={scrollSt}>
+      {/* `covered`: al desplazarse, las filas pasan por debajo del borde y la muesca del teléfono a propósito */}
+      <div key={styleKey(scrollSt)} data-qa-ignore="covered" style={scrollSt}>
         {p.children ?? (
           <div>
             <div style={{ padding: `${headTop}px 26px 14px`, opacity: fade(edgeFade(headTop - s.offset, headTop + headH - s.offset, scr.height)), fontSize: fs * 1.4, fontWeight: theme.font.weights.stat, color: theme.color.text }}>Actividad</div>

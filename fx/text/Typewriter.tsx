@@ -1,5 +1,5 @@
 import React from "react";
-import { Easing } from "../../engine";
+import { Easing, useVideoConfig } from "../../engine";
 import { progress, roleColor, styleKey, useFx } from "../core";
 import type { ColorRole } from "../core";
 import { baseText } from "./shared";
@@ -16,6 +16,7 @@ export type TypewriterProps = TextFxProps & {
 export function Typewriter(props: TypewriterProps) {
   const { text, caretColor = "accent", after, style } = props;
   const { local, theme } = useFx(props);
+  const { width: frameW } = useVideoConfig();
   const chars = Array.from(text);
   const n = chars.length;
   const duration = props.duration ?? Math.max(12, Math.round(n * 2));
@@ -29,8 +30,9 @@ export function Typewriter(props: TypewriterProps) {
   // El extra solo lleva opacidad y traslado mientras aparece.
   const afterStyle: React.CSSProperties = { display: "inline-block", ...landStyle(theme, afterP, fs) };
   return (
-    <div style={{ ...baseText(theme, { ...props, fontSize: fs }, true), whiteSpace: "pre-wrap", display: "flex", alignItems: "center", gap: "0.5em", width: props.width, ...style }}>
-      <span style={decorationHost(theme)}>
+    <div style={{ ...baseText(theme, { ...props, fontSize: fs }, true), whiteSpace: "pre-wrap", display: "flex", alignItems: "center", gap: "0.5em", width: props.width, minWidth: 0, maxWidth: frameW - 2 * theme.safe.x, ...style }}>
+      {/* `minWidth: 0` deja que el texto baje de renglón en vez de salirse del área segura con una tipografía más ancha o más grande */}
+      <span style={{ minWidth: 0, ...decorationHost(theme) }}>
         <span>{chars.slice(0, count).join("")}</span>
         <span style={caretStyle(theme, roleColor(theme, caretColor), caretOn)} />
         <span style={{ visibility: "hidden" }}>{chars.slice(count).join("")}</span>

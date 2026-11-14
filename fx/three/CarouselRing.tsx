@@ -47,7 +47,7 @@ export function CarouselRing(p: CarouselRingProps) {
           // Escala y opacidad solo cuando no son identidad (en reposo no queda `scale(1)` ni `opacity: 0.99`).
           transform: xform({ scale: s }),
           transformOrigin: "50% 50%",
-          opacity: fade(lerp(0.35, 1, Math.pow(c.front, 0.8)) * Math.min(1, e * 2)),
+          opacity: fade(lerp(0.5, 1, Math.pow(c.front, 0.8)) * Math.min(1, e * 2)),
           zIndex: z,
           // Forma, relleno, borde y sombra del design system (por defecto: radio `lg`, borde de 2 px y sin sombra).
           ...cardSurface(theme, { alt: c.front <= 0.85, accent: c.front > 0.92 ? pal.accent : undefined, guide: c.front <= 0.85 }),
@@ -57,8 +57,8 @@ export function CarouselRing(p: CarouselRingProps) {
         return (
           <div
             key={`${c.i}:${styleKey(st)}:${c.front < 0.85 ? "o" : ""}`}
-            // Oclusión y atenuación intencionales: las tarjetas de atrás quedan tapadas por la de adelante y a baja opacidad (profundidad)
-            data-qa-ignore={c.front < 0.85 ? "covered contrast" : undefined}
+            // Oclusión intencional: las tarjetas de atrás quedan tapadas por la de adelante (`covered`); su contraste, en cambio, se juzga (la atenuación tiene piso)
+            data-qa-ignore={c.front < 0.85 ? "covered" : undefined}
             style={st}
           >
             {kids.length ? kids[c.i] : (

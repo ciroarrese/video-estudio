@@ -73,11 +73,15 @@ function DemoScene({ variant }: { variant: number }) {
   ];
   const cam = cameraAt(f, keys, { map: (fr, c) => zoomThrough(fr, THROUGH, c, through, 40), noBlurFrom: THROUGH[0] });
   const appear = kf(f, [0, 20 - lead], [0, 1]);
+  // Con la cámara acercada a la tarjeta elegida, el título, las otras tarjetas y las filas quedan cortados por el borde a propósito: es el encuadre
+  // (la cámara sostiene una parte de un diseño más grande). Solo se silencia `offscreen`, solo mientras dura el zoom y solo en esos elementos:
+  // la tarjeta elegida (el sujeto del zoom) NO lleva la marca, así que si algún día queda cortada, `qa` lo informa.
+  const framing = cam.scale > 1.05 ? "offscreen" : undefined;
   return (
     <>
       <World camera={cam} width={width} height={height}>
         <div style={{ position: "absolute", left: P.x, top: P.y, width: P.w, height: P.h, ...surfaceStyle(theme, "window"), opacity: appear }}>
-          <div style={{ padding: "26px 50px", fontSize: theme.type.body, fontWeight: theme.font.weights.semibold, color: theme.color.text }}>
+          <div data-qa-ignore={framing} style={{ padding: "26px 50px", fontSize: theme.type.body, fontWeight: theme.font.weights.semibold, color: theme.color.text }}>
             <HighlightedTitle text="Resumen" highlight="Resumen" />
           </div>
         </div>
@@ -87,6 +91,7 @@ function DemoScene({ variant }: { variant: number }) {
           return (
             <div
               key={label}
+              data-qa-ignore={i === v.pick ? undefined : framing}
               style={{
                 position: "absolute", left: cardPos(i).x, top: cardPos(i).y + (1 - a) * 30, width: CARD.w, height: CARD.h, opacity: a,
                 background: theme.color.surfaceAlt, borderRadius: cornerRadius(theme, "panel"), padding: 30, boxSizing: "border-box",
@@ -103,7 +108,7 @@ function DemoScene({ variant }: { variant: number }) {
         {v.rows.map((r, i) => {
           const a = kf(f, [30 - lead * 2 + i * 5, 48 - lead * 2 + i * 5], [0, 1]);
           return (
-            <div key={r} style={{ position: "absolute", left: P.x + 50, top: P.y + rowsTop + i * 74, width: P.w - 100, height: 56, opacity: a, display: "flex", alignItems: "center", padding: "0 24px", boxSizing: "border-box", borderRadius: cornerRadius(theme, "control"), background: theme.color.bg, border: `${borderWidth(theme, "card")}px solid ${theme.color.border}`, fontSize: theme.type.eyebrow, color: theme.color.text }}>
+            <div key={r} data-qa-ignore={framing} style={{ position: "absolute", left: P.x + 50, top: P.y + rowsTop + i * 74, width: P.w - 100, height: 56, opacity: a, display: "flex", alignItems: "center", padding: "0 24px", boxSizing: "border-box", borderRadius: cornerRadius(theme, "control"), background: theme.color.bg, border: `${borderWidth(theme, "card")}px solid ${theme.color.border}`, fontSize: theme.type.eyebrow, color: theme.color.text }}>
               {r}
               <span style={{ marginLeft: "auto", width: 80 + ((i * 53 + variant * 31) % 120), height: 14, borderRadius: cornerRadius(theme, "bar"), background: theme.color.chart[(i + variant) % theme.color.chart.length] }} />
             </div>
