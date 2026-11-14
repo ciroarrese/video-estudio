@@ -75,10 +75,13 @@ export function Interlude({ spec: specIn, done, skip = [], next: nextProp }: { s
             const cs = Math.round(L.numSize * 1.5);
             const cl = -Math.round(cs * 0.14);
             const ct = Math.round(L.numSize * 0.5 - cs * 0.5);
+            // El número (texto de acento) se apaga en el primer cuarto de la tilde, cuando el relleno de acento que la tilde dibuja encima todavía es
+            // tenue (`CheckMark` entra con `2 * cp`): un número de acento a medio fundido sobre un relleno de acento ya teñido queda bajo 3:1
+            const numFade = 1 - Math.min(1, cp * 4);
             const number = cp > 0 ? (
               <>
                 {/* el número queda oculto (no `opacity: 0`) bajo la tilde: sigue ocupando su lugar en la línea y no cuenta como texto */}
-                <span key={cp >= 1 ? "hidden" : fade(1 - cp) === undefined ? "full" : "fade"} style={{ opacity: fade(1 - cp), visibility: cp >= 1 ? "hidden" : undefined }}><StoryNumeral loop={spec.design?.gradient?.loop}>{String(i + 1).padStart(2, "0")}</StoryNumeral></span>
+                <span key={numFade <= 0 ? "hidden" : fade(numFade) === undefined ? "full" : "fade"} style={{ opacity: fade(numFade), visibility: numFade <= 0 ? "hidden" : undefined }}><StoryNumeral loop={spec.design?.gradient?.loop}>{String(i + 1).padStart(2, "0")}</StoryNumeral></span>
                 <span style={{ position: "absolute", left: cl, top: ct, transform: xform({ scale: 1 + pop * 0.25 }) }}>
                   <CheckMark p={cp} size={cs} id={String(i)} />
                 </span>

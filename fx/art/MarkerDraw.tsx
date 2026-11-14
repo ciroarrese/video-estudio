@@ -56,10 +56,14 @@ export function MarkerDraw(p: MarkerDrawProps) {
   const sw = kind === "highlight" ? h * 0.82 : kind === "underline" ? h * 0.11 : kind === "circle" ? h * 0.07 : h * 0.09;
   const alpha = kind === "highlight" ? 0.4 : 0.9;
   const stroke = pts.length > 1 ? <path d={toPath(pts)} fill="none" stroke={kind === "highlight" ? withAlpha(color, alpha) : color} strokeWidth={sw} strokeLinecap="round" strokeLinejoin="round" /> : null;
+  const label = p.text ?? "palabra clave";
+  // Tamaño de letra: 0,58 del alto, pero sin pasar del ancho de la caja con una letra ancha (0,62 em por carácter): un texto largo se achica
+  // en vez de salirse del svg, que recorta lo que desborda.
+  const fontSize = Math.min(h * 0.58, (w * 0.94) / (Math.max(1, label.length) * 0.62));
   return (
     <svg width={w} height={h} viewBox={`0 0 ${w} ${h}`} style={{ display: "block", fontFamily: theme.font.family, ...p.style }}>
       {kind === "highlight" && stroke}
-      <text x={w / 2} y={h / 2 + h * 0.2} textAnchor="middle" fontSize={h * 0.58} fontWeight={tw.fontWeight} {...(tw.letterSpacing ? { letterSpacing: tw.letterSpacing } : {})} fill={theme.color.text}>{p.text ?? "palabra clave"}</text>
+      <text x={w / 2} y={h / 2 + h * 0.2} textAnchor="middle" fontSize={fontSize} fontWeight={tw.fontWeight} {...(tw.letterSpacing ? { letterSpacing: tw.letterSpacing } : {})} fill={theme.color.text}>{label}</text>
       {kind !== "highlight" && stroke}
     </svg>
   );

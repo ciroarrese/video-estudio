@@ -106,7 +106,7 @@ function Scene() {
               { min: 0, node: (
                 <div style={{ display: "flex", alignItems: "flex-start", gap: 40 }}>
                   <TileDone start={196} width={420} height={150} />
-                  <div style={{ marginTop: 10 }}><MarkerDraw text="Resaltado" start={198} width={420} height={120} /></div>
+                  <div style={{ marginTop: 10 }}><MarkerDraw text="Resaltado" start={198} width={440} height={100} /></div>
                 </div>
               ) },
             ]} />
