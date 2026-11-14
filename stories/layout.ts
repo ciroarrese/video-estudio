@@ -216,7 +216,7 @@ function inlineLayout(spec: StorySpec, theme: Theme, width: number, height: numb
   return {
     left, top, rowW, rowH, nameSize, lineSize, numSize, numW, nameH, lineH: nameH, blockTop, blockH, barW: rowW - numW, names, lines,
     // el atravesado apunta al medio del texto de la fila (no a su borde izquierdo): así el texto se abre parejo a los dos lados y no se corre hacia el borde derecho al empezar el zoom
-    target: (i) => ({ x: left + numW + Math.round(barW * 0.35), y: top + i * rowH + blockTop + nameH / 2 }),
+    target: (i) => ({ x: left + numW + Math.round((rowW - numW) * 0.35), y: top + i * rowH + blockTop + nameH / 2 }),
     stacked: false, numH: nameH, numGap: 0, lineRows: [], barTop: blockTop + nameH + ROW_GAP.b, barLeft: numW, inline: true,
   };
 }

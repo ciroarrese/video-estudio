@@ -62,8 +62,9 @@ export function MarqueeBands(props: MarqueeBandsProps) {
           const dir: 1 | -1 = j % 2 === 0 ? -1 : 1;
           const unit = measureWidth(`${line}`, fs, font) + gap * 2 + measureWidth(separator, fs, font);
           const reps = Math.ceil(span / unit) + 2;
+          // La banda entra desde 1,5 anchos de cuadro: a esa distancia ninguna copia del texto queda a medias en el borde mientras espera su turno.
           const enter = Easing.out(progress(local, j * 4, 26));
-          const x = marqueeShift(speed * Math.min(local, duration), unit, dir) + (1 - enter) * -dir * box.width * 1.2 + 0;
+          const x = marqueeShift(speed * Math.min(local, duration), unit, dir) + (1 - enter) * -dir * box.width * 1.5 + 0;
           // Copia "real": la que cae entera dentro del cuadro (dentro del margen de seguridad) y más cerca del centro; si ninguna entra
           // (frase más ancha que el cuadro, o la banda todavía entrando), la más cercana al centro. Esa se juzga como cualquier texto.
           // Las demás son repeticiones del mismo texto que el cuadro corta a propósito en sus bordes: `aria-hidden` y fuera del control.
