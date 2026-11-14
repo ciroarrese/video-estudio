@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { CLICS, CLIC_POR_DEFECTO, EFECTOS, EFECTOS_SR, elegirClic, generarEfectos, nombreDeClic, picosDeEfectos } from './efectos';
+import { BARRIDOS, BARRIDO_POR_DEFECTO, CLICS, CLIC_POR_DEFECTO, EFECTOS, elegirBarrido, nombreDeBarrido, EFECTOS_SR, elegirClic, generarEfectos, nombreDeClic, picosDeEfectos } from './efectos';
 import { correlacion, espectroDePotencia, espectroPorBandas, fraccionDeEnergia } from './medidas';
 
 const sr = EFECTOS_SR;
@@ -187,5 +187,93 @@ describe('variantes del clic', () => {
   it('un nombre de clic que no existe da un error que lista las opciones', () => {
     expect(() => elegirClic('inexistente')).toThrow(/thock/);
     expect(() => generarEfectos(join(tmpdir(), 'no-se-usa'), sr, { clic: 'zzz' })).toThrow(/zzz/);
+  });
+});
+
+describe('variantes del barrido (transiciones suaves)', () => {
+  const nuevos = ['aire', 'suave', 'grave', 'papel'];
+  const sb = Object.fromEntries(Object.keys(BARRIDOS).map((n) => [n, BARRIDOS[n].generar(sr)]));
+
+  /** Envolvente RMS en ventanas de 5 ms: devuelve el segundo en que llega al 50 % de su máximo. */
+  const tiempoAl50 = (x: Float32Array) => {
+    const w = Math.round(0.005 * sr);
+    const env: number[] = [];
+    for (let i = 0; i + w <= x.length; i += w) {
+      let e = 0;
+      for (let k = 0; k < w; k++) e += x[i + k] ** 2;
+      env.push(Math.sqrt(e / w));
+    }
+    const mx = Math.max(...env);
+    return env.findIndex((v) => v >= 0.5 * mx) * 0.005;
+  };
+
+  it('`actual` es el barrido original y las demás variantes lo acompañan con descripción, cuándo y ganancia recomendada', () => {
+    expect(BARRIDO_POR_DEFECTO).toBe('actual');
+    expect(Buffer.from(sb.actual.buffer).equals(Buffer.from(senales.barrido.buffer))).toBe(true);
+    for (const n of Object.keys(BARRIDOS)) {
+      expect(BARRIDOS[n].descripcion.length, n).toBeGreaterThan(20);
+      expect(BARRIDOS[n].cuando.length, n).toBeGreaterThan(10);
+      expect(BARRIDOS[n].gainRecomendado, n).toBeGreaterThan(0);
+    }
+  });
+
+  it('son deterministas', () => {
+    for (const n of nuevos) expect(Buffer.from(BARRIDOS[n].generar(sr).buffer).equals(Buffer.from(sb[n].buffer)), n).toBe(true);
+  });
+
+  it('pico en -6 dBFS (más bajo que el resto), extremos en cero y sin continua', () => {
+    for (const n of nuevos) {
+      const x = sb[n];
+      const pico = x.reduce((m, v) => Math.max(m, Math.abs(v)), 0);
+      expect(20 * Math.log10(pico), n).toBeGreaterThan(-6.3);
+      expect(20 * Math.log10(pico), n).toBeLessThan(-5.7);
+      expect(Math.abs(x[0]), n).toBe(0);
+      expect(Math.abs(x[x.length - 1]), n).toBe(0);
+      const media = x.reduce((a, v) => a + v, 0) / x.length;
+      expect(Math.abs(media) / pico, n).toBeLessThan(0.005);
+    }
+  });
+
+  it('duraciones: aire 250 a 350 ms, papel y suave más cortos que el actual', () => {
+    expect(sb.aire.length / sr).toBeGreaterThanOrEqual(0.25);
+    expect(sb.aire.length / sr).toBeLessThanOrEqual(0.35);
+    for (const n of ['suave', 'papel']) expect(sb[n].length, n).toBeLessThan(sb.actual.length);
+  });
+
+  it('`aire` y `suave` entran despacio: la envolvente llega al 50 % de su pico después de 40 ms', () => {
+    expect(tiempoAl50(sb.aire)).toBeGreaterThanOrEqual(0.04);
+    expect(tiempoAl50(sb.suave)).toBeGreaterThanOrEqual(0.04);
+  });
+
+  it('a lo sumo 10 % de la energía por encima de 5 kHz', () => {
+    for (const n of nuevos) expect(fraccionDeEnergia(sb[n], sr, 5000, sr / 2), n).toBeLessThanOrEqual(0.1);
+  });
+
+  it('`aire` es de banda limitada (casi toda la energía entre 300 Hz y 3,5 kHz) y `grave` es de graves (más del 80 % bajo 250 Hz)', () => {
+    expect(fraccionDeEnergia(sb.aire, sr, 300, 3500)).toBeGreaterThan(0.9);
+    expect(fraccionDeEnergia(sb.suave, sr, 0, 2500)).toBeGreaterThan(0.97);
+    expect(fraccionDeEnergia(sb.grave, sr, 0, 250)).toBeGreaterThan(0.8);
+    expect(fraccionDeEnergia(sb.grave, sr, 0, 80)).toBeLessThan(0.5);
+  });
+
+  it('generarEfectos escribe barrido-<nombre> de todas y deja `barrido` como el actual salvo que se elija otro', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'barridos-'));
+    try {
+      generarEfectos(dir);
+      const actual = readFileSync(join(dir, 'barrido.wav'));
+      for (const n of Object.keys(BARRIDOS)) expect(() => readFileSync(join(dir, `${nombreDeBarrido(n)}.wav`)), n).not.toThrow();
+      expect(readFileSync(join(dir, 'barrido-actual.wav')).equals(actual)).toBe(true);
+      generarEfectos(dir, sr, { barrido: 'aire' });
+      const aire = readFileSync(join(dir, 'barrido.wav'));
+      expect(aire.equals(readFileSync(join(dir, 'barrido-aire.wav')))).toBe(true);
+      expect(aire.equals(actual)).toBe(false);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it('un nombre de barrido que no existe da un error que lista las opciones', () => {
+    expect(() => elegirBarrido('inexistente')).toThrow(/papel/);
+    expect(() => generarEfectos(join(tmpdir(), 'no-se-usa'), sr, { barrido: 'zzz' })).toThrow(/zzz/);
   });
 });

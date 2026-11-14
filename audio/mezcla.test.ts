@@ -7,7 +7,7 @@ import { describe, expect, it } from 'vitest';
 import { decodificar, escribirWav16, hayFfmpeg } from './ffmpeg';
 import { EFECTOS, generarEfectos } from './efectos';
 import { picoVerdaderoDb, rmsDb } from './medidas';
-import { mezclar, planMezcla, rutaDeEfecto, ventanasDeDucking } from './mezcla';
+import { aplicarGainPorEfecto, mezclar, nombreParaGain, planMezcla, rutaDeEfecto, ventanasDeDucking } from './mezcla';
 import { sonoridadIntegrada } from './sonoridad';
 
 describe('planMezcla', () => {
@@ -66,6 +66,27 @@ describe('planMezcla', () => {
     // El segundo arranca antes del inicio del video: se le recorta el comienzo.
     expect(p.filterComplex).toContain('atrim=start_sample=2960');
     expect(p.filterComplex).toContain('pan=stereo|c0=c0|c1=c0');
+  });
+});
+
+describe('aplicarGainPorEfecto', () => {
+  it('multiplica el gain de los cues del efecto nombrado (por nombre o por ruta) y deja el resto igual', () => {
+    const cues = [
+      { frame: 1, sfx: 'barrido' },
+      { frame: 2, sfx: 'barrido', gain: 0.5 },
+      { frame: 3, sfx: 'barrido-aire', gain: 1 },
+      { frame: 4, sfx: 'tilde', gain: 0.9 },
+      { frame: 5, sfx: '/ruta/a/clic.wav', gain: 1.5 },
+    ];
+    const sinUsar: string[] = [];
+    const r = aplicarGainPorEfecto(cues, { barrido: 0.4, clic: 2, nada: 1 }, sinUsar);
+    expect(r.map((c) => c.gain)).toEqual([0.4, 0.2, 1, 0.9, 3]);
+    expect(sinUsar).toEqual(['nada']);
+    // No modifica la lista de entrada.
+    expect(cues[0]).toEqual({ frame: 1, sfx: 'barrido' });
+    expect(aplicarGainPorEfecto(cues, undefined)).toEqual(cues);
+    expect(() => aplicarGainPorEfecto(cues, { barrido: -1 })).toThrow(/barrido/);
+    expect(nombreParaGain('otra/cosa.wav')).toBe('cosa');
   });
 });
 
@@ -289,6 +310,23 @@ describe.skipIf(!HAY_FFMPEG)('mezcla: ducking, retardo, pico verdadero y sonorid
       expect(p2.efectoSamples[0]).toBeLessThan(cue);
       // Mono: el pico del canal es el del archivo (0,5), no 0,35.
       expect(yi.reduce((m, v) => Math.max(m, Math.abs(v)), 0)).toBeGreaterThan(0.45);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  }, 60000);
+
+  it('--gain por efecto baja solo los cues de ese efecto, en la proporción pedida', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 've-audio-'));
+    try {
+      escribirWav16(join(dir, 'barrido.wav'), tono(1, 0.5), SR, 1);
+      escribirWav16(join(dir, 'tilde.wav'), tono(1, 0.5), SR, 1);
+      const base = { fps: 30, durationFrames: 150, sfxDir: dir, cues: [{ frame: 15, sfx: 'barrido' }, { frame: 90, sfx: 'tilde' }] };
+      await mezclar({ ...base, salida: join(dir, 'a.wav') });
+      await mezclar({ ...base, salida: join(dir, 'b.wav'), gainPorEfecto: { barrido: 0.25 } });
+      const [a, b] = await Promise.all(['a.wav', 'b.wav'].map((f) => decodificar(join(dir, f), { sr: SR, canales: 1 })));
+      const nivel = (x: Float32Array, c: number) => rmsDb(x, Math.round((c / 30 + 0.2) * SR), Math.round(0.3 * SR));
+      expect(nivel(a, 15) - nivel(b, 15)).toBeCloseTo(12, 0);
+      expect(Math.abs(nivel(a, 90) - nivel(b, 90))).toBeLessThan(0.1);
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }

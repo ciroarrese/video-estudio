@@ -3,7 +3,7 @@
 // música y los efectos por separado, sin dinámica). El ducking, la normalización de sonoridad y el
 // limitador de pico verdadero se aplican después en memoria (`dinamica.ts`, `sonoridad.ts`).
 import { existsSync } from 'node:fs';
-import { extname, isAbsolute, join, resolve } from 'node:path';
+import { basename, extname, isAbsolute, join, resolve } from 'node:path';
 import { analizarEfecto, aplicarCurva, curvaDeDucking, limitar, type VentanaDuck } from './dinamica';
 import { avisoMp3SinEtiqueta, codificar, decodificar, runFfmpeg, sondear } from './ffmpeg';
 import { picoVerdaderoDb } from './medidas';
@@ -54,6 +54,13 @@ export interface MezclaOpts {
   fps: number;
   durationFrames: number;
   cues: readonly Cue[];
+  /**
+   * Tabla opcional de ganancia por efecto (`{ barrido: 0.4, tilde: 0.8 }`): se multiplica con el `gain` de cada cue cuyo
+   * `sfx` se llame así (o sea una ruta a un archivo con ese nombre sin la extensión). Sirve para bajar toda una clase de
+   * cues sin tocar la lista. Se aplica en `mezclar` (y, por lo tanto, también al ducking: un cue que queda bajo
+   * `gainMinimo` ya no baja la música); `planMezcla` recibe los cues ya multiplicados (`aplicarGainPorEfecto`).
+   */
+  gainPorEfecto?: Readonly<Record<string, number>>;
   sfxDir?: string;
   sr?: number;
   musica?: MusicaOpts;
@@ -85,6 +92,30 @@ const num = (v: number) => (Number.isInteger(v) ? String(v) : v.toFixed(6).repla
 export function rutaDeEfecto(sfx: string, dir: string): string {
   if (isAbsolute(sfx) || extname(sfx) !== '' || sfx.includes('/')) return sfx;
   return join(dir, `${sfx}.wav`);
+}
+
+/** Nombre con el que un cue se busca en la tabla de ganancias: el `sfx` tal cual, o el nombre de archivo sin extensión si es una ruta. */
+export function nombreParaGain(sfx: string): string {
+  return sfx.includes('/') || isAbsolute(sfx) || extname(sfx) !== '' ? basename(sfx, extname(sfx)) : sfx;
+}
+
+/**
+ * Multiplica el `gain` de cada cue por el de su efecto en `tabla` (los que no están en la tabla quedan igual). Falla si un
+ * valor no es un número >= 0. `sinUsar` (opcional) recibe los nombres de la tabla que no coinciden con ningún cue.
+ */
+export function aplicarGainPorEfecto(cues: readonly Cue[], tabla: Readonly<Record<string, number>> | undefined, sinUsar?: string[]): Cue[] {
+  if (!tabla) return [...cues];
+  for (const [n, g] of Object.entries(tabla)) if (!(Number.isFinite(g) && g >= 0)) throw new Error(`Ganancia por efecto inválida para "${n}": ${g} (tiene que ser un número >= 0)`);
+  const usados = new Set<string>();
+  const out = cues.map((c) => {
+    const n = nombreParaGain(c.sfx);
+    const g = Object.prototype.hasOwnProperty.call(tabla, n) ? tabla[n] : undefined;
+    if (g === undefined) return c;
+    usados.add(n);
+    return { ...c, gain: (c.gain ?? 1) * g };
+  });
+  if (sinUsar) for (const n of Object.keys(tabla)) if (!usados.has(n)) sinUsar.push(n);
+  return out;
 }
 
 export interface InfoCue {
@@ -226,7 +257,9 @@ export function verificarArchivos(o: MezclaOpts): void {
 }
 
 /** Renderiza la mezcla a `salida` (el formato lo da la extensión). */
-export async function mezclar(o: MezclaOpts & { salida: string }): Promise<PlanMezcla & { info: InfoMezcla }> {
+export async function mezclar(opts: MezclaOpts & { salida: string }): Promise<PlanMezcla & { info: InfoMezcla }> {
+  const sinUsar: string[] = [];
+  const o = { ...opts, cues: aplicarGainPorEfecto(opts.cues, opts.gainPorEfecto, sinUsar) };
   verificarArchivos(o);
   const sr = o.sr ?? 48000;
   const dir = o.sfxDir ?? 'public/sfx';
@@ -251,6 +284,7 @@ export async function mezclar(o: MezclaOpts & { salida: string }): Promise<PlanM
   }
   const plan = planMezcla(o, info);
   plan.advertencias.push(...avisos);
+  if (sinUsar.length > 0) plan.advertencias.push(`--gain: ningún cue usa ${sinUsar.map((n) => `"${n}"`).join(', ')} (se compara con el nombre del sfx tal cual, por ejemplo barrido-aire y no barrido)`);
   const cues = o.cues.filter((c) => !(c.frame >= o.durationFrames));
   const nCan = plan.stems === 'ambos' ? 4 : 2;
 
