@@ -29,7 +29,7 @@ export const storyDemoSorpresa = defineStory({ id: "story-demo-sorpresa", spec: 
 export const cuesSorpresa = () => storyCues(specSorpresa, scenesSorpresa);
 
 // La misma historia con la revelación escenificada (`design.reveal: "stage"`, vuelta de 200 cuadros): la fila nueva entra con resorte, un barrido de luz la
-// recorre y la miniatura de su escena vuela al lugar del número. Es el caso para mirar esa revelación bajo cada tema y formato (`--props '{"theme":"editorial"}'`,
+// recorre y la miniatura de su escena vuela al lugar del número (en horizontal) o aparece chica sobre el lugar del número, crece y se encoge hasta ser la tilde (en vertical y cuadrado, donde no hay lugar al costado y volar taparía la fila de arriba). Es el caso para mirar esa revelación bajo cada tema y formato (`--props '{"theme":"editorial"}'`,
 // `--format vertical`).
 export const specSorpresaStage: StorySpec = { ...specSorpresa, design: { ...specSorpresa.design, reveal: "stage" }, timing: { ...specSorpresa.timing, interludeReveal: 200 } };
 export const storyDemoSorpresaStage = defineStory({ id: "story-demo-sorpresa-stage", spec: specSorpresaStage, scenes: scenesSorpresa, formats: ["vertical", "cuadrado"] });

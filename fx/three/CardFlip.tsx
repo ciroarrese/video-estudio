@@ -12,6 +12,11 @@ export type CardFlipProps = ThreeProps & {
   /** Tamaño de la tarjeta en px. */
   cardWidth?: number;
   cardHeight?: number;
+  /**
+   * Borde nítido en cajas chicas: la superficie (relleno, borde, sombra) se dibuja con ancho y alto enteros y SIN `scale` (solo el contenido se escala dentro),
+   * con posiciones enteras y la rendija de canto oculta. Es lo que usa un muro de baldosas; sin `crisp` la tarjeta se dibuja como siempre (un solo `scale`).
+   */
+  crisp?: boolean;
 };
 
 // Una escala casi 1 (menos de 1,5 %) se toma como 1: bordes con escala casi identidad bajo una cámara con zoom se rasterizan distinto según el historial.
@@ -45,11 +50,51 @@ export function CardFlip(p: CardFlipProps) {
     </div>
   );
   // La transformación solo se emite mientras la tarjeta se mueve o gira (en reposo no queda `translateY(0px) scale(1, 1)`).
+  if (p.crisp) {
+    const gx = snap(sx * grow), gy = snap(grow);
+    const surf = cardSurface(theme, showFront ? {} : { alt: true, accent: pal.accent }, dk);
+    const bw = surf.border ? parseFloat(String(surf.border)) || 0 : 0;
+    const bw2 = Math.round(bw * 2) / 2;
+    const W = Math.max(1, Math.round(cw * gx)), H = Math.max(1, Math.round(ch * gy));
+    // de canto la tarjeta es una rendija: bajo 0,012 de ancho, o bajo unos 8 px, se oculta (el borde y la sombra de una rendija se rasterizan según el historial)
+    const hidden = sx < Math.max(0.012, 8 / cw);
+    const faceNode = showFront ? (p.front ? faces(p.front) : placeholder("Anverso", "Primera cara", false)) : p.back ? faces(p.back) : placeholder("Reverso", "Segunda cara", true);
+    const crispStyle: React.CSSProperties = {
+      position: "absolute",
+      left: Math.round((width - W) / 2),
+      top: Math.round((height - H) / 2 - lift),
+      width: W,
+      height: H,
+      boxSizing: "border-box",
+      ...surf,
+      overflow: "hidden",
+      visibility: hidden ? "hidden" : "visible",
+      fontFamily: theme.font.family,
+    };
+    // el contenido conserva su tamaño y se escala dentro de la superficie, centrado con posiciones enteras
+    const inner: React.CSSProperties = {
+      position: "absolute",
+      left: Math.round((W - 2 * bw2 - cw) / 2),
+      top: Math.round((H - 2 * bw2 - ch) / 2),
+      width: cw,
+      height: ch,
+      transform: xform({ scaleX: gx, scaleY: gy }),
+      transformOrigin: "50% 50%",
+      textRendering: "geometricPrecision",
+    };
+    return (
+      <div style={{ position: "relative", width, height, ...p.style }}>
+        <div key={styleKey(crispStyle)} style={crispStyle}>
+          <div key={styleKey(inner)} style={inner}>{faceNode}</div>
+          {shadeA > 0.0005 && <div style={{ position: "absolute", inset: 0, background: pal.darkest, opacity: +shadeA.toFixed(4) }} />}
+        </div>
+      </div>
+    );
+  }
   const cardStyle: React.CSSProperties = {
     position: "absolute",
-    // posiciones de layout enteras (en una caja de ancho impar un `.5` hacía que el texto bajo `scaleX` se rasterizara distinto según el historial)
-    left: Math.round((width - cw) / 2),
-    top: Math.round((height - ch) / 2),
+    left: (width - cw) / 2,
+    top: (height - ch) / 2,
     width: cw,
     height: ch,
     boxSizing: "border-box",
@@ -58,8 +103,7 @@ export function CardFlip(p: CardFlipProps) {
     overflow: "hidden",
     transform: xform({ y: -lift, scaleX: snap(sx * grow), scaleY: snap(grow) }),
     transformOrigin: "50% 50%",
-    // de canto la tarjeta es una rendija: bajo 0,012 de ancho, o bajo unos 8 px en una tarjeta chica (ahí el borde y la sombra de una rendija se rasterizaban distinto según el historial), se oculta
-    visibility: sx < Math.max(0.012, 8 / cw) ? "hidden" : "visible",
+    visibility: sx < 0.012 ? "hidden" : "visible",
     fontFamily: theme.font.family,
   };
   return (

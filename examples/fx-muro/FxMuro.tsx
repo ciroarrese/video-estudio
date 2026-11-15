@@ -36,7 +36,7 @@ const BALDOSAS: Baldosa[] = [
   { name: "TileDone", render: (w, h, d) => <TileDone width={w} height={h} density={d} duration={30} /> },
   { name: "NotificationStack", ignore: "clip" /* cada tarjeta entra desde arriba del recuadro de la baldosa a propósito: durante la llegada queda cortada por su borde */, render: (w, h, d) => <NotificationStack width={w} height={h} density={d} duration={DUR} items={[{ title: "Hecho", body: "Control aprobado", time: "ya" }, { title: "Nuevo", body: "Llegó un aviso", time: "1 min" }]} /> },
   { name: "DigitRoll", render: (w, _h, d) => <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center" }}><DigitRoll width={w - 30} density={d} duration={DUR} value={12480} suffix="%" /></div> },
-  { name: "CardFlip", loop: { mode: "pingpong" }, render: (w, h, d) => <CardFlip width={w} height={h} density={d} duration={DUR} /> },
+  { name: "CardFlip", loop: { mode: "pingpong" }, render: (w, h, d) => <CardFlip width={w} height={h} density={d} duration={DUR} crisp /> },
   { name: "DonutRing", render: (w, h) => <DonutRing width={w} height={h} duration={DUR} value={72} max={100} label="" /> },
   { name: "BarsGrow", render: (w, h) => <BarsGrow width={w} height={h} duration={DUR} data={[40, 64, 52]} labels={["A", "B", "C"]} format={() => ""} /> },
   { name: "FlowSteps", render: (w, h, d) => <FlowSteps width={w} height={h} density={d} duration={DUR} steps={[{ title: "Leer" }, { title: "Armar" }, { title: "Revisar" }]} /> },

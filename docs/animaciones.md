@@ -80,7 +80,7 @@ Proyectadas a mano (sin librerías 3D). Props comunes (`ThreeProps`): `bg` (rol 
 | `OrbitRings` | Núcleo con anillos y satélites. | Un sistema alrededor de un centro. | `rings` |
 | `WaveDots` | Campo de puntos con olas viajeras. | Fondo animado. | `grid`, `amplitude` |
 | `LayerExplode` | Capas rotuladas que se separan. | Arquitectura por capas. | `labels` (de abajo hacia arriba) |
-| `CardFlip` | Tarjeta que se da vuelta entre dos caras. | Antes/después, pregunta/respuesta. | `front`, `back`, `cardWidth`, `cardHeight` |
+| `CardFlip` | Tarjeta que se da vuelta entre dos caras. | Antes/después, pregunta/respuesta. | `front`, `back`, `cardWidth`, `cardHeight`, `crisp` (borde nítido en cajas chicas: superficie entera y sin `scale`; lo usa `fx-muro`) |
 | `CarouselRing` | Tarjetas en un anillo que gira. | Galería, lista de ejemplos. | `children`, `count`, `cardWidth`, `cardHeight` |
 | `IsoCity` | Bloques isométricos que crecen. | Crecimiento, mapa de calor. | `grid`, `maxHeight` |
 | `ExtrudeType` | Titular con volumen (capas apiladas). | Títulos con presencia. | `text`, `fontSize`, `layers`, `step` |
