@@ -6,7 +6,7 @@ import type { Theme } from "../themes";
 import { AVG_REG, fitText, textWidth } from "./layout";
 import { useStorySpec } from "./shared";
 import { listOptions } from "./types";
-import type { StorySpec } from "./types";
+import type { StorySpec, TopicArrival, TopicHandoff } from "./types";
 
 export type TopicInfo = {
   index: number;
@@ -16,6 +16,17 @@ export type TopicInfo = {
   docked?: boolean;
   /** Cómo se dibuja el titular: sale de `spec.design` (ver `headlineDefaults`); sin él, apilado y tamaño medio. */
   headline?: HeadlineDefaults;
+  /**
+   * Cómo sigue la historia después de esta escena: `"list"` (la vuelta al listado: la escena cierra con su salida de siempre, p. ej. un
+   * `Wash`), `"next-scene"` (la escena del tema que viene arranca en el cuadro siguiente, sin vuelta ni fundido de la historia: la escena
+   * puede omitir su salida y dejar el movimiento abierto) o `"closing"` (sigue el cierre). Fuera de una historia, `undefined`.
+   */
+  handoff?: TopicHandoff;
+  /**
+   * Cómo llega la historia a esta escena: `"opening"` (viene de la apertura), `"list"` (de una vuelta al listado) o `"previous-scene"`
+   * (continúa a la escena anterior: tiene que arrancar en el punto donde la otra dejó el movimiento). Fuera de una historia, `undefined`.
+   */
+  arrival?: TopicArrival;
 };
 
 /** Lo que la historia decide de la píldora del titular: `design.list` ("inline" → una sola línea con la del tema), `design.headline.size` y `design.gradient.loop`. */
@@ -43,11 +54,11 @@ export const TopicContext = createContext<TopicInfo | null>(null);
  * Da el tema `index` de `spec` a lo que va dentro (`useTopic()`, `<TopicHeadline />`): es lo que hace `composeStory` con cada escena, para
  * quien arma la historia a mano con `Sequence`. `docked`: la apertura terminó acoplando este titular (ver `StoryDesign.handoff`).
  */
-export function TopicProvider({ spec: specIn, index, docked, children }: { spec: StorySpec; index: number; docked?: boolean; children?: React.ReactNode }) {
+export function TopicProvider({ spec: specIn, index, docked, handoff, arrival, children }: { spec: StorySpec; index: number; docked?: boolean; /** Ver `TopicInfo.handoff`. */ handoff?: TopicHandoff; /** Ver `TopicInfo.arrival`. */ arrival?: TopicArrival; children?: React.ReactNode }) {
   const spec = useStorySpec(specIn);
   const t = spec.topics[index];
   if (!t) throw new Error(`TopicProvider: el tema ${index} no existe (hay ${spec.topics.length})`);
-  return <TopicContext.Provider value={{ index, name: t.name, line: t.line, docked, headline: headlineDefaults(spec) }}>{children}</TopicContext.Provider>;
+  return <TopicContext.Provider value={{ index, name: t.name, line: t.line, docked, headline: headlineDefaults(spec), handoff, arrival }}>{children}</TopicContext.Provider>;
 }
 
 /**

@@ -39,7 +39,7 @@ const spec: StorySpec = {
   topics: [{ id: "ventas", name: "Panel de ventas", line: "los números del día" }, /* 2 a 6 */],
   labels: ["Resumen diario", "Stock mínimo" /* ... */],           // palabras del muro; si faltan se repiten
   signoff: { logo: "brand/logo.png", tagline: "Hecho con ...", text: "Gracias por **mirar**" }, // o `slot: <MiSello />` en vez de `logo`; `text` es opcional si hay logo o slot
-  timing: { opening: 300, interlude: 120, interludeCompact: 40, closing: 480 },  // opcional (cuadros enteros, mínimo 60; interludeCompact mínimo 24; otras claves se rechazan)
+  timing: { opening: 300, interlude: 120, interludeCompact: 40, interludeReveal: 150, closing: 480 },  // opcional (cuadros enteros, mínimo 60; interludeCompact mínimo 24; otras claves se rechazan)
   design: { titleCard: "glass", list: "inline", handoff: "dock", wall: { columns: 8, rows: 4, blur: false }, clouds: { opacity: 0.25 } }, // opcional: ver "Opciones de diseño"
 };
 ```
@@ -87,6 +87,22 @@ defineStory({ id: "mi-video", spec, scenes: [escenaVentas, null, escenaAtencion,
 ```
 
 Las vueltas se numeran entre las escenas que hay (`interlude-1`, `interlude-2`...); cada entrada de `timeline` trae `topic` (índice del tema; en una vuelta, el último visto).
+
+## Último tema sorpresa, escenas sin vuelta y señales de sonido
+
+Para una historia cuya apertura anuncia N temas y cuyo último tema aparece de sorpresa. Todo es opcional y, sin esos campos, la historia es la de siempre.
+
+```ts
+topics: [/* 3 temas */, { id: "extra", name: "Un dato extra", line: "...", reveal: "late" }],   // el último de `topics`
+```
+
+- **`topics[i].reveal: "late"`**: el tema NO está en la lista de la apertura ni en las vueltas anteriores a su escena (esas listas se arman con una fila menos), no cuenta para el muro (salvo que su nombre esté en `labels`) y lleva el último número. Sale en el cierre como cualquier otro (con 5 y 6 temas el cierre entra en los tres formatos). Reglas (error en español si no se cumplen): a lo sumo uno, es el último de `topics`, tiene escena y hay una escena anterior, y quedan al menos 2 temas que no son tardíos (total de 3 a 6). Su escena sigue directo a la anterior: no admite `interludeBefore: true`.
+- **`topics[i].interludeBefore: false`**: la escena sigue a la escena anterior sin nada de la historia entre las dos (el último cuadro de una va seguido del primero de la otra: ni velo, ni fundido, ni cuadro plano); hacen continuo el movimiento las escenas. La tilde del tema anterior no se pierde: se dibuja con su pulso en la vuelta que viene después (si se acumulan varias, cada una arranca 6 cuadros, `motion.staggerRows`, después de la anterior). No rige en el primer tema con escena (sigue a la apertura: error).
+- **`useTopic().handoff`** (`"list" | "next-scene" | "closing"`): cómo sigue la historia a esta escena. Con `"next-scene"` la escena puede omitir su salida (el `Wash` o el atravesado) y dejar la cámara abierta; con `"list"` cierra como siempre; `"closing"`: sigue el cierre (último tema con `interludes: false`). **`useTopic().arrival`** (`"opening" | "list" | "previous-scene"`): cómo llegó; con `"previous-scene"` la escena arranca donde la anterior dejó el movimiento, ya con todo en su lugar. Fuera de una historia valen `undefined` (la escena hace su entrada y su salida de siempre). `TopicProvider` los acepta por prop. Ver `examples/story-demo/StoryDemo.tsx`.
+- **Duración de la escena**: la de la entrada de `scenes` (`durationInFrames`), no la que la escena declare por su cuenta: una entrada más corta la corta (el cuadro N de la historia es el primero de la escena siguiente). Así una escena se corta antes de su salida cuando la que sigue continúa su movimiento. No hace falta nada más.
+- **Vuelta de revelación** (id `interlude-reveal`, después de la escena tardía; `timing.interludeReveal`, **150 cuadros por defecto, mínimo 90**; con vueltas compactas dura lo que una compacta y con `interludes: false` no hay): la lista se arma con las n filas desde su primer cuadro (la fila nueva ya tiene su lugar: sin saltos al entrar). Cronología a 150 cuadros (se escala con la duración): 0-14 entran las filas anteriores, ya tildadas; 14-34 la tilde del tema anterior (el que no tuvo vuelta) con su pulso, que llega al máximo en el cuadro 36; 48-62 entra la fila nueva con la entrada y el escalonado del design system; 56-70 aparece su número; 74-96 se subraya como "el que sigue"; 104-124 se tilda (pulso máximo en el 126); 120-150 la lista se desvanece hacia el cierre. El presupuesto (`storyBudget(...).reveal`) y `--list-scenes` la cuentan aparte.
+- **`storyCues(spec, scenes, opts)`** devuelve `{ frame, kind, topic }[]` ordenado (`frame` absoluto; `topic` índice o `null`), para generar la lista de sonidos en lugar de ubicarla a mano. `kind`: `opening-title` (cuadro 0), `opening-list`, `fly-in` (atravesado de un titular: primer tema al final de la apertura y el que sigue en cada vuelta), `scene-start`, `interlude-tick` (cuadro del pulso máximo de cada tilde), `reveal-enter`, `reveal-tick` y `closing-logo` (entra la marca de la firma). `opts` es el de `composeStory` más `theme`, `width` y `height` (por defecto neutro en 1920 x 1080: el tema cambia cómo termina la apertura). Sale de las mismas constantes que las piezas; `stories/tardio.test.tsx` comprueba que coinciden con lo que se dibuja.
+- La demo: `story-demo-sorpresa` (`examples/story-demo/Sorpresa.tsx`) agrega un cuarto tema tardío a los tres de `story-demo`. Es un video aparte y no una prop porque la duración de un video se fija al registrarlo y no puede depender de las props.
 
 ## Armar a mano
 
@@ -188,4 +204,4 @@ Cada píldora va sobre el borde superior de su panel. El diseño (`panelLayout`)
 - Regla para no romper el determinismo: en una capa 3D todo el movimiento va dentro del `transform`; un `left`/`top` fraccionario (p. ej. un vaivén con `Math.sin` sumado a `top`) se rasteriza distinto según el historial de cuadros y `render --check` lo detecta. Las posiciones de layout van en enteros.
 - Si `timing` cambia una duración, los tiempos internos del bloque se escalan en proporción.
 
-Ejemplo: `examples/story-demo` (`/?video=story-demo&props={"theme":"dark"}`). Fondo del cierre: la firma entra sobre `theme.color.bg` (un velo que tapa el muro); `design.closing.bg` elige otro rol. Pruebas: `stories/stories.test.tsx`, `stories/opciones.test.tsx` (temas sin escena y opciones), `stories/rest.test.tsx` (reposo e historial), `stories/determinism.e2e.test.ts` (`--check` por escena; solo con `npm run test:e2e`).
+Ejemplo: `examples/story-demo` (`/?video=story-demo&props={"theme":"dark"}`). Fondo del cierre: la firma entra sobre `theme.color.bg` (un velo que tapa el muro); `design.closing.bg` elige otro rol. Pruebas: `stories/stories.test.tsx`, `stories/tardio.test.tsx` (tema sorpresa, handoff y señales), `stories/opciones.test.tsx` (temas sin escena y opciones), `stories/rest.test.tsx` (reposo e historial), `stories/determinism.e2e.test.ts` (`--check` por escena; solo con `npm run test:e2e`).

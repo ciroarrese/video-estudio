@@ -12,6 +12,8 @@ import type { StorySpec, TopicScene } from "./types";
 import { CLOSING_FRAMES } from "./durations";
 export { CLOSING_FRAMES };
 export const closingFrames = (spec: StorySpec) => spec.timing?.closing ?? CLOSING_FRAMES;
+/** Cuadro (local del cierre) en que empieza a entrar la marca de la firma (el logo o el `slot`; sin marca, el texto de la firma). Lo usa `storyCues`. */
+export const closingLogoAt = (dur: number): number => scaler(dur, CLOSING_FRAMES)(394);
 
 const PANEL = { w: 560, h: 340 };
 const WALL_P = 1600;
@@ -160,7 +162,7 @@ export function Closing({ spec: specIn, scenes = [] }: { spec: StorySpec; scenes
   // cuánto se acerca cada panel a la cámara al entrar (menos en los formatos donde los paneles llenan el cuadro)
   const camStart = closingCamStart(panels, theme, spec.topics.map((t) => t.name), width, height);
   const lifts = panels.map((c, i) => panelEntryLift(c, theme, spec.topics[i]!.name, pillBudget(panels, i, width), width, height, camStart));
-  const T = { wall: u(130), fold: [u(170), u(200)] as [number, number], fly: [u(200), u(254)] as [number, number], light: u(262), pull: u(372), wash: [u(368), u(398)] as [number, number], logo: u(394), sign: u(418) };
+  const T = { wall: u(130), fold: [u(170), u(200)] as [number, number], fly: [u(200), u(254)] as [number, number], light: u(262), pull: u(372), wash: [u(368), u(398)] as [number, number], logo: closingLogoAt(dur), sign: u(418) };
 
   const cam = {
     s: kf(f, [0, u(150), u(260)], [camStart, Math.min(camStart, 0.99), Math.min(camStart, 0.95)], Easing.inOut),

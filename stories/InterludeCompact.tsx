@@ -7,6 +7,7 @@ import { INTERLUDE_COMPACT_FRAMES } from "./durations";
 import { fitText } from "./layout";
 import { nextTopic } from "./Interlude";
 import { CheckMark, StoryStage, moveIn, scaler, useEase, useStorySpec } from "./shared";
+import { lateStart, withoutLate } from "./types";
 import type { StorySpec } from "./types";
 
 export { INTERLUDE_COMPACT_FRAMES };
@@ -20,7 +21,8 @@ export const interludeCompactFrames = (spec: StorySpec) => spec.timing?.interlud
  */
 export function InterludeCompact({ spec: specIn, done, skip = [], next: nextProp }: { spec: StorySpec; done: number; skip?: number[]; next?: number }) {
   const theme = useTheme();
-  const spec = useStorySpec(specIn); // el diseño del video sobre el del design system
+  // un tema tardío (`reveal: "late"`) entra en la tira recién en la vuelta que sigue a su escena (`done` = todos los temas)
+  const spec = useStorySpec(done > lateStart(specIn) ? specIn : withoutLate(specIn)); // el diseño del video sobre el del design system
   const ease = useEase();
   const f = useFrame();
   const { width } = useVideoConfig();
