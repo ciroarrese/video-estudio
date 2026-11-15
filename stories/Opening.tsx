@@ -1,12 +1,12 @@
 import type React from "react";
 import { Easing, useFrame, useVideoConfig } from "../engine";
-import { Wash, World, kf, useCameraAt, zoomThrough } from "../kit";
+import { Wash, World, kf, useCameraAt, exitThrough } from "../kit";
 import { entrance, staggerFrames, staggerOverride, surfaceStyle, textStyle, useTheme } from "../themes";
 import { fade, styleKey, xform } from "../fx/core/math";
 import { fitText, listLayout, openingWall, rigTransform } from "./layout";
 import { Chip, HeadlineRow, HighlightedTitle, StoryStage, rowEntrance, scaler, useEase, useStorySpec } from "./shared";
 import { TopicContext, TopicHeadline, headlineDefaults } from "./topic";
-import { wallOptions } from "./types";
+import { wallOptions, withoutLate } from "./types";
 import type { StorySpec } from "./types";
 
 import { OPENING_FRAMES } from "./durations";
@@ -17,6 +17,18 @@ const WALL_P = 1400;
 
 /** Cuadros que dura el acople final del titular (`design.handoff: "dock"`) antes de terminar la apertura. */
 const DOCK_FRAMES = 26;
+
+/**
+ * Cuadros (locales de la apertura) en que se atraviesa el titular del primer tema: con acople la lista se queda hasta `DOCK_FRAMES` antes del final
+ * (la píldora termina de entrar en el último cuadro menos 8); sin acople, con velo o sin él (`through`). Lo usan la apertura y `storyCues`.
+ */
+export const openingFly = (dur: number, docking: boolean, flying: boolean): [number, number] => {
+  const u = scaler(dur, OPENING_FRAMES);
+  if (docking) { const at = Math.max(Math.round(u(120)), dur - DOCK_FRAMES); return [at, at + 1]; }
+  return flying ? [u(246), u(292)] : [u(236), u(282)];
+};
+/** Cuadro (local) en que entra la lista de titulares de la apertura. */
+export const openingListAt = (dur: number): number => scaler(dur, OPENING_FRAMES)(104);
 
 /**
  * Apertura: el título se lee desde el primer cuadro sobre un muro de etiquetas en profundidad (cada pieza con su
@@ -32,7 +44,8 @@ const DOCK_FRAMES = 26;
  */
 export function Opening({ spec: specIn, first = 0, dock, through }: { spec: StorySpec; first?: number; dock?: boolean; through?: boolean }) {
   const theme = useTheme();
-  const spec = useStorySpec(specIn); // el diseño del video sobre el del design system
+  // un tema tardío (`reveal: "late"`) no está en la lista ni cuenta para el muro (sí si su nombre está en `labels`)
+  const spec = useStorySpec(withoutLate(specIn)); // el diseño del video sobre el del design system
   const ease = useEase();
   const f = useFrame();
   const { width, height } = useVideoConfig();
@@ -50,13 +63,11 @@ export function Opening({ spec: specIn, first = 0, dock, through }: { spec: Stor
   const wallBlur = wo.blurOpening;
   const target = Math.min(Math.max(0, first), n - 1);
   const gap = Math.min(16, 64 / n) * (dur / OPENING_FRAMES);
-  // con acople la lista se queda hasta DOCK_FRAMES antes del final (la píldora termina de entrar en el último cuadro menos 8)
-  const dockAt = Math.max(Math.round(u(120)), dur - DOCK_FRAMES);
   // demora de cada titular: el paso propio lo escala el tema (`motion.stagger`); si el design system fija el de la lista (`motion.staggerList`), son esos cuadros
   const heads = (i: number) => staggerFrames(theme, i, { base: gap, context: "list", scale: dur / OPENING_FRAMES });
   // cuadros que tarda cada pieza del muro en aparecer respecto de la anterior (0,5 de siempre; `motion.staggerChips` lo cambia)
   const chipStep = staggerOverride(theme, "chips") ?? 0.5;
-  const T = { titleOut: [u(78), u(100)] as [number, number], wallOff: [u(94), u(126)] as [number, number], heads: u(104), fly: (docking ? [dockAt, dockAt + 1] : flying ? [u(246), u(292)] : [u(236), u(282)]) as [number, number] };
+  const T = { titleOut: [u(78), u(100)] as [number, number], wallOff: [u(94), u(126)] as [number, number], heads: u(104), fly: openingFly(dur, docking, flying) };
   const underStart = T.heads + heads(n - 1) + u(20);
 
   // muro: avance lento de cámara con inclinación; al irse la lista se aleja
@@ -77,7 +88,7 @@ export function Opening({ spec: specIn, first = 0, dock, through }: { spec: Stor
 
   // atravesado del primer titular
   const cam = useCameraAt(f, [{ f: 0, x: cx, y: cy, scale: 1 }], {
-    map: (fr, c) => (docking ? c : zoomThrough(fr, T.fly, c, L.target(target), 60)),
+    map: (fr, c) => (docking ? c : exitThrough(theme, fr, T.fly, c, L.target(target), 60)),
     noBlurFrom: T.fly[0],
   });
   const othersOut = kf(f, [T.fly[0] - u(6), T.fly[0] + (docking ? 12 : u(14))], [1, 0]);

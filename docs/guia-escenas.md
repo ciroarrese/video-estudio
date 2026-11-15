@@ -62,7 +62,7 @@ const cam = cameraAt(f, KEYS);            // { x, y, scale, rx, ry, blur }
 | Trayecto 2D por paradas | `track(f, [[f, x, y], ...])` |
 | Texto que se escribe | `typed(texto, f, inicio, caracteresPorCuadro)` |
 | Cursor que viaja y hace clic | `Cursor` (`keys: [[f, x, y], ...]`, `clicks: [f]`, `show: [ini, fin]`) |
-| Marcar algo a mano | `DoodleCircle`, `DoodleArrow`, `DoodleUnderline` (con `id` único, `start`, `end`) |
+| Señalar algo | `Callout` (`target`, `text?`, `range`): la forma la decide el tema (sección 16). `DoodleCircle`, `DoodleArrow` y `DoodleUnderline` (con `id` único, `start`, `end`) solo si el sistema es de trazo a mano |
 | Una tarjeta que viaja de un lugar a otro | `FlyingCard` con `range`, `from`, `to`, `arc` |
 | Número que cuenta | `CountUp` (`start`, `duration`, `format?`) |
 | Texto con el degradado del tema | `GradientText` (`loop={90}` lo hace ir y volver y termina exacto en el primer cuadro del ciclo; `pan` es una velocidad sin ciclo exacto) |
@@ -95,11 +95,11 @@ Escribí los tiempos en una constante `T = { zoom: 40, click: 62, ... }` para qu
 Escena de 300 cuadros (10 s). Se lee en este orden:
 
 1. **Mundo.** Dos paneles (`A`, `B`) en coordenadas fijas y tres tarjetas posicionadas por `cardPos(i)`. Todo es `position: absolute` con `left`/`top` del mundo.
-2. **Cámara.** `KEYS` tiene siete claves: vista general (0 a 55), acercamiento a la tarjeta elegida (90 a 135), apertura a una vista media (165), viaje al contador (200) y sostener (300). `camera(f)` agrega `zoomThrough` entre 240 y 299 con el contador como destino y apaga el desenfoque desde 240.
+2. **Cámara.** `KEYS` tiene siete claves: vista general (0 a 55), acercamiento a la tarjeta elegida (90 a 135), apertura a una vista media (165), viaje al contador (200) y sostener (300). `camera(f)` agrega `exitThrough` entre 240 y 299 con el contador como destino (el atravesado de siempre, o el empuje suave si el tema pide `motion.exit: settle`) y apaga el desenfoque desde 240.
 3. **Entradas.** Cada tarjeta y fila aparece con `kf(frame, [i * 6 - 14, i * 6 + 8], [0, 1])`: escalonado.
-4. **Acción clave.** El cursor (`Cursor`) viaja entre 74 y 122 y hace clic en el cuadro 124; recién en 126 la tarjeta queda "seleccionada" (`picked`). El garabato `DoodleCircle` empieza en 96.
-5. **Viaje de una tarjeta.** Entre 150 y 190, `FlyingCard` la lleva con arco al panel B; mientras vuela, en su lugar queda un hueco punteado. Una flecha (`DoodleArrow`) marca el recorrido.
-6. **Llegada.** `CountUp` empieza a contar cuando la tarjeta aterriza (`land`) y el subrayado (`DoodleUnderline`) lo remata.
+4. **Acción clave.** El cursor (`Cursor`) viaja entre 74 y 122 y hace clic en el cuadro 124; recién en 126 la tarjeta queda "seleccionada" (`picked`). La llamada sobre la tarjeta elegida es un `Callout` sin texto (empieza en 96): la forma (anillo, corchete, óvalo a mano...) la decide el design system.
+5. **Viaje de una tarjeta.** Entre 150 y 190, `FlyingCard` la lleva con arco al panel B; mientras vuela, en su lugar queda un hueco punteado. Un `Callout` con rótulo ("Llega acá") marca el destino.
+6. **Llegada.** `CountUp` empieza a contar cuando la tarjeta aterriza (`land`) y otro `Callout` sin texto lo remata.
 7. **Pantalla.** Fuera de `World`: `Vignette` (crece con el zoom), `DockedHeadline` con `hide={hideFromScale(cam.scale)}` y `Wash` en los últimos 20 cuadros.
 
 Probalo: `npm run dev` y abrí `/?video=kit-demo`, o `npm run sheet -- kit-demo --count 12`. Con otro tema: `/?video=kit-demo&props={"theme":"dark"}`.
@@ -286,16 +286,17 @@ Probá cada escena sola (su propio `defineVideo`, como en `templates/scene/index
 
 ## 9. Combinar el kit con efectos de `fx/`
 
-Los efectos de `fx/` son componentes comunes: se ponen dentro de `World` (se mueven con la cámara) o fuera (fijos en pantalla), y los garabatos y el cursor del kit se dibujan encima. Reglas prácticas:
+Los efectos de `fx/` son componentes comunes: se ponen dentro de `World` (se mueven con la cámara) o fuera (fijos en pantalla), y las llamadas (`Callout`) y el cursor del kit se dibujan encima. Reglas prácticas:
 
 - Un efecto sin `frame` lee el cuadro del motor: usá `start` y `duration` para ubicarlo en la línea de tiempo de la escena. Su último cuadro es una imagen fija, así que se queda en pantalla después de terminar.
 - Posicionalo con un contenedor `position: absolute` con `left`/`top` en píxeles enteros y dale `width`/`height` al efecto.
-- Los garabatos y el cursor van en las coordenadas del mundo del efecto sobre el que apuntan; empezá el garabato cuando el efecto ya terminó (`start + duration`).
+- Las llamadas y el cursor van en las coordenadas del mundo del efecto sobre el que apuntan; empezá la llamada cuando el efecto ya terminó (`start + duration`).
+- Un efecto que se muestra solo (un muestrario, una baldosa de un muro) no se deja quieto con su imagen final: envolvelo en `Loop` (sección 17 y `docs/animaciones.md`, "Lazo").
 - Para una transición entre escenas, `DotWipe` (cuadro completo) o `Wash` del kit; no los apiles.
 
 ```tsx
 import { useFrame, useVideoConfig } from "../../../engine";
-import { Cursor, DoodleCircle, Stage, Wash, World, cameraAt } from "../../../kit";
+import { Callout, Cursor, Stage, Wash, World, cameraAt } from "../../../kit";
 import type { CameraKey } from "../../../kit";
 import { BarsGrow, MaskedRise } from "../../../fx";
 
@@ -318,7 +319,8 @@ export function EscenaCombinada() {
         <div style={{ position: "absolute", left: 760, top: 320 }}>
           <BarsGrow start={20} duration={50} width={900} height={520} data={[40, 65, 52, 90]} labels={["N", "S", "E", "O"]} />
         </div>
-        <DoodleCircle id="ej-circulo" start={80} end={105} cx={1330} cy={500} rx={110} ry={90} />
+        {/* la señal la decide el design system (`style.annotation.mark`); la escena solo dice qué señala y cuándo */}
+        <Callout target={{ x: 1220, y: 410, w: 220, h: 180 }} range={[80, 105]} />
         <Cursor show={[50, 118]} keys={[[50, 1500, 900], [76, 1360, 560]]} clicks={[78]} />
       </World>
       <Wash range={[104, 119]} />
@@ -327,7 +329,7 @@ export function EscenaCombinada() {
 }
 ```
 
-El titular y las barras entran solos con su propio escalonado; la cámara se acerca a las barras, el cursor hace clic y el círculo marca la barra más alta. Probalo con `npm run dev` y `/?video=fx-text`, `fx-3d` o `fx-data-ui-art` para ver cada efecto por separado.
+El titular y las barras entran solos con su propio escalonado; la cámara se acerca a las barras, el cursor hace clic y la llamada marca la barra más alta (con el tema que sea: anillo, corchete u óvalo a mano). Probalo con `npm run dev` y `/?video=fx-text`, `fx-3d` o `fx-data-ui-art` para ver cada efecto por separado.
 
 ## 10. Un tema distinto para una escena o una parte de la escena
 
@@ -400,7 +402,7 @@ Para que un elemento de ancho `w` (una fila, una tarjeta) se vea entero con un m
 zmax = (ancho del cuadro - 2 * m) / w          // con la altura: (alto del cuadro - 2 * m) / h; usá el menor
 ```
 
-`ancho del cuadro` es `width` de `useFormat()` y `m` el margen seguro por lado (`theme.safe.x / 2`, 70 con los temas base). La cámara va centrada en el elemento (`x = left + w / 2`, `y = top + h / 2`). Quedate un poco por debajo de `zmax` (el 90 %) para que entren el borde y el garabato.
+`ancho del cuadro` es `width` de `useFormat()` y `m` el margen seguro por lado (`theme.safe.x / 2`, 70 con los temas base). La cámara va centrada en el elemento (`x = left + w / 2`, `y = top + h / 2`). Quedate un poco por debajo de `zmax` (el 90 %) para que entren el borde y la llamada.
 
 Ejemplos con el tema neutro:
 
@@ -425,7 +427,7 @@ La escena de `examples/kit-demo` es un recorrido de piezas; esta es una escena d
 | 26 a 50 | acercamiento rápido a la fila elegida (zoom calculado con la fórmula) |
 | 24 a 64 | el cursor viaja al botón; clic en el 66 |
 | 68 | resultado: la fila pasa a "Aprobado" y el indicador suma uno |
-| 72 a 90 | garabato sobre el estado nuevo |
+| 72 a 90 | llamada (`Callout`) sobre el estado nuevo |
 | 96 a 122 | la cámara vuelve a la vista general |
 | 122 a 149 | atravesado hacia el indicador y velo |
 
@@ -434,7 +436,7 @@ Guardalo como `videos/<slug>/datos/Scene.tsx` después de `bash templates/nuevo.
 ```tsx
 import React from "react";
 import { useFormat, useFrame } from "../../../engine";
-import { Cursor, DockedHeadline, DoodleCircle, Stage, Wash, World, cameraAt, hideFromScale, kf, zoomThrough } from "../../../kit";
+import { Callout, Cursor, DockedHeadline, Stage, Wash, World, cameraAt, cameraView, exitThrough, hideFromScale, kf } from "../../../kit";
 import type { CameraKey } from "../../../kit";
 import { ThemeProvider, useTheme } from "../../../themes";
 import { theme as videoTheme } from "../theme";
@@ -477,7 +479,7 @@ export function SceneBody({ title }: { title: string }) {
     { f: T.back[0], x: fila.x, y: fila.y, scale: zoom },  // sostener el resultado
     { f: T.back[1], x: width / 2, y: height / 2, scale: 1 }, // vuelve a la vista general
   ];
-  const cam = cameraAt(f, keys, { map: (fr, c) => zoomThrough(fr, T.through, c, kpi, 40), noBlurFrom: T.through[0] });
+  const cam = cameraAt(f, keys, { map: (fr, c) => exitThrough(t, fr, T.through, c, kpi, 40), noBlurFrom: T.through[0] });
   const zoomed = cam.scale > 1.05;
 
   return (
@@ -506,7 +508,8 @@ export function SceneBody({ title }: { title: string }) {
           );
         })}
 
-        <DoodleCircle id="datos-circulo" start={T.result + 4} end={T.back[1] - 6} cx={ROW.x + ROW.w - 360} cy={fila.y} rx={100} ry={46} />
+        {/* el estado nuevo: la señal sale del design system; `within` la mantiene dentro de lo que ve la cámara */}
+        <Callout target={{ x: ROW.x + ROW.w - 460, y: fila.y - ROW.h / 2 + 10, w: 200, h: ROW.h - 20 }} range={[T.result + 4, T.back[1] - 6]} within={cameraView(cam, { width, height })} id="datos-estado" />
         <Cursor show={[T.hold - 2, T.back[0] + 6]} keys={[[T.hold - 2, 1500, 860], [T.click - 2, boton.x, boton.y]]} clicks={[T.click]} />
       </World>
       <DockedHeadline index={1} title={title} start={4} hide={hideFromScale(cam.scale)} />
@@ -524,7 +527,7 @@ export const SceneVideo: React.FC<{ title?: string; subtitle?: string }> = ({ ti
 );
 ```
 
-Qué copiar de este ejemplo: las constantes arriba (la caja, las filas y los tiempos, para que el guion y el código se lean juntos); la cámara con la primera clave sostenida; `data-qa-ignore` condicionado al zoom; el resultado derivado del cuadro (`hecho = f >= T.result`), nunca guardado; el garabato que empieza después del resultado.
+Qué copiar de este ejemplo: las constantes arriba (la caja, las filas y los tiempos, para que el guion y el código se lean juntos); la cámara con la primera clave sostenida; `data-qa-ignore` condicionado al zoom; el resultado derivado del cuadro (`hecho = f >= T.result`), nunca guardado; la llamada que empieza después del resultado (un `Callout`: dibuja la señal del design system, sea cual sea; un garabato a mano sobre un sistema geométrico delata una plantilla, sección 16).
 
 ## 14. El design system decide la estética: qué usar en lugar de escribirlo
 
@@ -612,3 +615,64 @@ La matriz muestra qué hallazgos aparecen en unos sistemas y en otros no: ahí s
 **Lo que dejaron los ejemplos de `examples/`** (todos dan 0 errores y 0 avisos con `--themes all`; con el estrés de tipografía, `theme-scope` y la plantilla dan 0 y `kit-demo` 0 errores con avisos de las filas vecinas que el zoom corta): las pilas de `fx-in-scene` (cada elemento con `minHeight` en una columna, no `y` fijos, y celdas de la grilla separadas más que el cuadro para que ninguna vecina entre cortada), la ventana de `theme-scope` (columnas y filas en flujo con `flex-wrap`, pastillas a una distancia medida del título, pie en flujo bajo la ventana), el panel de `kit-demo` (todo en flujo bajo la franja del título, contador con tamaño calculado por su ancho medido, superficie atenuada aparte del texto), `story-demo` y la plantilla (la marca `offscreen` solo en lo que el zoom corta a propósito, con comentario, nunca en el sujeto del zoom).
 
 **Trampa de `--font-scale` con tamaños redondos.** Mientras `qa` no lo corrija, un `--font-scale 1.25` repetido sobre cuadros seguidos puede acumular la escala en elementos cuyo tamaño por 1,25 da un entero (44 px a 55 px): el navegador devuelve `55px` y el control no restaura el valor, así que el texto crece más a cada cuadro y aparecen falsos errores. Si el estrés da errores que crecen con el número de cuadro, repetí con `--font-scale 1.2501`.
+
+## 16. Leer el design system antes de escribir escenas: qué señales, efectos y transiciones usa
+
+**Paso obligatorio, antes de la primera escena y después de aprobar el tema.** Un design system no es solo una paleta: tiene un carácter (geométrico y sobrio, editorial, lúdico y manual, técnico y oscuro) y ese carácter decide con qué se señala, cómo entran las cosas y cómo se pasa de una escena a otra. Si la herramienta pone la misma flecha a mano en todos los videos, todos se ven como el mismo video con otros colores.
+
+**Regla explícita: no se usan flechas (ni círculos, ni subrayados a mano) por costumbre. Se usa la señal que el sistema usaría, o ninguna.**
+
+1. **Leé el design system provisto**: sus formas (esquinas, bordes, superficies), su iconografía (¿tiene flechas, íconos, ilustraciones?), su movimiento (¿rebota, desliza, funde, corta?), sus ejemplos de énfasis (¿subraya, resalta con marcador, encierra, usa color?). Mirá `theme.style` (`annotation`, `type.highlight`, `motion`, `decor`, `line`, `text`) y `themeCharacter(theme)` (si el tema declara `style.decor.character`, es ese; si no, lo deduce de su estilo: es solo una guía, y si no encaja decidilo vos y anotalo); sin material propio, el de `neutral`/`dark` ya trae su señal.
+2. **Decidí y dejá anotado en el guion** (sección "Recursos de señalamiento y movimiento", al principio de `guion.md`, antes de la primera tabla de escena):
+
+   ```md
+   ## Recursos de señalamiento y movimiento
+   - Carácter del design system: <geométrico-sobrio | editorial | lúdico-manual | técnico-oscuro | otro: cuál>
+   - Señal: <la de `annotation.mark` del tema> (se usa `Callout`; excepciones forzadas con `variant`: <ninguna | cuáles y por qué>)
+   - Énfasis de palabras: <`type.highlight` del tema> con `Highlight`
+   - Transición entre escenas: <`motion.transition`> (`Wash`) y salida de cámara <`motion.exit`>
+   - Efectos que se usan: <del catálogo, filtrados por afinidad (`docs/animaciones.md`)>
+   - Efectos y recursos que NO se usan, y por qué: <p. ej. garabatos y `MarkerDraw` (sistema geométrico), `DotWipe` (sistema editorial)>
+   - Piezas a adaptar a los elementos del sistema: <formas, bordes, iconografía y movimiento de lo que se recrea>
+   ```
+3. **Adaptá lo que haga falta** para que lo recreado tenga la estética del sistema: las esquinas y bordes salen de `cornerRadius`/`borderWidth`/`surfaceStyle` (no de números), la iconografía se dibuja con los trazos del tema (`line.weight`, `line.cap`), el movimiento con `entrance`/`staggerFrames`. Si el sistema pide una señal que el tema no puede expresar (por ejemplo un ícono propio como marca), se declara en `theme.style` o se pide la pieza; no se resuelve a mano en la escena.
+4. **Probá con otros sistemas** (`--props '{"theme":"papel"}'`, `editorial`, `neon`) y mirá la hoja: la llamada tiene que cambiar de forma, no solo de color.
+
+**Cómo se usa en una escena.** `<Callout target={rect} text="Subió 12 %" range={[44, 128]} />`: el tema pone la flecha recta, la línea con codo, el corchete, el anillo o el trazo a mano; `text` es opcional (sin texto es solo la marca). Para forzar otra: `variant="underline"` con un comentario que diga por qué lo sabe la escena y no el tema. Si el tema declara `none`, solo queda el rótulo y la escena se entiende igual: una escena nunca depende de una flecha para explicarse. El ejemplo `examples/annotation-demo` es la misma escena bajo los cinco temas (`npm run sheet -- annotation-demo --frames 47,100 --props '{"theme":"papel"}'`). Los garabatos (`DoodleCircle`, `DoodleArrow`, `DoodleUnderline`) y `MarkerDraw` quedan para sistemas de trazo a mano; con otro tema se dibujan limpios, pero no son lo que ese sistema usaría, y `qa` lo avisa (regla `signal`: aviso si una escena usa `DoodleArrow`, `DoodleCircle` o `MarkerDraw` bajo un tema cuya señal no es `hand`; info si un `Callout` lleva una `variant` forzada).
+
+**Si el sistema señala con `focus`** (atenúa todo menos el objetivo): `Callout` solo dibuja el anillo; lo demás lo atenúa `FocusGroup`, que envuelve todo lo que no es el objetivo y toma la opacidad de `style.annotation.dim`:
+
+```tsx
+<FocusGroup range={RANGE}>{/* panel, otras tarjetas, filas */}</FocusGroup>
+<TarjetaObjetivo />                       {/* fuera del grupo: no se atenúa */}
+<Callout target={rect} range={RANGE} />
+```
+
+Con cualquier otra señal `FocusGroup` no hace nada (no emite `opacity`), así que se deja puesto siempre. Es una opacidad en el contenedor, no una capa translúcida encima, y no lleva `isolation`, `will-change` ni `filter`: pasa `--check --check-all` (`examples/annotation-demo` con `variant: "focus"` lo prueba bajo los cinco temas). `qa` trata el texto atenuado como atenuación a propósito (contraste en info).
+
+**Transiciones y énfasis.** Entre escenas manda `motion.transition` (`Wash`: velo, cortina, corte o sin velo) y `motion.exit` (`dive` atraviesa un elemento, `settle` empuja con suavidad con el foco llegando al objetivo en todo el tramo; en una escena propia usá `exitThrough(theme, fr, T.through, cam, objetivo, 40)` en el `map` de la cámara, que resuelve las dos); las palabras clave, `Highlight` (`type.highlight`); la entrada de los elementos, `entrance` (`motion.entrance`). No elijas `DotWipe`, `MarkerDraw` ni un barrido propio sin mirar la afinidad del efecto en `docs/animaciones.md`.
+
+## 17. Una escena dentro de otra, y efectos en lazo
+
+### Una escena completa mostrada chica (vista previa, miniatura viva)
+
+Receta resuelta en `NestedScene` (kit): la escena de adentro se dibuja a su tamaño natural y el contenedor la achica con una sola `scale()`.
+
+```tsx
+import { NestedScene } from "../../../kit";
+<NestedScene scene={Intro} start={120} width={640} style={{ position: "absolute", left: 80, top: 200 }} />   // viva: cuadro 0 de Intro en el 120
+<NestedScene scene={Intro} frame={90} height={360} format="vertical" />                                      // miniatura quieta, en vertical
+```
+
+Lo que resuelve y por qué, para quien lo arma a mano:
+
+- **`text-rendering: geometricPrecision`** en la escena de adentro. Con la escala, Chromium elige el suavizado del texto según el historial de cuadros y el mismo cuadro sale distinto: es el residuo clásico de "texto bajo `scale()`" de `docs/reglas.md`. Con esa propiedad, el chequeo pasa.
+- **El formato de adentro**: la escena de adentro tiene que ver un `useFormat()` / `useVideoConfig()` verdadero, aunque el video de afuera sea de otro formato. Se hace con un `FrameProvider` (o los contextos del motor) con otra `config` (`{ ...config, width, height, format }`); `NestedScene` lo hace con `format` (`horizontal`, `vertical`, `cuadrado`) o `size`.
+- **El cuadro local**: la escena de adentro ve su propio `useFrame()` desde 0; con `start` arranca cuando vos digas, con `frame` queda fija. Para que no quede muda al terminar, envolvela en `Loop` (abajo).
+- **Posiciones enteras y escala redondeada** (`left`/`top` del contenedor, `scale` a cuatro decimales) y nada de `scale(1)` en reposo.
+- **`qa`**: el texto de una reproducción chica no se juzga por tamaño ni contraste (`data-qa-decor`) ni entra en el estrés de tipografía (`data-qa-fixed-scale`); `clip` y `overlap` siguen valiendo. Con `qa={false}` se juzga todo (una vista previa grande que se lee).
+- Límites: no anides una escena con cámara en movimiento fuerte dentro de otra con zoom (escalas pesadas anidadas); el `Audio` de adentro suena como cualquiera. Ejemplo vivo: la última baldosa de `examples/fx-muro`.
+
+### Un efecto que se muestra solo no queda quieto: `Loop`
+
+Un muestrario (un muro de efectos, un catálogo en pantalla) nunca queda estático: cada efecto se repite mientras está a la vista. `Loop` (de `fx/`) lo hace como función pura del cuadro: `<Loop duration={60} pause={24} offset={i * 9}><Efecto start={0} duration={60} /></Loop>`. Modos: `fade` (se funde y vuelve a entrar: no hay pieza vacía), `pingpong` (ida y vuelta) y `restart` (corte seco, solo si el cuadro 0 del efecto ya es una imagen completa). Detalle en `docs/animaciones.md`, "Lazo". Efectos en cajas chicas: `density="auto"` (misma sección del catálogo).

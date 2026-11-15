@@ -1,6 +1,6 @@
 // @vitest-environment node
 import { describe, expect, it } from 'vitest';
-import { leerCortes, leerFase, leerFinal, leerInicio, leerNum, parsear } from './args';
+import { leerCortes, leerFase, leerGainPorEfecto, leerFinal, leerInicio, leerNum, parsear } from './args';
 
 const op = (...a: string[]) => parsear(a).op;
 
@@ -47,5 +47,17 @@ describe('args', () => {
     expect(leerFinal(op('--final', 'real'))).toBe('real');
     expect(leerFinal(op('--final', 'fade'))).toBe('fade');
     expect(() => leerFinal(op('--final', 'corte'))).toThrow(/fade/);
+  });
+
+  it('--gain lee pares nombre=número y rechaza lo mal formado', () => {
+    expect(leerGainPorEfecto(op())).toBeUndefined();
+    expect(leerGainPorEfecto(op('--gain', 'barrido=0.4,tilde=0.8'))).toEqual({ barrido: 0.4, tilde: 0.8 });
+    expect(leerGainPorEfecto(op('--gain', 'barrido-aire=0'))).toEqual({ 'barrido-aire': 0 });
+    expect(() => leerGainPorEfecto(op('--gain'))).toThrow(/necesita pares/);
+    expect(() => leerGainPorEfecto(op('--gain', 'barrido'))).toThrow(/--gain/);
+    expect(() => leerGainPorEfecto(op('--gain', 'barrido='))).toThrow(/--gain/);
+    expect(() => leerGainPorEfecto(op('--gain', 'barrido=mucho'))).toThrow(/--gain/);
+    expect(() => leerGainPorEfecto(op('--gain', 'barrido=-1'))).toThrow(/--gain/);
+    expect(() => leerGainPorEfecto(op('--gain', 'barrido=1,barrido=2'))).toThrow(/más de una vez/);
   });
 });

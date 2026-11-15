@@ -4,7 +4,7 @@ import { neutral } from "./neutral";
 import { deepClone, deepFreeze } from "./util";
 
 /**
- * Design system de ejemplo "editorial": papel claro, esquinas rectas, superficies de contorno y planas, tipografía con serif genérico,
+ * Design system de ejemplo "editorial": papel claro, esquinas rectas, superficies de contorno y planas, tipografía con serif genérico, corchetes y notas al margen como señal,
  * subrayados como énfasis, fondo de grilla, movimiento sobrio (fundido y barrido) y cortinas entre escenas. Inventado y genérico: sin marca ni fuentes propias. Muro en grilla ajustada (sin ladrillo ni temblor), eyebrows en mayúsculas con líneas de apoyo en caja normal y marca de acento fina.
  */
 export const editorial: ResolvedTheme = deepFreeze(resolveTheme({
@@ -46,7 +46,9 @@ export const editorial: ResolvedTheme = deepFreeze(resolveTheme({
     surface: { kind: "outline", elevation: "flat", opacity: 0.9 },
     type: { titleWeight: "medium", labelWeight: "regular", titleTracking: -0.01, eyebrowCase: "upper", eyebrowTracking: 0.14, captionCase: "as-is", captionTracking: 0, numerals: "solid", highlight: "underline" },
     background: { kind: "grid", intensity: 0.45 },
-    motion: { entrance: "fade", overshoot: 0, stagger: 3, staggerList: 10, staggerRows: 2, staggerChips: 0.25, cameraBlur: true, cameraTilt: 0.4, transition: "wipe" },
+    motion: { entrance: "fade", overshoot: 0, stagger: 3, staggerList: 10, staggerRows: 2, staggerChips: 0.25, cameraBlur: true, cameraTilt: 0.4, transition: "wipe", exit: "settle" },
+    // Señal de edición: un corchete fino y recto al margen del objetivo, con la nota pegada (sin flechas ni garabatos).
+    annotation: { mark: "bracket" },
     decor: { doodles: false, doodleStroke: "geometric", vignette: 0, accent: "underline", accentThickness: 0.5, gradientLoop: 0 },
     story: {
       titleCard: "solid", listLayout: "inline", listUnderline: "name", handoff: "dock", headlineSize: "sm", closingBg: "surface", signoffBar: false,

@@ -1,6 +1,6 @@
 import { chartFill, chartStyle, withAlpha } from "../../themes";
 import { Easing } from "../../engine";
-import { fxBox, progress, roleColor, useFx } from "../core";
+import { fxBox, fxDensity, progress, roleColor, useFx } from "../core";
 import type { ColorRole, FxProps } from "../core";
 import { catmullRom, fmtInt, niceTicks, pointAt, polyLength, toPath, trimPolyline } from "./geom";
 import type { Pt } from "./geom";
@@ -33,6 +33,8 @@ export function lineLayout(data: number[], w: number, h: number, pad = { l: 78, 
 export function LineDraw(p: LineDrawProps) {
   const { local, theme } = useFx(p);
   const { width: w, height: h } = fxBox(p, { width: 900, height: 520 });
+  // `density` (ver fx/core/density.ts): en una caja chica, la letra, los trazos y los márgenes bajan juntos (sin `density`, k = 1: el de siempre)
+  const k = fxDensity(p.density, { width: w, height: h }, { width: 900, height: 520 });
   const data = p.data ?? DEFAULT;
   const labels = p.labels ?? data.map((_, i) => String(i + 1));
   const dur = p.duration ?? 60;
@@ -40,9 +42,9 @@ export function LineDraw(p: LineDrawProps) {
   const uid = `ld${p.color ?? "accent"}`;
   // Estilo del diseño: grosor de línea (la punta lo sigue), guías y relleno del área.
   const cs = chartStyle(theme);
-  const lw = cs.lineWidth;
+  const lw = cs.lineWidth * k;
   const areaFill = chartFill(theme, color, `line-${p.color ?? "accent"}`);
-  const L = lineLayout(data, w, h);
+  const L = lineLayout(data, w, h, k === 1 ? undefined : { l: 78 * k, r: 40 * k, t: 130 * k, b: 64 * k });
   const tAxes = progress(local, 0, dur * 0.3, Easing.out);
   const draw = progress(local, dur * 0.1, dur * 0.8, Easing.inOut);
   const fade = progress(local, dur * 0.7, dur * 0.3);
@@ -52,7 +54,7 @@ export function LineDraw(p: LineDrawProps) {
   const last = data[data.length - 1]!;
   const tipValue = L.max * ((L.y0 - tip.y) / (L.y0 - L.y1));
   const value = draw >= 1 ? last : tipValue;
-  const fs = theme.type.eyebrow * 0.8;
+  const fs = theme.type.eyebrow * 0.8 * k;
   const area = trimmed.length > 1 ? `${toPath(trimmed)} L${trimmed[trimmed.length - 1]!.x.toFixed(2)} ${L.y0} L${L.x0} ${L.y0} Z` : "";
   return (
     <svg width={w} height={h} viewBox={`0 0 ${w} ${h}`} style={{ display: "block", fontFamily: theme.font.family, ...p.style }}>
@@ -63,19 +65,19 @@ export function LineDraw(p: LineDrawProps) {
           <stop offset="1" stopColor={withAlpha(color, 0)} />
         </linearGradient>
       </defs>
-      {cs.grid === "on" && L.pts.map((q, i) => <line key={`v${i}`} x1={q.x} x2={q.x} y1={L.y1} y2={L.y0} stroke={theme.color.border} strokeWidth={1.5} opacity={tAxes * 0.55} />)}
+      {cs.grid === "on" && L.pts.map((q, i) => <line key={`v${i}`} x1={q.x} x2={q.x} y1={L.y1} y2={L.y0} stroke={theme.color.border} strokeWidth={1.5 * k} opacity={tAxes * 0.55} />)}
       {L.ticks.map((tk, i) => {
         const y = L.y0 - ((L.y0 - L.y1) * tk) / L.max;
         return (
           <g key={i} opacity={tAxes}>
-            {(cs.grid !== "off" || i === 0) && <line x1={L.x0} x2={L.x0 + (L.x1 - L.x0) * tAxes} y1={y} y2={y} stroke={theme.color.border} strokeWidth={1.5} />}
-            <text x={L.x0 - 14} y={y + fs * 0.35} textAnchor="end" fontSize={fs} fill={theme.color.textMuted}>{fmtInt(tk)}</text>
+            {(cs.grid !== "off" || i === 0) && <line x1={L.x0} x2={L.x0 + (L.x1 - L.x0) * tAxes} y1={y} y2={y} stroke={theme.color.border} strokeWidth={1.5 * k} />}
+            <text x={L.x0 - 14 * k} y={y + fs * 0.35} textAnchor="end" fontSize={fs} fill={theme.color.textMuted}>{fmtInt(tk)}</text>
           </g>
         );
       })}
       {labels.map((lb, i) => {
         if (data.length > 8 && i % 2 === 1) return null;
-        return <text key={i} x={L.pts[i]!.x} y={L.y0 + fs + 16} textAnchor="middle" fontSize={fs} fill={theme.color.textMuted} opacity={tAxes}>{lb}</text>;
+        return <text key={i} x={L.pts[i]!.x} y={L.y0 + fs + 16 * k} textAnchor="middle" fontSize={fs} fill={theme.color.textMuted} opacity={tAxes}>{lb}</text>;
       })}
       {area && <path d={area} fill={areaFill.kind === "solid" ? `url(#ld-${uid})` : areaFill.fill} opacity={fade} />}
       {trimmed.length > 1 && <path d={toPath(trimmed)} fill="none" stroke={color} strokeWidth={lw} strokeLinecap="round" strokeLinejoin="round" />}
@@ -87,8 +89,8 @@ export function LineDraw(p: LineDrawProps) {
       )}
       {p.showValue !== false && (
         <g>
-          <text x={L.x0} y={34} fontSize={fs} fill={theme.color.textMuted}>{p.title ?? "Total"}</text>
-          <text x={L.x0} y={34 + theme.type.h2 * 0.8} fontSize={theme.type.h2 * 0.8} fontWeight={theme.font.weights.stat} fill={theme.color.text} style={{ fontVariantNumeric: "tabular-nums" }}>{fmt(value)}</text>
+          <text x={L.x0} y={34 * k} fontSize={fs} fill={theme.color.textMuted}>{p.title ?? "Total"}</text>
+          <text x={L.x0} y={34 * k + theme.type.h2 * 0.8 * k} fontSize={theme.type.h2 * 0.8 * k} fontWeight={theme.font.weights.stat} fill={theme.color.text} style={{ fontVariantNumeric: "tabular-nums" }}>{fmt(value)}</text>
         </g>
       )}
     </svg>

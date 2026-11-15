@@ -11,8 +11,9 @@ const c = neutral.color;
 
 describe("valores por defecto = lo que las piezas dibujan hoy", () => {
   it("neutral y dark traen el estilo por defecto, completo y congelado", () => {
-    expect(neutral.style).toEqual(DEFAULT_STYLE);
-    expect(dark.style).toEqual(DEFAULT_STYLE);
+    // lo único que neutral y dark declaran es la señal (`annotation.mark`); todo lo demás es el estilo por defecto
+    expect(neutral.style).toEqual({ ...DEFAULT_STYLE, annotation: { ...DEFAULT_STYLE.annotation, mark: "arrow" } });
+    expect(dark.style).toEqual({ ...DEFAULT_STYLE, annotation: { ...DEFAULT_STYLE.annotation, mark: "elbow" } });
     expect(Object.isFrozen(neutral.style)).toBe(true);
     expect(Object.isFrozen(neutral.style.shape)).toBe(true);
   });
@@ -90,7 +91,8 @@ describe("valores por defecto = lo que las piezas dibujan hoy", () => {
   it("movimiento y decoración: sin rebote, cámara sin cambios, viñeta y garabatos como siempre", () => {
     expect(cameraOptions(neutral)).toEqual({});
     expect(vignetteStrength(neutral)).toBe(1);
-    expect(doodleStyle(neutral)).toEqual({ enabled: true, jitter: true });
+    expect(doodleStyle(neutral)).toEqual({ enabled: true, jitter: false }); // neutral señala con flecha recta, sin temblor
+    expect(doodleStyle(papel)).toEqual({ enabled: true, jitter: true });
     expect(settle(0.3, 0)).toBe(0.3);
     expect(staggerFrames(neutral, 3)).toBe(12);
     expect(staggerFrames(neutral, 3, { base: 2 })).toBe(6); // paso propio de la pieza, sin cambio
@@ -254,7 +256,7 @@ describe("tokens -> style", () => {
     const { report } = themeFromTokensWithReport({ color: { accent: "#0a7a4f" } }, neon);
     expect(report.style.fallback.length).toBe(STYLE_FIELDS.length);
     // sin base explícita, el estilo por defecto
-    expect(themeFromTokens({}).style).toEqual(DEFAULT_STYLE);
+    expect(themeFromTokens({}).style).toEqual(neutral.style);
   });
 
   it("no cambia el informe ni el tema de siempre cuando no hay tokens de estilo", () => {

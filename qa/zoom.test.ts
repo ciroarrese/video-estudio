@@ -1,7 +1,7 @@
 // @vitest-environment node
 import { describe, expect, it } from 'vitest';
 import { mergeThresholds } from './thresholds';
-import { reclassifyDetail, scopeOf, type Readable } from './zoom';
+import { MAX_PROBE_AUTO, probeCount, reclassifyDetail, scopeOf, type Readable } from './zoom';
 import type { Finding } from './types';
 
 const dims = { width: 1920, height: 1080, duration: 600 };
@@ -44,5 +44,22 @@ describe('reclassifyDetail', () => {
   it('un texto sin ninguna lectura visible (clave ausente) queda como error', () => {
     const r = reclassifyDetail([small(10, 'a')], readable({ 'panel|0|299': {} }), scenes, th, dims);
     expect(r.findings[0]!.severity).toBe('error');
+  });
+});
+
+describe('probeCount: cuadros de prueba que escalan con la duración de la escena', () => {
+  const t = th['min-size'];
+  it('por defecto: un cuadro cada 15 en escenas largas, 24 como mínimo, con tope', () => {
+    expect(t).toMatchObject({ probeFrames: 24, probeEvery: 15 });
+    expect(probeCount(100, t)).toBe(24); // escena corta: el mínimo de siempre
+    expect(probeCount(30 * 60, t)).toBe(120); // una escena de un minuto a 30 fps: uno cada 0,5 s
+    expect(probeCount(30 * 230, t)).toBe(460); // 3:50 en una sola escena
+    expect(probeCount(30 * 3600, t)).toBe(MAX_PROBE_AUTO);
+    expect(probeCount(10, t)).toBe(10); // nunca más que los cuadros de la escena
+  });
+  it('probeEvery=0 deja exactamente probeFrames y probeFrames=0 apaga la regla', () => {
+    expect(probeCount(6900, { probeFrames: 120, probeEvery: 0 })).toBe(120);
+    expect(probeCount(6900, { probeFrames: 0, probeEvery: 15 })).toBe(0);
+    expect(probeCount(6900, { probeFrames: 24, probeEvery: 30 })).toBe(230);
   });
 });

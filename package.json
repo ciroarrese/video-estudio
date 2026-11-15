@@ -19,7 +19,8 @@
     "sheet": "tsx qa/cli.ts sheet",
     "privacy": "tsx qa/cli.ts privacy",
     "clean": "tsx render/clean.ts",
-    "audio": "tsx audio/cli.ts"
+    "audio": "tsx audio/cli.ts",
+    "exec": "node render/exec.mjs"
   },
   "dependencies": {
     "react": "^18.3.1",

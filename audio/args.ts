@@ -89,3 +89,22 @@ export function leerFinal(op: Map<string, string>): 'fade' | 'real' | undefined 
   if (v !== 'fade' && v !== 'real') throw new Error(`--final solo acepta "fade" o "real" (recibió "${v}")`);
   return v;
 }
+
+/**
+ * `--gain barrido=0.4,tilde=0.8`: multiplicador lineal por nombre de efecto, que se suma al `gain` de cada cue.
+ * Devuelve undefined si no se pasó; cada par tiene que ser `nombre=número >= 0`, sin nombres repetidos.
+ */
+export function leerGainPorEfecto(op: Map<string, string>): Record<string, number> | undefined {
+  const v = op.get('gain');
+  if (v === undefined) return undefined;
+  if (v.trim() === '') throw new Error('--gain necesita pares nombre=número (por ejemplo --gain barrido=0.4,tilde=0.8)');
+  const out: Record<string, number> = {};
+  for (const par of v.split(',')) {
+    const m = /^\s*([^=\s]+)\s*=\s*(.*?)\s*$/.exec(par);
+    const n = m ? Number(m[2]) : NaN;
+    if (!m || m[2] === '' || !Number.isFinite(n) || n < 0) throw new Error(`--gain: "${par.trim()}" no es un par nombre=número (el número, 0 o más)`);
+    if (Object.prototype.hasOwnProperty.call(out, m[1])) throw new Error(`--gain: "${m[1]}" aparece más de una vez`);
+    out[m[1]] = n;
+  }
+  return out;
+}

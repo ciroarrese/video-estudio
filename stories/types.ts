@@ -1,6 +1,6 @@
 import type React from "react";
 import type { CloudOptions } from "../kit";
-import { MIN_COMPACT_FRAMES } from "./durations";
+import { MIN_COMPACT_FRAMES, MIN_REVEAL_FRAMES } from "./durations";
 
 /** Una escena de tema que entra en la historia. */
 export type TopicScene = {
@@ -25,7 +25,27 @@ export type StoryTopic = {
    * sin escena se ve "plano" (atenuado, sin tilde ni subrayado y nunca como "el que sigue"). Ver "Temas sin escena" en `stories/README.md`.
    */
   seen?: boolean;
+  /**
+   * `"late"`: tema sorpresa. NO aparece en la lista de la apertura ni en las vueltas anteriores a su escena (no cuenta para el muro ni para
+   * las filas de esas listas, salvo que su nombre esté en `labels`); su escena sigue directo a la anterior (sin vuelta, ver `interludeBefore`) y
+   * después la lista vuelve con la fila nueva, que entra y se tilda (`timing.interludeReveal`). Lleva el último número y sale en el cierre como
+   * cualquier otro. Reglas: a lo sumo uno, tiene que ser el último de `topics`, tiene que tener escena y una escena anterior, y quedan al
+   * menos 2 temas que no son tardíos. Con `interludes: false` no hay vuelta de revelación (solo aparece en el cierre).
+   */
+  reveal?: "late";
+  /**
+   * `false`: la escena de este tema sigue directo a la escena anterior, sin vuelta al listado entre las dos ni nada que inserte la historia
+   * (el último cuadro de la anterior va seguido del primero de esta; las escenas hacen continuo el movimiento, ver `useTopic().handoff`).
+   * La tilde del tema anterior se pospone a la vuelta que viene después. Por defecto `true` (hay vuelta), salvo en un tema `reveal: "late"`
+   * (donde es `false` y no se puede pedir `true`). No rige en el primer tema con escena (sigue a la apertura).
+   */
+  interludeBefore?: boolean;
 };
+
+/** Cómo termina una escena de tema: `"list"` (sigue la vuelta al listado), `"next-scene"` (sigue directo la escena del tema que viene) o `"closing"` (sigue el cierre). */
+export type TopicHandoff = "list" | "next-scene" | "closing";
+/** Cómo empieza una escena de tema: `"opening"` (viene de la apertura), `"list"` (de una vuelta al listado) o `"previous-scene"` (continúa la escena anterior). */
+export type TopicArrival = "opening" | "list" | "previous-scene";
 
 /** Opciones de la lista de temas (forma larga de `design.list`). */
 export type StoryListOptions = {
@@ -65,6 +85,14 @@ export type StoryDesign = {
    * titular entrando por su cuenta). Sin escenas, `"dock"` y `"through"` se ignoran.
    */
   handoff?: "wash" | "dock" | "through";
+  /**
+   * Cómo se revela el tema tardío (`reveal: "late"`) en su vuelta al listado: `"fade"` (por defecto: la fila entra con un fundido, se subraya y se
+   * tilda) o `"stage"` (escenificada: las filas vistas se corren apenas, la fila nueva entra con resorte y una leve escala, un barrido de luz de acento
+   * la recorre, la miniatura de su escena aparece al costado y vuela hasta el lugar del número, y la tilde cierra con un anillo que se expande). Todo sale
+   * de `theme.style` (resorte de `motion.overshoot`, acentos, esquinas). La miniatura solo se muestra donde hay lugar libre a la derecha de la fila (formato ancho; en vertical y cuadrado la fila
+   * nueva entra igual, sin miniatura). Dura 200 cuadros de referencia: conviene `timing.interludeReveal: 200` (con el valor por defecto, 150, todo se acorta en proporción).
+   */
+  reveal?: "fade" | "stage";
   /** Píldora del titular (`TopicHeadline` y la que acopla la apertura). */
   headline?: {
     /** `"md"` (por defecto) o `"sm"` (85 % de la letra y del relleno). */
@@ -119,13 +147,15 @@ export type StoryTiming = {
   interlude?: number;
   /** Vuelta compacta (`interludes: "compact"`; mínimo 24, por defecto 40). */
   interludeCompact?: number;
+  /** Vuelta con la revelación del tema tardío (`reveal: "late"`; mínimo 90, por defecto 150). Con vueltas compactas rige `interludeCompact`. */
+  interludeReveal?: number;
   closing?: number;
 };
 
 export type StorySpec = {
   /** `highlight` es un fragmento de `text` que se pinta con el degradado del tema. */
   title: { text: string; highlight?: string };
-  /** De 2 a 6 temas. */
+  /** De 2 a 6 temas (un tema `reveal: "late"` cuenta, pero quedan al menos 2 que no lo son). */
   topics: StoryTopic[];
   /** Palabras del muro; si faltan, se repiten de forma determinista. */
   labels: string[];
@@ -145,7 +175,7 @@ export const MAX_TOPICS = 6;
 /** Ids que usa la composición para sus propios bloques: un tema no puede llamarse así. */
 export const isReservedSceneId = (id: string) => id === "opening" || id === "closing" || /^interlude(-.*)?$/.test(id);
 
-const TIMING_KEYS = ["opening", "interlude", "interludeCompact", "closing"];
+const TIMING_KEYS = ["opening", "interlude", "interludeCompact", "interludeReveal", "closing"];
 const isInt = (v: unknown): v is number => typeof v === "number" && Number.isInteger(v);
 
 /** Lanza un error claro si la configuración no se puede componer. */
@@ -159,6 +189,7 @@ export function validateSpec(spec: StorySpec): void {
   if (!spec.signoff.text && !spec.signoff.logo && !spec.signoff.slot) throw new Error("StorySpec: falta signoff.text (o signoff.logo / signoff.slot)");
   validateDesign(spec.design);
   spec.topics.forEach((t, i) => { if (t.seen !== undefined && typeof t.seen !== "boolean") throw new Error(`StorySpec: topics[${i}].seen debe ser true o false`); });
+  validateTopicFlow(spec);
   const ids = new Set(spec.topics.map((t) => t.id));
   if (ids.size !== n) throw new Error("StorySpec: los id de los temas deben ser únicos");
   // `labels` vacío o ausente es válido (el muro usa los nombres de los temas); si viene, tiene que ser una lista de textos.
@@ -171,13 +202,39 @@ export function validateSpec(spec: StorySpec): void {
   const timing = (spec.timing ?? {}) as Record<string, unknown>;
   for (const [k, v] of Object.entries(timing)) {
     if (!TIMING_KEYS.includes(k)) throw new Error(`StorySpec: timing.${k} no existe (las claves válidas son ${TIMING_KEYS.join(", ")})`);
-    const min = k === "interludeCompact" ? MIN_COMPACT_FRAMES : 60;
+    const min = k === "interludeCompact" ? MIN_COMPACT_FRAMES : k === "interludeReveal" ? MIN_REVEAL_FRAMES : 60;
     if (v !== undefined && (!isInt(v) || v < min)) throw new Error(`StorySpec: timing.${k} debe ser un número entero de cuadros >= ${min}`);
   }
 }
 
-const DESIGN_ENUMS: Record<string, string[]> = { titleCard: ["solid", "glass"], handoff: ["wash", "dock", "through"] };
-const DESIGN_KEYS = ["titleCard", "list", "handoff", "wall", "clouds", "headline", "gradient", "closing"];
+/** Índice desde el cual los temas son tardíos (`reveal: "late"`), o `spec.topics.length` si no hay ninguno. */
+export const lateStart = (spec: StorySpec): number => {
+  const i = spec.topics.findIndex((t) => t.reveal === "late");
+  return i < 0 ? spec.topics.length : i;
+};
+
+/** El mismo `spec` sin los temas tardíos (los que todavía no se revelaron). Sin ninguno devuelve el mismo objeto. */
+export const withoutLate = (spec: StorySpec): StorySpec => {
+  const k = lateStart(spec);
+  return k === spec.topics.length ? spec : { ...spec, topics: spec.topics.slice(0, k) };
+};
+
+/** Valida `reveal` e `interludeBefore` de los temas. */
+function validateTopicFlow(spec: StorySpec): void {
+  spec.topics.forEach((t, i) => {
+    if (t.reveal !== undefined && t.reveal !== "late") throw new Error(`StorySpec: topics[${i}].reveal debe ser "late" (recibió ${JSON.stringify(t.reveal)})`);
+    if (t.interludeBefore !== undefined && typeof t.interludeBefore !== "boolean") throw new Error(`StorySpec: topics[${i}].interludeBefore debe ser true o false`);
+    if (t.reveal === "late" && t.interludeBefore === true) throw new Error(`StorySpec: topics[${i}] es reveal: "late": su escena sigue directo a la anterior, no admite interludeBefore: true`);
+  });
+  const late = spec.topics.flatMap((t, i) => (t.reveal === "late" ? [i] : []));
+  if (late.length === 0) return;
+  if (late.length > 1) throw new Error("StorySpec: solo un tema puede ser reveal: \"late\"");
+  if (late[0] !== spec.topics.length - 1) throw new Error("StorySpec: el tema reveal: \"late\" tiene que ser el último de topics (lleva el último número)");
+  if (spec.topics.length - 1 < MIN_TOPICS) throw new Error(`StorySpec: con un tema reveal: \"late\" hacen falta al menos ${MIN_TOPICS} temas más (los de la lista)`);
+}
+
+const DESIGN_ENUMS: Record<string, string[]> = { titleCard: ["solid", "glass"], handoff: ["wash", "dock", "through"], reveal: ["fade", "stage"] };
+const DESIGN_KEYS = ["titleCard", "list", "handoff", "reveal", "wall", "clouds", "headline", "gradient", "closing"];
 const inRange = (v: unknown, lo: number, hi: number): v is number => typeof v === "number" && Number.isFinite(v) && v >= lo && v <= hi;
 
 function validateDesign(d: StoryDesign | undefined): void {

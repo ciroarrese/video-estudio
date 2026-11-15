@@ -5,7 +5,7 @@ import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import { FrameProvider } from "../engine";
 import { ThemeProvider, dark, editorial, neon, neutral, papel } from "../themes";
 import type { Theme } from "../themes";
-import { Closing, Interlude, InterludeCompact, Opening, closingFrames, interludeCompactFrames, interludeFrames, openingFrames } from "./index";
+import { Closing, Interlude, InterludeCompact, Opening, closingFrames, interludeCompactFrames, interludeFrames, interludeRevealFrames, openingFrames } from "./index";
 import type { StorySpec } from "./index";
 import { CheckMark, Chip, HeadlineRow, Pill } from "./shared";
 import { listLayout } from "./layout";
@@ -59,6 +59,15 @@ PIECES["Interlude/3 (ultima)"] = { make: () => R(Interlude, { spec: SPEC, done: 
 PIECES["Interlude/2 con tema sin escena"] = { make: () => R(Interlude, { spec: SPEC, done: 1, skip: [1] }), frames: interludeFrames(SPEC) };
 PIECES["Interlude/2 con tema visto sin escena"] = { make: () => R(Interlude, { spec: { ...SPEC, topics: SPEC.topics.map((t, i) => (i === 1 ? { ...t, seen: true } : t)), design: { gradient: { loop: 45 } } }, done: 1, skip: [1] }), frames: interludeFrames(SPEC) };
 PIECES["Interlude/renglon"] = { make: () => R(Interlude, { spec: SPECS.renglon!, done: 2 }), frames: interludeFrames(SPEC) };
+// tema tardío (`reveal: "late"`): apertura y cierre, vuelta común, vuelta de revelación (con una y con dos tildes pendientes) y compacta de revelación
+const LATE: StorySpec = { ...SPEC, topics: [...SPEC.topics, { id: "d", name: "Cuarto, el sorpresa", line: "nunca estuvo en la lista", reveal: "late" }] };
+PIECES["Opening/tardio"] = { make: () => R(Opening, { spec: LATE }), frames: openingFrames(LATE) };
+PIECES["Closing/tardio"] = { make: () => R(Closing, { spec: LATE }), frames: closingFrames(LATE) };
+PIECES["Interlude/tardio, vuelta previa"] = { make: () => R(Interlude, { spec: LATE, done: 2 }), frames: interludeFrames(LATE) };
+PIECES["Interlude/tardio, revelación"] = { make: () => R(Interlude, { spec: LATE, done: 4, ticks: [2] }), frames: interludeRevealFrames(LATE) };
+PIECES["Interlude/tardio, revelación con dos tildes"] = { make: () => R(Interlude, { spec: { ...LATE, design: { list: "inline" } }, done: 4, ticks: [1, 2] }), frames: interludeRevealFrames(LATE) };
+PIECES["Interlude/dos tildes pendientes"] = { make: () => R(Interlude, { spec: SPEC, done: 3, ticks: [1, 2] }), frames: interludeFrames(SPEC) };
+PIECES["InterludeCompact/tardio"] = { make: () => R(InterludeCompact, { spec: LATE, done: 4 }), frames: interludeCompactFrames(LATE) };
 PIECES["InterludeCompact/1"] = { make: () => R(InterludeCompact, { spec: SPEC, done: 1 }), frames: interludeCompactFrames(SPEC) };
 PIECES["InterludeCompact/3"] = { make: () => R(InterludeCompact, { spec: SPEC, done: 3 }), frames: interludeCompactFrames(SPEC) };
 // piezas compartidas: un cuadro fijo, sin animación propia
@@ -100,7 +109,7 @@ const without3d = (markup: string) => markup.replace(/transform:[^;"]*perspectiv
  * esquinas rectas, superficies de contorno, entradas con rebote, números sólidos, filete o punto de acento, fondos de patrón) con las
  * piezas y opciones que cambian de camino (apertura con los tres finales, lista apilada y en un renglón, vuelta compacta, cierre).
  */
-const THEMED = ["Opening/base", "Opening/acople", "Opening/paso", "Opening/vidrio", "Closing/base", "Closing/muro", "Interlude/1", "Interlude/renglon", "Interlude/2 con tema visto sin escena", "InterludeCompact/1", "Chip", "Pill", "HeadlineRow", "CheckMark"];
+const THEMED = ["Opening/base", "Opening/acople", "Opening/paso", "Opening/vidrio", "Closing/base", "Closing/muro", "Interlude/1", "Interlude/renglon", "Interlude/tardio, revelación", "Interlude/2 con tema visto sin escena", "InterludeCompact/1", "Chip", "Pill", "HeadlineRow", "CheckMark"];
 const THEMES: [string, Theme, string[] | null][] = [["neutral", neutral, null], ["dark", dark, THEMED], ["editorial", editorial, THEMED], ["neon", neon, THEMED], ["papel", papel, THEMED]];
 
 for (const [tname, theme, only] of THEMES) describe(`piezas de stories: reposo e historial (tema ${tname})`, () => {

@@ -1,6 +1,6 @@
-# video-estudio: convenciones para agentes
+# Video Studio (`video-estudio`): convenciones para agentes
 
-Herramienta para producir videos animados con un motor propio (TypeScript + React 18). Para hacer un video seguí la skill `.claude/skills/video-estudio/SKILL.md`; las reglas están en `docs/reglas.md`, la guía de escenas en `docs/guia-escenas.md`, el sonido en `docs/audio.md` y el catálogo de efectos listos (`fx/`) en `docs/animaciones.md`: usalo antes de escribir una animación desde cero.
+Video Studio es el nombre visible; repo, paquete, alias `video-estudio/*` y comandos no cambian. Herramienta para producir videos animados con un motor propio (TypeScript + React 18). Para hacer un video seguí la skill `.claude/skills/video-estudio/SKILL.md`; las reglas están en `docs/reglas.md`, la guía de escenas en `docs/guia-escenas.md`, el sonido en `docs/audio.md` y el catálogo de efectos listos (`fx/`) en `docs/animaciones.md`: usalo antes de escribir una animación desde cero.
 
 ## Idioma
 
@@ -11,6 +11,7 @@ Herramienta para producir videos animados con un motor propio (TypeScript + Reac
 
 - **Pureza**: toda escena y toda pieza del kit es una función pura del número de cuadro (`useFrame()`) y de sus props. La lista completa de lo prohibido y permitido (estado, azar, CSS animado, `useId`, canvas, CSS 3D por elemento, texto) está en `docs/reglas.md`, sección "Lista única de determinismo".
 - **Tema**: colores, tipografías, radios, sombras, curvas y tamaños de letra salen de `useTheme()`. Nada de valores de marca ni `#hex` en escenas ni en el kit.
+- **Señalar y animar según el design system**: antes de escribir escenas se lee el design system y se anota en el guion qué señales, efectos y transiciones se usan y cuáles no (`docs/guia-escenas.md`, sección 16). No se usan flechas ni garabatos por costumbre: `Callout` dibuja la señal del tema (`style.annotation.mark`), o ninguna. Afinidad de cada efecto: `docs/animaciones.md`.
 - **Interfaces**: se recrean con su estructura y sus rótulos; no se usan capturas.
 - **Privacidad**: repo público. Sin nombres de empresas, clientes o personas reales, sin credenciales, correos ni dominios internos, en ningún archivo. Cifras emuladas y nombres ficticios por defecto. Lo que la persona dice que no puede aparecer va en `videos/<slug>/prohibidos.txt` y se verifica con `ve-privacy`.
 - **Licencias**: no agregar fuentes, música, imágenes ni marcas sin verificar que su licencia permita usarlas donde se va a mostrar el video y redistribuirlas.

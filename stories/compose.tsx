@@ -2,11 +2,13 @@ import React from "react";
 import { Audio, Fill, Sequence } from "../engine";
 import { StoryStage, useStorySpec } from "./shared";
 import { Closing, closingFrames } from "./Closing";
-import { Interlude, interludeFrames, nextTopic } from "./Interlude";
+import { Interlude, interludeFrames, interludeRevealFrames, nextTopic } from "./Interlude";
 import { InterludeCompact, interludeCompactFrames } from "./InterludeCompact";
 import { Opening, openingFrames } from "./Opening";
 import { TopicContext, headlineDefaults } from "./topic";
-import { isReservedSceneId, validateSpec } from "./types";
+import { planScenes } from "./plan";
+import type { ScenePlan } from "./plan";
+import { isReservedSceneId, validateSpec, withoutLate } from "./types";
 import type { StorySpec, TopicScene } from "./types";
 
 export type TimelineEntry = {
@@ -16,12 +18,16 @@ export type TimelineEntry = {
   durationInFrames: number;
   /** Índice del tema (de `spec.topics`) al que pertenece la entrada: en un tema, el suyo; en una vuelta, el último tema visto. */
   topic?: number;
+  /** Solo en una vuelta: `true` en la que revela el tema tardío (`reveal: "late"`; su id es `interlude-reveal`). */
+  reveal?: boolean;
 };
 
 export type ComposeOptions = {
   /**
    * Vuelta al listado entre un tema y otro: `true` (por defecto) la lista completa con el siguiente tema atravesado (120 cuadros);
-   * `"compact"` una tira de progreso con el tema visto y el que sigue (40 cuadros, mínimo 24); `false` sin vueltas.
+   * `"compact"` una tira de progreso con el tema visto y el que sigue (40 cuadros, mínimo 24); `false` sin vueltas. Una escena puede seguir directo
+   * a la anterior sin vuelta (`topics[i].interludeBefore: false`, o un tema `reveal: "late"`); la vuelta que sigue a un tema tardío (id `interlude-reveal`,
+   * 150 cuadros, `timing.interludeReveal`, mínimo 90) revela su fila.
    */
   interludes?: boolean | "compact";
   /** Pista de audio que cubre todo el video. */
@@ -34,6 +40,10 @@ export type ComposeOptions = {
  * `scenes` va parejo a `spec.topics` (mismo orden). Un tema sin escena se indica con `null` (o `undefined`): sale en la lista de la apertura y
  * en el cierre (con `topic.thumbnail` o la tarjeta por defecto), se saltea en el medio y no tiene vuelta al listado. Una lista vacía vale
  * por "ningún tema tiene escena" (solo apertura y cierre).
+ *
+ * La duración de cada escena es la de su entrada en `scenes` (`durationInFrames`), no la que declare la escena por su cuenta: una entrada más corta
+ * que lo que la escena dibuja la corta (útil para cortar antes de su salida cuando la escena que sigue continúa el movimiento).
+ * A cada escena le llega `useTopic().handoff` (`"list"`, `"next-scene"` o `"closing"`) y `arrival` (`"opening"`, `"list"` o `"previous-scene"`).
  */
 export function composeStory(
   spec: StorySpec,
@@ -58,13 +68,22 @@ export function composeStory(
   }
   const withInterludes = opts.interludes ?? true;
   const compact = withInterludes === "compact";
+  const plans = planScenes(spec, scenes.map((s) => s !== null), withInterludes);
+  const planOf = new Map<number, ScenePlan>(plans.map((p) => [p.topic, p]));
+  spec.topics.forEach((t, i) => {
+    if (t.reveal === "late" && !scenes[i]) throw new Error(`composeStory: el tema "${t.id}" es reveal: "late" y necesita escena (se revela después de ella)`);
+    if (t.reveal === "late" && !plans.some((p) => p.topic < i)) throw new Error(`composeStory: el tema "${t.id}" es reveal: "late" y necesita una escena anterior a la que seguir`);
+    if (t.interludeBefore === false && scenes[i] && !plans.some((p) => p.topic < i)) throw new Error(`composeStory: topics[${i}].interludeBefore: false no tiene efecto en el primer tema con escena (sigue a la apertura)`);
+  });
   const timeline: TimelineEntry[] = [];
   // Índice de tema de cada entrada (y, en las vueltas al listado, cuántos temas van hechos): se arma acá, no se deduce del id.
   const topicOf: number[] = [];
+  const ticksOf: (number[] | undefined)[] = [];
   let at = 0;
-  const push = (id: string, kind: TimelineEntry["kind"], d: number, topic = -1) => {
-    timeline.push({ id, kind, from: at, durationInFrames: d, ...(kind === "topic" ? { topic } : kind === "interlude" ? { topic: topic - 1 } : {}) });
+  const push = (id: string, kind: TimelineEntry["kind"], d: number, topic = -1, extra: { reveal?: boolean; ticks?: number[] } = {}) => {
+    timeline.push({ id, kind, from: at, durationInFrames: d, ...(kind === "topic" ? { topic } : kind === "interlude" ? { topic: topic - 1 } : {}), ...(extra.reveal ? { reveal: true } : {}) });
     topicOf.push(topic);
+    ticksOf.push(extra.ticks);
     at += d;
   };
   // índices de los temas sin escena y primer tema con escena (el que cierra la apertura)
@@ -75,7 +94,14 @@ export function composeStory(
   scenes.forEach((s, i) => {
     if (!s) return;
     push(s.id, "topic", s.durationInFrames, i);
-    if (withInterludes) push(`interlude-${++lap}`, "interlude", compact ? interludeCompactFrames(spec) : interludeFrames(spec), i + 1);
+    const after = planOf.get(i)!.interlude;
+    if (!after) return;
+    // la vuelta que revela el tema tardío es la del tema tardío (`done` = todos); en vueltas compactas dura lo que una compacta
+    const reveal = after.kind === "reveal";
+    const d = compact ? interludeCompactFrames(spec) : reveal ? interludeRevealFrames(spec) : interludeFrames(spec);
+    // varias tildes en una vuelta solo cuando alguna escena anterior siguió directo a esta (lo común es una: la del último tema visto)
+    const ticks = after.ticks.length > 1 || reveal ? after.ticks : undefined;
+    push(reveal ? "interlude-reveal" : `interlude-${++lap}`, "interlude", d, i + 1, { reveal, ticks });
   });
   push("closing", "closing", closingFrames(spec));
 
@@ -90,15 +116,15 @@ export function composeStory(
           else if (e.kind === "closing") body = <Closing spec={spec} scenes={scenes} />;
           else if (e.kind === "interlude") {
             const done = topicOf[k]!;
-            const next = nextTopic(spec.topics.length, done, skip);
-            body = compact ? <InterludeCompact spec={spec} done={done} skip={skip} next={next} /> : <Interlude spec={spec} done={done} skip={skip} next={next} />;
+            const next = nextTopic(withoutLate(spec).topics.length, done, skip);
+            body = compact ? <InterludeCompact spec={spec} done={done} skip={skip} next={next} /> : <Interlude spec={spec} done={done} skip={skip} next={next} ticks={ticksOf[k]} thumbnail={e.reveal === true ? scenes[done - 1]?.thumbnail ?? spec.topics[done - 1]?.thumbnail : undefined} />;
           }
           else {
             const topic = topicOf[k]!;
             const t = spec.topics[topic]!;
             const Scene = scenes[topic]!.component;
             body = (
-              <TopicContext.Provider value={{ index: topic, name: t.name, line: t.line, docked: topic === first && rs.design?.handoff === "dock", headline: headlineDefaults(rs) }}>
+              <TopicContext.Provider value={{ index: topic, name: t.name, line: t.line, docked: topic === first && rs.design?.handoff === "dock", headline: headlineDefaults(rs), handoff: planOf.get(topic)!.handoff, arrival: planOf.get(topic)!.arrival }}>
                 <StoryStage cloud={rs.design?.clouds}>
                   <Scene />
                 </StoryStage>

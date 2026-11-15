@@ -5,3 +5,6 @@ export const CLOSING_FRAMES = 480;
 /** Vuelta al listado compacta (`interludes: "compact"`): duración por defecto y mínimo documentado (cuadros). */
 export const INTERLUDE_COMPACT_FRAMES = 40;
 export const MIN_COMPACT_FRAMES = 24;
+/** Vuelta con revelación del tema tardío (`topics[i].reveal: "late"`): duración por defecto y mínimo documentado (cuadros). */
+export const INTERLUDE_REVEAL_FRAMES = 150;
+export const MIN_REVEAL_FRAMES = 90;

@@ -25,11 +25,16 @@ const ESTILO: ThemeStyleInput = {
   // Texto: pesos (`regular` | `medium` | `semibold` | `stat`), interletrado, mayúsculas de los rótulos, y cómo se ven los números y la palabra resaltada.
   type: { titleWeight: "semibold", labelWeight: "medium", titleTracking: 0, eyebrowCase: "as-is", eyebrowTracking: 0, numerals: "gradient", highlight: "gradient" },
   // Fondo: `clouds` | `plain` | `grid` | `dots` | `gradient` | `noise`, con su intensidad de 0 a 1.
-  background: { kind: "clouds", intensity: 1 },
-  // Movimiento: cómo entran las cosas (`auto` deja la de cada pieza), rebote, paso entre elementos (cuadros), desenfoque y transición entre escenas.
-  motion: { entrance: "auto", overshoot: 0, stagger: 4, cameraBlur: true, cameraTilt: 1, transition: "wash" },
-  // Decoración: garabatos y su trazo (`hand` | `geometric`), viñeta (0 la apaga), marca de acento (`bar` | `underline` | `dot` | `none`).
-  decor: { doodles: true, doodleStroke: "hand", vignette: 1, accent: "bar", gradientLoop: 0 },
+  // `drift`: cuánto derivan las nubes (1 = casi quietas, 0 = quietas, 2 a 3 se nota).
+  background: { kind: "clouds", intensity: 1, drift: 1 },
+  // Movimiento: cómo entran las cosas (`auto` deja la de cada pieza), rebote, paso entre elementos (cuadros), desenfoque, transición entre escenas (`wash` | `through` | `cut` | `wipe`) y salida de la cámara (`dive` atraviesa un elemento | `settle` empuja con suavidad).
+  motion: { entrance: "auto", overshoot: 0, stagger: 4, cameraBlur: true, cameraTilt: 1, transition: "wash", exit: "dive" },
+  // Señal: cómo señala algo el design system (`Callout` la dibuja): `hand` | `arrow` | `elbow` | `bracket` | `tag` | `ring` | `focus` | `underline` | `none`; `dim`: cuánto atenúa `focus`.
+  // Sin este grupo el tema usa `auto` (se deriva de `decor`: con `doodleStroke: "hand"`, trazo a mano). `neutral` señala con flecha recta.
+  annotation: { mark: "arrow", dim: 0.55 },
+  // Decoración: carácter del design system (`auto` | `geometrico-sobrio` | `editorial` | `ludico-manual` | `tecnico-oscuro`: sirve para elegir efectos; `auto` lo deduce),
+  // garabatos y su trazo (`hand` | `geometric`; solo para sistemas de trazo a mano), viñeta (0 la apaga), marca de acento (`bar` | `underline` | `dot` | `none`).
+  decor: { character: "auto", doodles: true, doodleStroke: "hand", vignette: 1, accent: "bar", gradientLoop: 0 },
   // Gráficos: radio de las barras, grosor de línea, guías (`auto` | `on` | `off`) y relleno (`solid` | `gradient` | `hatched`).
   chart: { barRadius: "md", lineWidth: 5, grid: "auto", fill: "solid" },
   // Opcionales, para los efectos de `fx/`: `line` (grosor, guías, halo), `solid` (relleno y aristas de los sólidos), `depth` (volumen),

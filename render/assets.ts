@@ -8,7 +8,7 @@
 //   4. Después, el bundle y `public/`.
 // Gana el primero que tenga el archivo. Solo se incluyen las carpetas que existen.
 import { readdirSync, statSync } from 'node:fs';
-import { delimiter, join, resolve } from 'node:path';
+import { delimiter, extname, join, resolve } from 'node:path';
 
 const isDir = (p: string) => {
   try {
@@ -60,3 +60,9 @@ export function autoAssetDirs(root: string, source?: string | null, videosDir: s
 
 /** Lista completa de carpetas estáticas en orden de prioridad (sin el bundle ni `public/`, que van al final). */
 export const assetDirsFor = (root: string, explicit: string[], source?: string | null): string[] => [...new Set([...explicit.filter(isDir), ...autoAssetDirs(root, source)])];
+
+/** Extensiones de audio: el contenido del audio no cambia ningún cuadro, así que no entra en la clave de la cache de partes de video (ver `render.ts`). */
+export const EXTENSIONES_DE_AUDIO: ReadonlySet<string> = new Set(['.wav', '.mp3', '.m4a', '.aac', '.ogg', '.oga', '.opus', '.flac', '.aif', '.aiff', '.wma']);
+
+/** `true` si la ruta es un archivo de audio (por la extensión, sin mirar mayúsculas ni lo que viene después de `?`). */
+export const esArchivoDeAudio = (ruta: string): boolean => EXTENSIONES_DE_AUDIO.has(extname(ruta.split(/[?#]/)[0]!).toLowerCase());

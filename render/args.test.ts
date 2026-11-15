@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { parseCliArgs } from './args';
+import { parseCliArgs, parseTiempo } from './args';
 
 describe('parseCliArgs', () => {
   it('uses defaults', () => {
@@ -33,5 +33,25 @@ describe('parseCliArgs', () => {
   });
   it('handles --help without videoId', () => {
     expect(parseCliArgs(['--help']).help).toBe(true);
+  });
+
+  it('audio: tasa del AAC y pico máximo del audio codificado', () => {
+    expect(parseCliArgs(['v'])).toMatchObject({ audioBitrate: '192k', audioPeakMax: -1, audioPeakStrict: false, audioPeakCheck: true });
+    expect(parseCliArgs(['v', '--audio-bitrate', '256k', '--audio-peak-max', '-2.5', '--audio-peak-strict'])).toMatchObject({ audioBitrate: '256k', audioPeakMax: -2.5, audioPeakStrict: true });
+    expect(parseCliArgs(['v', '--audio-peak-max=-3', '--no-audio-peak-check']).audioPeakMax).toBe(-3);
+    expect(parseCliArgs(['v', '--audio-peak-max', '-3', '--frames', '1-5'])).toMatchObject({ audioPeakMax: -3, frames: [1, 5] });
+    expect(() => parseCliArgs(['v', '--audio-bitrate', 'mucho'])).toThrow(/--audio-bitrate/);
+    expect(() => parseCliArgs(['v', '--audio-peak-max', '9'])).toThrow(/--audio-peak-max/);
+    expect(() => parseCliArgs(['v', '--audio-peak-strict', '--no-audio-peak-check'])).toThrow(/contradicen/);
+  });
+  it('--seconds: tramo en segundos o m:ss, sin combinarse con --frames ni --scene', () => {
+    expect(parseCliArgs(['v', '--seconds', '12.5-20']).seconds).toEqual([12.5, 20]);
+    expect(parseCliArgs(['v', '--seconds', '1:30-2:05.5']).seconds).toEqual([90, 125.5]);
+    expect(parseTiempo('t', '1:02:03')).toBe(3723);
+    expect(() => parseCliArgs(['v', '--seconds', '20-10'])).toThrow(/mayor/);
+    expect(() => parseCliArgs(['v', '--seconds', '10'])).toThrow(/a-b/);
+    expect(() => parseCliArgs(['v', '--seconds', 'a-b'])).toThrow(/tiempo/);
+    expect(() => parseCliArgs(['v', '--seconds', '1-2', '--frames', '1-2'])).toThrow(/no se combina/);
+    expect(() => parseCliArgs(['v', '--seconds', '1-2', '--scene', 'x'])).toThrow(/no se combina/);
   });
 });

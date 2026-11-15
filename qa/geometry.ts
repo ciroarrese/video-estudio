@@ -1,4 +1,4 @@
-import type { ElementInfo, Rect, TextRun } from './types';
+import type { ClipBox, ElementInfo, Rect, TextRun } from './types';
 
 export const area = (r: Rect) => Math.max(0, r.w) * Math.max(0, r.h);
 
@@ -70,3 +70,20 @@ export const ink = (r: Rect, k: number): Rect => ({ x: r.x, y: r.y + (r.h * (1 -
 /** Largest edge displacement between two rects (px). */
 export const rectShift = (a: Rect, b: Rect) =>
   Math.max(Math.abs(a.x - b.x), Math.abs(a.y - b.y), Math.abs(a.x + a.w - (b.x + b.w)), Math.abs(a.y + a.h - (b.y + b.h)));
+
+/**
+ * Parte de una línea de texto que se ve: la recortan los ancestros con overflow oculto (en los ejes que recortan). Un recorte del
+ * tamaño del cuadro no cuenta (es el escenario o la cámara: el borde del cuadro es asunto de `offscreen`). `null` si no queda nada
+ * visible. Sirve a las reglas que miran DÓNDE cae el texto (`offscreen`, `safe-area`): un dígito vecino de un carrete que asoma por
+ * encima de su ventana no invade nada, porque lo que pasa de la ventana no se dibuja.
+ */
+export function visibleLine(line: Rect, clips: readonly ClipBox[], width: number, height: number): Rect | null {
+  let cur: Rect | null = line;
+  for (const c of clips) {
+    if (c.rect.x <= 1 && c.rect.y <= 1 && c.rect.x + c.rect.w >= width - 1 && c.rect.y + c.rect.h >= height - 1) continue;
+    const box: Rect = { x: c.ox ? c.rect.x : -1e9, y: c.oy ? c.rect.y : -1e9, w: c.ox ? c.rect.w : 2e9, h: c.oy ? c.rect.h : 2e9 };
+    cur = intersect(cur, box);
+    if (!cur) return null;
+  }
+  return cur;
+}

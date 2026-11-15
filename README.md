@@ -1,4 +1,6 @@
-# video-estudio
+# Video Studio
+
+Video Studio es el nombre con que se presenta la herramienta; el repo, el paquete npm, el alias de import (`video-estudio/*`), la skill y los comandos siguen llamándose `video-estudio` (el nombre del repo lo cambia su dueño por su cuenta).
 
 Herramienta para producir videos animados de nivel profesional a partir de un cuestionario, con el design system como tema intercambiable. El motor es propio: cada video es una función del número de cuadro, Chromium captura cada cuadro y ffmpeg arma el MP4. Pensada para que un agente de código (Claude Code) la maneje de punta a punta cuando alguien dice "haceme un video".
 
@@ -23,28 +25,30 @@ npm run render -- --list                   # videos descubiertos (examples/* y v
 npm run render -- hello --format vertical  # vertical (1080x1920 / 720x1280); también cuadrado
 npm run sheet -- hello --format vertical --count 8   # out/hello-vertical-sheet.png
 npm run render -- story-demo --list-scenes # escenas con nombre; --scene <id|índice> renderiza solo una
+npm run render -- kit-demo --seconds 1:30-2:05 # un extracto con su sonido (también --frames a-b); --audio-peak-strict falla si el AAC se pasa de -1 dBTP
+npm run exec -- /ruta/al/script.ts           # corre un script de afuera que importa video-estudio/* (sin tsconfig propio)
 npm run qa -- story-demo --list-scenes     # lo mismo y, en una historia, el presupuesto de cuadros por bloque
 npm run sheet -- fx-text --count 8         # galería del catálogo de efectos (también fx-3d y fx-data-ui-art)
 ```
 
-Catálogo de efectos listos (texto, 3D, datos, interfaz y arte): [docs/animaciones.md](docs/animaciones.md), con tres galerías para verlos: `fx-text`, `fx-3d` y `fx-data-ui-art` (`/?video=fx-3d&props={"theme":"dark"}`). Sonido (tempo, empalme al compás, efectos propios y mezcla): [docs/audio.md](docs/audio.md). Otros ejemplos: `hello`, `fx-in-scene` (regresión: efectos montados desde el cuadro 0 dentro de una escena, sin residuos antes de su `start` ni después de terminar), `story-demo` (historia con apertura, vueltas al listado y cierre), `qa-defects` (defectos sembrados para probar el QA). Un video roto no deja inservibles a los demás (solo falla el que tiene el problema) y los tamaños tienen que ser pares. Cada comando y sus opciones: [render/README.md](render/README.md) y [qa/README.md](qa/README.md) (con el criterio de severidad de `offscreen` y del velo en `contrast`). Pruebas y tipos: `npm run typecheck`, `npm test` (rápidas, 1 a 2 minutos) y `npm run test:e2e` (lentas, unos 10 minutos: `--check` por escena de varias historias; solo hace falta si se toca el toolkit).
+Catálogo de efectos listos (texto, 3D, datos, interfaz y arte): [docs/animaciones.md](docs/animaciones.md), con tres galerías para verlos: `fx-text`, `fx-3d` y `fx-data-ui-art` (`/?video=fx-3d&props={"theme":"dark"}`), y `fx-muro`, un muestrario en baldosas chicas con todos los efectos en lazo (`Loop`), `density="auto"` y una escena anidada (`NestedScene`). Para señalar algo: `Callout` (la forma la decide el design system, `annotation-demo` la muestra bajo los cinco temas). Sonido (tempo, empalme al compás, efectos propios y mezcla): [docs/audio.md](docs/audio.md). Otros ejemplos: `hello`, `fx-in-scene` (regresión: efectos montados desde el cuadro 0 dentro de una escena, sin residuos antes de su `start` ni después de terminar), `story-demo` (historia con apertura, vueltas al listado y cierre), `qa-defects` (defectos sembrados para probar el QA). Un video roto no deja inservibles a los demás (solo falla el que tiene el problema) y los tamaños tienen que ser pares. Cada comando y sus opciones: [render/README.md](render/README.md) y [qa/README.md](qa/README.md) (con el criterio de severidad de `offscreen` y del velo en `contrast`). Pruebas y tipos: `npm run typecheck`, `npm test` (rápidas, 1 a 2 minutos) y `npm run test:e2e` (lentas, unos 10 minutos: `--check` por escena de varias historias; solo hace falta si se toca el toolkit).
 
 ## Mapa de carpetas
 
 | Carpeta | Qué hay |
 |---|---|
 | `engine/` | Reloj de cuadros, interpolación, azar determinista, secuencias, audio, espera de recursos, página runtime |
-| `kit/` | Cámara, cursor, garabatos, titular que se aparta, vuelo de tarjetas, velo, números que cuentan |
+| `kit/` | Cámara, cursor, `Callout` (señal del design system) y `FocusGroup`, titular que se aparta, vuelo de tarjetas, velo, números que cuentan, escena anidada (`NestedScene`) y los garabatos para sistemas de trazo a mano |
 | `themes/` | Tema neutro y oscuro, tres design systems de ejemplo (`editorial`, `neon`, `papel`), adaptador de tokens, capa de estilo (`theme.style`) y chequeo de contraste y de estilo |
 | `fx/` | Catálogo de efectos listos y deterministas: texto, 3D, datos, interfaz y arte (`docs/animaciones.md`) |
 | `stories/` | Apertura, vuelta al listado y cierre armados desde un solo objeto de configuración, con su presupuesto de cuadros (`storyBudget`) |
 | `audio/` | `tempo`, `empalme`, `efectos` y `mezcla` (`npm run audio -- <comando>`); ver `docs/audio.md` |
 | `render/` | `ve-render`: captura con Chromium y MP4 con ffmpeg, en paralelo y por partes |
 | `qa/` | `ve-qa`, `ve-sheet`, `ve-privacy`: control de calidad, hoja de cuadros y privacidad |
-| `examples/` | Videos cortos genéricos con datos ficticios, las galerías del catálogo (`fx-text`, `fx-3d`, `fx-data-ui-art`) y `fx-in-scene` |
+| `examples/` | Videos cortos genéricos con datos ficticios, las galerías del catálogo (`fx-text`, `fx-3d`, `fx-data-ui-art`), el muestrario `fx-muro`, `annotation-demo` y `fx-in-scene` |
 | `templates/` | Escena e historia de arranque (con `nuevo.sh` para copiarlas) |
 | `docs/` | Reglas de producción (con la lista de determinismo), guía de escenas, catálogo de animaciones, sonido, origen del motor |
-| `.claude/` | Skill `video-estudio` (cuestionario y etapas con aprobación) |
+| `.claude/` | Skill `video-estudio` (Video Studio: cuestionario y etapas con aprobación) |
 | `videos/` | Los videos que se producen (`videos/<slug>/`). No existe en un clon nuevo: lo crea la skill (o `templates/nuevo.sh`) y se descubre solo |
 | `public/` | Fuentes, imágenes y música con licencia, referenciadas con `asset()` |
 
@@ -57,7 +61,7 @@ Abrí el repo con Claude Code y pedí lo que necesitás: "haceme un video de pre
 2. **Tema (el design system va primero)**: tokens, informe del adaptador, estilo elegido (esquinas, superficies, números, fondo, movimiento: `docs/estilo.md`) y una hoja de la historia de arranque bajo ese estilo. Las escenas no deciden forma ni movimiento: usan las ayudas del tema.
 3. **Guion** por escena (tiempos, qué se ve, efecto, texto, fuente).
 4. **Escenas de a una**, con QA, privacidad, hoja de cuadros y un MP4 de esa escena.
-5. **Armado**: apertura, vueltas al listado, cierre, sonido (efectos, música, mezcla), render final y verificación.
+5. **Armado, sonido y entrega**, con tres altos: el video armado y mudo (apertura, vueltas al listado, cierre), el sonido (efectos, música, mezcla) y la entrega (verificación completa y render final).
 
 Cada etapa exige lo anterior aprobado: sobre todo, el guion (con su presupuesto de cuadros) antes que cualquier escena.
 

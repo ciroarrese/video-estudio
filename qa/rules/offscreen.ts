@@ -1,4 +1,4 @@
-import { describe, hiddenFraction, ignored, intersect, isHuge, protrusion } from '../geometry';
+import { describe, hiddenFraction, ignored, intersect, isHuge, protrusion, visibleLine } from '../geometry';
 import type { Finding, Rule } from '../types';
 
 /**
@@ -23,7 +23,9 @@ export const offscreenRule: Rule = {
     const seen = new Set<number>();
     for (const r of runs) {
       if (r.opacity < t.minOpacity || ignored(r, 'offscreen') || (r.decor && !r.decorMain) || seen.has(r.elId) || isHuge(r.rect, width, height, t.maxFrames)) continue;
-      for (const line of r.lines) {
+      for (const full of r.lines) {
+        const line = visibleLine(full, r.clips, width, height); // la parte que recorta un ancestro con overflow oculto no se dibuja
+        if (!line) continue;
         if (!intersect(line, box)) continue; // fully outside: leaving on purpose
         const px = protrusion(line, box);
         if (px <= t.tolerancePx) continue;

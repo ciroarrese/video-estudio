@@ -43,6 +43,8 @@ const base: Theme = {
   },
   cloud: { colors: ["#3b5bdb", "#7048e8", "#0c8599"], opacity: 0.18 },
   data: {},
+  // Señal sobria: una flecha recta con cabeza. El trazo a mano es del design system que lo pide (`papel`), no del tema por defecto.
+  style: { annotation: { mark: "arrow" } },
 };
 
 export const neutral: ResolvedTheme = deepFreeze(resolveTheme(base));

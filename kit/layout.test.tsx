@@ -4,7 +4,7 @@ import { describe, expect, it } from "vitest";
 import { FrameProvider } from "../engine";
 import { ThemeProvider, dark, editorial, neon, neutral, papel } from "../themes";
 import type { Theme } from "../themes";
-import { Callout, calloutPlacement, calloutState, cameraKeepClear, cameraView, coveredOpacity, headlineStrip, placeBeside, textWidth } from "./index";
+import { Callout, focusOpacity, calloutPlacement, calloutState, cameraKeepClear, cameraView, coveredOpacity, headlineStrip, placeBeside, textWidth } from "./index";
 import type { Rect } from "./index";
 
 const config = { fps: 30, width: 1920, height: 1080, durationInFrames: 300 };
@@ -156,5 +156,53 @@ describe("Callout", () => {
     expect(boxed.covers.length).toBeGreaterThan(0);
     const clear = calloutPlacement(theme, { target, text: "Mirá acá", avoid: [labels[0]!] });
     expect(clear.covers).toEqual([]);
+  });
+});
+
+describe("Callout: una forma por señal del design system", () => {
+  const target: Rect = { x: 500, y: 400, w: 300, h: 200 };
+  const base = { target, text: "Mirá acá", range: [10, 60] as [number, number] };
+  const marks = ["hand", "arrow", "elbow", "bracket", "tag", "ring", "focus", "underline", "none"] as const;
+  it("cada variante dibuja lo suyo y es determinista", () => {
+    const out = new Map<string, string>();
+    for (const v of marks) {
+      const h = ssr(<Callout {...base} variant={v} />, 30, neutral);
+      expect(ssr(<Callout {...base} variant={v} />, 30, neutral)).toBe(h);
+      expect(h).toContain("Mirá acá");
+      out.set(v, h);
+    }
+    expect(new Set(out.values()).size).toBe(marks.length);
+    expect(out.get("tag")).not.toContain("<svg");
+    expect(out.get("none")).not.toContain("<svg");
+    expect(out.get("arrow")).toContain("<svg");
+    expect(out.get("elbow")).toContain("<circle");
+    expect(out.get("focus")).toContain("<path");
+  });
+  it("sin variante manda el tema: cada design system da una forma distinta", () => {
+    const hs = [neutral, dark, editorial, neon, papel].map((t) => ssr(<Callout {...base} />, 30, t));
+    expect(new Set(hs).size).toBe(5);
+    expect(hs[0]).toContain("<svg"); // arrow
+    expect(hs[4]).toContain("<polyline"); // hand
+  });
+  it("sin texto es solo la señal; con none y sin texto, nada", () => {
+    expect(ssr(<Callout target={target} range={[10, 60]} />, 30, neutral)).toContain("<path");
+    expect(ssr(<Callout target={target} range={[10, 60]} variant="none" />, 30, neutral)).toBe("");
+    expect(ssr(<Callout target={target} range={[10, 60]} variant="underline" />, 30, neutral)).not.toContain("Mirá");
+  });
+  it("en reposo la señal no deja dasharray ni opacidad; mientras se dibuja, sí", () => {
+    expect(ssr(<Callout {...base} variant="ring" />, 30, neutral)).not.toContain("stroke-dasharray");
+    expect(ssr(<Callout {...base} variant="ring" />, 14, neutral)).toContain("stroke-dasharray");
+  });
+  it("focusOpacity atenúa el resto solo con la señal focus", () => {
+    expect(focusOpacity(neutral, 1)).toBe(1);
+    expect(focusOpacity(neutral, 1, "focus")).toBeCloseTo(0.45, 4);
+    expect(focusOpacity(neutral, 0, "focus")).toBe(1);
+    expect(focusOpacity(neon, 1, "focus")).toBeCloseTo(0.3, 4);
+  });
+  it("el aire con el objetivo depende de la señal (la flecha pide más que la etiqueta pegada)", () => {
+    const tag = calloutPlacement(neutral, { target, text: "Mirá acá", variant: "tag" });
+    const arrow = calloutPlacement(neutral, { target, text: "Mirá acá", variant: "arrow" });
+    expect(arrow.x - (target.x + target.w)).toBeGreaterThan(tag.x - (target.x + target.w));
+    expect(arrow.mark).toBe("arrow");
   });
 });

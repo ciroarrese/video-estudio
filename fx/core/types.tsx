@@ -2,6 +2,7 @@ import React from "react";
 import { useFrame } from "../../engine";
 import { resolveStyle, useTheme } from "../../themes";
 import type { Theme, ThemeColors, ThemeStyle } from "../../themes";
+import type { Density } from "./density";
 
 /** Roles de color del tema (sin la serie `chart`). Los efectos aceptan sobrescrituras con estos nombres. */
 export type ColorRole = Exclude<keyof ThemeColors, "chart">;
@@ -27,6 +28,11 @@ export type FxProps = {
   size?: number;
   seed?: string | number;
   style?: React.CSSProperties;
+  /**
+   * Escala de las medidas del efecto que no son su contenido (letra, trazos, márgenes) para cajas chicas: un número o `"auto"` (según `width`/`height`).
+   * Sin ella, el efecto de siempre. Lo implementan los efectos que lo dicen en `docs/animaciones.md` ("Cajas chicas"); en los demás no hace nada.
+   */
+  density?: Density;
 };
 
 export type FxBox = { width: number; height: number };

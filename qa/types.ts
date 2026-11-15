@@ -2,8 +2,8 @@ export type Rect = { x: number; y: number; w: number; h: number };
 
 /** `info`: probably intentional (element in motion, faded out); hidden by default, shown with --verbose. */
 export type Severity = 'error' | 'warn' | 'info';
-export type RuleId = 'clip' | 'offscreen' | 'safe-area' | 'overlap' | 'min-size' | 'contrast' | 'covered' | 'unjudged';
-export const ALL_RULES: RuleId[] = ['clip', 'offscreen', 'safe-area', 'overlap', 'min-size', 'contrast', 'covered', 'unjudged'];
+export type RuleId = 'clip' | 'offscreen' | 'safe-area' | 'overlap' | 'min-size' | 'contrast' | 'covered' | 'unjudged' | 'signal';
+export const ALL_RULES: RuleId[] = ['clip', 'offscreen', 'safe-area', 'overlap', 'min-size', 'contrast', 'covered', 'unjudged', 'signal'];
 
 /** Short, serialisable description of an element (tag, test id, text excerpt, on-screen box). */
 export type ElementInfo = { tag: string; testid: string | null; text: string; rect: Rect; /** DOM child-index path from the stage ("0.2.1"), a fallback id when there is no test id. */ path?: string };
@@ -48,6 +48,8 @@ export type TextRun = {
   decorMain?: boolean;
   /** El texto está bajo `data-qa-fixed-scale` (reproducción a escala fija): queda fuera del estrés de tipografía, no de las reglas. */
   fixedScale?: boolean;
+  /** El texto está bajo un `FocusGroup` que lo atenúa a propósito (`data-qa-focus`, kit/FocusGroup.tsx): su contraste bajo es el efecto buscado (`contrast` lo baja a info). */
+  focusDim?: boolean;
   clips: ClipBox[];
   own: { sw: number; cw: number; sh: number; ch: number; ox: string; oy: string; ellipsis: boolean };
   /**
@@ -77,7 +79,10 @@ export type TextRun = {
   skippedCovers?: number;
 };
 
-export type PageData = { frame: number; width: number; height: number; runs: TextRun[]; elems: Record<string, Rect>; /** Cajas de los elementos `data-qa-fixed-scale` del cuadro. */ fixedRoots?: Rect[]; /** Coverage alpha of the elements in `elems` (same keys). */ opac?: Record<string, number> };
+/** Pieza que señala algo (`data-ve-signal`, kit/signal.ts): qué es, la señal que resuelve el tema (`mark`) y si la escena la forzó. */
+export type SignalMark = { kind: 'callout' | 'doodle' | 'marker' | string; piece: string; mark: string; forced: boolean; tag: string; rect: Rect };
+
+export type PageData = { frame: number; width: number; height: number; runs: TextRun[]; elems: Record<string, Rect>; /** Cajas de los elementos `data-qa-fixed-scale` del cuadro. */ fixedRoots?: Rect[]; /** Coverage alpha of the elements in `elems` (same keys). */ opac?: Record<string, number>; /** Piezas que señalan algo en el cuadro (regla `signal`). */ signals?: SignalMark[] };
 
 /**
  * Resumen de lo que `min-size` reclasificó como "detalle que se lee al acercar" (info): textos por debajo del mínimo en el cuadro
@@ -136,7 +141,7 @@ export type Thresholds = {
   offscreen: { tolerancePx: number; minOpacity: number; maxFrames: number; slipPct: number; /** Rebaba (px) que, con la cámara en movimiento, se informa como info. */ sliverPx: number; /** Desplazamiento mínimo (px) entre cuadros para decir que la cámara se mueve. */ cameraPx: number };
   'safe-area': { margin: number; minOpacity: number };
   overlap: { ratio: number; minOpacity: number; inkHeight: number; maxFrames: number };
-  'min-size': { minPx1080: number; minOpacity: number; tolerancePx: number; /** Cuadros que se miran dentro de la escena para saber si un texto chico se lee al acercar la cámara (0 = no mirar: todo texto chico es error). */ probeFrames: number };
+  'min-size': { minPx1080: number; minOpacity: number; tolerancePx: number; /** Cuadros que se miran dentro de la escena para saber si un texto chico se lee al acercar la cámara (0 = no mirar: todo texto chico es error). Es el mínimo: en escenas largas se mira uno cada `probeEvery` cuadros si eso da más. */ probeFrames: number; /** Un cuadro de prueba cada tantos cuadros de la escena (con tope de 600 por escena); 0 = solo `probeFrames`, sin escalar con la duración. */ probeEvery: number };
   contrast: { error: number; warn: number; largePx1080: number; minOpacity: number };
   covered: { minOpacity: number; maxCoverFraction: number; hiddenFully: number };
   /** `minFraction`: parte de los pixeles de un texto que tiene que cambiar al ocultarlo para decir que se ve (qa/png.ts); `minDiff` esta fijo en png.ts. */
@@ -145,6 +150,6 @@ export type Thresholds = {
   motion: { px: number; crossPx: number };
 };
 
-export type RuleContext = { frame: number; width: number; height: number; runs: TextRun[]; thresholds: Thresholds };
+export type RuleContext = { frame: number; width: number; height: number; runs: TextRun[]; thresholds: Thresholds; signals?: SignalMark[] };
 
 export type Rule = { id: RuleId; description: string; check(ctx: RuleContext): Finding[] };

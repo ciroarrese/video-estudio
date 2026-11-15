@@ -562,6 +562,11 @@ export function themeFromTokensWithReport(
       if (r.ok) setStyle(spec.path, r.value, "options.style");
     }
   }
+  // Compatibilidad: un design system que ya declaraba su política de garabatos (`decor.doodles` o `decor.doodleStroke`) y no dice nada de
+  // `annotation.mark` conserva esa política (`auto`: se deriva de `decor`) en vez de heredar la señal del tema base (`neutral` señala con flecha recta).
+  if ((patch.decor?.doodles !== undefined || patch.decor?.doodleStroke !== undefined) && patch.annotation?.mark === undefined) {
+    (patch.annotation ??= {}).mark = "auto";
+  }
   if (Object.keys(patch).length) theme.style = mergeStyleInput(theme.style, patch as ThemeStyleInput);
   report.style.fallback = STYLE_FIELDS.map((f) => f.path).filter((p) => !(p in report.style.mapped));
 

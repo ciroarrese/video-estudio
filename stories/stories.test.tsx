@@ -210,6 +210,11 @@ describe("no hard-coded colours leak (sentinel theme)", () => {
       for (const f of [0, 150, 200, 240, 300, 390, 440, 479]) assertThemed(html(<Closing spec={s} scenes={scenesN(n)} />, sentinel, f));
     }
   });
+  it("la revelación escenificada (design.reveal: stage) dibuja solo valores del tema", () => {
+    const base = specN(4);
+    const s: StorySpec = { ...base, topics: base.topics.map((t, i) => (i === 3 ? { ...t, reveal: "late" as const } : t)), design: { reveal: "stage" }, timing: { interludeReveal: 200 } };
+    for (const f of [0, 20, 50, 60, 70, 90, 100, 110, 125, 136, 146, 152, 156, 166, 185, 199]) assertThemed(html(<Interlude spec={s} done={4} ticks={[2]} />, sentinel, f));
+  });
   it("the demo story only draws theme values", () => {
     const { component: Story, timeline } = composeStory(demoSpec, demoScenes);
     for (const e of timeline) for (const k of [3, 40, 90, e.durationInFrames - 1]) assertThemed(html(<Story />, sentinel, e.from + Math.min(k, e.durationInFrames - 1)));

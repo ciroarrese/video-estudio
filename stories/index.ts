@@ -1,9 +1,13 @@
-export type { StorySpec, StoryTopic, StoryTiming, StoryDesign, StoryListOptions, TopicScene } from "./types";
-export { validateSpec, parseRich, plainRich, MIN_TOPICS, MAX_TOPICS } from "./types";
+export type { StorySpec, StoryTopic, StoryTiming, StoryDesign, StoryListOptions, TopicScene, TopicHandoff, TopicArrival } from "./types";
+export { validateSpec, parseRich, plainRich, MIN_TOPICS, MAX_TOPICS, lateStart, withoutLate } from "./types";
+export { planScenes, continuesIntoScene } from "./plan";
+export type { ScenePlan, InterludePlan } from "./plan";
+export { storyCues } from "./cues";
+export type { StoryCue, StoryCueKind, StoryCueOptions } from "./cues";
 export { Opening, OPENING_FRAMES, openingFrames } from "./Opening";
-export { Interlude, INTERLUDE_FRAMES, interludeFrames, nextTopic } from "./Interlude";
+export { Interlude, INTERLUDE_FRAMES, interludeFrames, INTERLUDE_REVEAL_FRAMES, REVEAL_STAGE_FRAMES, interludeRevealFrames, nextTopic } from "./Interlude";
 export { InterludeCompact, INTERLUDE_COMPACT_FRAMES, interludeCompactFrames } from "./InterludeCompact";
-export { MIN_COMPACT_FRAMES } from "./durations";
+export { MIN_COMPACT_FRAMES, MIN_REVEAL_FRAMES } from "./durations";
 export { Closing, CLOSING_FRAMES, closingFrames, DefaultThumbnail } from "./Closing";
 export { composeStory } from "./compose";
 export type { ComposeOptions, TimelineEntry } from "./compose";

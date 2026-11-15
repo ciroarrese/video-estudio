@@ -3,8 +3,8 @@ import { useFrame, useVideoConfig } from "../../engine";
 import { ThemeProvider, borderWidth, cornerRadius, dark, editorial, entrance, neon, neutral, papel, staggerFrames, surfaceStyle, textStyle, useTheme } from "../../themes";
 import type { Theme } from "../../themes";
 import {
-  CountUp, Cursor, DockedHeadline, DoodleArrow, DoodleCircle, DoodleUnderline, Eyebrow, FlyingCard,
-  GradientText, Stage, Vignette, Wash, World, flyInZ, hideFromScale, kf, textWidth, typed, useCameraAt, zoomThrough,
+  Callout, CountUp, Cursor, DockedHeadline, Eyebrow, FlyingCard,
+  GradientText, Stage, Vignette, Wash, World, flyInZ, hideFromScale, kf, textWidth, typed, useCameraAt, exitThrough,
 } from "../../kit";
 import type { CameraKey } from "../../kit";
 
@@ -44,7 +44,8 @@ const KEYS: CameraKey[] = [
   { f: 300, x: COUNTER.x, y: 480, scale: 1.6 },
 ];
 
-const CAMERA_OPTS = { map: (fr: number, c: { x: number; y: number; scale: number }) => zoomThrough(fr, T.through, c, COUNTER, 40), noBlurFrom: T.through[0] };
+// la salida de la cámara sigue al design system (`motion.exit`: atraviesa el contador, o un empuje suave con `settle`)
+const cameraOpts = (theme: Theme) => ({ map: (fr: number, c: { x: number; y: number; scale: number }) => exitThrough(theme, fr, T.through, c, COUNTER, 40), noBlurFrom: T.through[0] });
 
 /**
  * Panel con título. La superficie (relleno, borde, sombra) es una capa propia, hermana del contenido: se atenúa con `dim` sin tocar el texto
@@ -93,7 +94,7 @@ function Scene({ frame }: { frame: number }) {
   const theme = useTheme();
   const { width, height } = useVideoConfig();
   // Cámara con los valores por defecto del design system (desenfoque en el recorrido, ganancia de inclinación).
-  const cam = useCameraAt(frame, KEYS, CAMERA_OPTS);
+  const cam = useCameraAt(frame, KEYS, cameraOpts(theme));
   const picked = frame >= 126; // after the click
   const left = frame >= T.flight[0];
   const pos = cardPos(PICK);
@@ -171,9 +172,10 @@ function Scene({ frame }: { frame: number }) {
           </div>
         )}
 
-        <DoodleCircle frame={frame} start={96} end={140} id="kd-circle" cx={pos.x + 110} cy={pos.y + 112} rx={130} ry={46} />
-        <DoodleArrow frame={frame} start={152} end={196} id="kd-arrow" x1={pos.x + CARD.w - 40} y1={pos.y - 24} x2={B.x - 20} y2={LANDING.y - 70} bend={0.3} />
-        <DoodleUnderline frame={frame} start={200} end={250} id="kd-under" x={COUNTER.x - 150} y={COUNTER.y + 100} length={300} />
+        {/* Las llamadas son `Callout`: la forma (flecha, codo, corchete, anillo, trazo a mano...) la decide `style.annotation.mark` del design system, no la escena. */}
+        <Callout frame={frame} range={[96, 140]} target={{ x: pos.x, y: pos.y, w: CARD.w, h: CARD.h }} id="kd-card" />
+        <Callout frame={frame} range={[152, 196]} target={{ x: LANDING.x - CARD.w / 2, y: LANDING.y - CARD.h / 2, w: CARD.w, h: CARD.h }} text="Llega acá" prefer={["below", "above"]} id="kd-landing" />
+        <Callout frame={frame} range={[200, 250]} target={{ x: COUNTER.x - 185, y: COUNTER.y - 74, w: 370, h: 160 }} id="kd-counter" />
         <Cursor frame={frame} show={[74, 146]} keys={[[74, 1000, 800], [122, cardCenter(PICK).x + 40, cardCenter(PICK).y + 40], [146, cardCenter(PICK).x + 80, cardCenter(PICK).y + 90]]} clicks={[124]} />
       </World>
       <Vignette amount={zoomIn} />
@@ -183,7 +185,7 @@ function Scene({ frame }: { frame: number }) {
   );
 }
 
-/** Demo genérica del kit: cámara, cursor, garabatos, vuelo, cuenta y atravesado final. */
+/** Demo genérica del kit: cámara, cursor, llamadas (`Callout`), vuelo, cuenta y atravesado final. */
 export function KitDemo({ theme = "neutral" }: KitDemoProps) {
   const frame = useFrame();
   return (

@@ -3,7 +3,7 @@ import { applyMotion, coverKeys } from './motion';
 import { collectRuns, sampleBackgrounds } from './page';
 import { ALL_RULES, type DecorSummary, type DetailSummary, type FixedScaleSummary, type JudgedSummary, type SilencedSummary, type Finding, type RuleId, type Severity } from './types';
 import { addJudged, emptyJudged, runRulesCounted } from './rules';
-import { sampleFrames, type SampleSpec } from './sampling';
+import { anchoredFrames, DEFAULT_PER_SCENE, sampleFrames, type SampleSpec } from './sampling';
 import { openSession, sceneFrames, type Stress } from './session';
 import type { FormatName } from '../engine';
 import { mergeThresholds, type ThresholdOverrides } from './thresholds';
@@ -20,6 +20,12 @@ export type QaOptions = SampleSpec & {
   thresholds?: ThresholdOverrides;
   /** Pages in parallel (default min(cpus, 3)). */
   concurrency?: number;
+  /**
+   * Cuadros por escena con nombre que se suman al muestreo repartido (por defecto 4): anclados al cuadro LOCAL de cada escena, no
+   * cambian cuando cambia la duración del resto del video (ver `anchoredFrames`). 0 = solo el muestreo repartido. Solo en el muestreo
+   * por defecto o con `count` (no con `frames`, `every` ni una escena sola).
+   */
+  perScene?: number;
   /** Carpetas extra de estáticos (`--assets`), como en `render`. */
   assets?: string[];
   /** Borrador: una fuente que no carga solo avisa. */
@@ -49,6 +55,8 @@ export type QaSummary = {
   judged: JudgedSummary;
   /** Estres de tipografia con el que se corrio (si hubo). */
   stress?: Stress;
+  /** De dónde salieron los cuadros: repartidos, anclados a cada escena y cuántas escenas (solo con el muestreo por defecto o `count`). */
+  sampling?: { even: number; anchored: number; perScene: number; scenes: number };
   seconds: number;
 };
 export type QaResult = { findings: Finding[]; summary: QaSummary };
@@ -73,7 +81,16 @@ async function runQaPass(o: QaOptions, honorFixedScale: boolean): Promise<{ resu
   const session = await openSession({ videoId: o.videoId, props: o.props, format: o.format, assets: o.assets, allowMissingFonts: o.allowMissingFonts, stress: o.stress, honorFixedScale, log: o.log });
   try {
     const { meta } = session;
-    const frames = sampleFrames(o, meta.durationInFrames, 24, await sceneFrames(session, o.scene));
+    const range = await sceneFrames(session, o.scene);
+    const perScene = o.perScene ?? DEFAULT_PER_SCENE;
+    if (!Number.isInteger(perScene) || perScene < 0) throw new Error('--per-scene debe ser un entero >= 0');
+    // Cuadros anclados a cada escena (ver `anchoredFrames`): solo con el muestreo por defecto, sin rango ni cuadros pedidos.
+    const porDefecto = !range && o.frames === undefined && o.every === undefined && perScene > 0;
+    const scenesAll = porDefecto ? await session.scenes().catch(() => []) : [];
+    const anchored = porDefecto ? anchoredFrames(scenesAll, meta.durationInFrames, perScene) : [];
+    const frames = sampleFrames(o, meta.durationInFrames, 24, range, anchored);
+    const evenCount = porDefecto && (o.count ?? 24) > 0 ? sampleFrames({ count: o.count }, meta.durationInFrames, 24).length : porDefecto ? 0 : frames.length;
+    const sampling = porDefecto && anchored.length ? { even: evenCount, anchored: anchored.length, perScene, scenes: scenesAll.length } : undefined;
     const workers = Math.max(1, Math.min(o.concurrency ?? Math.min(cpus().length, 3), frames.length));
     const queue = [...frames];
     const findings: Finding[] = [];
@@ -102,7 +119,7 @@ async function runQaPass(o: QaOptions, honorFixedScale: boolean): Promise<{ resu
             neighbours.push(await collectRuns(vp, meta.width, meta.height, keys));
           }
           applyMotion(data, neighbours);
-          const r = runRulesCounted({ frame: f, width: meta.width, height: meta.height, runs: data.runs, thresholds }, rules);
+          const r = runRulesCounted({ frame: f, width: meta.width, height: meta.height, runs: data.runs, thresholds, signals: data.signals }, rules);
           findings.push(...r.findings);
           addJudged(judged, r.judged);
           for (const [rule, c] of Object.entries(r.silenced)) {
@@ -147,7 +164,7 @@ async function runQaPass(o: QaOptions, honorFixedScale: boolean): Promise<{ resu
         byRule, ...(detail ? { detailSmallText: detail } : {}),
         // Las claves de `silenced` se insertan en el orden en que terminan los cuadros (según el paralelismo): se ordenan para que el informe sea idéntico entre corridas.
         ...(Object.keys(silenced).length ? { silenced: Object.fromEntries(Object.entries(silenced).sort(([a], [b]) => a.localeCompare(b))) } : {}),
-        ...(decorTexts.size ? { decor: { texts: decorTexts.size, frames: decorFrames.size } } : {}), judged, ...(o.stress ? { stress: o.stress } : {}),
+        ...(decorTexts.size ? { decor: { texts: decorTexts.size, frames: decorFrames.size } } : {}), judged, ...(o.stress ? { stress: o.stress } : {}), ...(sampling ? { sampling } : {}),
         ...(fixed && !fixed.refuse ? { fixedScale: { texts: fixed.texts, frames: fixed.frames } } : {}), seconds: Math.round((Date.now() - t0) / 100) / 10,
       },
     };

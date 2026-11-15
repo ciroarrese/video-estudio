@@ -1,5 +1,5 @@
 import React from "react";
-import { Easing, lerp, progress, styleKey, xform } from "../core";
+import { Easing, fxDensity, lerp, progress, styleKey, xform } from "../core";
 import { cornerRadius } from "../../themes";
 import { cardSurface, useThreeFx } from "./common";
 import type { ThreeProps } from "./common";
@@ -23,13 +23,17 @@ export function CardFlip(p: CardFlipProps) {
   const cw = p.cardWidth ?? Math.min(width * 0.8, 1000);
   const ch = p.cardHeight ?? Math.min(height * 0.8, 620);
   const sc = Math.min(cw / 620, ch / 400);
+  // `density` (fx/core/density.ts): borde, elevación y, si pasás tus propias caras, la escala a la que se dibujan (se diseñan para la tarjeta de 620 x 400 y
+  // se achican con la tarjeta). Sin `density`, el de siempre.
+  const dk = p.density === undefined ? 1 : fxDensity(p.density, { width: cw, height: ch }, { width: 620, height: 400 });
+  const faces = (node: React.ReactNode) => (dk === 1 ? node : <div style={{ width: cw / dk, height: ch / dk, transform: `scale(${+dk.toFixed(4)})`, transformOrigin: "0 0" }}>{node}</div>);
   const k = progress(local, 6, Math.max(1, duration - 18), Easing.inOut);
   const ang = Math.PI * k;
   const c = Math.cos(ang), s = Math.sin(ang);
   const showFront = c >= 0;
   const sx = Math.max(0.0001, Math.abs(c));
   const grow = 1 + 0.1 * s; // la tarjeta se "acerca" mientras gira
-  const lift = Math.round(lerp(0, 26 * sc, s));
+  const lift = Math.round(lerp(0, 26 * sc * (dk === 1 ? 1 : dk), s));
   const shadeA = 0.28 * s;
   // Los rótulos de relleno bajan con la tarjeta cuando es más chica que el diseño base (620 x 400); en tamaños normales (escala >= 1) quedan en el tamaño del tema.
   const fit = Math.min(1, sc);
@@ -49,7 +53,7 @@ export function CardFlip(p: CardFlipProps) {
     height: ch,
     boxSizing: "border-box",
     // Forma, relleno, borde y sombra del design system (por defecto: radio `lg`, borde de 2 px y sin sombra).
-    ...cardSurface(theme, showFront ? {} : { alt: true, accent: pal.accent }),
+    ...cardSurface(theme, showFront ? {} : { alt: true, accent: pal.accent }, dk),
     overflow: "hidden",
     transform: xform({ y: -lift, scaleX: snap(sx * grow), scaleY: snap(grow) }),
     transformOrigin: "50% 50%",
@@ -62,7 +66,7 @@ export function CardFlip(p: CardFlipProps) {
         key={styleKey(cardStyle)}
         style={cardStyle}
       >
-        {showFront ? p.front ?? placeholder("Anverso", "Primera cara", false) : p.back ?? placeholder("Reverso", "Segunda cara", true)}
+        {showFront ? (p.front ? faces(p.front) : placeholder("Anverso", "Primera cara", false)) : p.back ? faces(p.back) : placeholder("Reverso", "Segunda cara", true)}
         {shadeA > 0.0005 && <div style={{ position: "absolute", inset: 0, background: pal.darkest, opacity: +shadeA.toFixed(4) }} />}
       </div>
     </div>

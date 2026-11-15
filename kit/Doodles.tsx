@@ -1,6 +1,7 @@
 import React from "react";
 import { Easing } from "../engine";
 import { doodleStyle, useTheme } from "../themes";
+import { signalAttrs } from "./signal";
 import { arrowPoints, circlePoints, pointsToArray, pointsToString, underlinePoints } from "./doodle";
 import { kf } from "./kf";
 import { themeEasing, useFrameOr } from "./util";
@@ -36,10 +37,10 @@ function bounds(pts: [number, number][]) {
   return { x1: Math.min(...xs), y1: Math.min(...ys), x2: Math.max(...xs), y2: Math.max(...ys) };
 }
 
-function Svg({ id, fade, box, children }: { id: string; fade: number; box: ReturnType<typeof bounds>; children: React.ReactNode }) {
+function Svg({ id, fade, box, piece, children }: { id: string; fade: number; box: ReturnType<typeof bounds>; piece: string; children: React.ReactNode }) {
   const theme = useTheme();
   return (
-    <svg key={fade >= 0.9995 ? "full" : "part"} style={{ position: "absolute", left: 0, top: 0, overflow: "visible", pointerEvents: "none", opacity: fade >= 0.9995 ? undefined : +fade.toFixed(4), zIndex: 40 }} width={1} height={1}>
+    <svg key={fade >= 0.9995 ? "full" : "part"} {...signalAttrs(theme, "doodle", piece)} style={{ position: "absolute", left: 0, top: 0, overflow: "visible", pointerEvents: "none", opacity: fade >= 0.9995 ? undefined : +fade.toFixed(4), zIndex: 40 }} width={1} height={1}>
       <defs>
         {/* userSpaceOnUse: un trazo perfectamente recto (bbox sin alto) igual se pinta */}
         <linearGradient id={safeId(id)} gradientUnits="userSpaceOnUse" x1={box.x1} y1={box.y1} x2={box.x2} y2={box.y2}>
@@ -75,7 +76,7 @@ export function DoodleCircle({ cx, cy, rx, ry, frame, start, end = 99999, id, bo
   if (!enabled || f < start || fade <= 0) return null;
   const pts = pointsToArray(circlePoints(id, f, cx, cy, rx, ry, boil, jitter));
   return (
-    <Svg id={id} fade={fade} box={bounds(pts)}>
+    <Svg id={id} fade={fade} box={bounds(pts)} piece="DoodleCircle">
       <Stroke id={id} pts={pts} draw={draw} width={width} jitter={jitter} />
     </Svg>
   );
@@ -93,7 +94,7 @@ export function DoodleArrow({ x1, y1, x2, y2, bend = 0.25, frame, start, end = 9
   const ang = Math.atan2(ay - by, ax - bx);
   const head = (d: number): [number, number] => [ax - Math.cos(ang + d) * 22, ay - Math.sin(ang + d) * 22];
   return (
-    <Svg id={id} fade={fade} box={bounds(pts)}>
+    <Svg id={id} fade={fade} box={bounds(pts)} piece="DoodleArrow">
       <polyline points={pointsToString(shown)} fill="none" stroke={`url(#${safeId(id)})`} strokeWidth={width} strokeLinecap={cap} strokeLinejoin={join} />
       {draw > 0.95 && (
         <polyline points={pointsToString([head(0.5), [ax, ay], head(-0.5)])} fill="none" stroke={theme.color.accent2} strokeWidth={width - 1} strokeLinecap={cap} strokeLinejoin={join} />
@@ -108,7 +109,7 @@ export function DoodleUnderline({ x, y, length, frame, start, end = 99999, id, b
   if (!enabled || f < start || fade <= 0) return null;
   const pts = pointsToArray(underlinePoints(id, f, x, y, length, boil, jitter));
   return (
-    <Svg id={id} fade={fade} box={bounds(pts)}>
+    <Svg id={id} fade={fade} box={bounds(pts)} piece="DoodleUnderline">
       <Stroke id={id} pts={pts} draw={draw} width={width} jitter={jitter} />
     </Svg>
   );

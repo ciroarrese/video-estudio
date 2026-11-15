@@ -59,7 +59,8 @@ function assertThemed(markup: string) {
   expect(rest).not.toMatch(HEX);
   expect(rest).not.toMatch(/rgba?\(|hsla?\(/);
   const styles = (rest.match(/(?:style|fill|stroke|stop-color)="[^"]*"/g) ?? []).join(" ");
-  expect(styles.replace(/transparent|none/g, "")).not.toMatch(NAMED);
+  // `white-space` es una propiedad, no un color: se quita antes de buscar nombres de color
+  expect(styles.replace(/white-space:[a-z-]+/g, "").replace(/transparent|none/g, "")).not.toMatch(NAMED);
   const radii = new Set(Object.values(sentinel.radius).map((r) => `${r}px`));
   for (const m of markup.matchAll(/border-radius:([^;"]+)/g)) expect(radii.has(m[1]!.trim()), `border-radius ${m[1]}`).toBe(true);
   const shadows = new Set(Object.values(sentinel.shadow));

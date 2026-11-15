@@ -1,4 +1,4 @@
-import { doodleStyle, textStyle, withAlpha } from "../../themes";
+import { annotationLook, doodleStyle, resolveAnnotationMark, textStyle, withAlpha } from "../../themes";
 import { Easing, random } from "../../engine";
 import { fxBox, progress, roleColor, useFx } from "../core";
 import type { ColorRole, FxProps } from "../core";
@@ -8,6 +8,7 @@ import type { Pt } from "../data/geom";
 export type MarkerKind = "highlight" | "underline" | "circle" | "scribble";
 export type MarkerDrawProps = FxProps & {
   text?: string;
+  /** Sin `kind` lo decide el design system: `type.highlight` (marcador o subrayado) y, si no, la señal de `annotation.mark` (anillo o a mano: círculo; subrayado: subrayado). */
   kind?: MarkerKind;
   color?: ColorRole;
 };
@@ -48,9 +49,11 @@ export function MarkerDraw(p: MarkerDrawProps) {
   const jitter = doodleStyle(theme).jitter;
   const tw = textStyle(theme, "title");
   const asUnderline = style.type.highlight === "underline";
-  const kind = (p.kind ?? "highlight") === "highlight" && asUnderline ? "underline" : p.kind ?? "highlight";
+  const mark = annotationLook(theme).mark;
+  const themed: MarkerKind = style.type.highlight === "marker" ? "highlight" : asUnderline || mark === "underline" ? "underline" : mark === "ring" || mark === "hand" ? "circle" : "highlight";
+  const kind: MarkerKind = p.kind === undefined ? themed : p.kind === "highlight" && asUnderline ? "underline" : p.kind;
   const dur = p.duration ?? 40;
-  const color = roleColor(theme, p.color ?? ((p.kind ?? "highlight") === "highlight" && !asUnderline ? "warning" : "accent"));
+  const color = roleColor(theme, p.color ?? (kind === "highlight" ? "warning" : "accent"));
   const t = Easing.inOut(progress(local, dur * 0.1, dur * 0.8));
   const pts = trimPolyline(markerPoints(kind, w, h, p.seed ?? "marker", jitter), t);
   const sw = kind === "highlight" ? h * 0.82 : kind === "underline" ? h * 0.11 : kind === "circle" ? h * 0.07 : h * 0.09;
@@ -61,7 +64,7 @@ export function MarkerDraw(p: MarkerDrawProps) {
   // en vez de salirse del svg, que recorta lo que desborda.
   const fontSize = Math.min(h * 0.58, (w * 0.94) / (Math.max(1, label.length) * 0.62));
   return (
-    <svg width={w} height={h} viewBox={`0 0 ${w} ${h}`} style={{ display: "block", fontFamily: theme.font.family, ...p.style }}>
+    <svg width={w} height={h} viewBox={`0 0 ${w} ${h}`} data-ve-signal="marker" data-ve-piece="MarkerDraw" data-ve-mark={resolveAnnotationMark(theme)} style={{ display: "block", fontFamily: theme.font.family, ...p.style }}>
       {kind === "highlight" && stroke}
       <text x={w / 2} y={h / 2 + h * 0.2} textAnchor="middle" fontSize={fontSize} fontWeight={tw.fontWeight} {...(tw.letterSpacing ? { letterSpacing: tw.letterSpacing } : {})} fill={theme.color.text}>{label}</text>
       {kind !== "highlight" && stroke}

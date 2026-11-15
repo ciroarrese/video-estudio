@@ -10,8 +10,8 @@
 //
 // "Mismo texto" = misma clave (ruta DOM + etiqueta + testid + texto); "misma escena" = la escena con nombre más chica que contiene el
 // cuadro (o todo el video si no declara escenas). Para saber si se lee en otro cuadro se miran `min-size.probeFrames` cuadros
-// repartidos de la escena (más los muestreados) con el modo liviano de la recolección (sin tapados ni recortes): es un muestreo, así
-// que un acercamiento más breve que el paso entre cuadros mirados puede no verse (subir `--set min-size.probeFrames=N`).
+// repartidos de la escena (más los muestreados; en escenas largas, uno cada `min-size.probeEvery` = 15 cuadros) con el modo liviano de la recolección (sin tapados ni recortes): es un muestreo, así
+// que un acercamiento más breve que el paso entre cuadros mirados puede no verse (`--set min-size.probeEvery=N` lo hace más fino; ver `probeCount`).
 // `probeFrames=0` apaga la regla: todo texto chico es error, como antes.
 import type { SceneInfo } from '../engine';
 import { collectRuns } from './page';
@@ -31,6 +31,20 @@ export function scopeOf(frame: number, scenes: Pick<SceneInfo, 'id' | 'from' | '
     if (!best || to - s.from < best.to - best.from) best = { id: s.id, from: s.from, to };
   }
   return best ?? { id: '', from: 0, to: duration - 1 };
+}
+
+/** Tope de cuadros de prueba por escena cuando escalan con la duración (cada uno es una recolección liviana). */
+export const MAX_PROBE_AUTO = 600;
+
+/**
+ * Cuántos cuadros se miran en una escena de `len` cuadros: al menos `probeFrames`, y en escenas largas uno cada `probeEvery`
+ * (con tope `MAX_PROBE_AUTO`), así un acercamiento de 1 o 2 segundos no se escapa entre dos cuadros mirados aunque la escena dure minutos.
+ * `probeFrames = 0` apaga la regla; `probeEvery = 0` deja exactamente `probeFrames`.
+ */
+export function probeCount(len: number, t: { probeFrames: number; probeEvery: number }): number {
+  if (t.probeFrames <= 0 || len <= 0) return 0;
+  const escalado = t.probeEvery > 0 ? Math.min(MAX_PROBE_AUTO, Math.ceil(len / t.probeEvery)) : 0;
+  return Math.min(len, Math.max(t.probeFrames, escalado));
 }
 
 const scopeKey = (s: Scope) => `${s.id}|${s.from}|${s.to}`;
@@ -61,7 +75,8 @@ export async function probeReadable(
   const vp = await session.openPage();
   try {
     for (const [sk, { scope, keys }] of byScope) {
-      const frames = new Set(evenFrames(scope.to - scope.from + 1, t.probeFrames).map((n) => n + scope.from));
+      const len = scope.to - scope.from + 1;
+      const frames = new Set(evenFrames(len, probeCount(len, t)).map((n) => n + scope.from));
       for (const f of sampled) if (f >= scope.from && f <= scope.to) frames.add(f);
       const best = new Map<string, Readable>();
       for (const f of [...frames].sort((a, b) => a - b)) {

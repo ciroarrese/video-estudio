@@ -25,6 +25,35 @@ export function runFfmpeg(args: string[], stdin?: Buffer): Promise<Buffer> {
   });
 }
 
+/**
+ * Pico verdadero (dBTP, BS.1770, sobremuestreo x4) que informa el resumen del filtro `ebur128` de ffmpeg (`True peak: Peak: -0.6 dBFS`).
+ * Devuelve `-Infinity` si ffmpeg dice `-inf` (silencio) y `null` si no encuentra la línea.
+ */
+export function parsePicoEbur128(salida: string): number | null {
+  const m = /True peak:\s*\n\s*Peak:\s*(-?inf|[-+]?\d+(?:\.\d+)?)\s*dBFS/i.exec(salida);
+  if (!m) return null;
+  return /inf/i.test(m[1]!) ? -Infinity : Number(m[1]);
+}
+
+/**
+ * Mide el pico verdadero del audio YA DECODIFICADO de un archivo (por ejemplo, el mp4 con AAC): un códec con pérdida puede dejar
+ * crestas por encima de las de la mezcla que le entró. Usa el filtro `ebur128` de ffmpeg (sin cargar el audio en memoria).
+ * `null` si el archivo no tiene audio o ffmpeg no dio la medida.
+ */
+export function picoVerdaderoDeArchivo(archivo: string): Promise<number | null> {
+  return new Promise((resolveP, reject) => {
+    const p = spawn('ffmpeg', ['-hide_banner', '-nostdin', '-nostats', '-loglevel', 'info', '-i', resolve(archivo), '-vn', '-af', 'ebur128=peak=true:framelog=quiet', '-f', 'null', '-'], { stdio: ['ignore', 'ignore', 'pipe'] });
+    const err: Buffer[] = [];
+    p.stderr.on('data', (d: Buffer) => err.push(d));
+    p.on('error', (e) => reject(new Error(`No se pudo ejecutar ffmpeg: ${e.message}`)));
+    p.on('close', (code) => {
+      const txt = Buffer.concat(err).toString();
+      if (code !== 0) reject(new Error(`ffmpeg falló al medir el pico (código ${code}): ${txt.slice(-400)}`));
+      else resolveP(parsePicoEbur128(txt));
+    });
+  });
+}
+
 export function hayFfmpeg(): boolean {
   return spawnSync('ffmpeg', ['-version'], { stdio: 'ignore' }).status === 0;
 }

@@ -4,6 +4,7 @@
 import { join } from 'node:path';
 import { analizarEfecto } from './dinamica';
 import { escribirWav16 } from './ffmpeg';
+import { generarMouse } from './mouse';
 
 export const EFECTOS_SR = 48000;
 
@@ -193,7 +194,7 @@ export interface Clic {
 
 /**
  * Variantes del clic de interfaz. Cada una es un sonido distinto (no el mismo con otro filtro): todas
- * sintetizadas con fórmulas propias, mono, de 15 a 120 ms, con pico cerca de -3 dBFS. `actual` es el `clic`
+ * sintetizadas con fórmulas propias, mono, de 15 a 120 ms (el doble clic de mouse dura unos 280), con pico cerca de -3 dBFS. `actual` es el `clic`
  * original (el que se escribe como `clic` si no se elige otro con `efectos --clic <nombre>`).
  */
 export const CLICS: Record<string, Clic> = {
@@ -302,6 +303,31 @@ export const CLICS: Record<string, Clic> = {
       return terminar(x, sr, PICO_CLIC);
     },
   },
+  mouse: {
+    descripcion: 'Clic de mouse de oficina: bajada y subida del botón (95 ms entre una y otra), cada una un chasquido seco con el repiqueteo de la carcasa.',
+    cuando: 'El clic del cursor en demos de software: es el sonido de un mouse de verdad, no un aviso de interfaz.',
+    generar: (sr) => generarMouse(sr, 'normal'),
+  },
+  'mouse-suave': {
+    descripcion: 'Clic de mouse silencioso: bajada y subida más sordas, con menos agudos y el ataque blando.',
+    cuando: 'Música tranquila o muchos clics seguidos: se siente como un mouse con interruptor silencioso y no cansa.',
+    generar: (sr) => generarMouse(sr, 'suave'),
+  },
+  'mouse-marcado': {
+    descripcion: 'Clic de microinterruptor mecánico: más agudo y seco, con la subida tan fuerte como la bajada, o un poco más.',
+    cuando: 'Cuando el clic tiene que oírse entre música con percusión, o para un mouse gamer.',
+    generar: (sr) => generarMouse(sr, 'marcado'),
+  },
+  'mouse-apretar': {
+    descripcion: 'Solo la bajada del botón de un mouse de oficina: un chasquido seco sin la subida.',
+    cuando: 'Clics rápidos del cursor, en ráfaga o sobre un cuadro corto, donde la subida embarraría.',
+    generar: (sr) => generarMouse(sr, 'normal', { subida: false }),
+  },
+  'mouse-doble': {
+    descripcion: 'Doble clic de mouse de oficina: dos clics completos separados por unos 200 ms.',
+    cuando: 'Abrir un archivo o una carpeta, o seleccionar una palabra.',
+    generar: (sr) => generarMouse(sr, 'normal', { clics: 2, entreClicsMs: 200 }),
+  },
   cinta: {
     descripcion: 'Clic de cinta: ráfaga acotada en banda, con un poco de saturación y sin agudos ni graves extremos.',
     cuando: 'Música lo-fi cálida: se mezcla con el grano de la música en lugar de destacar.',
@@ -319,6 +345,122 @@ export const CLICS: Record<string, Clic> = {
     },
   },
 };
+
+/** Pico de los barridos alternativos: -6 dBFS (a propósito, más bajo que el resto de los efectos). */
+const PICO_BARRIDO = 0.501;
+
+export interface Barrido {
+  descripcion: string;
+  /** Cuándo conviene (una línea). */
+  cuando: string;
+  /** Ganancia de cue recomendada (multiplicador lineal sobre el archivo, que ya tiene el pico en -6 dBFS). */
+  gainRecomendado: number;
+  generar: Gen;
+}
+
+/** Ruido pasabanda sobre `n` muestras con frecuencia central `fc(i)`, amortiguación `q` (más alta = más ancha), suavizado por pasabajos y pasaaltos. */
+function aireFiltrado(n: number, sr: number, semilla: number, fc: (u: number) => number, q: number, techoHz: number, pisoHz: number): Float32Array {
+  const y = ruidoBanda(n, sr, semilla, (i) => fc(i / n), q);
+  pasaBajos(y, sr, techoHz, 2);
+  pasaAltos(y, sr, pisoHz);
+  return y;
+}
+
+/**
+ * Variantes del barrido (la transición). `actual` es el `barrido` original; las otras cuatro son más suaves a
+ * propósito: todas con pico en -6 dBFS, ataque lento o sin transitorio, casi nada por encima de 5 kHz, mono,
+ * deterministas, con los extremos en cero y sin continua. Se eligen con `efectos --barrido <nombre>` o con
+ * `"sfx": "barrido-<nombre>"` en un cue.
+ */
+export const BARRIDOS: Record<string, Barrido> = {
+  actual: {
+    descripcion: 'El barrido de siempre: aire ascendente de 180 Hz a 2,5 kHz, 0,7 s, con el pico a la mitad.',
+    cuando: 'Referencia; marca el movimiento con claridad (en un video con muchas transiciones cansa).',
+    gainRecomendado: 1,
+    generar: EFECTOS.barrido.generar,
+  },
+  aire: {
+    descripcion: 'Soplo de aire filtrado de unos 300 ms, entre 400 Hz y 3 kHz con la banda moviéndose apenas; entra despacio (sin transitorio) y se apaga suave.',
+    cuando: 'Acompañar cada movimiento de cámara o de panel sin marcarlo: se siente más de lo que se oye. Bueno para repetir muchas veces.',
+    gainRecomendado: 0.3,
+    generar: (sr) => {
+      const x = aireFiltrado(Math.round(0.3 * sr), sr, 71, (u) => 750 + 450 * Math.sin(Math.PI * u), 1.1, 3000, 400);
+      for (let i = 0; i < x.length; i++) {
+        const u = i / x.length;
+        // Sube con coseno elevado hasta el 40 % y baja más largo, en una cola suave.
+        x[i] *= u < 0.4 ? Math.sin((Math.PI / 2) * (u / 0.4)) ** 2 : Math.cos((Math.PI / 2) * ((u - 0.4) / 0.6)) ** 2;
+      }
+      return terminar(x, sr, PICO_BARRIDO);
+    },
+  },
+  suave: {
+    descripcion: 'El swish clásico pero redondo: pasabajos (sin brillo), 0,45 s, sube de 150 a 900 Hz con subida y bajada suaves.',
+    cuando: 'Transiciones entre escenas o cambios de tema, en lugar del barrido actual: se reconoce como un "whoosh" sin el filo.',
+    gainRecomendado: 0.4,
+    generar: (sr) => {
+      const x = aireFiltrado(Math.round(0.45 * sr), sr, 72, (u) => 150 * Math.pow(6, u), 0.45, 1800, 90);
+      for (let i = 0; i < x.length; i++) {
+        const u = i / x.length;
+        x[i] *= Math.sin(Math.PI * Math.pow(u, 0.85)) ** 2;
+      }
+      return terminar(x, sr, PICO_BARRIDO);
+    },
+  },
+  grave: {
+    descripcion: 'Movimiento grave y blando: un "whoomp" de cuerpo entre 80 y 200 Hz que baja de tono, con un poco de aire por arriba; 0,5 s.',
+    cuando: 'Un cambio de sección o de tema (no cada movimiento de cámara); se siente en el pecho más que en el oído. Pide parlantes que lleguen a 100 Hz: en un celular queda el aire y el armónico.',
+    gainRecomendado: 0.4,
+    generar: (sr) => {
+      const x = buf(sr, 0.5);
+      let fase = 0;
+      for (let i = 0; i < x.length; i++) {
+        const t = i / sr;
+        fase += (TAU * (80 + 120 * Math.exp(-t / 0.09))) / sr;
+        // Un poco de saturación suma el segundo armónico (160 a 400 Hz), que sí se oye en parlantes chicos.
+        x[i] = Math.tanh(1.3 * Math.sin(fase)) * Math.sin((Math.PI / 2) * Math.min(1, t / 0.035)) ** 2 * Math.exp(-t / 0.14);
+      }
+      const aire = aireFiltrado(x.length, sr, 73, () => 600, 1.0, 1800, 250);
+      for (let i = 0; i < x.length; i++) {
+        const u = i / x.length;
+        x[i] += 0.18 * aire[i] * Math.sin(Math.PI * Math.pow(u, 0.7)) ** 2;
+      }
+      return terminar(x, sr, PICO_BARRIDO);
+    },
+  },
+  papel: {
+    descripcion: 'Textura de hoja que se desliza: roce seco y granulado de 1 a 3,5 kHz, unos 280 ms, sin tono ni cola.',
+    cuando: 'Paneles de interfaz que se deslizan o se levantan; es el más seco y el menos "cinematográfico".',
+    gainRecomendado: 0.5,
+    generar: (sr) => {
+      const n = Math.round(0.28 * sr);
+      const x = aireFiltrado(n, sr, 74, (u) => 1200 + 1500 * u, 0.7, 3500, 700);
+      // Granulado: modulación de amplitud con ruido lento (unos 150 Hz), como las fibras de la hoja.
+      const azar = ruido(75);
+      const grano = pasaBajos(Float32Array.from({ length: n }, () => azar()), sr, 160, 2);
+      let m = 0;
+      for (const v of grano) m = Math.max(m, Math.abs(v));
+      for (let i = 0; i < n; i++) {
+        const u = i / n;
+        const env = Math.sin((Math.PI / 2) * Math.min(1, u / 0.12)) ** 2 * Math.pow(1 - u, 1.6);
+        x[i] *= env * (0.55 + 0.45 * (grano[i] / (m || 1)));
+      }
+      return terminar(x, sr, PICO_BARRIDO);
+    },
+  },
+};
+
+/** Nombre de archivo de una variante de barrido: `barrido-<nombre>`. */
+export const nombreDeBarrido = (n: string) => `barrido-${n}`;
+
+/** Nombre de la variante que se escribe como `barrido` si no se pide otra. */
+export const BARRIDO_POR_DEFECTO = 'actual';
+
+/** Variante de barrido por nombre (error claro si no existe). */
+export function elegirBarrido(nombre: string): Barrido {
+  const b = BARRIDOS[nombre];
+  if (!b) throw new Error(`No hay un barrido "${nombre}"; las opciones son: ${Object.keys(BARRIDOS).join(', ')}`);
+  return b;
+}
 
 /** Nombre de archivo de una variante: `clic-<nombre>`. */
 export const nombreDeClic = (n: string) => `clic-${n}`;
@@ -346,19 +488,25 @@ export function picosDeEfectos(sr: number = EFECTOS_SR): Record<string, number> 
 
 /**
  * Genera todos los efectos como WAV mono de 16 bits en `carpeta`; devuelve las rutas. Además de `clic` escribe
- * `clic-<nombre>` por cada variante de `CLICS`. Con `clic` se elige cuál variante se escribe como `clic` a secas
- * (por defecto `actual`, el original).
+ * `clic-<nombre>` por cada variante de `CLICS` y `barrido-<nombre>` por cada una de `BARRIDOS`. Con `clic` y `barrido` se elige
+ * cuál variante se escribe como `clic` o `barrido` a secas (por defecto `actual`, el original).
  */
-export function generarEfectos(carpeta: string, sr: number = EFECTOS_SR, opts: { clic?: string } = {}): string[] {
+export function generarEfectos(carpeta: string, sr: number = EFECTOS_SR, opts: { clic?: string; barrido?: string } = {}): string[] {
   const elegido = elegirClic(opts.clic ?? CLIC_POR_DEFECTO);
+  const barrido = elegirBarrido(opts.barrido ?? BARRIDO_POR_DEFECTO);
   const rutas = Object.entries(EFECTOS).map(([nombre, e]) => {
     const ruta = join(carpeta, `${nombre}.wav`);
-    escribirWav16(ruta, (nombre === 'clic' ? elegido : e).generar(sr), sr, 1);
+    escribirWav16(ruta, (nombre === 'clic' ? elegido : nombre === 'barrido' ? barrido : e).generar(sr), sr, 1);
     return ruta;
   });
   for (const [n, c] of Object.entries(CLICS)) {
     const ruta = join(carpeta, `${nombreDeClic(n)}.wav`);
     escribirWav16(ruta, c.generar(sr), sr, 1);
+    rutas.push(ruta);
+  }
+  for (const [n, b] of Object.entries(BARRIDOS)) {
+    const ruta = join(carpeta, `${nombreDeBarrido(n)}.wav`);
+    escribirWav16(ruta, b.generar(sr), sr, 1);
     rutas.push(ruta);
   }
   return rutas;

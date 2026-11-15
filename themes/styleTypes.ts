@@ -18,6 +18,8 @@ export const STYLE_ENUMS = {
   backgroundKind: ["clouds", "plain", "grid", "dots", "gradient", "noise"],
   entrance: ["auto", "rise", "fade", "scale", "slide", "wipe", "depth"],
   transition: ["wash", "through", "cut", "wipe"],
+  exit: ["dive", "settle"],
+  annotationMark: ["auto", "hand", "arrow", "elbow", "bracket", "tag", "ring", "focus", "underline", "none"],
   doodleStroke: ["hand", "geometric"],
   accent: ["underline", "bar", "dot", "none"],
   titleCard: ["solid", "glass"],
@@ -41,6 +43,7 @@ export const STYLE_ENUMS = {
   tile: ["card", "flat", "outline"],
   charset: ["caps", "hex", "binary", "symbols"],
   decoration: ["none", "underline", "marker", "box"],
+  character: ["auto", "geometrico-sobrio", "editorial", "ludico-manual", "tecnico-oscuro"],
 } as const;
 
 type Of<K extends keyof typeof STYLE_ENUMS> = (typeof STYLE_ENUMS)[K][number];
@@ -54,6 +57,9 @@ export type HighlightStyle = Of<"highlight">;
 export type BackgroundKind = Of<"backgroundKind">;
 export type EntranceStyle = Of<"entrance">;
 export type TransitionStyle = Of<"transition">;
+export type ExitStyle = Of<"exit">;
+/** Cómo señala algo el design system (`style.annotation.mark`). `auto` deriva de `decor` (ver `annotationLook`); el resto es una forma concreta. */
+export type AnnotationMarkSetting = Of<"annotationMark">;
 export type AccentDecor = Of<"accent">;
 export type CaptionCase = Of<"captionCase">;
 export type CaptionWeight = Of<"captionWeight">;
@@ -71,6 +77,8 @@ export type CaretStyle = Of<"caret">;
 export type TileStyle = Of<"tile">;
 export type Charset = Of<"charset">;
 export type TextDecoration = Of<"decoration">;
+/** Carácter declarado de un design system (`style.decor.character`); `auto` lo deduce `themeCharacter` del resto del estilo. */
+export type CharacterSetting = Of<"character">;
 
 export interface ThemeStyle {
   /** Lenguaje de esquinas y bordes de chips, píldoras, tarjetas y paneles. */
@@ -124,6 +132,12 @@ export interface ThemeStyle {
     kind: BackgroundKind;
     /** 0 a 1: multiplica la opacidad de las nubes (`theme.cloud.opacity`) o la fuerza del patrón. */
     intensity: number;
+    /**
+     * Deriva de las nubes (`clouds`), como multiplicador de la velocidad del vaivén lento de cada mancha (y de su amplitud, hasta el doble; 0 a 4). 1 (por defecto) es el
+     * movimiento de siempre (unos 120 px de amplitud en ciclos de 570 a 1070 cuadros: a simple vista, casi quieto); 0 las deja quietas; 2 a 3 se nota
+     * en un video corto sin llamar la atención. Una escena puede pasar `cloud.drift` para pisarlo.
+     */
+    drift: number;
   };
   motion: {
     /** Cómo entran los elementos genéricos (tarjetas, filas, chips). `auto` (por defecto): cada pieza conserva su entrada propia de siempre. */
@@ -146,12 +160,38 @@ export interface ThemeStyle {
     cameraTilt: number;
     /** Cierre de una escena hacia la siguiente. */
     transition: TransitionStyle;
+    /**
+     * Cómo sale la cámara hacia la escena siguiente: `dive` (atraviesa un elemento con `zoomThrough`: la escala se multiplica por 40 a 70, como siempre) o
+     * `settle` (empuja con suavidad, sin atravesar: la transición la hace el velo). Con `transition: "through"` la salida tiene que ser `dive`: sin velo,
+     * el atravesado es la transición (`checkTheme` lo avisa). Ayuda: `exitPower`.
+     */
+    exit: ExitStyle;
+  };
+  /**
+   * Cómo se señala algo en pantalla (llamadas, énfasis sobre una zona, rótulos que apuntan). Un design system decide la señal que usaría:
+   * un trazo a mano, una flecha recta, una línea con codo y punto, un corchete, una etiqueta pegada, un anillo, un foco que atenúa el resto,
+   * un subrayado o ninguna. `Callout` la resuelve con `annotationLook`; una escena puede forzar otra con la prop `variant` (excepción explícita).
+   */
+  annotation: {
+    /**
+     * `auto` (por defecto, el de un tema que no declara el grupo): se deriva de `decor` (sin garabatos: sin señal; con trazo a mano: a mano; con trazo
+     * geométrico: flecha recta). El resto fija la forma: `hand`, `arrow`, `elbow`, `bracket`, `tag` (píldora pegada, sin flecha), `ring`, `focus`
+     * (anillo; la escena atenúa el resto con `focusOpacity`), `underline` y `none` (solo el rótulo, sin señal).
+     */
+    mark: AnnotationMarkSetting;
+    /** 0,2 a 0,9: cuánto se atenúa el resto del cuadro con `focus` (opacidad del fondo que se le superpone). */
+    dim: number;
   };
   decor: {
     /** `false`: los garabatos del kit no se dibujan. */
     doodles: boolean;
     /** `hand` (temblor de mano) o `geometric` (trazo limpio, sin temblor). */
     doodleStroke: "hand" | "geometric";
+    /**
+     * Carácter del design system para elegir efectos (`docs/animaciones.md`, "Afinidad"): `auto` (por defecto) lo deduce `themeCharacter` de
+     * la señal, las líneas, las esquinas, la superficie y el fondo; con un valor, el design system lo declara y la deducción queda de respaldo.
+     */
+    character: CharacterSetting;
     /** Multiplicador de la viñeta (0 = apagada; hasta 2). */
     vignette: number;
     /** Rol del tema con que se tiñe la viñeta (`accent` por defecto, como siempre). Una escena puede pasar su propio `color`. */

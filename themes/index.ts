@@ -12,6 +12,7 @@ export { STYLE_FIELDS, DEFAULT_STYLE, resolveStyle, resolveStyleInput, styleIssu
 export type { StyleFieldSpec, StyleIssue } from "./style";
 export * from "./styleHelpers";
 export * from "./styleLine";
+export * from "./styleAnnotation";
 export { editorial } from "./editorial";
 export { neon } from "./neon";
 export { papel } from "./papel";

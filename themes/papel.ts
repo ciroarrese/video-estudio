@@ -48,6 +48,8 @@ export const papel: ResolvedTheme = deepFreeze(resolveTheme({
     background: { kind: "noise", intensity: 1 },
     motion: { entrance: "rise", overshoot: 0.06, stagger: 4, staggerChips: 0.7, cameraBlur: true, cameraTilt: 1, transition: "wash" },
     decor: { doodles: true, doodleStroke: "hand", vignette: 0.4, accent: "dot", accentThickness: 1.5, gradientLoop: 0 },
+    // Señal a mano: flecha curva con temblor y círculos de marcador. Es el único de los cinco donde el trazo a mano encaja.
+    annotation: { mark: "hand" },
     story: {
       titleCard: "solid", listLayout: "stacked", listUnderline: "row", handoff: "wash", headlineSize: "md", closingBg: "surface", signoffBar: true,
       wallColumns: null, wallRows: null, wallChipScale: 1.1, wallDolly: 0, wallDepth: 1, wallGapX: 1.05, wallGapY: 1, wallBrick: 1, wallJitter: 1.6, wallBlurOpening: true, wallBlurClosing: true,

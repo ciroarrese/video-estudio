@@ -38,3 +38,19 @@ export const json = (p: Parsed, name: string): Record<string, unknown> | undefin
   if (!o || typeof o !== 'object' || Array.isArray(o)) throw new Error(`--${name} debe ser un objeto JSON`);
   return o as Record<string, unknown>;
 };
+
+/**
+ * Contenido de una opción de listas repetible (`--deny a.txt --deny b.txt`): `rutas` (las que se pasaron, para saltarlas al escanear
+ * el código) y `contenido` (todas unidas con saltos de línea, como si fueran un solo archivo). `leer` se inyecta para poder probarlo.
+ */
+export function leerListas(p: Parsed, name: string, leer: (ruta: string) => string): { rutas: string[]; contenido: string } {
+  const rutas = (p.flags.get(name) ?? []).map((r) => r.trim()).filter(Boolean);
+  const contenido = rutas.map((r) => {
+    try {
+      return leer(r);
+    } catch (e) {
+      throw new Error(`--${name} ${r}: no se pudo leer (${(e as Error).message})`);
+    }
+  }).join('\n');
+  return { rutas, contenido };
+}

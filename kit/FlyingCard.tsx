@@ -9,6 +9,12 @@ import { themeEasing, useFrameOr } from "./util";
  * Antes de `range[0]` no se dibuja (`hideBefore`, por defecto true: si no, quedaba una copia encima del origen mientras la tarjeta
  * "real" todavía estaba ahí); después de `range[1]` queda en `to` (`hideAfter: true` la oculta). Con `hideBefore={false}` se
  * dibuja en `from` desde el principio.
+ *
+ * Opcionales, para que la tarjeta cambie mientras vuela: `toWidth`/`toHeight` (el tamaño al llegar; crece o se achica con la misma curva del vuelo, para que
+ * una tarjeta chica del origen llegue a ser el panel grande del destino) y `rotate` (grados: un número fijo, o `[desde, hasta]` para que gire mientras
+ * viaja). Sin ellos la pieza es la de siempre, con el mismo marcado. Un tamaño que cambia relayoutea los hijos en cada cuadro (es una función pura del cuadro:
+ * no deja estado), pero un texto bajo `rotate()` o bajo una escala fraccionaria es el riesgo conocido de `docs/reglas.md`: si `--check` falla, girá una
+ * tarjeta sin texto (el texto entra con un fundido al llegar) o animá el tamaño en vez de la escala.
  */
 export function FlyingCard({
   frame,
@@ -18,6 +24,9 @@ export function FlyingCard({
   arc = 0,
   width,
   height,
+  toWidth,
+  toHeight,
+  rotate,
   trail = 5,
   trailLag = 1.5,
   hideBefore = true,
@@ -31,6 +40,12 @@ export function FlyingCard({
   arc?: number;
   width: number;
   height: number;
+  /** Ancho al llegar a `to` (por defecto `width`: no cambia). */
+  toWidth?: number;
+  /** Alto al llegar a `to` (por defecto `height`: no cambia). */
+  toHeight?: number;
+  /** Rotación en grados: fija, o `[al salir, al llegar]` (con la curva del vuelo). Por defecto 0. */
+  rotate?: number | [number, number];
   trail?: number;
   trailLag?: number;
   /** No dibujar nada antes de `range[0]` (por defecto true). */
@@ -48,15 +63,15 @@ export function FlyingCard({
   const moving = cur.t > 0 && cur.t < 1;
   // la estela entra y sale suavemente: sin fantasmas de un solo cuadro en los extremos
   const trailFade = Math.min(1, cur.t / 0.12, (1 - cur.t) / 0.12);
-  const place = (p: { x: number; y: number }, scale = 1): React.CSSProperties => ({
-    position: "absolute",
-    left: p.x - width / 2,
-    top: p.y - height / 2,
-    width,
-    height,
-    // la escala solo se emite si no es 1 (en reposo no queda `scale(1)`)
-    transform: +scale.toFixed(4) === 1 ? undefined : `scale(${+scale.toFixed(4)})`,
-  });
+  const rot = (t: number) => (rotate === undefined ? 0 : typeof rotate === "number" ? rotate : rotate[0] + (rotate[1] - rotate[0]) * t);
+  const place = (p: { x: number; y: number; t: number }, scale = 1): React.CSSProperties => {
+    const w = toWidth === undefined ? width : +(width + (toWidth - width) * p.t).toFixed(2);
+    const h = toHeight === undefined ? height : +(height + (toHeight - height) * p.t).toFixed(2);
+    const s = +scale.toFixed(4), a = +rot(p.t).toFixed(3);
+    // escala y giro solo se emiten si no son la identidad (en reposo no queda `scale(1)` ni `rotate(0deg)`)
+    const parts = [a !== 0 ? `rotate(${a}deg)` : "", s !== 1 ? `scale(${s})` : ""].filter(Boolean).join(" ");
+    return { position: "absolute", left: p.x - w / 2, top: p.y - h / 2, width: w, height: h, transform: parts || undefined };
+  };
   return (
     <>
       {moving &&
