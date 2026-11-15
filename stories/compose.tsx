@@ -117,7 +117,7 @@ export function composeStory(
           else if (e.kind === "interlude") {
             const done = topicOf[k]!;
             const next = nextTopic(withoutLate(spec).topics.length, done, skip);
-            body = compact ? <InterludeCompact spec={spec} done={done} skip={skip} next={next} /> : <Interlude spec={spec} done={done} skip={skip} next={next} ticks={ticksOf[k]} />;
+            body = compact ? <InterludeCompact spec={spec} done={done} skip={skip} next={next} /> : <Interlude spec={spec} done={done} skip={skip} next={next} ticks={ticksOf[k]} thumbnail={e.reveal === true ? scenes[done - 1]?.thumbnail ?? spec.topics[done - 1]?.thumbnail : undefined} />;
           }
           else {
             const topic = topicOf[k]!;

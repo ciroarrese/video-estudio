@@ -5,7 +5,7 @@ import { composeStory } from "./compose";
 import type { ComposeOptions } from "./compose";
 import { resolveTheme } from "./define";
 import type { ThemeInput } from "./define";
-import { INTERLUDE_FRAMES, INTERLUDE_REVEAL_FRAMES, INTERLUDE_T, REVEAL_T, TICK_STEP, nextTopic } from "./Interlude";
+import { INTERLUDE_FRAMES, INTERLUDE_T, REVEAL_STAGE_T, REVEAL_T, TICK_STEP, isStageReveal, nextTopic, revealBase } from "./Interlude";
 import { closingLogoAt } from "./Closing";
 import { openingFly, openingListAt } from "./Opening";
 import { planScenes } from "./plan";
@@ -21,10 +21,11 @@ import type { StorySpec, TopicScene } from "./types";
  * - `"scene-start"`: primer cuadro de la escena de un tema.
  * - `"interlude-tick"`: el pulso de una tilde que se gana en una vuelta (cuadro de mayor brillo; en la compacta, cuando la tilde termina de dibujarse).
  * - `"reveal-enter"`: empieza a entrar la fila nueva (tema tardío) en la vuelta de revelación.
+ * - `"reveal-sweep"`: arranca el barrido de luz sobre la fila nueva (solo con `design.reveal: "stage"`).
  * - `"reveal-tick"`: el pulso de la tilde de esa fila.
  * - `"closing-logo"`: empieza a entrar la marca de la firma (el logo, el `slot` o, sin ellos, el texto) en el cierre.
  */
-export type StoryCueKind = "opening-title" | "opening-list" | "fly-in" | "scene-start" | "interlude-tick" | "reveal-enter" | "reveal-tick" | "closing-logo";
+export type StoryCueKind = "opening-title" | "opening-list" | "fly-in" | "scene-start" | "interlude-tick" | "reveal-enter" | "reveal-sweep" | "reveal-tick" | "closing-logo";
 
 /** Un cuadro notable de la historia: `frame` es absoluto (desde el cuadro 0 del video) y `topic` el índice del tema (de `spec.topics`) o `null` si no es de un tema. */
 export type StoryCue = { frame: number; kind: StoryCueKind; topic: number | null };
@@ -72,16 +73,19 @@ export function storyCues(spec: StorySpec, scenes: (TopicScene | null | undefine
         continue;
       }
       const reveal = e.reveal === true;
-      const u = scaler(dur, reveal ? INTERLUDE_REVEAL_FRAMES : INTERLUDE_FRAMES);
-      const check = reveal ? REVEAL_T.check : INTERLUDE_T.check;
+      const stage = reveal && isStageReveal(rs);
+      const u = scaler(dur, reveal ? revealBase(rs) : INTERLUDE_FRAMES);
+      const R = stage ? REVEAL_STAGE_T : REVEAL_T;
+      const check = reveal ? R.check : INTERLUDE_T.check;
       ticks.forEach((t, order) => {
         // el pulso llega 2 cuadros después de que la tilde termina de dibujarse (el brillo de `Interlude`)
         const off = order > 0 ? u(staggerFrames(theme, order, { base: TICK_STEP, context: "rows" })) : 0;
         add(e.from + u(check[1] + 2) + off, "interlude-tick", t);
       });
       if (reveal) {
-        add(e.from + u(REVEAL_T.enter[0]), "reveal-enter", i);
-        add(e.from + u(REVEAL_T.lateCheck[1] + 2), "reveal-tick", i);
+        add(e.from + u(R.enter[0] + (stage ? 4 : 0)), "reveal-enter", i); // con la escenificada, cuando la fila ya se ve (el resorte arranca invisible)
+        if (stage) add(e.from + u(REVEAL_STAGE_T.sweep[0]), "reveal-sweep", i);
+        add(e.from + u(R.lateCheck[1] + 2), "reveal-tick", i);
       } else {
         const next = nextTopic(lateStart(spec), i + 1, skip);
         if (next >= 0) add(e.from + u(INTERLUDE_T.fly[0]), "fly-in", next);

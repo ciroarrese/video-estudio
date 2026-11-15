@@ -108,6 +108,74 @@ describe("tema tardío: qué se ve", () => {
   });
 });
 
+describe("revelación escenificada (design.reveal: stage)", () => {
+  const base = late(spec(4));
+  const st: StorySpec = { ...base, design: { reveal: "stage" }, timing: { interludeReveal: 200 } };
+  const sc = scenes(4);
+  const Thumb = () => <div>MINIATURA-REAL</div>;
+  const el = (s: StorySpec) => <Interlude spec={s} done={4} ticks={[2]} thumbnail={Thumb} />;
+  const tl = composeStory(st, sc).timeline;
+  const cues = storyCues(st, sc);
+  const by = (k: string) => cues.filter((c) => c.kind === k);
+  const er = tl.find((e) => e.id === "interlude-reveal")!;
+  it("valida la opción y admite 200 cuadros", () => {
+    expect(() => validateSpec(st)).not.toThrow();
+    expect(() => validateSpec({ ...base, design: { reveal: "otra" as never } })).toThrow(/design\.reveal debe ser "fade" o "stage"/);
+    expect(er.durationInFrames).toBe(200);
+    expect(interludeRevealFrames(st)).toBe(200);
+  });
+  it('"fade" y sin opción dan exactamente lo mismo (la revelación de siempre)', () => {
+    const fade: StorySpec = { ...base, design: { reveal: "fade" } };
+    for (const f of [0, 30, 60, 100, 140]) expect(html(<Interlude spec={fade} done={4} ticks={[2]} />, f)).toBe(html(<Interlude spec={base} done={4} ticks={[2]} />, f));
+    expect(storyCues(fade, sc)).toEqual(storyCues(base, sc));
+  });
+  it("storyCues informa la entrada, el barrido y la tilde, en orden y dentro de la vuelta", () => {
+    const enter = by("reveal-enter")[0]!.frame - er.from, sweep = by("reveal-sweep")[0]!.frame - er.from, tick = by("reveal-tick")[0]!.frame - er.from;
+    expect(by("reveal-sweep")).toHaveLength(1);
+    expect(enter).toBeLessThan(sweep);
+    expect(sweep).toBeLessThan(tick);
+    expect(tick).toBeLessThan(er.durationInFrames - 20);
+    expect(by("reveal-sweep")[0]!.topic).toBe(3);
+    // la variante por defecto no tiene barrido
+    expect(storyCues(base, sc).filter((c) => c.kind === "reveal-sweep")).toHaveLength(0);
+  });
+  it("la fila nueva se ve desde el cuadro de reveal-enter; el barrido y la miniatura existen solo mientras duran", () => {
+    const enter = by("reveal-enter")[0]!.frame - er.from, sweep = by("reveal-sweep")[0]!.frame - er.from;
+    expect(html(el(st), enter - 5)).not.toContain("Tema cuatro");
+    expect(html(el(st), enter + 2)).toContain("Tema cuatro");
+    expect(html(el(st), sweep - 3)).not.toContain("linear-gradient(100deg");
+    expect(html(el(st), sweep + 12)).toContain("linear-gradient(100deg");
+    expect(html(el(st), 5)).not.toContain("MINIATURA-REAL");
+    expect(html(el(st), 90)).toContain("MINIATURA-REAL");
+    expect(html(el(st), 140)).not.toContain("MINIATURA-REAL"); // ya se guardó en la fila
+    expect(html(el(st), 199)).not.toContain("MINIATURA-REAL");
+  });
+  it("sin miniatura propia usa la tarjeta por defecto del tema", () => {
+    expect(html(<Interlude spec={st} done={4} ticks={[2]} />, 90)).toContain("Tema cuatro");
+  });
+  it("el cuadro del pulso máximo de la tilde es el de reveal-tick y el anillo se expande", () => {
+    const tick = by("reveal-tick")[0]!.frame - er.from;
+    const glow = (f: number) => Math.max(0, ...[...html(el(st), f).matchAll(/box-shadow:0 0 ([\d.]+)px/g)].map((m) => Number(m[1])));
+    const g = Array.from({ length: er.durationInFrames }, (_, f) => glow(f));
+    expect(g.indexOf(Math.max(...g.slice(100)), 100)).toBe(tick);
+    const ring = (f: number) => (html(el(st), f).match(/width:(\d+)px;height:\d+px;box-sizing:border-box/) ?? [])[1];
+    expect(ring(tick - 8)).toBeUndefined();
+    expect(Number(ring(tick + 4))).toBeLessThan(Number(ring(tick + 14)));
+  });
+  it("renderiza todos los cuadros en los tres formatos sin lanzar (en vertical y cuadrado, sin miniatura)", () => {
+    for (const [w, h] of [[1920, 1080], [1080, 1920], [1080, 1080]]) {
+      for (let f = 0; f < 200; f += 7) expect(() => html(el(st), f, { ...cfg, width: w, height: h })).not.toThrow();
+      expect(html(el(st), 90, { ...cfg, width: w, height: h }).includes("MINIATURA-REAL")).toBe(w === 1920);
+    }
+  });
+  it("con la duración por defecto (150) los tiempos se acortan en proporción", () => {
+    const s150: StorySpec = { ...base, design: { reveal: "stage" } };
+    expect(composeStory(s150, sc).timeline.find((e) => e.id === "interlude-reveal")!.durationInFrames).toBe(150);
+    const e = storyCues(s150, sc);
+    expect(e.find((c) => c.kind === "reveal-tick")!.frame - composeStory(s150, sc).timeline.find((x) => x.id === "interlude-reveal")!.from).toBeLessThan(150);
+  });
+});
+
 describe("storyCues", () => {
   const s = late(spec(4));
   const sc = scenes(4);

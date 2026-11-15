@@ -85,6 +85,14 @@ export type StoryDesign = {
    * titular entrando por su cuenta). Sin escenas, `"dock"` y `"through"` se ignoran.
    */
   handoff?: "wash" | "dock" | "through";
+  /**
+   * Cómo se revela el tema tardío (`reveal: "late"`) en su vuelta al listado: `"fade"` (por defecto: la fila entra con un fundido, se subraya y se
+   * tilda) o `"stage"` (escenificada: las filas vistas se corren apenas, la fila nueva entra con resorte y una leve escala, un barrido de luz de acento
+   * la recorre, la miniatura de su escena aparece al costado y vuela hasta el lugar del número, y la tilde cierra con un anillo que se expande). Todo sale
+   * de `theme.style` (resorte de `motion.overshoot`, acentos, esquinas). La miniatura solo se muestra donde hay lugar libre a la derecha de la fila (formato ancho; en vertical y cuadrado la fila
+   * nueva entra igual, sin miniatura). Dura 200 cuadros de referencia: conviene `timing.interludeReveal: 200` (con el valor por defecto, 150, todo se acorta en proporción).
+   */
+  reveal?: "fade" | "stage";
   /** Píldora del titular (`TopicHeadline` y la que acopla la apertura). */
   headline?: {
     /** `"md"` (por defecto) o `"sm"` (85 % de la letra y del relleno). */
@@ -225,8 +233,8 @@ function validateTopicFlow(spec: StorySpec): void {
   if (spec.topics.length - 1 < MIN_TOPICS) throw new Error(`StorySpec: con un tema reveal: \"late\" hacen falta al menos ${MIN_TOPICS} temas más (los de la lista)`);
 }
 
-const DESIGN_ENUMS: Record<string, string[]> = { titleCard: ["solid", "glass"], handoff: ["wash", "dock", "through"] };
-const DESIGN_KEYS = ["titleCard", "list", "handoff", "wall", "clouds", "headline", "gradient", "closing"];
+const DESIGN_ENUMS: Record<string, string[]> = { titleCard: ["solid", "glass"], handoff: ["wash", "dock", "through"], reveal: ["fade", "stage"] };
+const DESIGN_KEYS = ["titleCard", "list", "handoff", "reveal", "wall", "clouds", "headline", "gradient", "closing"];
 const inRange = (v: unknown, lo: number, hi: number): v is number => typeof v === "number" && Number.isFinite(v) && v >= lo && v <= hi;
 
 function validateDesign(d: StoryDesign | undefined): void {

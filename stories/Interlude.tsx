@@ -1,8 +1,10 @@
+import React from "react";
 import { Easing, useFrame, useVideoConfig } from "../engine";
 import { Wash, World, kf, useCameraAt, zoomThrough } from "../kit";
-import { cornerRadius, staggerFrames, useTheme, withAlpha } from "../themes";
+import { cornerRadius, resolveStyle, settle, staggerFrames, surfaceStyle, useTheme, withAlpha } from "../themes";
 import { fade, xform } from "../fx/core/math";
-import { listLayout } from "./layout";
+import { AVG_BOLD, AVG_REG, ROW_GAP, listLayout, textWidth } from "./layout";
+import { DefaultThumbnail } from "./Closing";
 import { CheckMark, HeadlineRow, StoryNumeral, StoryStage, quietOpacity, rowEntrance, scaler, useEase, useStorySpec } from "./shared";
 import { lateStart, withoutLate } from "./types";
 import type { StorySpec } from "./types";
@@ -20,6 +22,19 @@ export const interludeRevealFrames = (spec: StorySpec) => spec.timing?.interlude
 export const INTERLUDE_T = { check: [14, 34] as [number, number], next: [40, 62] as [number, number], fly: [66, 112] as [number, number] };
 /** Tiempos (cuadros de la duración por defecto, 150) de la vuelta de revelación: tilde(s) de lo anterior, entrada de la fila nueva, su número, su subrayado y su tilde. */
 export const REVEAL_T = { check: [14, 34] as [number, number], enter: [48, 62] as [number, number], number: [56, 70] as [number, number], next: [74, 96] as [number, number], lateCheck: [104, 124] as [number, number] };
+/** Duración de referencia (cuadros) de la revelación escenificada (`design.reveal: "stage"`); `timing.interludeReveal` la estira o la achica en proporción. */
+export const REVEAL_STAGE_FRAMES = 200;
+/**
+ * Tiempos (cuadros de la duración de referencia, 200) de la revelación escenificada: tilde de lo anterior, filas vistas que se corren para hacer lugar,
+ * entrada de la fila nueva (resorte), su número, el barrido de luz, la miniatura que aparece al costado, el subrayado, el vuelo de la miniatura hacia la
+ * fila (se achica hasta el lugar del número) y la tilde con su anillo. La opción por defecto (`"fade"`) usa `REVEAL_T`.
+ */
+export const REVEAL_STAGE_T = { check: [14, 34] as [number, number], room: [40, 70] as [number, number], enter: [48, 80] as [number, number], number: [62, 76] as [number, number], sweep: [68, 104] as [number, number], thumbIn: [60, 80] as [number, number], next: [88, 110] as [number, number], thumbFly: [96, 132] as [number, number], lateCheck: [132, 152] as [number, number] };
+/** `true` si la vuelta de revelación de esta historia es la escenificada (`design.reveal: "stage"`). */
+export const isStageReveal = (spec: StorySpec) => spec.design?.reveal === "stage";
+/** Duración de referencia con que se escalan los tiempos de la vuelta de revelación según su variante. */
+export const revealBase = (spec: StorySpec) => (isStageReveal(spec) ? REVEAL_STAGE_FRAMES : INTERLUDE_REVEAL_FRAMES);
+
 /** Cuadros que se corre cada tilde pendiente respecto de la anterior cuando una vuelta tilda varios temas a la vez (paso propio del tema: `motion.staggerRows`). */
 export const TICK_STEP = 6;
 
@@ -38,7 +53,7 @@ export function nextTopic(n: number, done: number, skip: number[] = []): number 
  * Con `done === n` (o sin más temas con escena) no hay siguiente: quedan todos tildados y la lista se desvanece.
  * `skip` (índices de temas sin escena) los deja en la lista sin tilde y sin atravesarlos; `next` fuerza el siguiente (-1: ninguno).
  */
-export function Interlude({ spec: specIn, done, skip = [], next: nextProp, ticks: ticksProp }: {
+export function Interlude({ spec: specIn, done, skip = [], next: nextProp, ticks: ticksProp, thumbnail }: {
   spec: StorySpec;
   done: number;
   skip?: number[];
@@ -48,6 +63,8 @@ export function Interlude({ spec: specIn, done, skip = [], next: nextProp, ticks
    * más de uno cuando la escena anterior siguió directo a esta (`interludeBefore: false`) y su tilde quedó pendiente.
    */
   ticks?: number[];
+  /** Miniatura del tema que se revela (`design.reveal: "stage"`): la de su escena o la del tema; sin ella, la tarjeta por defecto. */
+  thumbnail?: React.FC;
 }) {
   const theme = useTheme();
   // Un tema tardío (`reveal: "late"`) no está en la lista hasta que se lo revela: la vuelta con `done` = todos los temas es la de la revelación
@@ -58,7 +75,8 @@ export function Interlude({ spec: specIn, done, skip = [], next: nextProp, ticks
   const f = useFrame();
   const { width, height } = useVideoConfig();
   const dur = reveal ? interludeRevealFrames(spec) : interludeFrames(spec);
-  const u = scaler(dur, reveal ? INTERLUDE_REVEAL_FRAMES : INTERLUDE_FRAMES);
+  const stage = reveal && isStageReveal(spec);
+  const u = scaler(dur, reveal ? revealBase(spec) : INTERLUDE_FRAMES);
   const n = spec.topics.length;
   // la lista se arma para las n filas desde el primer cuadro de la vuelta de revelación (el lugar de la fila nueva ya está, sin saltos al entrar)
   const L = listLayout(spec, theme, width, height);
@@ -69,9 +87,20 @@ export function Interlude({ spec: specIn, done, skip = [], next: nextProp, ticks
   const quietDone = Math.min(1, Math.max(QUIET_DONE + Math.max(0, (spec.design?.clouds?.opacity ?? theme.cloud.opacity) - theme.cloud.opacity) * 1.2, quietOpacity(theme, spec.design?.clouds, QUIET_DONE)));
 
   const sc = (r: [number, number]) => [u(r[0]), u(r[1])] as [number, number];
+  const R = stage ? REVEAL_STAGE_T : REVEAL_T;
+  const Z: [number, number] = [0, 0];
   const T = reveal
-    ? { check: sc(REVEAL_T.check), next: sc(REVEAL_T.next), fly: sc(INTERLUDE_T.fly), enter: sc(REVEAL_T.enter), number: sc(REVEAL_T.number), lateCheck: sc(REVEAL_T.lateCheck) }
-    : { check: sc(INTERLUDE_T.check), next: sc(INTERLUDE_T.next), fly: sc(INTERLUDE_T.fly), enter: [0, 0] as [number, number], number: [0, 0] as [number, number], lateCheck: [0, 0] as [number, number] };
+    ? { check: sc(R.check), next: sc(R.next), fly: sc(INTERLUDE_T.fly), enter: sc(R.enter), number: sc(R.number), lateCheck: sc(R.lateCheck) }
+    : { check: sc(INTERLUDE_T.check), next: sc(INTERLUDE_T.next), fly: sc(INTERLUDE_T.fly), enter: Z, number: Z, lateCheck: Z };
+  const S = stage ? { room: sc(REVEAL_STAGE_T.room), sweep: sc(REVEAL_STAGE_T.sweep), thumbIn: sc(REVEAL_STAGE_T.thumbIn), thumbFly: sc(REVEAL_STAGE_T.thumbFly) } : null;
+  const motion = resolveStyle(theme).motion;
+  const room = S ? kf(f, S.room, [0, 1], ease.inOut) : 0; // las filas ya vistas se corren apenas hacia arriba para hacer lugar a la nueva
+  const lateI = n - 1;
+  const rowTop = L.top + lateI * L.rowH;
+  const rowMidY = rowTop + L.blockTop + L.nameH / 2; // centro del renglón del nombre de la fila nueva
+  // extremo derecho estimado del texto de la fila nueva (solo para ubicar la miniatura en el lugar libre y acotar el barrido)
+  // (la estimación por glifo medio sobra un poco: se descuenta para que la miniatura no quede diminuta)
+  const textEnd = L.left + L.numW + 0.88 * (textWidth(L.names[lateI]!, L.nameSize, AVG_BOLD) + (L.inline ? textWidth(` · ${L.lines[lateI]!}`, L.lineSize, AVG_REG) : textWidth(L.lines[lateI]!, L.lineSize, AVG_REG)));
   const appear = kf(f, [0, u(14)], [0, 1], ease.out);
   const nextP = kf(f, T.next, [0, 1], ease.out);
   const end = next < 0 ? kf(f, [dur - u(30), dur], [0, 1]) : 0;
@@ -81,10 +110,44 @@ export function Interlude({ spec: specIn, done, skip = [], next: nextProp, ticks
   });
   const others = next >= 0 ? 1 - kf(f, [T.fly[0] - u(6), T.fly[0] + u(12)], [0, 1]) : 1;
 
+
+  // ---- revelación escenificada: barrido de luz sobre la fila nueva y miniatura del tema que vuela hasta el lugar del número
+  const sweepP = S ? kf(f, S.sweep, [0, 1], Easing.inOut) : 0;
+  const sweepW = Math.max(200, Math.min(L.rowW, textEnd - L.left + 48));
+  const sweepTop = rowTop + L.blockTop - 10;
+  const sweepH = L.barTop + ROW_GAP.bar + 12 - (L.blockTop - 10);
+  const sweepA = -40 + sweepP * 140; // posición (% del ancho) del borde izquierdo de la franja de luz
+  const sweep = S && !L.stacked && sweepP > 0 && sweepP < 1 ? (
+    <div data-qa-decor="" style={{ position: "absolute", left: L.left - 14, top: sweepTop, width: sweepW + 28, height: sweepH, borderRadius: cornerRadius(theme, "chip"), pointerEvents: "none", background: `linear-gradient(100deg, transparent ${sweepA.toFixed(1)}%, ${withAlpha(theme.color.accent, 0.34)} ${(sweepA + 16).toFixed(1)}%, ${withAlpha(theme.color.accent2, 0.22)} ${(sweepA + 30).toFixed(1)}%, transparent ${(sweepA + 40).toFixed(1)}%)` }} />
+  ) : null;
+  const Thumb = thumbnail ?? (() => <DefaultThumbnail index={lateI} name={spec.topics[lateI]!.name} />);
+  const PANEL_W = 560, PANEL_H = 340;
+  const free = width - theme.safe.x - textEnd - 40; // lugar libre a la derecha del texto de la fila nueva
+  const tScale = Math.min(0.62, free / PANEL_W); // con menos de 0,4 no hay lugar sin tapar texto: no se muestra
+  const tx0 = width - theme.safe.x - (PANEL_W * tScale) / 2, ty0 = rowMidY - L.rowH * 0.42; // un poco más arriba que el renglón: ahí no hay texto a la derecha
+  const tx1 = L.left + Math.round(L.numSize * 1.5 * 0.36), ty1 = rowMidY; // donde queda la tilde
+  const endScale = Math.round(L.numSize * 1.5) / PANEL_W;
+  const tIn = S ? kf(f, S.thumbIn, [0, 1], ease.out) : 0;
+  const tFly = S ? kf(f, S.thumbFly, [0, 1], ease.inOut) : 0;
+  const tOut = kf(tFly, [0.7, 1], [0, 1]);
+  const tPresent = S !== null && !L.stacked && tScale >= 0.4 && tIn > 0 && tFly < 1;
+  const tX = tx0 + (tx1 - tx0) * tFly;
+  const tY = ty0 + (ty1 - ty0) * tFly - Math.sin(Math.PI * tFly) * 70 + (1 - tIn) * 28;
+  const tSc = (tScale * (0.86 + 0.14 * tIn)) * (1 - tFly) + endScale * tFly;
+  const panelSurf = surfaceStyle(theme, "window");
+  const panelShadow = resolveStyle(theme).surface.elevation === "shadow" ? `0 30px 60px -24px ${withAlpha(theme.color.text, 0.4)}` : panelSurf.boxShadow;
+  const thumb = tPresent ? (
+    // la miniatura es una vista chica de la escena: su texto es detalle, no se le pide el tamaño mínimo; al volar pasa por encima del texto de la fila (`overlap`)
+    <div data-qa-ignore="min-size overlap covered" style={{ position: "absolute", left: 0, top: 0, width: PANEL_W, height: PANEL_H, transform: `translate(${(tX - PANEL_W / 2).toFixed(2)}px, ${(tY - PANEL_H / 2).toFixed(2)}px) scale(${tSc.toFixed(4)})`, borderRadius: panelSurf.borderRadius, boxShadow: panelShadow, overflow: "hidden", opacity: fade(tIn * (1 - tOut)), zIndex: 5 }}>
+      <Thumb />
+    </div>
+  ) : null;
+
   return (
     <StoryStage frame={f} cloud={spec.design?.clouds}>
       <World camera={cam} width={width} height={height}>
         <div key={fade(appear * (1 - end)) === undefined ? "on" : "fade"} style={{ position: "absolute", left: 0, top: 0, opacity: fade(appear * (1 - end)) }}>
+          {sweep}
           {spec.topics.map((_, i) => {
             // un tema sin escena (`skip`) no es "pendiente" ni "visto": se ve plano (atenuado, sin tilde) y nunca es el siguiente; con
             // `topics[i].seen` se muestra tildado desde el principio, sin pulso
@@ -104,10 +167,21 @@ export function Interlude({ spec: specIn, done, skip = [], next: nextProp, ticks
             // las ya vistas quedan más tenues que la próxima, pero con el contraste del texto atenuado por encima del mínimo del control de calidad
             const quiet = isDone ? quietDone + (1 - cp) * (1 - quietDone) : skipped ? quietDone : 1;
             const stag = staggerFrames(theme, i, { base: 3, context: "rows" }); // el paso entre filas lo escala el tema, o es el de `motion.staggerRows`
-            const rowIn = lateRow ? kf(f, T.enter, [0, 1], ease.out) : kf(f, [u(stag), u(stag + 14)], [0, 1], ease.out);
+            const rowIn = lateRow ? kf(f, stage ? [T.enter[0], T.enter[0] + u(12)] : T.enter, [0, 1], ease.out) : kf(f, [u(stag), u(stag + 14)], [0, 1], ease.out);
             if (lateRow && rowIn <= 0) return null; // todavía no está en la lista (su lugar ya está reservado en el diseño)
             const pop = justDone ? kf(f, [win[1] - u(4), win[1] + u(2), win[1] + u(14)], [0, 1, 0]) : 0;
+            // revelación escenificada: la fila nueva entra con resorte y una leve escala desde abajo; las demás se corren apenas hacia arriba
+            let rowStyle = rowEntrance(theme, rowIn, i, { distance: 60, round: false });
+            if (stage && lateRow) {
+              const sp = kf(f, T.enter, [0, 1]);
+              const q = settle(sp, Math.max(motion.overshoot, 0.05));
+              if (sp < 1) rowStyle = { transform: `translateY(${((1 - q) * L.rowH * 0.6).toFixed(2)}px) scale(${(0.94 + 0.06 * q).toFixed(4)})`, transformOrigin: "0 50%" };
+              else rowStyle = {};
+            } else if (stage && room > 0) {
+              rowStyle = { ...rowStyle, transform: [rowStyle.transform, `translateY(${(-room * L.rowH * 0.14).toFixed(2)}px)`].filter(Boolean).join(" ") };
+            }
             const rowOpacity = rowIn * (flyNext ? 1 : others) * (flyNext ? 1 - kf(f, [T.fly[1] - u(16), T.fly[1] - u(10)], [0, 1]) : 1);
+            const ringP = stage && lateRow ? kf(f, [win[1] - u(2), win[1] + u(22)], [0, 1], ease.out) : 0;
             const cs = Math.round(L.numSize * 1.5);
             const cl = -Math.round(cs * 0.14);
             const ct = Math.round(L.numSize * 0.5 - cs * 0.5);
@@ -126,7 +200,11 @@ export function Interlude({ spec: specIn, done, skip = [], next: nextProp, ticks
                 {pop > 0 && (
                   <span style={{ position: "absolute", left: cl, top: ct, width: cs, height: cs, borderRadius: cornerRadius(theme, "chip"), boxShadow: `0 0 ${pop * 40}px ${pop * 8}px ${withAlpha(theme.color.accent, 0.55 * pop)}` }} />
                 )}
-                {pop > 0 && (
+                {stage && lateRow && ringP > 0 && ringP < 1 && (
+                  // anillo que se expande desde la tilde y se desvanece (cierra el momento)
+                  <span style={{ position: "absolute", left: cl - Math.round(cs * ringP * 1.1), top: ct - Math.round(cs * ringP * 1.1), width: Math.round(cs * (1 + ringP * 2.2)), height: Math.round(cs * (1 + ringP * 2.2)), boxSizing: "border-box", borderRadius: cornerRadius(theme, "chip"), border: `${Math.max(1, Math.round(5 * (1 - ringP)))}px solid ${theme.color.accent}`, opacity: +((1 - ringP) * 0.95).toFixed(3) }} />
+                )}
+                {!(stage && lateRow) && pop > 0 && (
                   <span style={{ position: "absolute", left: cl - Math.round(cs * 0.2), top: ct - Math.round(cs * 0.2), width: Math.round(cs * 1.4), height: Math.round(cs * 1.4), borderRadius: cornerRadius(theme, "chip"), border: `3px solid ${theme.color.accent}`, transform: `scale(${0.6 + (1 - pop) * 0.8})`, opacity: pop }} />
                 )}
               </>
@@ -145,10 +223,11 @@ export function Interlude({ spec: specIn, done, skip = [], next: nextProp, ticks
                 gradientLoop={spec.design?.gradient?.loop}
                 underline={isNext ? nextP : 0}
                 underlineOpacity={lateRow ? 1 - kf(f, [win[0], win[0] + u(12)], [0, 1]) : isNext ? 1 : 0}
-                style={rowEntrance(theme, rowIn, i, { distance: 60, round: false })}
+                style={rowStyle}
               />
             );
           })}
+          {thumb}
         </div>
       </World>
       {next >= 0 && <Wash range={[T.fly[1] - u(26), T.fly[1] - u(10)]} />}
