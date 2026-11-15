@@ -200,7 +200,7 @@
     var runKey = keyOf(el) + '#' + Array.prototype.indexOf.call(el.childNodes, node);
     var run = {
       id: runs.length, key: runKey, elId: idOf(el), chain: chain, tag: tag.toLowerCase(), testid: testidOf(el),
-      text: excerpt(node.data),
+      text: excerpt(node.data), endsEllipsis: /\u2026\s*$/.test(node.data),
       rect: { x: x0, y: y0, w: x1 - x0, h: y1 - y0 }, lines: rects,
       opacity: opacityUp(el), fontPx: fontPx, scale: scale, transformed: transformed, screenPx: fontPx * scale, bold: weight >= 700,
       color: 'rgba(' + fill.r + ',' + fill.g + ',' + fill.b + ',' + fill.a + ')', transparentFill: fill.a < 0.05,

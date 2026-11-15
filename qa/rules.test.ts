@@ -57,6 +57,18 @@ describe('rules on plain data', () => {
     const f = check([own, cut, gone, silenced], ['clip']);
     expect(f.map((x) => x.element.testid)).toEqual([own.testid, cut.testid]);
   });
+  it('clip: a text that ends in a literal "…" is an error unless data-qa-ignore="clip"; ellipsis that does not cut is not', () => {
+    const lit = run({ text: 'Módulo Sincro Pres…', endsEllipsis: true });
+    const spaced = run({ text: 'videos a partir de contexto y un design syst…', endsEllipsis: true });
+    const excerpt = run({ text: 'Escribinos a persona.ejemplo@dominio-fi…' }); // el extracto de un texto largo termina en "…" por el recolector: no es un recorte
+    const mid = run({ text: 'Cargando… listo' });
+    const marked = run({ text: 'Cortado a propósito…', endsEllipsis: true, ignore: ['clip'] });
+    const fits = run({ own: { sw: 100, cw: 170, sh: 30, ch: 30, ox: 'hidden', oy: 'visible', ellipsis: true } }); // text-overflow: ellipsis que no recorta
+    const f = check([lit, spaced, excerpt, mid, marked, fits], ['clip']);
+    expect(f.map((x) => x.element.testid)).toEqual([lit.testid, spaced.testid]);
+    expect(f.every((x) => x.severity === 'error' && x.rule === 'clip')).toBe(true);
+    expect(f[0]!.message).toContain('…');
+  });
   it('clip: a box as big as the frame, or a cut that is the frame edge, is not a clip', () => {
     const stageBox = { id: 1, tag: 'div', testid: null, rect: { x: 0, y: 0, w: W, h: H }, ox: true, oy: true };
     const r = run({ clips: [stageBox], rect: { x: W - 50, y: 100, w: 200, h: 30 } });

@@ -1,7 +1,16 @@
 import { describe, hiddenFraction, ignored, intersect, isHuge, protrusion } from '../geometry';
 import type { Finding, Rule } from '../types';
 
-/** Text visually cut: own overflow under overflow:hidden/ellipsis, or line boxes partly outside an overflow-hidden ancestor. */
+/**
+ * Un texto que termina en "…" escrito en el propio texto (no `text-overflow`): lo acortó quien maqueta (un `fitText`, un recorte a mano) porque no entraba.
+ * Es lo mismo que una elipsis de CSS que recorta: el contenido no se lee entero. Solo se calla con `data-qa-ignore="clip"` y un comentario que diga por qué.
+ */
+const literalEllipsis = (r: { endsEllipsis?: boolean }) => r.endsEllipsis === true;
+
+/**
+ * Text visually cut: own overflow under overflow:hidden/ellipsis (`text-overflow: ellipsis` que de verdad recorta), a literal trailing "…" in the text,
+ * or line boxes partly outside an overflow-hidden ancestor. All errors unless `data-qa-ignore="clip"`.
+ */
 export const clipRule: Rule = {
   id: 'clip',
   description: 'Texto cortado por un contenedor con overflow oculto o por elipsis',
@@ -17,7 +26,10 @@ export const clipRule: Rule = {
       const o = r.own;
       const clipX = o.ox !== 'visible';
       const clipY = o.oy !== 'visible';
-      if (clipX && o.sw > o.cw + t.tolerancePx) {
+      if (literalEllipsis(r)) {
+        why = `el texto termina en "…": esta cortado (${JSON.stringify(r.text.slice(-24))}); que entre entero o, si es a proposito, data-qa-ignore="clip" con el motivo`;
+        data = { literalEllipsis: true };
+      } else if (clipX && o.sw > o.cw + t.tolerancePx) {
         why = `el texto (${Math.round(o.sw)}px) es mas ancho que su caja (${Math.round(o.cw)}px)${o.ellipsis ? ' y se recorta con elipsis' : ''}`;
         data = { scrollWidth: o.sw, clientWidth: o.cw };
       } else if (clipY && o.sh > o.ch + t.tolerancePx) {

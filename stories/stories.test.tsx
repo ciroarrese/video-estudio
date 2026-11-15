@@ -10,7 +10,7 @@ import {
 } from "./index";
 import type { StorySpec, TopicScene } from "./index";
 import { TopicContext } from "./topic";
-import { closingCamStart, closingWall, labelAt, listLayout, panelEntryLift, panelLayout, panelRects, pillBudget, reservedSlots, textWidth } from "./layout";
+import { closingCamStart, closingWall, labelAt, lineMeter, listLayout, nameMeter, panelEntryLift, panelLayout, panelRects, pillBudget, reservedSlots, textWidth } from "./layout";
 
 const config = { fps: 30, width: 1920, height: 1080, durationInFrames: 1000 };
 const html = (node: React.ReactNode, theme: Theme, frame: number) =>
@@ -149,11 +149,21 @@ describe("layout", () => {
     for (let n = 2; n <= 6; n++) {
       for (const s of [specN(n), { ...specN(n), topics: specN(n).topics.map((t) => ({ ...t, name: t.name.repeat(5), line: t.line.repeat(5) })) }]) {
         const L = listLayout(s, neutral, 1920, 1080);
-        expect(L.top).toBeGreaterThanOrEqual(neutral.safe.y);
-        expect(L.top + n * L.rowH).toBeLessThanOrEqual(1080 - neutral.safe.y + 1);
-        expect(L.blockTop + L.blockH).toBeLessThanOrEqual(L.rowH);
+        // con el texto de siempre, la lista entra en el área segura; con texto larguísimo que obliga a partir en renglones (`nameRows`) puede pasarla un poco
+        // (más vale usar casi todo el alto que cortar un nombre), pero sigue dentro del cuadro con el 3 % de margen
+        const margin = L.nameRows ? Math.round(1080 * 0.03) : neutral.safe.y;
+        expect(L.top).toBeGreaterThanOrEqual(margin);
+        expect(L.top + n * L.rowH).toBeLessThanOrEqual(1080 - margin + 1);
+        expect(L.blockTop + L.blockH).toBeLessThanOrEqual(L.rowH + (L.nameRows ? 22 : 0)); // 22 px: el aire que se deja entre filas
         const avail = L.rowW - L.numW;
         for (let i = 0; i < n; i++) {
+          if (L.nameRows) {
+            // la lista de siempre cortaría con "…": se acomodó en renglones medidos (ver `angosto.test.tsx`); el nombre sale entero y cada renglón entra
+            expect(L.names[i]).toBe(s.topics[i]!.name);
+            for (const r of L.nameRows[i]!) expect(nameMeter(neutral)(r, L.nameSize)).toBeLessThanOrEqual(1920 - 2 * neutral.safe.x - L.numW + 1);
+            for (const r of L.lineRows[i]!) expect(lineMeter(neutral)(r, L.lineSize)).toBeLessThanOrEqual(1920 - 2 * neutral.safe.x - L.numW + 1);
+            continue;
+          }
           expect(L.names[i]!.length * 0.56 * L.nameSize).toBeLessThanOrEqual(avail + 1);
           expect(L.lines[i]!.length * 0.52 * L.lineSize).toBeLessThanOrEqual(avail + 1);
         }

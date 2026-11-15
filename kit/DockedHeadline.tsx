@@ -31,6 +31,7 @@ export function DockedHeadline({
   layout = "stacked",
   size = "md",
   gradientLoop,
+  titleMaxWidth,
 }: {
   index: number;
   title: string;
@@ -41,6 +42,8 @@ export function DockedHeadline({
   layout?: "stacked" | "inline";
   size?: "md" | "sm";
   gradientLoop?: number;
+  /** Ancho máximo (px) del título: si el nombre no entra, pasa a otro renglón en vez de cortarse. Sin él, el título va en un solo renglón (como siempre). */
+  titleMaxWidth?: number;
 }) {
   const theme = useTheme();
   const k = size === "sm" ? 0.85 : 1;
@@ -66,7 +69,7 @@ export function DockedHeadline({
     ...(resting ? {} : entrance(theme, a, 0, { native: "slide", distance: 30, round: false })),
     zIndex: 90,
   };
-  const title = { fontSize: caption, ...textStyle(theme, "title"), color: theme.color.text, lineHeight: 1.15 };
+  const title = { fontSize: caption, ...textStyle(theme, "title"), color: theme.color.text, lineHeight: 1.15, ...(titleMaxWidth !== undefined ? { maxWidth: titleMaxWidth, whiteSpace: "normal" as const } : {}) };
   const sub = (size: number, lineHeight: number) => ({ fontSize: size, color: theme.color.textMuted, ...textStyle(theme, "caption"), lineHeight });
   return (
     <div key={resting ? "rest" : "anim"} style={style}>

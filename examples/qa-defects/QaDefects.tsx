@@ -43,7 +43,7 @@ import { Fill, useFrame } from '../../engine';
  * sin otro texto fuera de ella: la exencion se RECHAZA (aviso, `summary.fixedScale.refused`), el estres se aplica y el rotulo da `clip`.
  * Frame 18 builds a term and an e-mail out of one span per letter / per part: only the privacy check cares (block-level scan).
  */
-export const QA_DEFECT_FRAMES = { clean: 0, clip: 1, offscreen: 2, overlap: 3, tiny: 4, contrast: 5, covered: 6, privacy: 7, wash: 8, flyingA: 9, flyingB: 10, faint: 11, leavingA: 12, leavingB: 13, leavingC: 14, stillFaint: 15, sideCover: 16, hiddenStatic: 17, split: 18, veilCrossA: 19, veilCrossB: 20, veilCrossC: 21, veilStaticA: 22, veilStaticB: 23, veilStaticC: 24, slowFadeA: 25, slowFadeB: 26, slowFadeC: 27, slowStaticA: 28, slowStaticB: 29, slowStaticC: 30, crossMoveA: 31, crossMoveB: 32, crossMoveC: 33, crossStillA: 34, crossStillB: 35, crossStillC: 36, overlapMoveA: 37, overlapMoveB: 38, overlapMoveC: 39, overlapStillA: 40, overlapStillB: 41, overlapStillC: 42, coverMoveA: 43, coverMoveB: 44, coverMoveC: 45, coverStillA: 46, coverStillB: 47, coverStillC: 48, camMoveA: 49, camMoveB: 50, camMoveC: 51, camStillA: 52, camStillB: 53, camStillC: 54, splitBlocks: 55, splitLine: 56, zoomOut: 57, zoomIn: 59, neverReadable: 61, svgFillDark: 63, svgFillPale: 64, svgStroke: 65, hiddenCovers: 66, inheritedHidden: 67, visibleCanvas: 68, decorOk: 69, decorStrict: 70, decorClip: 71, decorOverlap: 72, decorOffscreen: 73, decorMainOffscreen: 74, ignoreCounted: 75, vigContrastA: 76, vigContrastB: 77, vigOverlapA: 78, vigOverlapB: 79, vigCoveredA: 80, vigCoveredB: 81, vigFadeA: 82, vigFadeB: 83, vigFadeC: 84, washCrossA: 85, washCrossB: 86, washCrossC: 87, washStillA: 88, washStillB: 89, washStillC: 90, washClosed: 91, gradientOverlap: 92, fixedOk: 93, fixedStrict: 94, fixedWhole: 95 } as const;
+export const QA_DEFECT_FRAMES = { clean: 0, clip: 1, offscreen: 2, overlap: 3, tiny: 4, contrast: 5, covered: 6, privacy: 7, wash: 8, flyingA: 9, flyingB: 10, faint: 11, leavingA: 12, leavingB: 13, leavingC: 14, stillFaint: 15, sideCover: 16, hiddenStatic: 17, split: 18, veilCrossA: 19, veilCrossB: 20, veilCrossC: 21, veilStaticA: 22, veilStaticB: 23, veilStaticC: 24, slowFadeA: 25, slowFadeB: 26, slowFadeC: 27, slowStaticA: 28, slowStaticB: 29, slowStaticC: 30, crossMoveA: 31, crossMoveB: 32, crossMoveC: 33, crossStillA: 34, crossStillB: 35, crossStillC: 36, overlapMoveA: 37, overlapMoveB: 38, overlapMoveC: 39, overlapStillA: 40, overlapStillB: 41, overlapStillC: 42, coverMoveA: 43, coverMoveB: 44, coverMoveC: 45, coverStillA: 46, coverStillB: 47, coverStillC: 48, camMoveA: 49, camMoveB: 50, camMoveC: 51, camStillA: 52, camStillB: 53, camStillC: 54, splitBlocks: 55, splitLine: 56, zoomOut: 57, zoomIn: 59, neverReadable: 61, svgFillDark: 63, svgFillPale: 64, svgStroke: 65, hiddenCovers: 66, inheritedHidden: 67, visibleCanvas: 68, decorOk: 69, decorStrict: 70, decorClip: 71, decorOverlap: 72, decorOffscreen: 73, decorMainOffscreen: 74, ignoreCounted: 75, vigContrastA: 76, vigContrastB: 77, vigOverlapA: 78, vigOverlapB: 79, vigCoveredA: 80, vigCoveredB: 81, vigFadeA: 82, vigFadeB: 83, vigFadeC: 84, washCrossA: 85, washCrossB: 86, washCrossC: 87, washStillA: 88, washStillB: 89, washStillC: 90, washClosed: 91, gradientOverlap: 92, fixedOk: 93, fixedStrict: 94, fixedWhole: 95, literalEllipsis: 96, literalEllipsisMarked: 97, ellipsisFits: 98 } as const;
 
 const font: CSSProperties = { fontFamily: 'Arial, Helvetica, sans-serif', color: '#1b1f2a' };
 const abs = (left: number, top: number, extra: CSSProperties = {}): CSSProperties => ({ position: 'absolute', left, top, margin: 0, whiteSpace: 'nowrap', ...font, ...extra });
@@ -503,6 +503,23 @@ export function QaDefects() {
       );
       break;
     }
+    case 96:
+    case 97:
+      // nombre acortado a mano con "…" (lo que hacia un `fitText` de la historia): se lee cortado aunque el CSS no recorte nada. El 97 lleva la marca explicita.
+      body = (
+        <Card>
+          <p data-testid="literal-ellipsis" {...(f === 97 ? { 'data-qa-ignore': 'clip' } : {})} style={abs(40, 70, { fontSize: 28 })}>Módulo Sincro Pres…</p>
+        </Card>
+      );
+      break;
+    case 98:
+      // `text-overflow: ellipsis` que NO recorta (el texto entra entero): no es un defecto
+      body = (
+        <Card>
+          <div data-testid="ellipsis-fits" style={{ position: 'absolute', left: 40, top: 70, width: 400, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontSize: 26, ...font }}>Módulo Sincro Presta</div>
+        </Card>
+      );
+      break;
     default:
       body = (
         <Card>

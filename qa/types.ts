@@ -27,6 +27,8 @@ export type TextRun = {
   tag: string;
   testid: string | null;
   text: string;
+  /** El texto completo (no el extracto de `text`) termina en "…" escrito en el propio texto: un recorte hecho al maquetar (regla `clip`). */
+  endsEllipsis?: boolean;
   /** Union of the line rects, in frame pixels (transforms already applied). */
   rect: Rect;
   lines: Rect[];
