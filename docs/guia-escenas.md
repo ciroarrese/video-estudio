@@ -62,7 +62,7 @@ const cam = cameraAt(f, KEYS);            // { x, y, scale, rx, ry, blur }
 | Trayecto 2D por paradas | `track(f, [[f, x, y], ...])` |
 | Texto que se escribe | `typed(texto, f, inicio, caracteresPorCuadro)` |
 | Cursor que viaja y hace clic | `Cursor` (`keys: [[f, x, y], ...]`, `clicks: [f]`, `show: [ini, fin]`) |
-| Marcar algo a mano | `DoodleCircle`, `DoodleArrow`, `DoodleUnderline` (con `id` único, `start`, `end`) |
+| Señalar algo | `Callout` (`target`, `text?`, `range`): la forma la decide el tema (sección 16). `DoodleCircle`, `DoodleArrow` y `DoodleUnderline` (con `id` único, `start`, `end`) solo si el sistema es de trazo a mano |
 | Una tarjeta que viaja de un lugar a otro | `FlyingCard` con `range`, `from`, `to`, `arc` |
 | Número que cuenta | `CountUp` (`start`, `duration`, `format?`) |
 | Texto con el degradado del tema | `GradientText` (`loop={90}` lo hace ir y volver y termina exacto en el primer cuadro del ciclo; `pan` es una velocidad sin ciclo exacto) |
@@ -524,7 +524,7 @@ export const SceneVideo: React.FC<{ title?: string; subtitle?: string }> = ({ ti
 );
 ```
 
-Qué copiar de este ejemplo: las constantes arriba (la caja, las filas y los tiempos, para que el guion y el código se lean juntos); la cámara con la primera clave sostenida; `data-qa-ignore` condicionado al zoom; el resultado derivado del cuadro (`hecho = f >= T.result`), nunca guardado; el garabato que empieza después del resultado.
+Qué copiar de este ejemplo: las constantes arriba (la caja, las filas y los tiempos, para que el guion y el código se lean juntos); la cámara con la primera clave sostenida; `data-qa-ignore` condicionado al zoom; el resultado derivado del cuadro (`hecho = f >= T.result`), nunca guardado; el garabato que empieza después del resultado (en este ejemplo es un `DoodleCircle` porque asume trazo a mano; con otro design system cambialo por un `Callout`, que dibuja la señal del tema: sección 16).
 
 ## 14. El design system decide la estética: qué usar en lugar de escribirlo
 
@@ -612,3 +612,29 @@ La matriz muestra qué hallazgos aparecen en unos sistemas y en otros no: ahí s
 **Lo que dejaron los ejemplos de `examples/`** (todos dan 0 errores y 0 avisos con `--themes all`; con el estrés de tipografía, `theme-scope` y la plantilla dan 0 y `kit-demo` 0 errores con avisos de las filas vecinas que el zoom corta): las pilas de `fx-in-scene` (cada elemento con `minHeight` en una columna, no `y` fijos, y celdas de la grilla separadas más que el cuadro para que ninguna vecina entre cortada), la ventana de `theme-scope` (columnas y filas en flujo con `flex-wrap`, pastillas a una distancia medida del título, pie en flujo bajo la ventana), el panel de `kit-demo` (todo en flujo bajo la franja del título, contador con tamaño calculado por su ancho medido, superficie atenuada aparte del texto), `story-demo` y la plantilla (la marca `offscreen` solo en lo que el zoom corta a propósito, con comentario, nunca en el sujeto del zoom).
 
 **Trampa de `--font-scale` con tamaños redondos.** Mientras `qa` no lo corrija, un `--font-scale 1.25` repetido sobre cuadros seguidos puede acumular la escala en elementos cuyo tamaño por 1,25 da un entero (44 px a 55 px): el navegador devuelve `55px` y el control no restaura el valor, así que el texto crece más a cada cuadro y aparecen falsos errores. Si el estrés da errores que crecen con el número de cuadro, repetí con `--font-scale 1.2501`.
+
+## 16. Leer el design system antes de escribir escenas: qué señales, efectos y transiciones usa
+
+**Paso obligatorio, antes de la primera escena y después de aprobar el tema.** Un design system no es solo una paleta: tiene un carácter (geométrico y sobrio, editorial, lúdico y manual, técnico y oscuro) y ese carácter decide con qué se señala, cómo entran las cosas y cómo se pasa de una escena a otra. Si la herramienta pone la misma flecha a mano en todos los videos, todos se ven como el mismo video con otros colores.
+
+**Regla explícita: no se usan flechas (ni círculos, ni subrayados a mano) por costumbre. Se usa la señal que el sistema usaría, o ninguna.**
+
+1. **Leé el design system provisto**: sus formas (esquinas, bordes, superficies), su iconografía (¿tiene flechas, íconos, ilustraciones?), su movimiento (¿rebota, desliza, funde, corta?), sus ejemplos de énfasis (¿subraya, resalta con marcador, encierra, usa color?). Mirá `theme.style` (`annotation`, `type.highlight`, `motion`, `decor`, `line`, `text`) y `themeCharacter(theme)`; sin material propio, el de `neutral`/`dark` ya trae su señal.
+2. **Decidí y dejá anotado en el guion** (sección "Recursos de señalamiento y movimiento", al principio de `guion.md`, antes de la primera tabla de escena):
+
+   ```md
+   ## Recursos de señalamiento y movimiento
+   - Carácter del design system: <geométrico-sobrio | editorial | lúdico-manual | técnico-oscuro | otro: cuál>
+   - Señal: <la de `annotation.mark` del tema> (se usa `Callout`; excepciones forzadas con `variant`: <ninguna | cuáles y por qué>)
+   - Énfasis de palabras: <`type.highlight` del tema> con `Highlight`
+   - Transición entre escenas: <`motion.transition`> (`Wash`) y salida de cámara <`motion.exit`>
+   - Efectos que se usan: <del catálogo, filtrados por afinidad (`docs/animaciones.md`)>
+   - Efectos y recursos que NO se usan, y por qué: <p. ej. garabatos y `MarkerDraw` (sistema geométrico), `DotWipe` (sistema editorial)>
+   - Piezas a adaptar a los elementos del sistema: <formas, bordes, iconografía y movimiento de lo que se recrea>
+   ```
+3. **Adaptá lo que haga falta** para que lo recreado tenga la estética del sistema: las esquinas y bordes salen de `cornerRadius`/`borderWidth`/`surfaceStyle` (no de números), la iconografía se dibuja con los trazos del tema (`line.weight`, `line.cap`), el movimiento con `entrance`/`staggerFrames`. Si el sistema pide una señal que el tema no puede expresar (por ejemplo un ícono propio como marca), se declara en `theme.style` o se pide la pieza; no se resuelve a mano en la escena.
+4. **Probá con otros sistemas** (`--props '{"theme":"papel"}'`, `editorial`, `neon`) y mirá la hoja: la llamada tiene que cambiar de forma, no solo de color.
+
+**Cómo se usa en una escena.** `<Callout target={rect} text="Subió 12 %" range={[44, 128]} />`: el tema pone la flecha recta, la línea con codo, el corchete, el anillo o el trazo a mano; `text` es opcional (sin texto es solo la marca). Para forzar otra: `variant="underline"` con un comentario que diga por qué lo sabe la escena y no el tema. Si el tema declara `none`, solo queda el rótulo y la escena se entiende igual: una escena nunca depende de una flecha para explicarse. El ejemplo `examples/annotation-demo` es la misma escena bajo los cinco temas (`npm run sheet -- annotation-demo --frames 47,100 --props '{"theme":"papel"}'`). Los garabatos (`DoodleCircle`, `DoodleArrow`, `DoodleUnderline`) y `MarkerDraw` quedan para sistemas de trazo a mano; con otro tema se dibujan limpios, pero no son lo que ese sistema usaría.
+
+**Transiciones y énfasis.** Entre escenas manda `motion.transition` (`Wash`: velo, cortina, corte o sin velo) y `motion.exit` (`dive` atraviesa un elemento, `settle` empuja con suavidad; si escribís `zoomThrough` a mano, `exitPower(theme, 40)` como potencia); las palabras clave, `Highlight` (`type.highlight`); la entrada de los elementos, `entrance` (`motion.entrance`). No elijas `DotWipe`, `MarkerDraw` ni un barrido propio sin mirar la afinidad del efecto en `docs/animaciones.md`.

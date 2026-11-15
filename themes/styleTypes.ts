@@ -18,6 +18,8 @@ export const STYLE_ENUMS = {
   backgroundKind: ["clouds", "plain", "grid", "dots", "gradient", "noise"],
   entrance: ["auto", "rise", "fade", "scale", "slide", "wipe", "depth"],
   transition: ["wash", "through", "cut", "wipe"],
+  exit: ["dive", "settle"],
+  annotationMark: ["auto", "hand", "arrow", "elbow", "bracket", "tag", "ring", "focus", "underline", "none"],
   doodleStroke: ["hand", "geometric"],
   accent: ["underline", "bar", "dot", "none"],
   titleCard: ["solid", "glass"],
@@ -54,6 +56,9 @@ export type HighlightStyle = Of<"highlight">;
 export type BackgroundKind = Of<"backgroundKind">;
 export type EntranceStyle = Of<"entrance">;
 export type TransitionStyle = Of<"transition">;
+export type ExitStyle = Of<"exit">;
+/** Cómo señala algo el design system (`style.annotation.mark`). `auto` deriva de `decor` (ver `annotationLook`); el resto es una forma concreta. */
+export type AnnotationMarkSetting = Of<"annotationMark">;
 export type AccentDecor = Of<"accent">;
 export type CaptionCase = Of<"captionCase">;
 export type CaptionWeight = Of<"captionWeight">;
@@ -146,6 +151,27 @@ export interface ThemeStyle {
     cameraTilt: number;
     /** Cierre de una escena hacia la siguiente. */
     transition: TransitionStyle;
+    /**
+     * Cómo sale la cámara hacia la escena siguiente: `dive` (atraviesa un elemento con `zoomThrough`: la escala se multiplica por 40 a 70, como siempre) o
+     * `settle` (empuja con suavidad, sin atravesar: la transición la hace el velo). Con `transition: "through"` la salida tiene que ser `dive`: sin velo,
+     * el atravesado es la transición (`checkTheme` lo avisa). Ayuda: `exitPower`.
+     */
+    exit: ExitStyle;
+  };
+  /**
+   * Cómo se señala algo en pantalla (llamadas, énfasis sobre una zona, rótulos que apuntan). Un design system decide la señal que usaría:
+   * un trazo a mano, una flecha recta, una línea con codo y punto, un corchete, una etiqueta pegada, un anillo, un foco que atenúa el resto,
+   * un subrayado o ninguna. `Callout` la resuelve con `annotationLook`; una escena puede forzar otra con la prop `variant` (excepción explícita).
+   */
+  annotation: {
+    /**
+     * `auto` (por defecto, el de un tema que no declara el grupo): se deriva de `decor` (sin garabatos: sin señal; con trazo a mano: a mano; con trazo
+     * geométrico: flecha recta). El resto fija la forma: `hand`, `arrow`, `elbow`, `bracket`, `tag` (píldora pegada, sin flecha), `ring`, `focus`
+     * (anillo; la escena atenúa el resto con `focusOpacity`), `underline` y `none` (solo el rótulo, sin señal).
+     */
+    mark: AnnotationMarkSetting;
+    /** 0,2 a 0,9: cuánto se atenúa el resto del cuadro con `focus` (opacidad del fondo que se le superpone). */
+    dim: number;
   };
   decor: {
     /** `false`: los garabatos del kit no se dibujan. */

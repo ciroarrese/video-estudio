@@ -454,10 +454,15 @@ export function cameraOptions(theme: Theme): { tiltGain?: number; maxBlur?: numb
 
 // ---------- decoración ----------
 
-/** Garabatos: `enabled` (si no, no se dibujan) y `jitter` (temblor de mano; `false` = trazo limpio). */
+/**
+ * Garabatos: `enabled` (si no, no se dibujan) y `jitter` (temblor de mano; `false` = trazo limpio). `decor.doodles: false` los apaga; con
+ * `annotation.mark: "none"` tampoco hay trazos. Con un `annotation.mark` explícito el temblor lo decide la señal (solo `hand` tiembla); con `auto`
+ * (un tema que no declara `annotation`) sigue `decor.doodleStroke`, como siempre. Para señalar algo en una escena nueva: `Callout`, no un garabato.
+ */
 export function doodleStyle(theme: Theme): { enabled: boolean; jitter: boolean } {
-  const d = resolveStyle(theme).decor;
-  return { enabled: d.doodles, jitter: d.doodleStroke === "hand" };
+  const st = resolveStyle(theme);
+  const m = st.annotation.mark;
+  return { enabled: st.decor.doodles && m !== "none", jitter: m === "auto" ? st.decor.doodleStroke === "hand" : m === "hand" };
 }
 
 /** Multiplicador de la viñeta (`Vignette strength`); 0 = apagada. */

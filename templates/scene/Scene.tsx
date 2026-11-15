@@ -11,17 +11,17 @@
 //    (`Eyebrow`, `useCameraAt`, y `Highlight` / `Numeral` para palabras y cifras destacadas). La escena no pone radios, sombras, pesos ni curvas propios: cambiar el tema cambia el video.
 //  - Diseño por formato (`useFormat().pick`): una disposición para horizontal y otra para vertical.
 //    El mundo mide width x height del formato (no 1920x1080 a mano) y la cámara arranca en su centro.
-//  - Un acercamiento rápido en la acción clave, un clic, un garabato y un atravesado final.
+//  - Un acercamiento rápido en la acción clave, un clic, una señal del design system y un atravesado final.
 //  - Termina atravesando un elemento y con un velo (`Wash`) hacia la escena siguiente.
 import React from "react";
 import { useFormat, useFrame } from "../../engine";
 import {
-  Cursor, DockedHeadline, DoodleCircle, Eyebrow, Stage, Wash, World,
+  Callout, Cursor, DockedHeadline, Eyebrow, Stage, Wash, World,
   hideFromScale, kf, useCameraAt, zoomThrough,
 } from "../../kit";
 import type { CameraKey } from "../../kit";
 import { MaskedRise } from "../../fx";
-import { ThemeProvider, borderWidth, dark, editorial, entrance, neon, neutral, papel, staggerFrames, surfaceStyle, useTheme } from "../../themes";
+import { ThemeProvider, borderWidth, dark, editorial, entrance, exitPower, neon, neutral, papel, staggerFrames, surfaceStyle, useTheme } from "../../themes";
 import { theme as videoTheme } from "../theme";
 
 /** Duración de la escena en cuadros (30 fps = 5 s). La historia la lee de acá. */
@@ -68,7 +68,7 @@ const LAYOUTS: { horizontal: Layout; vertical: Layout } = {
     row: { w: 920, h: 96 },
     rows: [0, 1, 2].map((i) => ({ x: 80, y: 1250 + i * 120 })),
     cursorHome: { x: 940, y: 1580 },
-    zoom: 2, // tope: (1080 - 2 * 70) / 440 = 2,13; 2 muestra la tarjeta entera con su garabato
+    zoom: 2, // tope: (1080 - 2 * 70) / 440 = 2,13; 2 muestra la tarjeta entera con su señal
     through: { x: 540, y: 1298 },
   },
 };
@@ -112,7 +112,7 @@ export function SceneBody({ title, subtitle }: SceneProps) {
   });
   const { panel: PANEL, card: CARD } = L;
   const cam = useCameraAt(f, cameraKeys(L, width / 2, height / 2), {
-    map: (fr, c) => zoomThrough(fr, T.through, c, L.through, 40),
+    map: (fr, c) => zoomThrough(fr, T.through, c, L.through, exitPower(t, 40)),
     noBlurFrom: T.through[0],
   });
   const picked = f >= T.click;
@@ -181,8 +181,10 @@ export function SceneBody({ title, subtitle }: SceneProps) {
           </div>
         ))}
 
-        {/* Un garabato sobre lo que importa (también en coordenadas del mundo). Cada uno lleva un `id` único. */}
-        <DoodleCircle start={T.doodle} end={108} id="tpl-circle" cx={target.x} cy={target.y} rx={CARD.w / 2 + 20} ry={CARD.h / 2 + 16} />
+        {/* Una señal sobre lo que importa (también en coordenadas del mundo). La forma NO se elige acá: la decide `style.annotation.mark` del design system
+            (flecha, codo, corchete, anillo, trazo a mano o ninguna). Sin `text` es solo la marca; con `text="..."` suma un rótulo que se ubica solo.
+            No uses garabatos ni flechas por costumbre: si el sistema no las usa, no van (`docs/guia-escenas.md`, sección 16). */}
+        <Callout range={[T.doodle, 108]} target={{ x: L.cards[PICK]!.x, y: L.cards[PICK]!.y, w: CARD.w, h: CARD.h }} />
 
         {/* Un clic: el cursor viaja en coordenadas del mundo y la onda sale en cada cuadro de `clicks`. */}
         <Cursor show={[T.hold - 2, 108]} keys={[[T.hold - 2, L.cursorHome.x, L.cursorHome.y], [T.click - 2, target.x + 60, target.y + 50]]} clicks={[T.click]} />

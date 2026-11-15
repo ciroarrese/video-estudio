@@ -117,5 +117,17 @@ export function styleWarnings(theme: Theme, ratio: (a: string, b: string) => num
   } else if (st.text.decoration === "underline" || st.text.decoration === "box") {
     add(`style.text.decoration/${st.text.decoration}`, ratio(c.accent, c.bg), 3, `El adorno ${st.text.decoration} se dibuja con color.accent sobre el fondo`, "Usá un acento más contrastado o text.decoration none.");
   }
+  // señales (`annotation`): el trazo de la señal va en acento sobre el fondo
+  const mark = st.annotation.mark;
+  if (mark !== "auto" && mark !== "none" && mark !== "tag") {
+    add(`style.annotation.${mark}/accent`, ratio(c.accent, c.bg), 3, `La señal ${mark} se dibuja con color.accent sobre el fondo`, "Usá un acento más contrastado con el fondo, o annotation.mark tag / none.");
+  }
+  // salida de cámara: sin velo (`through`) el atravesado ES la transición
+  if (st.motion.transition === "through" && st.motion.exit === "settle") {
+    out.push({
+      pair: "style.motion.exit/transition", ratio: 0, required: 0, severity: "error",
+      message: "style.motion.exit/transition: con motion.transition through no hay velo y la salida con motion.exit settle no atraviesa nada, así que la escena cortaría en seco. Usá motion.exit dive o una transición con velo (wash, wipe, cut).",
+    });
+  }
   return out;
 }

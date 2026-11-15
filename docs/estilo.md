@@ -65,6 +65,19 @@ Los parámetros de las nubes siguen en `theme.cloud`: colores, opacidad, cantida
 | `cameraTilt` | 0 a 3 (1) | Multiplica `tiltGain` (0,05) de `cameraAt`. | `cameraOptions` | cumplido (ídem `cameraBlur`) |
 | `transition` | `wash` (por defecto), `through`, `cut`, `wipe` | `Wash` (kit): `wash` = velo; `wipe` = cortina de izquierda a derecha; `cut` = escalón al llegar a 1; `through` = sin velo (la escena siguiente entra sobre el fondo que sigue; hace falta que el final de la escena atraviese un elemento, como hoy). Conserva `data-qa-veil` y `data-qa-ignore="covered"` en `wash` y `wipe`. | `transitionVeil(theme, progress, color?)` → `{ kind, style } \| null` | cumplido: `Wash` (kit), velo de `stories` |
 
+| `exit` | `dive` (por defecto), `settle` | Cómo sale la cámara hacia la escena siguiente: `dive` atraviesa un elemento con `zoomThrough` (potencia 40 a 70, como siempre); `settle` empuja con suavidad (potencia 1,5) y deja la transición al velo. Con `transition: "through"` tiene que ser `dive` (sin velo el atravesado es la transición): `checkTheme` lo marca como error. | `exitPower(theme, native)` (se pasa como `power` de `zoomThrough`) | cumplido: `Opening`, `Interlude` y la plantilla. Quien escriba `zoomThrough` a mano en una escena propia usa `exitPower` |
+
+### `annotation`: cómo se señala algo
+
+Una escena no decide con qué señala (una flecha, un círculo a mano, un subrayado): lo decide el design system, que es quien sabe qué señal usaría. `Callout` (kit) la resuelve con `annotationLook(theme, variant?)`; la escena puede forzar otra con la prop `variant` (excepción explícita, a comentar).
+
+| Campo | Valores | Pieza → qué cambia | Ayuda | Estado |
+|---|---|---|---|---|
+| `mark` | `auto` (por defecto), `hand`, `arrow`, `elbow`, `bracket`, `tag`, `ring`, `focus`, `underline`, `none` | `hand`: óvalo y flecha curva con temblor sembrado. `arrow`: flecha recta con cabeza. `elbow`: línea con codo y punto en el objetivo. `bracket`: corchete al margen del objetivo con la nota pegada. `tag`: píldora pegada, sin trazo. `ring`: anillo con las esquinas del tema (`cornerRadius(theme, "control")`) y halo si `line.glow` > 0. `focus`: anillo, y la escena atenúa lo demás con `focusOpacity(theme, progreso, variant?)` (opacidad `1 - dim`). `underline`: subrayado del objetivo. `none`: solo el rótulo, sin señal; sin texto, nada. `auto` (un tema que no declara el grupo) se deriva de `decor`: `doodles: false` da `none`, trazo a mano da `hand`, geométrico da `arrow`. Grosor, terminación y halo del trazo salen de `style.line` (`weight`, `cap`, `glow`). Sin texto, una flecha, codo o etiqueta pasan a anillo. | `annotationLook(theme, variant?)`, `resolveAnnotationMark`, `markHasConnector`; los garabatos usan `doodleStyle` (con `mark` explícito solo `hand` tiembla; con `none`, no se dibujan) | cumplido: `Callout`, `DoodleCircle`/`DoodleArrow`/`DoodleUnderline`, `MarkerDraw` (sin `kind`, lo elige el tema) |
+| `dim` | 0,2 a 0,9 (0,55) | Cuánto atenúa `focus` lo que no es el objetivo (la escena aplica `focusOpacity` a un contenedor de lo demás: la pieza no dibuja una capa grande, porque una capa translúcida que se monta y se desmonta rasteriza según el historial de cuadros). | `annotationLook(theme).dim`, `focusOpacity` | cumplido: `Callout` |
+
+Valores de los cinco temas: `neutral` `arrow`, `dark` `elbow`, `editorial` `bracket` (y `exit: settle`), `neon` `ring` con `dim` 0,7, `papel` `hand`. Un tema de tokens (`themeFromTokens`) que declara `decor.doodles` o `decor.doodleStroke` y no dice nada de `annotation.mark` conserva `auto` en vez de heredar la señal de `neutral`: así un design system anterior a este grupo se ve igual.
+
 ### `decor`: decoración
 
 | Campo | Valores | Pieza → qué cambia | Ayuda | Estado |

@@ -24,6 +24,8 @@ Las tres galerías admiten `&props={"theme":"dark"}`; `fx-in-scene` no es una ga
 
 ## Cómo elegir
 
+Esta tabla da el efecto por función; después filtrá por el carácter del design system con "Afinidad con el design system" (más abajo).
+
 | Necesitás | Probá con | Alternativas |
 |---|---|---|
 | Título de apertura | `MaskedRise` | `KineticWords` (con energía), `ScrambleDecode` (tono técnico), `ExtrudeType` (con volumen), `TypeRing` (portada) |
@@ -37,8 +39,8 @@ Las tres galerías admiten `&props={"theme":"dark"}`; `fx-in-scene` no es una ga
 | Notificación o aviso | `NotificationStack` | `ChatThread`, `CommandPalette` |
 | Mostrar una app | `PhoneFrame` / `PhoneScroll` con tu contenido | `PhoneOrbit` (gira hacia el espectador; acepta tu interfaz como `children` o `screen`) |
 | Cierre con logo | `LogoLand` | `SealSpin`, `MaskedRise` con `dot` |
-| Resaltar algo a mano | `MarkerDraw` | los garabatos del kit (`DoodleCircle`, ...) |
-| Transición entre escenas | `DotWipe` | `Tunnel`, `HalftoneWave`, `MarqueeBands` (separador) |
+| Señalar o llamar la atención sobre algo | `Callout` (la señal la decide el tema) | `MarkerDraw` y los garabatos del kit, solo si el design system es de trazo a mano |
+| Transición entre escenas | `Wash` (sigue a `motion.transition`) | `DotWipe` (lúdico), `Tunnel`, `HalftoneWave`, `MarqueeBands` (separador) |
 | Fondo animado | `WaveDots`, `TerrainMesh` | `HalftoneWave`, `LiquidBlob` |
 | Plano técnico, arquitectura | `BlueprintDraw` | `LayerExplode`, `CubeStack` |
 
@@ -136,6 +138,66 @@ Ayudas de tamaño de la interfaz (se importan de `fx/`): `phoneScreen(width, hei
 | `RibbonTwist` | Cinta que se retuerce mostrando dos caras. | Decoración, separador. | `segments`, `twists`, `ribbonWidth` |
 
 Notas: **`PixelBuild` muestrea la cobertura de los glifos en un canvas fuera de pantalla y espera a que cargue la tipografía del tema** (`holdRender` hasta que esté lista; la memoria de celdas es acotada y su clave incluye la fuente); sin canvas (pruebas), usa un patrón sembrado. Verificá en la hoja que la forma sea legible. `DotWipe` va a cuadro completo: se superpone a la escena y, con `inout`, termina despejado. Los trazados (`path`) aceptan `M L H V C S Q T A Z`, absolutos y relativos.
+
+## Afinidad con el design system
+
+Antes de elegir un efecto mirá el **carácter** del design system que te dieron: `geométrico-sobrio` (formas limpias, flechas rectas, sin adornos), `editorial` (esquinas rectas, contorno, serif, subrayados y corchetes), `lúdico-manual` (trazo a mano, superficies cálidas, marcador) y `técnico-oscuro` (fondo oscuro, líneas finas, halos, mallas). `themeCharacter(theme)` (en `themes/`) lo deduce del estilo de los cinco temas de ejemplo (`neutral` geométrico-sobrio, `dark` y `neon` técnico-oscuro, `editorial`, `papel` lúdico-manual); un design system propio puede no encajar del todo: decidilo vos y anotalo en el guion. "Evitar" no es una prohibición: es lo que desentona con ese carácter salvo que el guion lo justifique y lo adaptes con `theme.style`. El dato también está en código (`FX_AFFINITY`, `affinityOf(nombre)` y `fxFor(carácter | tema)` en `fx/affinity.ts`, que se exportan de `fx/`).
+
+**Señalar no es un efecto del catálogo: lo decide el tema.** Para llamar la atención sobre algo usá `Callout` (kit), que dibuja la señal de `style.annotation.mark` (flecha recta, línea con codo y punto, corchete, anillo, trazo a mano, etiqueta pegada, foco, subrayado o ninguna). `MarkerDraw` y los garabatos del kit son para sistemas de trazo a mano; no uses flechas por costumbre. La transición entre escenas es `Wash` (sigue a `motion.transition`); `DotWipe` es una elección lúdica, no la de siempre.
+
+| Efecto | Encaja con | Evitar en | Nota |
+|---|---|---|---|
+| `MaskedRise` | todos | - | Entrada limpia de titulares; sirve en cualquier sistema (el tema decide la llegada con text.arrival). |
+| `KineticWords` | geométrico-sobrio, técnico-oscuro, lúdico-manual | editorial | Corte seco y energía: evitarlo en un sistema editorial sobrio. |
+| `Typewriter` | técnico-oscuro, editorial | - | Comandos y citas; el cursor sigue a text.caret. |
+| `ScrambleDecode` | técnico-oscuro | editorial, lúdico-manual | Tono técnico o de cifrado; desentona con un sistema editorial o manual. |
+| `SplitFlap` | geométrico-sobrio, técnico-oscuro | lúdico-manual | Tablero mecánico; evitarlo donde el sistema es cálido y manual. |
+| `DigitRoll` | geométrico-sobrio, técnico-oscuro, editorial | - | Cifra destacada; neutro en casi todos. |
+| `MarqueeBands` | lúdico-manual, técnico-oscuro | editorial | Bandas inclinadas con energía; evitarlo en un sistema sobrio y de márgenes amplios. |
+| `TypeRing` | técnico-oscuro, lúdico-manual | editorial | Portada con volumen; recargado para un sistema editorial. |
+| `Globe` | geométrico-sobrio, técnico-oscuro | - | Alcance y red; pide líneas finas (line.weight) en sistemas editoriales. |
+| `ParticleSphere` | técnico-oscuro | editorial, lúdico-manual | Datos o IA en abstracto; frío y tecnológico. |
+| `CubeStack` | geométrico-sobrio, técnico-oscuro | lúdico-manual | Piezas que forman un todo, geométrico. |
+| `CubeFold` | geométrico-sobrio, técnico-oscuro | lúdico-manual | Entrega o paquete, geométrico. |
+| `Tunnel` | técnico-oscuro | editorial, lúdico-manual | Velocidad y avance; enérgico, no sobrio. |
+| `TerrainMesh` | técnico-oscuro | editorial, lúdico-manual | Fondo de malla; técnico. |
+| `TorusWire` | técnico-oscuro, geométrico-sobrio | lúdico-manual | Decoración de alambre. |
+| `Helix` | técnico-oscuro, geométrico-sobrio | lúdico-manual | Ciencia o código. |
+| `OrbitRings` | geométrico-sobrio, técnico-oscuro | lúdico-manual | Un sistema alrededor de un centro. |
+| `WaveDots` | técnico-oscuro, geométrico-sobrio | editorial | Fondo animado de puntos; evitarlo en un sistema editorial de fondo liso o de grilla. |
+| `LayerExplode` | geométrico-sobrio, técnico-oscuro, editorial | - | Capas rotuladas; claro y diagramático. |
+| `CardFlip` | geométrico-sobrio, editorial, lúdico-manual | - | Antes y después; con tarjetas del tema. |
+| `CarouselRing` | geométrico-sobrio, técnico-oscuro | editorial | Galería en anillo; vistoso, no sobrio. |
+| `IsoCity` | geométrico-sobrio, técnico-oscuro | lúdico-manual | Bloques isométricos. |
+| `ExtrudeType` | técnico-oscuro, geométrico-sobrio | editorial | Volumen en el titular; el tema elige la extrusión (depth.extrude). |
+| `PhoneOrbit` | geométrico-sobrio, técnico-oscuro | - | Presentar una app con tu interfaz en la pantalla. |
+| `LineDraw` | todos | - | Tendencia; sigue chart.lineWidth y chart.grid. |
+| `DonutRing` | geométrico-sobrio, técnico-oscuro, lúdico-manual | - | Porcentaje; en un sistema editorial preferí BarsGrow. |
+| `RadarMorph` | geométrico-sobrio, técnico-oscuro | lúdico-manual | Perfiles en varios ejes. |
+| `Bars3D` | técnico-oscuro, geométrico-sobrio | editorial | Barras con volumen; en un sistema editorial preferí BarsGrow. |
+| `BarsGrow` | todos | - | Comparar categorías; sigue chart.barRadius, chart.fill y chart.grid. |
+| `FlowSteps` | todos | - | Proceso en pasos; sigue la forma de panel del tema. |
+| `NotificationStack` | geométrico-sobrio, técnico-oscuro, lúdico-manual | - | Avisos; superficie y entrada del tema. |
+| `ChatThread` | geométrico-sobrio, técnico-oscuro, lúdico-manual | - | Conversación. |
+| `CommandPalette` | técnico-oscuro, geométrico-sobrio | lúdico-manual | Búsqueda rápida, técnica. |
+| `CardFan` | geométrico-sobrio, lúdico-manual | - | Varias opciones en abanico. |
+| `PhoneFrame` | todos | - | Marco para tu interfaz. |
+| `PhoneScroll` | todos | - | Pantalla larga o feed. |
+| `BeforeAfter` | todos | - | Comparación; manija neutra. |
+| `TileGrid` | geométrico-sobrio, técnico-oscuro | editorial | Progreso de muchas cosas a la vez. |
+| `TileDone` | todos | - | Tarea completada junto a un cursor. |
+| `BlueprintDraw` | técnico-oscuro, editorial, geométrico-sobrio | lúdico-manual | Plano técnico; líneas finas. |
+| `MarkerDraw` | lúdico-manual, editorial | técnico-oscuro | Trazo de marcador; evitarlo en un sistema técnico oscuro (usá Callout con la señal del tema). |
+| `PaperCollage` | lúdico-manual | geométrico-sobrio, técnico-oscuro, editorial | Collage artesanal; solo con un sistema manual. |
+| `ShapeMorph` | geométrico-sobrio, técnico-oscuro | editorial | Cambio de concepto, geométrico. |
+| `DotWipe` | lúdico-manual, geométrico-sobrio | editorial | Transición con un punto que crece; lúdica. En un sistema editorial usá Wash con motion.transition wipe. |
+| `HalftoneWave` | geométrico-sobrio, técnico-oscuro, editorial | - | Fondo o transición suave de semitono. |
+| `PixelBuild` | técnico-oscuro | editorial, lúdico-manual | Estética retro; solo si el sistema la tiene. |
+| `LogoLand` | todos | - | Cierre con marca. |
+| `LiquidBlob` | lúdico-manual, geométrico-sobrio | editorial, técnico-oscuro | Fondo orgánico; evitarlo en un sistema editorial o técnico. |
+| `SealSpin` | editorial, lúdico-manual, geométrico-sobrio | técnico-oscuro | Sello de cierre. |
+| `RibbonTwist` | lúdico-manual, geométrico-sobrio | editorial, técnico-oscuro | Decoración con cinta. |
+
 
 ## Principios
 

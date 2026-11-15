@@ -48,6 +48,8 @@ export const neon: ResolvedTheme = deepFreeze(resolveTheme({
     background: { kind: "dots", intensity: 0.7 },
     motion: { entrance: "depth", overshoot: 0.12, stagger: 2, staggerList: 6, staggerChips: 0.35, cameraBlur: true, cameraTilt: 1.6, transition: "through" },
     decor: { doodles: true, doodleStroke: "geometric", vignette: 0.6, vignetteColor: "accent2", accent: "bar", gradientLoop: 90 },
+    // Señal de luz: un anillo con halo alrededor del objetivo (con `focus` el resto se atenúa bastante), nunca un trazo a mano.
+    annotation: { mark: "ring", dim: 0.7 },
     story: {
       titleCard: "glass", listLayout: "stacked", listUnderline: "name", handoff: "through", headlineSize: "md", closingBg: "bg", signoffBar: true,
       wallColumns: 8, wallRows: 7, wallChipScale: 0.85, wallDolly: 300, wallDepth: 1.5, wallGapX: 1.2, wallGapY: 1.15, wallBrick: 1.5, wallJitter: 2.2, wallBlurOpening: true, wallBlurClosing: true,

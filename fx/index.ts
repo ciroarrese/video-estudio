@@ -8,3 +8,5 @@ export * from "./art";
 // "sub" existe en core (tramo de un progreso) y en three (resta de vectores): aca gana core;
 // la de vectores se importa desde "fx/three".
 export { sub } from "./core";
+export { FX_AFFINITY, affinityOf, fxFor } from "./affinity";
+export type { FxAffinity, FxName } from "./affinity";

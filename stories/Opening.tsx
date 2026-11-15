@@ -1,7 +1,7 @@
 import type React from "react";
 import { Easing, useFrame, useVideoConfig } from "../engine";
 import { Wash, World, kf, useCameraAt, zoomThrough } from "../kit";
-import { entrance, staggerFrames, staggerOverride, surfaceStyle, textStyle, useTheme } from "../themes";
+import { entrance, exitPower, staggerFrames, staggerOverride, surfaceStyle, textStyle, useTheme } from "../themes";
 import { fade, styleKey, xform } from "../fx/core/math";
 import { fitText, listLayout, openingWall, rigTransform } from "./layout";
 import { Chip, HeadlineRow, HighlightedTitle, StoryStage, rowEntrance, scaler, useEase, useStorySpec } from "./shared";
@@ -88,7 +88,7 @@ export function Opening({ spec: specIn, first = 0, dock, through }: { spec: Stor
 
   // atravesado del primer titular
   const cam = useCameraAt(f, [{ f: 0, x: cx, y: cy, scale: 1 }], {
-    map: (fr, c) => (docking ? c : zoomThrough(fr, T.fly, c, L.target(target), 60)),
+    map: (fr, c) => (docking ? c : zoomThrough(fr, T.fly, c, L.target(target), exitPower(theme, 60))),
     noBlurFrom: T.fly[0],
   });
   const othersOut = kf(f, [T.fly[0] - u(6), T.fly[0] + (docking ? 12 : u(14))], [1, 0]);

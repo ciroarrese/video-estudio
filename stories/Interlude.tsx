@@ -1,7 +1,7 @@
 import React from "react";
 import { Easing, useFrame, useVideoConfig } from "../engine";
 import { Wash, World, kf, useCameraAt, zoomThrough } from "../kit";
-import { cornerRadius, resolveStyle, settle, staggerFrames, surfaceStyle, useTheme, withAlpha } from "../themes";
+import { cornerRadius, exitPower, resolveStyle, settle, staggerFrames, surfaceStyle, useTheme, withAlpha } from "../themes";
 import { fade, xform } from "../fx/core/math";
 import { AVG_BOLD, AVG_REG, ROW_GAP, listLayout, textWidth } from "./layout";
 import { DefaultThumbnail } from "./Closing";
@@ -105,7 +105,7 @@ export function Interlude({ spec: specIn, done, skip = [], next: nextProp, ticks
   const nextP = kf(f, T.next, [0, 1], ease.out);
   const end = next < 0 ? kf(f, [dur - u(30), dur], [0, 1]) : 0;
   const cam = useCameraAt(f, [{ f: 0, x: width / 2, y: height / 2, scale: 1 }], {
-    map: (fr, c) => (next >= 0 ? zoomThrough(fr, [T.fly[0], T.fly[1] - u(10)], c, L.target(next), 60) : c),
+    map: (fr, c) => (next >= 0 ? zoomThrough(fr, [T.fly[0], T.fly[1] - u(10)], c, L.target(next), exitPower(theme, 60)) : c),
     noBlurFrom: T.fly[0],
   });
   const others = next >= 0 ? 1 - kf(f, [T.fly[0] - u(6), T.fly[0] + u(12)], [0, 1]) : 1;

@@ -24,7 +24,7 @@ export type { FlightOptions } from "./flight";
 export { Stage } from "./Stage";
 export { ThemeScope } from "./ThemeScope";
 export type { ThemeScopeProps } from "./ThemeScope";
-export { Callout, calloutBox, calloutPlacement } from "./Callout";
+export { Callout, calloutBox, calloutPlacement, focusOpacity } from "./Callout";
 export type { CalloutLayoutOptions } from "./Callout";
 export { placeBeside, calloutState, coveredOpacity, headlineStrip, cameraView, cameraKeepClear } from "./layout";
 export type { Rect, Side, Placement, PlaceOptions, CalloutStateOptions, HeadlineStripOptions, KeepClearOptions } from "./layout";
