@@ -23,6 +23,8 @@ npm run render -- --list                   # videos descubiertos (examples/* y v
 npm run render -- hello --format vertical  # vertical (1080x1920 / 720x1280); también cuadrado
 npm run sheet -- hello --format vertical --count 8   # out/hello-vertical-sheet.png
 npm run render -- story-demo --list-scenes # escenas con nombre; --scene <id|índice> renderiza solo una
+npm run render -- kit-demo --seconds 1:30-2:05 # un extracto con su sonido (también --frames a-b); --audio-peak-strict falla si el AAC se pasa de -1 dBTP
+npm run exec -- /ruta/al/script.ts           # corre un script de afuera que importa video-estudio/* (sin tsconfig propio)
 npm run qa -- story-demo --list-scenes     # lo mismo y, en una historia, el presupuesto de cuadros por bloque
 npm run sheet -- fx-text --count 8         # galería del catálogo de efectos (también fx-3d y fx-data-ui-art)
 ```

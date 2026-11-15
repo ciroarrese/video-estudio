@@ -132,7 +132,7 @@ function main(): Promise<void> {
         const res = {
           salida: r.salida, fps, durationFrames: frames, startSec: r.plan.startSec, loopStartSec: r.plan.loopStartSec, loopEndSec: r.plan.loopEndSec,
           final: r.plan.final, silencioFinalSec: r.plan.silencioFinalSec, cuerpo: r.cuerpo, headroomDb: r.headroomDb,
-          spliceFrames: r.spliceFrames, beatFrames: r.beatFrames, avisos: r.plan.avisos, plan: r.plan,
+          spliceFrames: r.spliceFrames, cortes: r.cortes, beatFrames: r.beatFrames, avisos: r.plan.avisos, plan: r.plan,
         };
         if (op.get('json')) writeFileSync(resolve(op.get('json')!), JSON.stringify(res, null, 2) + '\n');
         console.log(JSON.stringify({ ...res, plan: undefined }, null, 2));

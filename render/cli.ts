@@ -21,7 +21,7 @@ async function main(): Promise<number> {
   const log = (m: string) => console.log(m);
   const base = {
     videoId: o.videoId, out: o.out, props: o.props, frames: o.frames, concurrency: o.concurrency, scale: o.scale,
-    crf: o.crf, segment: o.segment, audio: o.audio, cache: o.cache, keepFrames: o.keepFrames, frameFormat: o.frameFormat, jpegQuality: o.jpegQuality, assets: o.assets, allowMissingFonts: o.allowMissingFonts || undefined, checkCount: o.checkCount, checkPerScene: o.checkPerScene, checkAll: o.checkAll, checkMaxDelta: o.checkMaxDelta, checkMaxRatio: o.checkMaxRatio, checkStrict: o.checkStrict, format: o.format, scene: o.scene, log,
+    crf: o.crf, segment: o.segment, audio: o.audio, cache: o.cache, keepFrames: o.keepFrames, frameFormat: o.frameFormat, jpegQuality: o.jpegQuality, assets: o.assets, allowMissingFonts: o.allowMissingFonts || undefined, checkCount: o.checkCount, checkPerScene: o.checkPerScene, checkAll: o.checkAll, checkMaxDelta: o.checkMaxDelta, checkMaxRatio: o.checkMaxRatio, checkStrict: o.checkStrict, format: o.format, scene: o.scene, seconds: o.seconds, audioBitrate: o.audioBitrate, audioPeakMax: o.audioPeakMax, audioPeakStrict: o.audioPeakStrict, audioPeakCheck: o.audioPeakCheck, log,
   };
   try {
     if (o.list) {

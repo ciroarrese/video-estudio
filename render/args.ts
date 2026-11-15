@@ -27,6 +27,12 @@ export type CliOptions = {
   checkAll: boolean;
   format?: FormatName;
   scene?: string;
+  /** `--seconds a-b`: rango en tiempo (segundos o m:ss); se convierte a cuadros cuando se conoce el fps. */
+  seconds?: [number, number];
+  audioBitrate: string;
+  audioPeakMax: number;
+  audioPeakStrict: boolean;
+  audioPeakCheck: boolean;
   list: boolean;
   listScenes: boolean;
   help: boolean;
@@ -40,6 +46,7 @@ export const USAGE = `Uso: ve-render <videoId> [opciones]
   --props '<json>'       Props (objeto JSON) que se mezclan con defaultProps
   --frames a-b           Solo ese rango de cuadros (inclusive)
   --format <f>           horizontal, vertical o cuadrado (el video tiene que admitirlo; ver defineVideo({ formats }))
+  --seconds a-b          Solo ese tramo, en segundos o m:ss (p. ej. 12.5-20 o 1:30-2:05; el fin no se incluye); no se combina con --frames ni --scene
   --scene <id|indice>    Solo esa escena (indice desde 0, como en --list-scenes); no se combina con --frames
   --list                 Lista los videos disponibles con su tamaño y formatos
   --list-scenes          Lista las escenas con nombre del video y sus cuadros
@@ -48,6 +55,10 @@ export const USAGE = `Uso: ve-render <videoId> [opciones]
   --crf N                Calidad x264, 0-51 (por defecto 18)
   --segment N            Cuadros por parte en cache (por defecto 150)
   --no-audio             No mezclar audio
+  --audio-bitrate <r>    Tasa del AAC (por defecto 192k; p. ej. 256k)
+  --audio-peak-max=<dB>  Pico verdadero maximo del audio YA codificado (por defecto -1 dBTP); si lo supera, avisa. Con el signo menos va con "="
+  --audio-peak-strict    Si el pico del audio codificado supera el maximo, falla (no deja el mp4)
+  --no-audio-peak-check  No medir el pico del audio codificado
   --no-cache             Ignorar y reescribir la cache de partes
   --keep-frames          Conservar los PNG junto a la salida
   --frame-format png|jpeg  Formato de captura (png sin perdida, por defecto; jpeg mas rapido)
@@ -66,6 +77,13 @@ export const USAGE = `Uso: ve-render <videoId> [opciones]
   -h, --help             Esta ayuda
 `;
 
+/** Segundos a partir de `12`, `12.5` o `m:ss(.f)` / `h:mm:ss(.f)`. */
+export function parseTiempo(name: string, txt: string): number {
+  const partes = txt.trim().split(':');
+  if (partes.length > 3 || partes.some((p) => !/^\d+(?:\.\d+)?$/.test(p))) throw new Error(`${name}: "${txt}" no es un tiempo (usá segundos, 12.5, o m:ss, 1:30)`);
+  return partes.reduce((acc, p) => acc * 60 + Number(p), 0);
+}
+
 const int = (name: string, v: string, min: number): number => {
   if (!/^-?\d+$/.test(v)) throw new Error(`${name} debe ser un entero (recibido "${v}")`);
   const n = Number(v);
@@ -73,7 +91,9 @@ const int = (name: string, v: string, min: number): number => {
   return n;
 };
 
-export function parseCliArgs(argv: string[]): CliOptions {
+export function parseCliArgs(argvIn: string[]): CliOptions {
+  // `--audio-peak-max -1`: node:util toma "-1" por una opción; se junta con "=" para que se lea como valor.
+  const argv = argvIn.flatMap((a, i) => (i > 0 && argvIn[i - 1] === '--audio-peak-max' && /^-\d/.test(a) ? [] : a === '--audio-peak-max' && /^-\d/.test(argvIn[i + 1] ?? '') ? [`--audio-peak-max=${argvIn[i + 1]}`] : [a]));
   let parsed;
   try {
     parsed = parseArgs({
@@ -88,6 +108,11 @@ export function parseCliArgs(argv: string[]): CliOptions {
         crf: { type: 'string' },
         segment: { type: 'string' },
         'no-audio': { type: 'boolean' },
+        seconds: { type: 'string' },
+        'audio-bitrate': { type: 'string' },
+        'audio-peak-max': { type: 'string' },
+        'audio-peak-strict': { type: 'boolean' },
+        'no-audio-peak-check': { type: 'boolean' },
         'no-cache': { type: 'boolean' },
         'keep-frames': { type: 'boolean' },
         'frame-format': { type: 'string' },
@@ -113,11 +138,11 @@ export function parseCliArgs(argv: string[]): CliOptions {
   }
   const { values: v, positionals } = parsed;
   if (v.help) {
-    return { videoId: '', props: {}, scale: 1, crf: 18, segment: 150, audio: true, cache: true, keepFrames: false, frameFormat: 'png', jpegQuality: 95, check: false, checkMaxDelta: 2, checkMaxRatio: 0.001, checkStrict: false, assets: [], allowMissingFonts: false, checkAll: false, list: false, listScenes: false, help: true };
+    return { videoId: '', props: {}, scale: 1, crf: 18, segment: 150, audio: true, cache: true, keepFrames: false, frameFormat: 'png', jpegQuality: 95, check: false, checkMaxDelta: 2, checkMaxRatio: 0.001, checkStrict: false, assets: [], allowMissingFonts: false, checkAll: false, audioBitrate: '192k', audioPeakMax: -1, audioPeakStrict: false, audioPeakCheck: true, list: false, listScenes: false, help: true };
   }
   if (v.list) {
     if (positionals.length) throw new Error('--list no lleva <videoId>');
-    return { videoId: '', props: {}, scale: 1, crf: 18, segment: 150, audio: true, cache: true, keepFrames: false, frameFormat: 'png', jpegQuality: 95, check: false, checkMaxDelta: 2, checkMaxRatio: 0.001, checkStrict: false, assets: [], allowMissingFonts: false, checkAll: false, list: true, listScenes: false, help: false };
+    return { videoId: '', props: {}, scale: 1, crf: 18, segment: 150, audio: true, cache: true, keepFrames: false, frameFormat: 'png', jpegQuality: 95, check: false, checkMaxDelta: 2, checkMaxRatio: 0.001, checkStrict: false, assets: [], allowMissingFonts: false, checkAll: false, audioBitrate: '192k', audioPeakMax: -1, audioPeakStrict: false, audioPeakCheck: true, list: true, listScenes: false, help: false };
   }
   if (positionals.length !== 1) throw new Error('Falta <videoId> (o sobran argumentos posicionales)');
   if ((v['check-count'] !== undefined || v['check-per-scene'] !== undefined || v['check-all']) && !v.check && !v['check-strict']) throw new Error('--check-count, --check-per-scene y --check-all van con --check');
@@ -125,6 +150,24 @@ export function parseCliArgs(argv: string[]): CliOptions {
   const format = parseFormat(v.format);
   if (v.scene !== undefined && v.scene === '') throw new Error('--scene necesita un id o un índice');
   if (v.scene !== undefined && v.frames !== undefined) throw new Error('--scene y --frames no se combinan: --scene ya fija el rango de cuadros');
+  if (v.seconds !== undefined && (v.frames !== undefined || v.scene !== undefined)) throw new Error('--seconds no se combina con --frames ni con --scene: cada uno fija el rango de cuadros');
+  let seconds: [number, number] | undefined;
+  if (v.seconds !== undefined) {
+    const m = /^([^-]+)-([^-]+)$/.exec(v.seconds);
+    if (!m) throw new Error(`--seconds debe ser "a-b" (segundos o m:ss; recibido "${v.seconds}")`);
+    const a = parseTiempo('--seconds', m[1]!);
+    const b = parseTiempo('--seconds', m[2]!);
+    if (b <= a) throw new Error(`--seconds: el final (${b} s) tiene que ser mayor que el inicio (${a} s)`);
+    seconds = [a, b];
+  }
+  const audioBitrate = v['audio-bitrate'] ?? '192k';
+  if (!/^\d+(?:\.\d+)?[kKmM]?$/.test(audioBitrate)) throw new Error(`--audio-bitrate debe ser una tasa como 192k o 256k (recibido "${audioBitrate}")`);
+  let audioPeakMax = -1;
+  if (v['audio-peak-max'] !== undefined) {
+    audioPeakMax = Number(v['audio-peak-max']);
+    if (!Number.isFinite(audioPeakMax) || audioPeakMax > 3 || audioPeakMax < -60) throw new Error(`--audio-peak-max debe ser un valor en dBTP entre -60 y 3 (recibido "${v['audio-peak-max']}")`);
+  }
+  if (v['audio-peak-strict'] && v['no-audio-peak-check']) throw new Error('--audio-peak-strict y --no-audio-peak-check se contradicen');
   let props: Record<string, unknown> = {};
   if (v.props !== undefined) {
     let p: unknown;
@@ -192,6 +235,11 @@ export function parseCliArgs(argv: string[]): CliOptions {
     assets: v.assets ?? [],
     format,
     scene: v.scene,
+    seconds,
+    audioBitrate,
+    audioPeakMax,
+    audioPeakStrict: !!v['audio-peak-strict'],
+    audioPeakCheck: !v['no-audio-peak-check'],
     list: false,
     listScenes: !!v['list-scenes'],
     help: false,

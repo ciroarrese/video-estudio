@@ -1,6 +1,6 @@
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
-import { json, num, one, parseArgs, type Parsed } from './args';
+import { json, leerListas, num, one, parseArgs, type Parsed } from './args';
 import { formatElement } from './geometry';
 import { makeSheet } from './sheet';
 import { openSession } from './session';
@@ -19,10 +19,10 @@ const USAGE = {
   sheet: `Uso: ve-sheet <videoId> [--frames 0,60,120 | --every N | --count 12] [--props json] [--format horizontal|vertical|cuadrado] [--scene id|índice] [--list-scenes]
              [--assets dir]... [--allow-missing-fonts] [--cols 4] [--scale 0.25] [--out out/<id>[-<formato>]-sheet.png] [--no-labels]   (--out acepta cualquier ruta, se crean las carpetas)`,
   qa: `Uso: ve-qa <videoId> [--frames 0,60,120 | --every N | --count 24] [--props json] [--format horizontal|vertical|cuadrado] [--scene id|índice] [--list-scenes] [--json salida.json | --out salida.json] [--fail-on error|warn] [--verbose] [--max 40]
-             [--assets dir]... [--allow-missing-fonts] [--rules clip,overlap,...] [--skip regla,...] [--set regla.umbral=valor]... [--concurrency N] [--repeat N]
+             [--per-scene 4] [--assets dir]... [--allow-missing-fonts] [--rules clip,overlap,...] [--skip regla,...] [--set regla.umbral=valor]... [--concurrency N] [--repeat N]
              [--themes neutral,dark,editorial,neon,papel|all] [--font-scale 1.2] [--font-fallback wide|narrow]
 Reglas: ${ALL_RULES.join(', ')}  (silenciar: data-qa-ignore="regla" en el elemento o un ancestro; adorno de interfaz: data-qa-decor)`,
-  privacy: `Uso: ve-privacy [<videoId>] --deny lista.txt [--allow lista.txt] [--frames … | --every N | --count 24] [--props json] [--format …] [--scene id|índice] [--scan-source dir]... [--assets dir]... [--allow-missing-fonts] [--json salida.json | --out salida.json]`,
+  privacy: `Uso: ve-privacy [<videoId>] --deny lista.txt [--deny otra.txt]... [--allow lista.txt]...  [--frames … | --every N | --count 24] [--props json] [--format …] [--scene id|índice] [--scan-source dir]... [--assets dir]... [--allow-missing-fonts] [--json salida.json | --out salida.json]`,
 };
 
 /** Opciones comunes de estáticos y fuentes (`--assets`, `--allow-missing-fonts`) que entienden sheet, qa y privacy. */
@@ -146,6 +146,7 @@ async function main(cmd: string, argv: string[]): Promise<number> {
 
   if (cmd === 'qa') {
     if (!id) throw new Error('Falta <videoId>');
+    for (const f of ['allow', 'deny']) if (p.flags.has(f)) throw new Error(`--${f} es de \`privacy\` (npm run privacy -- <id> --deny lista.txt [--allow lista.txt]...); \`qa\` no lo usa`);
     const only = one(p, 'rules')?.split(',').filter(Boolean) as RuleId[] | undefined;
     const skip = (one(p, 'skip')?.split(',').filter(Boolean) ?? []) as RuleId[];
     for (const r of [...(only ?? []), ...skip]) if (!ALL_RULES.includes(r)) throw new Error(`Regla desconocida: ${r}`);
@@ -161,8 +162,10 @@ async function main(cmd: string, argv: string[]): Promise<number> {
     const themesSpec = one(p, 'themes');
     const themes = themesSpec !== undefined ? parseThemes(themesSpec) : undefined;
     if (themes && props && 'theme' in props) throw new Error('--themes y --props con "theme" se pisan: dejá solo uno');
+    const perScene = num(p, 'per-scene');
+    if (perScene !== undefined && (!Number.isInteger(perScene) || perScene < 0)) throw new Error('--per-scene debe ser un entero >= 0');
     const qaOpts = {
-      videoId: id, props, format, scene, ...sample(p), rules: (only ?? ALL_RULES).filter((x) => !skip.includes(x)),
+      videoId: id, props, format, scene, ...sample(p), perScene, rules: (only ?? ALL_RULES).filter((x) => !skip.includes(x)),
       thresholds: parseOverrides(p.flags.get('set') ?? []), concurrency: num(p, 'concurrency'), stress, ...common(p), log,
     };
     const verbose = p.bools.has('verbose');
@@ -185,6 +188,7 @@ async function main(cmd: string, argv: string[]): Promise<number> {
         console.log(`\ncallados (no cuentan arriba): ${parts.join('; ')}`);
       }
       console.log('');
+      if (s.sampling) console.log(`muestreo: ${s.sampling.even} cuadros repartidos + ${s.sampling.anchored} anclados al cuadro local de ${s.sampling.scenes} ${s.sampling.scenes === 1 ? 'escena' : 'escenas'} (hasta ${s.sampling.perScene} por escena: no se mueven si cambia la duración del resto del video; --per-scene 0 los apaga)`);
       for (const l of formatJudged(s.judged)) console.log(l);
       const per = Object.entries(s.byRule).map(([k, v]) => `${k}=${v}`).join(' ') || 'ninguno';
       console.log(`\n${label}${id}: ${s.frames.length} cuadros revisados en ${s.seconds}s; ${s.errors} errores, ${s.warnings} avisos, ${s.infos} info${verbose ? '' : ' (ocultos; --verbose)'} (${per})`);
@@ -238,13 +242,13 @@ async function main(cmd: string, argv: string[]): Promise<number> {
   }
 
   // privacy
-  const denyFile = one(p, 'deny');
-  if (!denyFile) throw new Error('Falta --deny <archivo>');
+  const deny = leerListas(p, 'deny', (f) => readFileSync(f, 'utf8'));
+  if (!deny.rutas.length) throw new Error('Falta --deny <archivo> (se puede repetir)');
   const dirs = p.flags.get('scan-source') ?? [];
   if (!id && !dirs.length) throw new Error('Indica un <videoId> y/o --scan-source <dir>');
-  const allowFile = one(p, 'allow');
+  const allow = leerListas(p, 'allow', (f) => readFileSync(f, 'utf8'));
   const r = await runPrivacy({
-    videoId: id, props, format, scene, ...sample(p), deny: readFileSync(denyFile, 'utf8'), allow: allowFile ? readFileSync(allowFile, 'utf8') : '', scanSource: dirs, skipFiles: [denyFile, ...(allowFile ? [allowFile] : [])], ...common(p), log,
+    videoId: id, props, format, scene, ...sample(p), deny: deny.contenido, allow: allow.contenido, scanSource: dirs, skipFiles: [...deny.rutas, ...allow.rutas], ...common(p), log,
   });
   for (const f of r.findings) {
     console.log(`${f.kind.toUpperCase().padEnd(11)} "${f.value}"${f.term ? ` (termino: ${f.term})` : ''}  en ${f.where}${f.frames ? ` cuadros ${f.frames.join(',')}` : ''}\n       ...${f.context}...`);

@@ -61,7 +61,23 @@ export interface Plan {
   silencioFinalSec: number;
   /** Pulsos en tiempo de salida. */
   outBeatsSec: number[];
+  /** Qué pasó con cada `--corte-en` pedido (en el orden pedido): ver `EstadoDeCorte`. Un corte que no se pudo respetar hace fallar el plan. */
+  cortes: CortePlanificado[];
   avisos: string[];
+}
+
+/**
+ * - `empalme`: hay un empalme en el compás de salida más cercano (`outSec`).
+ * - `comparte`: otro corte pedido ya tiene ese mismo empalme (dos cortes dentro de un mismo compás: un solo empalme los cubre).
+ * - `inicio` / `final`: cae a menos de medio compás del comienzo o del final del video, donde un empalme no tiene sentido.
+ * - `sin-repetir`: la pista alcanza para la duración, no hay empalmes que poner.
+ */
+export type EstadoDeCorte = 'empalme' | 'comparte' | 'inicio' | 'final' | 'sin-repetir';
+export interface CortePlanificado {
+  pedidoSec: number;
+  estado: EstadoDeCorte;
+  /** Instante de salida del empalme que lo cubre (`empalme` y `comparte`). */
+  outSec?: number;
 }
 
 const r6 = (v: number) => Math.round(v * 1e6) / 1e6;
@@ -87,6 +103,8 @@ export function planEmpalme(o: PlanOpts): Plan {
   const final = o.final ?? 'fade';
 
   const sinRepetir = targetSec <= trackDurSec - t0 + 1e-9;
+  const cortesPedidos = [...(o.cortesEnSec ?? [])];
+  let cortes: CortePlanificado[] = [];
   let segments: Segmento[];
   const splices: Plan['splices'] = [];
   let loopStartSec: number | null = null;
@@ -96,6 +114,8 @@ export function planEmpalme(o: PlanOpts): Plan {
 
   if (sinRepetir) {
     segments = [{ srcStart: t0, outStart: 0, lenSec: targetSec }];
+    cortes = cortesPedidos.map((c) => ({ pedidoSec: c, estado: 'sin-repetir' as const }));
+    if (cortes.length) avisos.push('La pista alcanza para la duración pedida: no hay empalmes y se ignora --corte-en.');
   } else {
     // Compases enteros desde el pulso de inicio; si no hay ninguno, de a un pulso (como antes).
     let paso = B;
@@ -152,7 +172,7 @@ export function planEmpalme(o: PlanOpts): Plan {
     if (o.cuerpo && o.cuerpo.finSec < trackDurSec - 0.5 && !real && t1 > o.cuerpo.finSec + 0.5) avisos.push('El lazo termina dentro de la caída final de la pista.');
 
     segments = [];
-    const cortes = [...(o.cortesEnSec ?? [])].sort((x, y) => x - y);
+    const cortesPorAplicar = [...cortesPedidos].sort((x, y) => x - y);
     let ci = s;
     let out = 0;
     let ini = { src: s, out: 0 };
@@ -192,9 +212,9 @@ export function planEmpalme(o: PlanOpts): Plan {
         continue;
       }
       // Corte pedido: si el compás más cercano a un corte es este, se fuerza el empalme acá.
-      const iCorte = cortes.findIndex((c) => c >= out - lenCompas / 2 && c < out + lenCompas / 2);
+      const iCorte = cortesPorAplicar.findIndex((c) => c >= out - lenCompas / 2 && c < out + lenCompas / 2);
       if (iCorte >= 0) {
-        cortes.splice(iCorte, 1);
+        cortesPorAplicar.splice(iCorte, 1);
         // En modo real no se fuerza un corte que haga pasarse a la cola del largo pedido.
         const cabe = !real || out + L + cola <= targetSec + 1e-9;
         if (out > 0 && ci !== a && cabe) {
@@ -228,6 +248,9 @@ export function planEmpalme(o: PlanOpts): Plan {
       if (silencioFinalSec > 1.5) avisos.push(`Con el final real de la pista quedan ${silencioFinalSec.toFixed(1)} s de silencio al final del video (la duración no cae justo en un compás): ajustá la duración o usá --final fade.`);
     }
     // Un tramo que no llega al largo pedido solo se acepta en el modo `real` (el resto es silencio).
+    // Qué pasó con cada corte pedido: todos tienen que quedar cubiertos por un empalme (o caer en el borde del video).
+    const barSec = (t1 - beats[a]) / Math.max(1, Math.round((e - a) / paso));
+    cortes = clasificarCortes(cortesPedidos, splices.map((x) => x.outSec), { targetSec, barSec, real, avisos });
   }
 
   const outBeatsSec: number[] = [];
@@ -237,7 +260,52 @@ export function planEmpalme(o: PlanOpts): Plan {
       if (rel >= -1e-9 && rel < sg.lenSec - 1e-9) outBeatsSec.push(r6(sg.outStart + rel));
     }
   }
-  return { startSec: t0, startBeatIndex: s, beatsPerBar: B, targetSec, loopStartSec, loopEndSec, segments, splices, fadeIn, fadeOut, final: loopEndSec !== null && final === 'real' ? 'real' : 'fade', silencioFinalSec, outBeatsSec, avisos };
+  return { startSec: t0, startBeatIndex: s, beatsPerBar: B, targetSec, loopStartSec, loopEndSec, segments, splices, fadeIn, fadeOut, final: loopEndSec !== null && final === 'real' ? 'real' : 'fade', silencioFinalSec, outBeatsSec, cortes, avisos };
+}
+
+/**
+ * Pura. Para cada corte pedido decide si quedó cubierto: por un empalme a menos de medio compás, o por el borde del video. Si no,
+ * lanza un error que dice cuál corte, por qué y qué hacer: nunca se ignora un corte en silencio.
+ */
+export function clasificarCortes(
+  pedidos: readonly number[],
+  empalmesSec: readonly number[],
+  o: { targetSec: number; barSec: number; real: boolean; avisos: string[] },
+): CortePlanificado[] {
+  const medio = o.barSec / 2 + 1e-6;
+  const usados = new Set<number>();
+  const out: CortePlanificado[] = [];
+  const fallas: string[] = [];
+  for (const c of pedidos) {
+    if (c > o.targetSec + 1e-9) {
+      fallas.push(`--corte-en ${r6(c)} s cae después del final del video (${r6(o.targetSec)} s)`);
+      continue;
+    }
+    let mejor = -1;
+    empalmesSec.forEach((x, i) => {
+      if (Math.abs(x - c) <= medio && (mejor < 0 || Math.abs(x - c) < Math.abs(empalmesSec[mejor] - c))) mejor = i;
+    });
+    if (mejor >= 0) {
+      const compartido = usados.has(mejor);
+      usados.add(mejor);
+      out.push({ pedidoSec: c, estado: compartido ? 'comparte' : 'empalme', outSec: empalmesSec[mejor] });
+      if (compartido) o.avisos.push(`--corte-en ${r6(c)} s comparte el empalme de ${r6(empalmesSec[mejor])} s con otro corte (caen dentro de un mismo compás de ${r6(o.barSec)} s): un solo empalme los cubre.`);
+    } else if (c < medio) {
+      out.push({ pedidoSec: c, estado: 'inicio' });
+      o.avisos.push(`--corte-en ${r6(c)} s cae a menos de medio compás del comienzo: no hace falta empalme (la música ya arranca ahí).`);
+    } else if (c > o.targetSec - medio) {
+      out.push({ pedidoSec: c, estado: 'final' });
+      o.avisos.push(`--corte-en ${r6(c)} s cae a menos de medio compás del final del video: no se agrega un empalme ahí.`);
+    } else {
+      fallas.push(
+        o.real
+          ? `--corte-en ${r6(c)} s no se pudo respetar: con --final real el último lazo y la cola de la pista tienen que entrar antes del final (${r6(o.targetSec)} s) y un empalme acá no deja lugar. Probá --final fade, mové el corte antes o quitalo`
+          : `--corte-en ${r6(c)} s no se pudo respetar (no hay un empalme a menos de medio compás de ${r6(o.barSec)} s). Movelo, o quitalo`,
+      );
+    }
+  }
+  if (fallas.length) throw new Error(`No se pudieron respetar todos los cortes pedidos:\n  ${fallas.join('\n  ')}`);
+  return out;
 }
 
 /** Posiciones enteras (en muestras) de cada tramo. Una sola fuente de verdad para renderizar y probar:
@@ -318,6 +386,8 @@ export interface EmpalmeResult {
   /** Cuadro (fraccionario) de cada pulso en el archivo de salida: se usa con `audio/beats.ts`. */
   beatFrames: number[];
   spliceFrames: number[];
+  /** Qué pasó con cada `--corte-en` (ver `EstadoDeCorte`), con el cuadro del empalme que lo cubre. */
+  cortes: (CortePlanificado & { outFrame?: number })[];
   /** Ganancia (dB, negativa) que hubo que aplicar para que la salida no pase de 0 dBFS; 0 si no hizo falta. */
   headroomDb: number;
 }
@@ -365,6 +435,7 @@ export async function empalmar(o: EmpalmeOpts): Promise<EmpalmeResult> {
     cuerpo,
     beatFrames: plan.outBeatsSec.map((t) => r3(t * o.fps)),
     spliceFrames: plan.splices.map((s) => r3(s.outSec * o.fps)),
+    cortes: plan.cortes.map((c) => ({ ...c, ...(c.outSec !== undefined ? { outFrame: r3(c.outSec * o.fps) } : {}) })),
     headroomDb,
   };
 }

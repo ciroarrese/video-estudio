@@ -1,7 +1,7 @@
-import { describe, ignored, intersect, protrusion } from '../geometry';
+import { describe, ignored, intersect, protrusion, visibleLine } from '../geometry';
 import type { Finding, Rule } from '../types';
 
-/** Text under a camera/zoom transform is skipped (the camera decides where it ends up). Visible text inside the frame but outside the safe margins (warning). Text already reported as offscreen is skipped. */
+/** Solo cuenta la parte que se ve (recortada por los ancestros con overflow oculto). Text under a camera/zoom transform is skipped (the camera decides where it ends up). Visible text inside the frame but outside the safe margins (warning). Text already reported as offscreen is skipped. */
 export const safeAreaRule: Rule = {
   id: 'safe-area',
   description: 'Texto fuera del area segura (margen por lado)',
@@ -15,7 +15,9 @@ export const safeAreaRule: Rule = {
     const seen = new Set<number>();
     for (const r of runs) {
       if (r.opacity < t.minOpacity || r.transformed || ignored(r, 'safe-area') || seen.has(r.elId)) continue;
-      for (const line of r.lines) {
+      for (const full of r.lines) {
+        const line = visibleLine(full, r.clips, width, height); // lo que recorta un ancestro con overflow oculto no se ve: no invade nada
+        if (!line) continue;
         if (!intersect(line, frameBox)) continue;
         if (protrusion(line, frameBox) > 1) continue; // that is the offscreen rule's job
         const px = protrusion(line, safe);

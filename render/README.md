@@ -24,7 +24,8 @@ Tambien `npx ve-render <id> ...`. **La herramienta se ejecuta desde un clon de e
 |---|---|
 | `--out` | Archivo de salida (por defecto `out/<id>.mp4`; con `VE_VIDEOS_DIR`, `<VE_VIDEOS_DIR>/out/<id>.mp4`) |
 | `--props '<json>'` | Objeto JSON mezclado con `defaultProps` |
-| `--frames a-b` | Solo ese rango (inclusive); el audio se recorta igual |
+| `--frames a-b` | Solo ese rango (inclusive): un extracto con el audio que le corresponde, alineado al del video completo (ver "Extracto con sonido"). Sin `--out`, sale como `out/<id>-f<a>-<b>.mp4` para no pisar el video completo |
+| `--seconds a-b` | Lo mismo en tiempo: `12.5-20` o `1:30-2:05.5` (m:ss o h:mm:ss); el fin no se incluye. No se combina con `--frames` ni `--scene`. Con `--check`, también |
 | `--format f` | `horizontal`, `vertical` o `cuadrado`. El video tiene que habilitarlo (`formats` en `defineVideo`); si no, error que dice cuáles admite. La salida por defecto pasa a `out/<id>-<formato>.mp4` |
 | `--scene id\|n` | Solo esa escena (id o nombre; o el índice desde 0 que muestra `--list-scenes`). Fija el rango de cuadros: no se combina con `--frames`. Salida por defecto `out/<id>-<escena>.mp4`. También en `--check` |
 | `--list` | Lista los videos que descubrió el runtime con su tamaño, duración, formatos y carpeta (no lleva `<videoId>`). Si alguna carpeta no cargó (archivo roto, `id` repetido) lo informa después de la lista, sin dejar de listar los demás |
@@ -34,6 +35,10 @@ Tambien `npx ve-render <id> ...`. **La herramienta se ejecuta desde un clon de e
 | `--crf N` | Calidad H.264 (por defecto 18) |
 | `--segment N` | Cuadros por parte (por defecto 150) |
 | `--no-audio` | Sin audio |
+| `--audio-bitrate R` | Tasa del AAC (por defecto `192k`; `256k`...). Ver "Pico del audio codificado" |
+| `--audio-peak-max=dB` | Pico verdadero máximo (dBTP) del audio YA codificado en el mp4 (por defecto `-1`). Si lo supera, avisa. Con valor negativo conviene el `=` (también se acepta `--audio-peak-max -2`) |
+| `--audio-peak-strict` | Si el pico del audio codificado supera el máximo, falla y no deja el mp4 (para scripts y entregas) |
+| `--no-audio-peak-check` | No mide el pico del audio codificado |
 | `--no-cache` | Vuelve a renderizar todas las partes |
 | `--keep-frames` | Deja los cuadros en `<carpeta de salida>/<id>[-formato][-escena]-frames/` (el mismo sufijo que el nombre de salida por defecto, así formatos y escenas distintos no se pisan) |
 | `--frame-format png\|jpeg` | Captura sin perdida (por defecto) o JPEG (algo mas rapido, con perdida) |
@@ -48,14 +53,15 @@ Tambien `npx ve-render <id> ...`. **La herramienta se ejecuta desde un clon de e
 | `--check-max-ratio R` | Fraccion maxima de pixeles con delta mayor que 1 (por defecto 0.001 = 0.1 %); los de delta 1 tienen su propia cota de 20 % |
 | `--check-strict` | Comparacion de PNG byte a byte (implica `--check`) |
 
-API: `renderVideo(options)` (con `format`, `scene`, `assets` y `allowMissingFonts`) devuelve `{out, frames, seconds, renderedSegments, cachedSegments}`; `checkVideo(options)` devuelve `{ok, ...}`, `listScenes(options)` y `listVideos()` (todos en `render/render.ts`).
+API: `renderVideo(options)` (con `format`, `scene`, `seconds`, `assets`, `allowMissingFonts`, `audioBitrate`, `audioPeakMax`, `audioPeakStrict` y `audioPeakCheck`) devuelve `{out, frames, seconds, renderedSegments, cachedSegments, audioPeakDbtp?}`; `checkVideo(options)` devuelve `{ok, ...}`, `listScenes(options)` y `listVideos()` (todos en `render/render.ts`).
 
 ## Como funciona
 
 1. Compila el runtime con vite en `.ve-cache/bundles/<hash de las fuentes>/` (se reutiliza si nada cambio; el hash incluye `package-lock.json`, `tsconfig.json`, `vite.config.ts` y todo el proyecto salvo `node_modules`, `dist`, `out`, `render`, `docs`, `*.md` y lo que empieza con punto; **incluye `videos/`**, aunque no esté en git; con `VE_VIDEOS_DIR` el `videos/` real ni se compila ni entra en el hash y en su lugar va esa carpeta). El directorio nunca se modifica una vez creado, asi que dos renders simultaneos (o `npm run build`) no se pisan. Lo sirve en un puerto libre.
 2. Una pagina dedicada llama `__ve.scanAudio()` una sola vez, y todos los archivos de audio se resuelven ANTES de renderizar (si falta uno, falla de inmediato).
 3. Los cuadros pendientes se reparten en tramos contiguos entre N paginas; cada una espera `__ve.ready` y por cuadro hace `await __ve.setFrame(n)` + captura de `#stage` (CDP `Page.captureScreenshot`). Un rechazo de `setFrame` o un error de pagina aborta con el mensaje.
-4. En cuanto una parte tiene todos sus cuadros se codifica a `.ve-cache/seg-<clave>.mp4` (H.264, yuv420p, fps constante) y se borran sus cuadros (uso de disco acotado; la codificacion se solapa con la captura). Al final se concatenan sin recodificar y en la misma pasada se mezcla el audio (`atrim`, `adelay`, `volume`, `amix`) con `+faststart`.
+4. En cuanto una parte tiene todos sus cuadros se codifica a `.ve-cache/seg-<clave>.mp4` (H.264, yuv420p, fps constante) y se borran sus cuadros (uso de disco acotado; la codificacion se solapa con la captura). Al final se concatenan sin recodificar y en la misma pasada se mezcla el audio (`atrim`, `adelay`, `volume`, `amix`) con `+faststart`. **El audio no entra en la clave de las partes**: los archivos de audio (`.wav`, `.mp3`, `.m4a`, `.aac`, `.ogg`, `.opus`, `.flac`, `.aif`...) no cuentan en la huella del video, en `public/` ni en el resumen de las carpetas de estáticos, así que cambiar solo el audio (otra mezcla, otro techo, otro volumen del archivo) multiplexa el audio nuevo sobre las partes de video en cache y tarda segundos, no minutos. Lo que sigue invalidando las partes: el código del video y cualquier archivo que no sea de audio (fuentes, imágenes). Cambiar el `volume`, el `from` o el `src` de un `<Audio>` es cambiar el código de la escena, y ahí sí se vuelve a renderizar. La compilación del runtime (unos segundos) sí se rehace si cambia un audio dentro de `videos/` o `public/`: solo se salta el render de cuadros.
+4b. **Pico del audio codificado.** Con audio, después de multiplexar se mide el pico verdadero (BS.1770, sobremuestreo x4) del audio YA decodificado del mp4 (filtro `ebur128` de ffmpeg). El AAC es con pérdida y puede dejar crestas sobre la mezcla que le entró: una mezcla con techo -2 dBTP llegó a decodificar a +0,9 dBTP. Si el pico supera `--audio-peak-max` (-1 dBTP por defecto) se avisa con cuánto hay que bajar el techo de la mezcla (`npm run audio -- mezcla ... --techo <más bajo>`); con `--audio-peak-strict` falla y no deja el mp4. Subir `--audio-bitrate` ayuda poco: lo que sirve es bajar el techo de la mezcla. El resultado trae `audioPeakDbtp`.
 5. Todo lo temporal vive en `.ve-cache/tmp-<pid>-<id>/` y se borra al terminar, al fallar y con Ctrl-C / SIGTERM (el CLI cierra Chromium y limpia antes de salir con 130 / 143).
 
 Chromium se lanza con `--disable-partial-raster` (entre otras banderas): sin ella, el rasterizado parcial reutiliza teselas del cuadro anterior y algunos cuadros salen con diferencias de 1 nivel segun el historial. Se puede agregar mas banderas con `VE_CHROMIUM_ARGS`.
@@ -128,6 +134,20 @@ import { Typewriter } from "video-estudio/fx";               // y "video-estudio
 ```
 
 También sirve la ruta absoluta al repo (`/clon/engine`). Los imports relativos entre archivos del propio video funcionan igual. El render no necesita el `tsconfig.json`; es para el editor y `tsc`. Los archivos de la carpeta entran en el hash del bundle como los de `videos/`.
+
+## Extracto con sonido (`--frames` y `--seconds`)
+
+`--frames a-b` y `--seconds a-b` entregan un mp4 con SOLO ese tramo y el audio que le corresponde: las pistas se recortan y se corren con la misma cuenta que el video completo (`atrim` al cuadro, `adelay`), así que un clic que en el video completo suena en el segundo 1,43 suena en el 0,43 del extracto, con la misma diferencia de menos de 1 ms (el AAC mueve apenas el comienzo del ataque). No hay que recodificar ni recortar a mano con ffmpeg. Las partes de video alineadas a `--segment` salen de la cache; solo se renderizan las de los bordes (alineá el tramo a `--segment`, `--segment 30`, para no renderizar nada). El mp4 del extracto empieza en el segundo 0 y dura exactamente `cuadros / fps`. Prueba: `render/audio.e2e.test.ts`.
+
+## Scripts de afuera del repo (`npm run exec`)
+
+Un script suelto que importa `video-estudio/engine`, `video-estudio/audio/medidas`, `video-estudio/qa/...`, etc. necesita el alias `video-estudio/*` y un solo React. En vez de armar un `tsconfig` con `paths` a mano:
+
+```bash
+npm run exec -- /ruta/al/script.ts [argumentos...]    # o una ruta relativa al directorio desde donde llamás
+```
+
+Corre `tsx` con `tsconfig.exec.json` (alias `video-estudio/*` al clon, y `react`/`react-dom` del clon), con el directorio de trabajo y las rutas relativas de donde se llamó (se vuelve a él con `INIT_CWD`). El script no necesita carpeta, `package.json` ni `node_modules` propios. Para escribir el script con tipos en el editor, la carpeta externa usa `templates/externo/tsconfig.json` (ver "Armar la carpeta"); este comando es solo para correrlo. Prueba: `render/exec.test.ts`.
 
 ## Archivos del video (fuentes, logos, audio): dos maneras
 

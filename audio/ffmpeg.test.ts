@@ -4,7 +4,8 @@ import { existsSync, mkdtempSync, readdirSync, rmSync, writeFileSync } from 'nod
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { avisoMp3SinEtiqueta, codificar, decodificar, escribirAtomico, escribirWav16, hayFfmpeg, sondear } from './ffmpeg';
+import { avisoMp3SinEtiqueta, codificar, decodificar, escribirAtomico, escribirWav16, hayFfmpeg, parsePicoEbur128, picoVerdaderoDeArchivo, sondear } from './ffmpeg';
+import { picoVerdaderoDb } from './medidas';
 import { pistaDeClics } from './pistas-de-prueba';
 
 const HAY_FFMPEG = hayFfmpeg();
@@ -112,3 +113,28 @@ describe.skipIf(!HAY_FFMPEG)('ffmpeg y CLI (e2e)', () => {
   }, 60000);
 });
 
+
+describe('pico verdadero de un archivo (ebur128 de ffmpeg)', () => {
+  it('lee la línea del resumen', () => {
+    expect(parsePicoEbur128('  True peak:\n    Peak:       -0.6 dBFS\n')).toBe(-0.6);
+    expect(parsePicoEbur128('True peak:\n    Peak:       +0.9 dBFS')).toBe(0.9);
+    expect(parsePicoEbur128('True peak:\n    Peak:       -inf dBFS')).toBe(-Infinity);
+    expect(parsePicoEbur128('nada')).toBeNull();
+  });
+  it.skipIf(!HAY_FFMPEG)('mide un seno de amplitud 0,5 (-6 dBTP) y coincide con la medida propia sobre el audio decodificado de un AAC', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 've-audio-'));
+    try {
+      const sr = 48000;
+      const x = new Float32Array(sr * 2);
+      for (let i = 0; i < x.length; i++) x[i] = 0.5 * Math.sin((2 * Math.PI * 997 * i) / sr);
+      await codificar(x, { sr, canales: 1, salida: join(dir, 'a.wav'), bits: 24 });
+      expect(Math.abs((await picoVerdaderoDeArchivo(join(dir, 'a.wav')))! + 6.02)).toBeLessThan(0.15);
+      await codificar(x, { sr, canales: 1, salida: join(dir, 'a.m4a') });
+      // el AAC es con pérdida y su pico decodificado no es el de la entrada: lo que importa es que la medida del archivo coincida con la propia
+      const dec = await decodificar(join(dir, 'a.m4a'), { sr, canales: 1 });
+      expect(Math.abs((await picoVerdaderoDeArchivo(join(dir, 'a.m4a')))! - picoVerdaderoDb(dec, 1, 8))).toBeLessThan(0.3);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  }, 60000);
+});

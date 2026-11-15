@@ -169,6 +169,65 @@ describe('empalme dentro del cuerpo de la pista (cola, intro baja, lazo a mano)'
     expect(largo.segments.reduce((a, s) => a + s.lenSec, 0)).toBeCloseTo(50, 6);
   });
 
+  it('--corte-en: se respetan todos, también el segundo dentro del tramo que sigue al primer empalme', () => {
+    const beats = grilla(120, 0, 60); // compases de 2 s
+    const plan = planEmpalme({ beatsSec: beats, trackDurSec: 20, targetSec: 50, fadeOutSec: 0, cortesEnSec: [27.3, 30.4, 34.9, 41.2] });
+    const salidas = plan.splices.map((x) => x.outSec);
+    expect(plan.cortes.map((c) => c.estado)).toEqual(['empalme', 'empalme', 'empalme', 'empalme']);
+    expect(plan.cortes.map((c) => c.outSec)).toEqual([28, 30, 34, 42]);
+    for (const c of plan.cortes) expect(salidas).toContain(c.outSec);
+    expect(plan.segments.reduce((a, sg) => a + sg.lenSec, 0)).toBeCloseTo(50, 6);
+  });
+
+  it('--corte-en: dos cortes dentro del mismo compás comparten empalme (y se avisa); en el borde no hace falta empalme', () => {
+    const beats = grilla(120, 0, 60);
+    const plan = planEmpalme({ beatsSec: beats, trackDurSec: 20, targetSec: 50, fadeOutSec: 0, cortesEnSec: [0.4, 27.3, 28.4, 49.6] });
+    expect(plan.cortes.map((c) => c.estado)).toEqual(['inicio', 'empalme', 'comparte', 'final']);
+    expect(plan.cortes[2].outSec).toBe(plan.cortes[1].outSec);
+    expect(plan.avisos.some((a) => /comparte el empalme/.test(a))).toBe(true);
+  });
+
+  it('--corte-en: si la pista alcanza no hay empalmes y se avisa; uno que cae después del final falla', () => {
+    const beats = grilla(120, 0, 60);
+    const corto = planEmpalme({ beatsSec: beats, trackDurSec: 60, targetSec: 30, cortesEnSec: [10] });
+    expect(corto.cortes).toEqual([{ pedidoSec: 10, estado: 'sin-repetir' }]);
+    expect(corto.avisos.join(' ')).toMatch(/--corte-en/);
+    expect(() => planEmpalme({ beatsSec: beats, trackDurSec: 20, targetSec: 50, cortesEnSec: [51] })).toThrow(/después del final/);
+  });
+
+  it('--corte-en: con --final real, un corte que no deja lugar para el último lazo y la cola falla con un mensaje claro (nunca se ignora)', () => {
+    const p = pistaConCola(44, 6);
+    const cuerpo = detectarCuerpo(p.mono, SR_P);
+    expect(() => planEmpalme({ beatsSec: p.beats, trackDurSec: p.dur, targetSec: 100, cuerpo, final: 'real', cortesEnSec: [96.5] })).toThrow(/No se pudieron respetar[\s\S]*96\.5[\s\S]*--final fade/);
+  });
+
+  it('--corte-en: propiedad, con cualquier tempo y compás, cada corte pedido queda cubierto por un empalme a menos de medio compás', () => {
+    let seed = 11;
+    const azar = () => ((seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0) / 2 ** 32);
+    let casos = 0;
+    for (let k = 0; k < 300; k++) {
+      const bpm = 70 + Math.floor(azar() * 80);
+      const B = [3, 4, 4, 4][Math.floor(azar() * 4)];
+      const per = 60 / bpm;
+      const track = 15 + Math.floor(azar() * 30);
+      const target = 60 + Math.floor(azar() * 100);
+      const beats: number[] = [];
+      for (let t = azar() * 0.5; t < track; t += per) beats.push(t);
+      const n = 2 + Math.floor(azar() * 3);
+      const cortes = Array.from({ length: n }, () => Math.round((5 + azar() * (target - 10)) * 10) / 10);
+      const plan = planEmpalme({ beatsSec: beats, trackDurSec: track, targetSec: target, fadeOutSec: 0, beatsPerBar: B, cortesEnSec: cortes });
+      casos++;
+      expect(plan.cortes).toHaveLength(n);
+      for (const c of plan.cortes) {
+        if (c.estado === 'empalme' || c.estado === 'comparte') {
+          expect(Math.abs(c.outSec! - c.pedidoSec)).toBeLessThanOrEqual((per * B) / 2 + 1e-6);
+          expect(plan.splices.map((x) => x.outSec)).toContain(c.outSec);
+        }
+      }
+    }
+    expect(casos).toBe(300);
+  });
+
   it('la entrada gradual es de 0,3 s si el inicio no es el comienzo del archivo y se puede ajustar', () => {
     const beats = grilla(120, 0, 60);
     expect(planEmpalme({ beatsSec: beats, trackDurSec: 60, targetSec: 10 }).fadeIn.durSec).toBe(0);

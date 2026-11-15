@@ -7,12 +7,13 @@ import { dirname, join, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { comparePngs, DEFAULT_TOLERANCE, formatDiff, withinTolerance, type CheckTolerance } from './compare';
 import { buildAudioGraph, resolveSrc, windowTracks, type Track } from './audio';
+import { picoVerdaderoDeArchivo } from '../audio/ffmpeg';
 import { launchChromium, type PwBrowser, type PwPage } from './browser';
 import { FileHashCache } from './filehash';
 import { trackChild, trackCloser, trackPath, untrackPath } from './cleanup';
 import { digestFiles, ENCODER_SETTINGS, frameFile, planCheckFrames, framePattern, planSegments, planShards, segmentKey } from './plan';
 import { serveStatic } from './server';
-import { assetDirsFor, explicitAssetDirs } from './assets';
+import { assetDirsFor, esArchivoDeAudio, explicitAssetDirs } from './assets';
 import { cacheDirPorDefecto, salidaPorDefecto } from './dirs';
 import { cleanPageError, metaForFormat, NOSTAGE_QUERY, pageQuery, resolveScene, sceneRange, type VideoMeta } from './meta';
 import type { FormatName, SceneInfo } from '../engine';
@@ -50,13 +51,22 @@ export type RenderOptions = {
   format?: FormatName;
   /** Renderiza solo esta escena (id/nombre o índice desde 0; ver `listScenes`). No se combina con `frames`. */
   scene?: string;
+  /** Tramo en segundos [desde, hasta) (el fin no se incluye); se pasa a cuadros con el fps del video. No se combina con `frames` ni `scene`. */
+  seconds?: [number, number];
+  /** Tasa del AAC (por defecto 192k). */
+  audioBitrate?: string;
+  /** Pico verdadero máximo (dBTP) del audio ya codificado; por encima, aviso (o error con `audioPeakStrict`). Por defecto -1. */
+  audioPeakMax?: number;
+  audioPeakStrict?: boolean;
+  /** `false`: no medir el pico del audio codificado. */
+  audioPeakCheck?: boolean;
   /** Project root (default: parent of render/). */
   root?: string;
   cacheDir?: string;
   log?: (msg: string) => void;
 };
 
-export type RenderResult = { out: string; frames: number; seconds: number; renderedSegments: number; cachedSegments: number };
+export type RenderResult = { out: string; frames: number; seconds: number; renderedSegments: number; cachedSegments: number; /** Pico verdadero (dBTP) del audio ya codificado del mp4; ausente sin audio o sin medir. */ audioPeakDbtp?: number };
 export type CheckResult = { ok: boolean; frames: number[]; determinism: { frame: number; ok: boolean; reordered?: boolean }[]; mismatches: number[]; diffs: Record<number, string> };
 
 /** `--allow-missing-fonts` o `VE_ALLOW_MISSING_FONTS=1`: una fuente que no carga avisa y sigue en vez de fallar. */
@@ -99,13 +109,16 @@ const hashFiles = async (base: string, files: string[], cache: FileHashCache = n
   return h.digest('hex');
 };
 
-/** Content hash of every file of a directory (the built bundle). */
-export const hashDir = (dir: string, cache?: FileHashCache) => hashFiles(dir, walk(dir), cache);
+/** Content hash of every file of a directory (the built bundle). Con `sinAudio`, los archivos de audio no cuentan (no cambian ningún cuadro). */
+export const hashDir = (dir: string, cache?: FileHashCache, opts: { sinAudio?: boolean } = {}) => hashFiles(dir, walk(dir).filter((f) => !opts.sinAudio || !esArchivoDeAudio(f)), cache);
 
-/** path+size+mtime digest of extra asset directories. */
+/**
+ * path+size+mtime digest of extra asset directories. Los archivos de audio no entran: el audio se mezcla al final sobre las
+ * partes de video en cache y no cambia ningún cuadro, así que cambiarlo no tiene que re-renderizar el video.
+ */
 export function assetsDigest(dirs: string[]): string {
   const entries = dirs.flatMap((d) =>
-    existsSync(d) ? walk(d).map((f) => ({ path: `${d}::${relative(d, f)}`, size: statSync(f).size, mtimeMs: statSync(f).mtimeMs })) : [],
+    existsSync(d) ? walk(d).filter((f) => !esArchivoDeAudio(f)).map((f) => ({ path: `${d}::${relative(d, f)}`, size: statSync(f).size, mtimeMs: statSync(f).mtimeMs })) : [],
   );
   return digestFiles(entries);
 }
@@ -239,7 +252,8 @@ export async function videoCodeHash(root: string, bundleDir: string, source: str
   const files = new Set<string>();
   for (const f of [...deps.runtime, ...own, 'package-lock.json', 'tsconfig.json', 'vite.config.ts', 'engine/runtime/index.html']) files.add(at(f));
   for (const dir of [at(source), join(root, 'public')]) if (existsSync(dir)) for (const f of statSync(dir).isDirectory() ? walk(dir) : [dir]) files.add(f);
-  const present = [...files].filter((f) => existsSync(f) && statSync(f).isFile());
+  // El audio no entra en la huella: se mezcla al final sobre las partes de video en cache y no cambia ningún cuadro.
+  const present = [...files].filter((f) => existsSync(f) && statSync(f).isFile() && !esArchivoDeAudio(f));
   const h = createHash('sha256');
   const cache = opts.cache ?? new FileHashCache();
   for (const f of present.sort()) h.update(relative(root, f)).update('\0').update(await cache.hashOf(f)).update('\0');
@@ -423,7 +437,7 @@ async function setup(o: RenderOptions, needAudio: boolean) {
       };
       // La clave de las partes usa la huella de ESTE video (no la de todo el bundle) cuando se puede calcular.
       // Solo si hace falta se hashea todo el bundle (con la cache de hashes, no se relee lo que no cambió).
-      const codeHash = (await videoCodeHash(root, bundleDir, found.source, { cache: hashes })) ?? (await hashDir(bundleDir, hashes));
+      const codeHash = (await videoCodeHash(root, bundleDir, found.source, { cache: hashes })) ?? (await hashDir(bundleDir, hashes, { sinAudio: true }));
       hashes.save();
       const loadErrors = (await page.evaluate(() => (window as any).__ve.loadErrors)) as { message: string }[];
       for (const e of loadErrors) log(`aviso: ${e.message.split('\n')[0]} (no afecta a este video)`);
@@ -445,14 +459,24 @@ async function setup(o: RenderOptions, needAudio: boolean) {
  * reemplazan (`a b` y `a/b` darían los dos `a_b`), se agrega el índice de la escena (o, si todavía no se conoce, un hash
  * corto del nombre) para que escenas distintas no pisen el mismo archivo.
  */
-export const suffixOf = (o: { format?: FormatName; scene?: string }, sceneIndex?: number) => {
+export const suffixOf = (o: { format?: FormatName; scene?: string; frames?: readonly [number, number] }, sceneIndex?: number) => {
   let scene = '';
   if (o.scene !== undefined) {
     const clean = o.scene.replace(/[^A-Za-z0-9_-]+/g, '_');
     scene = `-${clean}${clean === o.scene ? '' : `-${sceneIndex ?? createHash('sha1').update(o.scene).digest('hex').slice(0, 6)}`}`;
   }
-  return `${o.format ? `-${o.format}` : ''}${scene}`;
+  const rango = o.frames ? `-f${o.frames[0]}-${o.frames[1]}` : '';
+  return `${o.format ? `-${o.format}` : ''}${scene}${rango}`;
 };
+
+/** `[desde, hasta)` en segundos -> cuadros inclusivos `[primero, último]` (el cuadro n empieza en n/fps), recortado al video. */
+export function segundosACuadros(seconds: readonly [number, number], fps: number, durationInFrames: number): [number, number] {
+  const first = Math.round(seconds[0] * fps);
+  const last = Math.min(Math.round(seconds[1] * fps) - 1, durationInFrames - 1);
+  if (first >= durationInFrames) throw new RangeError(`--seconds ${seconds[0]}-${seconds[1]}: el inicio cae después del final del video (${(durationInFrames / fps).toFixed(2)} s)`);
+  if (last < first) throw new RangeError(`--seconds ${seconds[0]}-${seconds[1]}: el tramo no abarca ningún cuadro a ${fps} fps`);
+  return [first, last];
+}
 
 export async function renderVideo(options: RenderOptions): Promise<RenderResult> {
   const t0 = Date.now();
@@ -462,6 +486,8 @@ export async function renderVideo(options: RenderOptions): Promise<RenderResult>
   const useCache = options.cache ?? true;
   const wantAudio = options.audio ?? true;
   const concurrency = options.concurrency ?? defaultConcurrency();
+  const audioBitrate = options.audioBitrate ?? '192k';
+  const peakMax = options.audioPeakMax ?? -1;
   const s = await setup(options, wantAudio);
   const { env, log } = s;
   const tmpDir = join(s.cacheDir, `tmp-${s.runId}`);
@@ -470,7 +496,10 @@ export async function renderVideo(options: RenderOptions): Promise<RenderResult>
   trackPath(tmpDir);
   try {
     const { meta } = env;
-    let [first, last] = options.frames ?? [0, meta.durationInFrames - 1];
+    if (options.seconds && (options.frames || options.scene !== undefined)) throw new Error('--seconds no se combina con --frames ni con --scene');
+    const frames = options.frames ?? (options.seconds ? segundosACuadros(options.seconds, meta.fps, meta.durationInFrames) : undefined);
+    let [first, last] = frames ?? [0, meta.durationInFrames - 1];
+    if (options.seconds) log(`--seconds ${options.seconds[0]}-${options.seconds[1]}: cuadros ${first}-${last}`);
     let sceneIndex: number | undefined;
     if (options.scene !== undefined) {
       if (options.frames) throw new Error('--scene y --frames no se combinan: --scene ya fija el rango de cuadros');
@@ -479,7 +508,7 @@ export async function renderVideo(options: RenderOptions): Promise<RenderResult>
       sceneIndex = sc.index;
       log(`escena "${sc.id}" (índice ${sc.index}): cuadros ${first}-${last}`);
     }
-    out = resolve(options.out ?? salidaPorDefecto(`${options.videoId}${suffixOf(options, sceneIndex)}.mp4`));
+    out = resolve(options.out ?? salidaPorDefecto(`${options.videoId}${suffixOf({ ...options, frames }, sceneIndex)}.mp4`));
     outTmp = `${out}.${s.runId}.tmp.mp4`;
     trackPath(outTmp);
     if (last > meta.durationInFrames - 1) throw new RangeError(`--frames ${first}-${last} excede el video (0-${meta.durationInFrames - 1})`);
@@ -512,7 +541,7 @@ export async function renderVideo(options: RenderOptions): Promise<RenderResult>
 
     if (todo.length) {
       const ext = env.shot.format === 'jpeg' ? 'jpg' : 'png';
-      const framesRoot = options.keepFrames ? join(dirname(out), `${options.videoId}${suffixOf(options, sceneIndex)}-frames`) : join(tmpDir, 'frames');
+      const framesRoot = options.keepFrames ? join(dirname(out), `${options.videoId}${suffixOf({ format: options.format, scene: options.scene }, sceneIndex)}-frames`) : join(tmpDir, 'frames');
       mkdirSync(framesRoot, { recursive: true });
       const list: number[] = todo.flatMap((seg) => Array.from({ length: seg.end - seg.start + 1 }, (_, i) => seg.start + i));
       const remaining = new Map(todo.map((seg) => [seg, seg.end - seg.start + 1]));
@@ -573,16 +602,33 @@ export async function renderVideo(options: RenderOptions): Promise<RenderResult>
     const args = ['-hide_banner', '-loglevel', 'error', '-nostdin', '-y', '-f', 'concat', '-safe', '0', '-i', listFile];
     if (graph) {
       for (const f of graph.inputs) args.push('-i', f);
-      args.push('-filter_complex', graph.filterComplex, '-map', '0:v', '-map', graph.map, '-c:v', 'copy', '-c:a', 'aac', '-b:a', '192k');
+      args.push('-filter_complex', graph.filterComplex, '-map', '0:v', '-map', graph.map, '-c:v', 'copy', '-c:a', 'aac', '-b:a', audioBitrate);
     } else {
       args.push('-map', '0:v', '-c:v', 'copy');
     }
     args.push('-movflags', '+faststart', outTmp);
     await run('ffmpeg', args);
+    // El AAC es con pérdida: el audio decodificado puede tener crestas más altas que la mezcla que entró (un techo de -2 dBTP puede
+    // decodificar a +0,9 dBTP). Se mide sobre el mp4 ya multiplexado, antes de dejarlo en su lugar.
+    let audioPeakDbtp: number | undefined;
+    if (graph && (options.audioPeakCheck ?? true)) {
+      const peak = await picoVerdaderoDeArchivo(outTmp);
+      if (peak !== null && Number.isFinite(peak)) {
+        audioPeakDbtp = Math.round(peak * 100) / 100;
+        const sobre = peak > peakMax + 1e-9;
+        log(`audio: pico verdadero del AAC (${audioBitrate}) ${audioPeakDbtp} dBTP (máximo ${peakMax} dBTP)${sobre ? ': SUPERA el máximo' : ': ok'}`);
+        if (sobre) {
+          const falta = Math.ceil((peak - peakMax) * 10) / 10;
+          const msg = `el audio codificado llega a ${audioPeakDbtp} dBTP y el máximo es ${peakMax} dBTP: el AAC agrega crestas sobre la mezcla. Bajá el techo de la mezcla al menos ${falta} dB (npm run audio -- mezcla ... --techo <dBTP más bajo>) y volvé a multiplexar; subir --audio-bitrate ayuda poco.`;
+          if (options.audioPeakStrict) throw new Error(`${msg} (--audio-peak-strict: no se dejó el mp4)`);
+          log(`aviso: ${msg}`);
+        }
+      }
+    }
     renameSync(outTmp, out);
     const seconds = (Date.now() - t0) / 1000;
     log(`listo: ${out} (${total} cuadros, ${seconds.toFixed(1)} s, ${todo.length} partes renderizadas, ${cachedSegments} en cache)`);
-    return { out, frames: total, seconds, renderedSegments: todo.length, cachedSegments };
+    return { out, frames: total, seconds, renderedSegments: todo.length, cachedSegments, ...(audioPeakDbtp !== undefined ? { audioPeakDbtp } : {}) };
   } finally {
     rmSync(tmpDir, { recursive: true, force: true });
     if (outTmp) rmSync(outTmp, { force: true });
@@ -659,8 +705,9 @@ export async function checkVideo(options: RenderOptions): Promise<CheckResult> {
         log(`escena "${sc.id}" (índice ${sc.index}): cuadros ${a}-${b}`);
         return planCheckFrames({ first: a, last: b, scenes: [sc], ...common });
       }
-      if (options.frames) {
-        const [a, b] = options.frames;
+      const rango = options.frames ?? (options.seconds ? segundosACuadros(options.seconds, env.meta.fps, env.meta.durationInFrames) : undefined);
+      if (rango) {
+        const [a, b] = rango;
         if (b > env.meta.durationInFrames - 1) throw new RangeError(`--frames ${a}-${b} excede el video (0-${env.meta.durationInFrames - 1})`);
         return planCheckFrames({ first: a, last: b, explicitRange: true, ...common });
       }

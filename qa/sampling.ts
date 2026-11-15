@@ -29,9 +29,36 @@ export const everyFrames = (duration: number, every: number): number[] => {
   return Array.from({ length: Math.ceil(duration / every) }, (_, i) => i * every);
 };
 
+import { sceneCheckFrames } from '../render/plan';
+import type { SceneInfo } from '../engine';
+
+/** Cuadros por escena que `qa` agrega al muestreo repartido (`--per-scene`); 0 = ninguno. */
+export const DEFAULT_PER_SCENE = 4;
+
+/**
+ * Cuadros anclados a cada escena con nombre: los mismos desplazamientos LOCALES (2, 10 y 24 desde el inicio de la escena, que es donde
+ * ocurren las entradas, y el último cuadro) mientras la escena dure lo mismo, vengan donde vengan en el video. El muestreo repartido
+ * (`--count`) cae en otros cuadros cada vez que cambia la duración total del video y trae hallazgos "nuevos" en escenas que no cambiaron;
+ * estos cuadros no se mueven con lo que pasa antes o después de la escena, así dos corridas se comparan escena por escena. Pura y determinista.
+ */
+export function anchoredFrames(scenes: readonly Pick<SceneInfo, 'id' | 'from' | 'durationInFrames'>[], duration: number, perScene: number): number[] {
+  if (perScene <= 0) return [];
+  const out = new Set<number>();
+  for (const s of scenes) {
+    const len = Math.min(s.durationInFrames, duration - s.from);
+    if (len <= 0 || s.from < 0) continue;
+    for (const f of sceneCheckFrames(s.from, len, perScene)) if (f >= 0 && f < duration) out.add(f);
+  }
+  return [...out].sort((a, b) => a - b);
+}
+
 export type SampleSpec = { frames?: number[] | string; every?: number; count?: number };
 
-export function sampleFrames(spec: SampleSpec, duration: number, defaultCount: number, range?: [number, number]): number[] {
+/**
+ * `anchored`: cuadros extra (ver `anchoredFrames`) que se suman al muestreo repartido SOLO cuando no se pidieron cuadros (`frames`) ni paso (`every`)
+ * y no hay `range` (una escena sola ya se muestrea en su propio rango). Con `count: 0` se usan solo ellos.
+ */
+export function sampleFrames(spec: SampleSpec, duration: number, defaultCount: number, range?: [number, number], anchored: readonly number[] = []): number[] {
   if (range) {
     // Dentro de una escena: se muestrea el rango [a, b] y el resultado se corre al cuadro absoluto.
     if (spec.frames !== undefined) throw new Error('--scene y --frames no se combinan: usá --count o --every');
@@ -45,5 +72,10 @@ export function sampleFrames(spec: SampleSpec, duration: number, defaultCount: n
     return [...new Set(spec.frames)];
   }
   if (spec.every !== undefined) return everyFrames(duration, spec.every);
-  return evenFrames(duration, spec.count ?? defaultCount);
+  if (spec.count === 0) {
+    if (!anchored.length) throw new Error('--count 0 deja solo los cuadros por escena, y este video no declara escenas con nombre (o --per-scene es 0): pedí --count N');
+    return [...anchored];
+  }
+  const even = evenFrames(duration, spec.count ?? defaultCount);
+  return anchored.length ? [...new Set([...even, ...anchored])].sort((a, b) => a - b) : even;
 }

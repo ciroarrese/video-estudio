@@ -81,6 +81,19 @@ describe('rules on plain data', () => {
     expect(f[0]!.severity).toBe('warn');
     expect(check([edge], ['safe-area'], mergeThresholds({ 'safe-area': { margin: 0.01 } }))).toEqual([]);
   });
+  it('safe-area y offscreen: lo que recorta un ancestro con overflow oculto no se ve y no se juzga (dígito vecino de un carrete)', () => {
+    // ventana de la ranura dentro del área segura; el dígito vecino asoma por debajo de la ventana y de la zona segura, pero está recortado
+    const ventana = { id: 50, tag: 'span', testid: 'ranura', rect: { x: 400, y: 600, w: 60, h: 100 }, ox: true, oy: true };
+    const vecino = run({ chain: [8, 50], clips: [ventana], rect: { x: 400, y: 1040, w: 60, h: 80 } }); // fuera de la ventana por completo
+    const asoma = run({ chain: [9, 50], clips: [ventana], rect: { x: 400, y: 650, w: 60, h: 80 } }); // asoma 30 px de la ventana: lo visible está adentro
+    const suelto = run({ rect: { x: 400, y: 1040, w: 60, h: 80 } }); // el mismo texto sin recorte sí invade el margen y se sale del cuadro
+    const f = check([vecino, asoma, suelto], ['safe-area', 'offscreen']);
+    expect(f.map((x) => [x.rule, x.element.testid])).toEqual([['offscreen', suelto.testid]]);
+    // un recorte del tamaño del cuadro es la cámara, no una ventana: no oculta nada
+    const cuadro = { id: 51, tag: 'div', testid: 'camara', rect: { x: 0, y: 0, w: W, h: H }, ox: true, oy: true };
+    const sale = run({ chain: [10, 51], clips: [cuadro], rect: { x: -30, y: 300, w: 300, h: 40 } });
+    expect(check([sale], ['offscreen']).map((x) => x.rule)).toEqual(['offscreen']);
+  });
   it('overlap: unrelated elements over the threshold; ancestors, faint text and near misses are ignored', () => {
     const a = run({ rect: { x: 100, y: 100, w: 400, h: 60 }, elId: 1, chain: [1] });
     const b = run({ rect: { x: 140, y: 120, w: 400, h: 60 }, elId: 2, chain: [2] });
