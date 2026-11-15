@@ -58,7 +58,8 @@ export function CardFlip(p: CardFlipProps) {
     overflow: "hidden",
     transform: xform({ y: -lift, scaleX: snap(sx * grow), scaleY: snap(grow) }),
     transformOrigin: "50% 50%",
-    visibility: sx < 0.012 ? "hidden" : "visible",
+    // de canto la tarjeta es una rendija: bajo 0,012 de ancho, o bajo unos 8 px en una tarjeta chica (ahí el borde y la sombra de una rendija se rasterizaban distinto según el historial), se oculta
+    visibility: sx < Math.max(0.012, 8 / cw) ? "hidden" : "visible",
     fontFamily: theme.font.family,
   };
   return (

@@ -106,7 +106,9 @@ export function Interlude({ spec: specIn, done, skip = [], next: nextProp, ticks
   const rowMidY = rowTop + L.blockTop + L.nameH / 2; // centro del renglón del nombre de la fila nueva
   // extremo derecho estimado del texto de la fila nueva (solo para ubicar la miniatura en el lugar libre y acotar el barrido)
   // (la estimación por glifo medio sobra un poco: se descuenta para que la miniatura no quede diminuta)
-  const textEnd = L.left + L.numW + 0.88 * (textWidth(L.names[lateI]!, L.nameSize, AVG_BOLD) + (L.inline ? textWidth(` · ${L.lines[lateI]!}`, L.lineSize, AVG_REG) : textWidth(L.lines[lateI]!, L.lineSize, AVG_REG)));
+  const textEnd = L.stacked
+    ? L.left + 0.88 * Math.max(textWidth(L.names[lateI]!, L.nameSize, AVG_BOLD), Math.min(L.rowW, textWidth(L.lines[lateI]!, L.lineSize, AVG_REG))) // en columna, el nombre y la línea van en renglones aparte
+    : L.left + L.numW + 0.88 * (textWidth(L.names[lateI]!, L.nameSize, AVG_BOLD) + (L.inline ? textWidth(` · ${L.lines[lateI]!}`, L.lineSize, AVG_REG) : textWidth(L.lines[lateI]!, L.lineSize, AVG_REG)));
   const appear = kf(f, [0, u(14)], [0, 1], ease.out);
   const nextP = kf(f, T.next, [0, 1], ease.out);
   const end = next < 0 ? kf(f, [dur - u(30), dur], [0, 1]) : 0;
@@ -129,16 +131,20 @@ export function Interlude({ spec: specIn, done, skip = [], next: nextProp, ticks
   const Thumb = thumbnail ?? (() => <DefaultThumbnail index={lateI} name={spec.topics[lateI]!.name} />);
   const PANEL_W = 560, PANEL_H = 340;
   const free = width - theme.safe.x - textEnd - 40; // lugar libre a la derecha del texto de la fila nueva
-  const tScale = Math.min(0.62, free / PANEL_W); // con menos de 0,4 no hay lugar sin tapar texto: no se muestra
-  const tx0 = width - theme.safe.x - (PANEL_W * tScale) / 2, ty0 = rowMidY - L.rowH * 0.42; // un poco más arriba que el renglón: ahí no hay texto a la derecha
+  // Formatos sin lugar a la derecha del texto (vertical y cuadrado): la miniatura aparece centrada, un poco por encima de la fila nueva, como una tarjeta flotante sobre
+  // la lista (tapa algo de la fila de arriba mientras llega; su texto y el de la fila no se juzgan por `overlap` ni `covered`), y vuela de ahí a la tilde como en el horizontal.
+  const side = free >= 0.4 * PANEL_W; // hay lugar a la derecha del texto de la fila nueva
+  const tScale = side ? Math.min(0.62, free / PANEL_W) : Math.min(0.62, (width - 2 * theme.safe.x) / PANEL_W);
+  const tx0 = side ? width - theme.safe.x - (PANEL_W * tScale) / 2 : width / 2;
+  const ty0 = side ? rowMidY - L.rowH * 0.42 : Math.max(theme.safe.y + (PANEL_H * tScale) / 2, rowTop - (PANEL_H * tScale) / 2 + L.rowH * 0.1); // en el horizontal, un poco más arriba que el renglón: ahí no hay texto a la derecha
   const tx1 = L.left + Math.round(L.numSize * 1.5 * 0.36), ty1 = rowMidY; // donde queda la tilde
   const endScale = Math.round(L.numSize * 1.5) / PANEL_W;
   const tIn = S ? kf(f, S.thumbIn, [0, 1], ease.out) : 0;
   const tFly = S ? kf(f, S.thumbFly, [0, 1], ease.inOut) : 0;
   const tOut = kf(tFly, [0.7, 1], [0, 1]);
-  const tPresent = S !== null && !L.stacked && tScale >= 0.4 && tIn > 0 && tFly < 1;
+  const tPresent = S !== null && tScale >= 0.4 && tIn > 0 && tFly < 1;
   const tX = tx0 + (tx1 - tx0) * tFly;
-  const tY = ty0 + (ty1 - ty0) * tFly - Math.sin(Math.PI * tFly) * 70 + (1 - tIn) * 28;
+  const tY = ty0 + (ty1 - ty0) * tFly - Math.sin(Math.PI * tFly) * (!side ? 0 : 70) + (1 - tIn) * 28;
   const tSc = (tScale * (0.86 + 0.14 * tIn)) * (1 - tFly) + endScale * tFly;
   const panelSurf = surfaceStyle(theme, "window");
   const panelShadow = resolveStyle(theme).surface.elevation === "shadow" ? `0 30px 60px -24px ${withAlpha(theme.color.text, 0.4)}` : panelSurf.boxShadow;

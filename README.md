@@ -1,21 +1,42 @@
 # Video Studio
 
-Video Studio es el nombre con que se presenta la herramienta; el repo, el paquete npm, el alias de import (`video-estudio/*`), la skill y los comandos siguen llamándose `video-estudio` (el nombre del repo lo cambia su dueño por su cuenta).
+Video Studio produce **videos animados** (presentaciones, demos, explicadores, recorridos de herramientas) a partir de una conversación: le decís a un agente de código (Claude Code) "haceme un video de presentación de estos tres proyectos" y la skill [`video-estudio`](.claude/skills/video-estudio/SKILL.md) te lleva por etapas (cuestionario, fichas, tema, guion, escenas, sonido), esperando tu aprobación en cada una. El motor es propio, en TypeScript y React 18: cada video es una función del número de cuadro, Chromium captura cada cuadro y ffmpeg arma el MP4. El design system (colores, tipografía, esquinas, movimiento) es un tema intercambiable: el mismo video se rehace con otro estilo cambiando solo el tema.
 
-Herramienta para producir videos animados de nivel profesional a partir de un cuestionario, con el design system como tema intercambiable. El motor es propio: cada video es una función del número de cuadro, Chromium captura cada cuadro y ffmpeg arma el MP4. Pensada para que un agente de código (Claude Code) la maneje de punta a punta cuando alguien dice "haceme un video".
+El nombre que ves es "Video Studio"; el repo, el paquete npm, el alias de import (`video-estudio/*`), la skill y los comandos se siguen llamando `video-estudio`.
 
-El plan, las etapas y la forma de trabajo están en [PLAN.md](PLAN.md). De dónde sale el motor: [docs/ORIGEN.md](docs/ORIGEN.md).
+## Qué necesitás instalar
 
-## Requisitos
+- **Node 22 o superior** (`node -v`).
+- **ffmpeg y ffprobe** en el PATH (`ffmpeg -version`): arman el MP4 y mezclan el sonido.
+- **Chromium vía Playwright**: lo instala el paso 1 de abajo. Si ya tenés un Chrome o Chromium, alcanza con `VE_CHROMIUM=/ruta/al/chrome` (en ese caso igual hace falta el paquete `playwright`).
+- Para producir un video con ayuda: [Claude Code](https://claude.com/claude-code) abierto en la carpeta del repo.
 
-- Node 22 o superior.
-- Chromium vía Playwright (`npm i -D playwright` y `npx playwright install chromium`; otro ejecutable con `VE_CHROMIUM=/ruta/a/chrome`).
-- `ffmpeg` y `ffprobe` en el PATH.
-
-## Empezar
+## Inicio rápido (unos 5 minutos)
 
 ```bash
+# 1. Instalar (una vez)
 npm install
+npm i -D playwright && npx playwright install chromium
+
+# 2. Comprobar que todo anda: renderiza un video de ejemplo (datos ficticios) en out/hello.mp4
+npm run render -- hello
+
+# 3. Mirar los cuadros de un ejemplo más largo y correr su control de calidad
+npm run sheet -- kit-demo --count 12      # out/kit-demo-sheet.png: abrila y mirá la hoja
+npm run qa -- kit-demo --count 12         # textos cortados, contraste, áreas seguras
+```
+
+### Tu primer video propio
+
+1. **Con la skill (lo recomendado).** Abrí Claude Code en esta carpeta y pedí lo que necesitás: "haceme un video de presentación de mi herramienta". Contestá el cuestionario (podés decir "todo por defecto") y aprobá cada etapa. Los archivos del video se crean en `videos/<slug>/` (que no se sube: está en `.gitignore`).
+2. **Si tu material es privado**, definí antes una carpeta fuera del repo: `export VE_VIDEOS_DIR=$HOME/mis-videos`. La skill, las plantillas y los comandos la usan igual, y la cache, los MP4 y las hojas quedan ahí (`$VE_VIDEOS_DIR/out`).
+3. **A mano, sin la skill**: `bash templates/nuevo.sh escena mi-video intro` crea `mi-video/intro/` con una escena de arranque ya descubierta por el motor; después `npm run render -- mi-video-intro` (el id es `<slug>-<escena>`), `npm run sheet -- mi-video-intro --count 6` y `npm run qa -- mi-video-intro`. `npm run render -- --list` muestra todos los videos que el motor ve.
+
+El render termina en `out/<id>.mp4`. Antes de dar un video por terminado, la lista de control está en [CLAUDE.md](CLAUDE.md) (tipos, determinismo con `--check`, calidad, privacidad y hoja de cuadros).
+
+## Comandos de referencia
+
+```bash
 npm run render -- kit-demo                 # out/kit-demo.mp4 (video de ejemplo, datos ficticios)
 npm run sheet -- kit-demo --count 12       # out/kit-demo-sheet.png: hoja de cuadros
 npm run qa -- kit-demo                     # control de calidad automático
@@ -30,6 +51,8 @@ npm run exec -- /ruta/al/script.ts           # corre un script de afuera que imp
 npm run qa -- story-demo --list-scenes     # lo mismo y, en una historia, el presupuesto de cuadros por bloque
 npm run sheet -- fx-text --count 8         # galería del catálogo de efectos (también fx-3d y fx-data-ui-art)
 ```
+
+El plan, las etapas y la forma de trabajo están en [PLAN.md](PLAN.md). De dónde sale el motor: [docs/ORIGEN.md](docs/ORIGEN.md).
 
 Catálogo de efectos listos (texto, 3D, datos, interfaz y arte): [docs/animaciones.md](docs/animaciones.md), con tres galerías para verlos: `fx-text`, `fx-3d` y `fx-data-ui-art` (`/?video=fx-3d&props={"theme":"dark"}`), y `fx-muro`, un muestrario en baldosas chicas con todos los efectos en lazo (`Loop`), `density="auto"` y una escena anidada (`NestedScene`). Para señalar algo: `Callout` (la forma la decide el design system, `annotation-demo` la muestra bajo los cinco temas). Sonido (tempo, empalme al compás, efectos propios y mezcla): [docs/audio.md](docs/audio.md). Otros ejemplos: `hello`, `fx-in-scene` (regresión: efectos montados desde el cuadro 0 dentro de una escena, sin residuos antes de su `start` ni después de terminar), `story-demo` (historia con apertura, vueltas al listado y cierre), `qa-defects` (defectos sembrados para probar el QA). Un video roto no deja inservibles a los demás (solo falla el que tiene el problema) y los tamaños tienen que ser pares. Cada comando y sus opciones: [render/README.md](render/README.md) y [qa/README.md](qa/README.md) (con el criterio de severidad de `offscreen` y del velo en `contrast`). Pruebas y tipos: `npm run typecheck`, `npm test` (rápidas, 1 a 2 minutos) y `npm run test:e2e` (lentas, unos 10 minutos: `--check` por escena de varias historias; solo hace falta si se toca el toolkit).
 
