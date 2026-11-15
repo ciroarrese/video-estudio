@@ -101,6 +101,7 @@ function Scene({ frame }: { frame: number }) {
   const zoomIn = kf(cam.scale, [1.05, 1.45], [0, 1]) * kf(frame, [T.through[0], T.through[0] + 10], [1, 0]);
   const rowDots = [theme.color.success, theme.color.warning, theme.color.success, theme.color.danger, theme.color.success];
   const land = frame >= T.flight[1];
+  const rowsAway = 1 - kf(frame, [56, 72], [0, 1]) * (1 - kf(frame, [136, 152], [0, 1]));
   // El contador entra en el panel con aire: el tamaño del tema, salvo que el número medido (con un 30 % de margen por si la letra real es más ancha o más grande)
   // no entre en el ancho útil del panel; en ese caso baja lo justo. Un número no se parte en dos líneas: si no entra, se sale del panel.
   const counterSize = Math.min(theme.type.stat, Math.floor((B.w - 60) / (textWidth(theme, "1.284", { size: 1, weight: "stat" }) * 1.3)));
@@ -140,10 +141,14 @@ function Scene({ frame }: { frame: number }) {
               const row = surfaceStyle(theme, "card", { level: "sm" });
               // El borde (más grueso o ausente) no cambia la caja: el relleno de la fila lo compensa.
               const bd = borderWidth(theme, "card") - 1;
+              // Las filas se apagan mientras la cámara se acerca a las tarjetas (cuadros 56 a 72) y vuelven al alejarse (136 a 152): con el zoom, la fila de abajo quedaba
+              // asomando por el borde del cuadro (un renglón recortado casi del todo, aviso `offscreen`); lo que queda fuera de cuadro no se muestra.
+              const away = rowsAway;
               const ent = entrance(theme, a, i, { native: "fade" });
+              const entAway = away < 1 ? { ...ent, opacity: (typeof ent.opacity === "number" ? ent.opacity : 1) * away } : ent;
               // `key` según las propiedades de la entrada: si aparecen o desaparecen, React las agregaría al final y el marcado dependería del historial.
               return (
-                <div key={`${r}-${Object.keys(ent).join("-")}`} style={{ minHeight: 52, boxSizing: "border-box", display: "flex", alignItems: "center", gap: 18, padding: `0 ${24 - bd}px`, background: row.background, border: row.border, borderRadius: cornerRadius(theme, "control"), ...ent, fontSize: theme.type.caption, lineHeight: 1.2, color: theme.color.text }}>
+                <div key={`${r}-${Object.keys(entAway).join("-")}`} style={{ minHeight: 52, boxSizing: "border-box", display: "flex", alignItems: "center", gap: 18, padding: `0 ${24 - bd}px`, background: row.background, border: row.border, borderRadius: cornerRadius(theme, "control"), ...entAway, fontSize: theme.type.caption, lineHeight: 1.2, color: theme.color.text }}>
                   <span style={{ width: 16, height: 16, borderRadius: cornerRadius(theme, "bar"), background: rowDots[i] }} />
                   {r}
                   <span style={{ marginLeft: "auto", color: theme.color.textMuted, fontSize: theme.type.ui.md }}>{(i + 1) * 7} min</span>
