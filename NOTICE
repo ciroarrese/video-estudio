@@ -1,0 +1,25 @@
+Video Studio (`video-estudio`)
+Código del repo: licencia MIT (ver LICENSE).
+
+Este repo no incluye fuentes, música, efectos de sonido grabados, imágenes, logos ni marcas de terceros:
+- Tipografía: los temas de ejemplo declaran pilas de fuentes del sistema (`system-ui`, `ui-serif`, `ui-rounded`; algunas nombran Georgia, Roboto o Segoe UI como
+  preferencia, que se usan solo si están instaladas en la máquina que renderiza); no se distribuye ningún archivo de fuente. Quien agrega una fuente propia
+  (`theme.font.files`) verifica antes que su licencia permita usarla donde se muestra el video y redistribuirla.
+- Sonido: los efectos de `audio/efectos.ts` se sintetizan con fórmulas propias (no hay muestras de terceros). La música la trae cada persona,
+  con licencia verificada, y vive en `videos/<slug>/audio/` (fuera de git); nunca va a `public/`.
+- Datos, nombres y cifras de los ejemplos: ficticios.
+
+Terceros que se usan como herramientas (no se redistribuyen con el repo; se instalan con `npm install` o desde el sistema):
+
+| Componente | Uso | Licencia |
+|---|---|---|
+| react, react-dom 18 | dependencia de ejecución | MIT |
+| vite, @vitejs/plugin-react | empaquetado de los videos | MIT |
+| typescript | tipos | Apache-2.0 |
+| tsx | correr TypeScript en los comandos | MIT |
+| vitest, jsdom, @testing-library/react | pruebas | MIT |
+| @types/node, @types/react, @types/react-dom | tipos | MIT |
+| playwright (opcional, peer) y el Chromium que descarga | captura de cuadros | Apache-2.0 (Playwright); Chromium: licencias BSD y otras de su proyecto |
+| ffmpeg, ffprobe (del sistema) | arman el MP4 y mezclan el audio | LGPL 2.1 o GPL según la compilación que tengas instalada |
+
+Las dependencias transitivas llevan sus propias licencias (ver `package-lock.json`). Algoritmos implementados desde su descripción pública: ver `docs/ORIGEN.md`.

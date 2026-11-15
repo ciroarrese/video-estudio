@@ -16,6 +16,14 @@ export type CardFlipProps = ThreeProps & {
 
 // Una escala casi 1 (menos de 1,5 %) se toma como 1: bordes con escala casi identidad bajo una cámara con zoom se rasterizan distinto según el historial.
 const snap = (k: number) => (Math.abs(k - 1) < 0.015 ? 1 : k);
+// Escala que deja el lado en un número entero de píxeles y de la misma paridad que el original: los bordes caen justo sobre la grilla de píxeles (con un borde
+// fraccionario, el borde y la sombra de la tarjeta se rasterizaban distinto según el historial de cuadros en una tarjeta chica).
+const gridScale = (k: number, side: number) => {
+  if (k === 1) return 1;
+  let w = Math.round(side * k);
+  if ((side - w) % 2 !== 0) w += k * side >= w ? 1 : -1;
+  return Math.max(0.0001, w) / side;
+};
 
 /** Tarjeta que da media vuelta; la cara que no mira al espectador se oculta por ángulo. Proyección a mano: escala en X y en Y, sin `rotateY`. */
 export function CardFlip(p: CardFlipProps) {
@@ -56,7 +64,7 @@ export function CardFlip(p: CardFlipProps) {
     // Forma, relleno, borde y sombra del design system (por defecto: radio `lg`, borde de 2 px y sin sombra).
     ...cardSurface(theme, showFront ? {} : { alt: true, accent: pal.accent }, dk),
     overflow: "hidden",
-    transform: xform({ y: -lift, scaleX: snap(sx * grow), scaleY: snap(grow) }),
+    transform: xform({ y: -lift, scaleX: gridScale(snap(sx * grow), cw), scaleY: gridScale(snap(grow), ch) }),
     transformOrigin: "50% 50%",
     // de canto la tarjeta es una rendija: bajo 0,012 de ancho, o bajo unos 8 px en una tarjeta chica (ahí el borde y la sombra de una rendija se rasterizaban distinto según el historial), se oculta
     visibility: sx < Math.max(0.012, 8 / cw) ? "hidden" : "visible",

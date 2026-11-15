@@ -103,5 +103,5 @@ Este repo es público: no puede llevar nombres de empresas, clientes o personas 
 
 - El repo no incluye fuentes, música, efectos de sonido, logos ni marcas de terceros. Quien los agrega es responsable de que su licencia permita usarlos en el lugar donde se va a mostrar el video y, si se suben al repo, redistribuirlos.
 - Los datos, nombres y cifras de los ejemplos son ficticios.
-- Licencia del código del repo: MIT (ver `LICENSE`).
+- Licencia del código del repo: MIT (ver `LICENSE`). Lista de terceros (dependencias, Playwright, ffmpeg) y qué no se incluye (fuentes, música, imágenes): [NOTICE](NOTICE).
 - La carpeta `videos/` no se sube al repo (está en `.gitignore`): ahí viven los guiones y las escenas de cada persona. El motor descubre solo las carpetas `videos/<slug>/` (no hay que editar `engine/runtime/videos.ts`), así que un video propio no deja cambios locales en el motor.
