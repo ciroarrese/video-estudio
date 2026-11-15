@@ -1,13 +1,13 @@
-import { staggerFrames } from "../themes";
+import { handoffShift, staggerFrames } from "../themes";
 import type { Theme } from "../themes";
 import { INTERLUDE_COMPACT_FRAMES } from "./durations";
 import { composeStory } from "./compose";
 import type { ComposeOptions } from "./compose";
 import { resolveTheme } from "./define";
 import type { ThemeInput } from "./define";
-import { INTERLUDE_FRAMES, INTERLUDE_T, REVEAL_STAGE_T, REVEAL_T, TICK_STEP, isStageReveal, nextTopic, revealBase } from "./Interlude";
+import { INTERLUDE_BLANK, INTERLUDE_FRAMES, INTERLUDE_SHIFT_MIN, INTERLUDE_T, REVEAL_STAGE_T, REVEAL_T, TICK_STEP, isStageReveal, nextTopic, revealBase } from "./Interlude";
 import { closingLogoAt } from "./Closing";
-import { openingFly, openingListAt } from "./Opening";
+import { OPENING_BLANK, openingFly, openingListAt } from "./Opening";
 import { planScenes } from "./plan";
 import { resolveStorySpec, scaler } from "./shared";
 import { lateStart } from "./types";
@@ -60,7 +60,7 @@ export function storyCues(spec: StorySpec, scenes: (TopicScene | null | undefine
     if (e.kind === "opening") {
       add(e.from, "opening-title", null);
       add(e.from + openingListAt(dur), "opening-list", null);
-      if (first >= 0) add(e.from + openingFly(dur, rs.design?.handoff === "dock", rs.design?.handoff === "through")[0], "fly-in", first);
+      if (first >= 0) add(e.from + openingFly(dur, rs.design?.handoff === "dock", rs.design?.handoff === "through", handoffShift(theme, OPENING_BLANK))[0], "fly-in", first);
     } else if (e.kind === "topic") {
       add(e.from, "scene-start", e.topic!);
     } else if (e.kind === "closing") {
@@ -88,7 +88,7 @@ export function storyCues(spec: StorySpec, scenes: (TopicScene | null | undefine
         add(e.from + u(R.lateCheck[1] + 2), "reveal-tick", i);
       } else {
         const next = nextTopic(lateStart(spec), i + 1, skip);
-        if (next >= 0) add(e.from + u(INTERLUDE_T.fly[0]), "fly-in", next);
+        if (next >= 0) add(e.from + u(INTERLUDE_T.fly[0] + handoffShift(theme, INTERLUDE_BLANK, INTERLUDE_SHIFT_MIN)), "fly-in", next);
       }
     }
   }

@@ -1,7 +1,7 @@
 import React from "react";
 import { Easing, useFrame, useVideoConfig } from "../engine";
 import { Wash, World, kf, useCameraAt, exitThrough } from "../kit";
-import { cornerRadius, resolveStyle, settle, staggerFrames, surfaceStyle, useTheme, withAlpha } from "../themes";
+import { cornerRadius, handoffShift, resolveStyle, settle, staggerFrames, surfaceStyle, useTheme, withAlpha } from "../themes";
 import { fade, xform } from "../fx/core/math";
 import { AVG_BOLD, AVG_REG, ROW_GAP, listLayout, textWidth } from "./layout";
 import { DefaultThumbnail } from "./Closing";
@@ -19,6 +19,10 @@ export const interludeFrames = (spec: StorySpec) => spec.timing?.interlude ?? IN
 export const interludeRevealFrames = (spec: StorySpec) => spec.timing?.interludeReveal ?? INTERLUDE_REVEAL_FRAMES;
 
 /** Tiempos (cuadros de la duración por defecto, 120) de la vuelta común: la tilde, el subrayado del que sigue y el atravesado. Los usa `storyCues`. */
+/** Cuadros de referencia (a `INTERLUDE_FRAMES`) con el velo cerrado entre el atravesado y la escena que sigue: lo de siempre, que `motion.handoffHold` puede cambiar. */
+export const INTERLUDE_BLANK = 18;
+/** Cuánto se puede adelantar el atravesado (cuadros de referencia): hasta que empiece justo al terminar de aparecer la fila que sigue (62). */
+export const INTERLUDE_SHIFT_MIN = -4;
 export const INTERLUDE_T = { check: [14, 34] as [number, number], next: [40, 62] as [number, number], fly: [66, 112] as [number, number] };
 /** Tiempos (cuadros de la duración por defecto, 150) de la vuelta de revelación: tilde(s) de lo anterior, entrada de la fila nueva, su número, su subrayado y su tilde. */
 export const REVEAL_T = { check: [14, 34] as [number, number], enter: [48, 62] as [number, number], number: [56, 70] as [number, number], next: [74, 96] as [number, number], lateCheck: [104, 124] as [number, number] };
@@ -89,9 +93,11 @@ export function Interlude({ spec: specIn, done, skip = [], next: nextProp, ticks
   const sc = (r: [number, number]) => [u(r[0]), u(r[1])] as [number, number];
   const R = stage ? REVEAL_STAGE_T : REVEAL_T;
   const Z: [number, number] = [0, 0];
+  const flyShift = handoffShift(theme, INTERLUDE_BLANK, INTERLUDE_SHIFT_MIN);
+  const flySc = sc([INTERLUDE_T.fly[0] + flyShift, INTERLUDE_T.fly[1] + flyShift]);
   const T = reveal
-    ? { check: sc(R.check), next: sc(R.next), fly: sc(INTERLUDE_T.fly), enter: sc(R.enter), number: sc(R.number), lateCheck: sc(R.lateCheck) }
-    : { check: sc(INTERLUDE_T.check), next: sc(INTERLUDE_T.next), fly: sc(INTERLUDE_T.fly), enter: Z, number: Z, lateCheck: Z };
+    ? { check: sc(R.check), next: sc(R.next), fly: flySc, enter: sc(R.enter), number: sc(R.number), lateCheck: sc(R.lateCheck) }
+    : { check: sc(INTERLUDE_T.check), next: sc(INTERLUDE_T.next), fly: flySc, enter: Z, number: Z, lateCheck: Z };
   const S = stage ? { room: sc(REVEAL_STAGE_T.room), sweep: sc(REVEAL_STAGE_T.sweep), thumbIn: sc(REVEAL_STAGE_T.thumbIn), thumbFly: sc(REVEAL_STAGE_T.thumbFly) } : null;
   const motion = resolveStyle(theme).motion;
   const room = S ? kf(f, S.room, [0, 1], ease.inOut) : 0; // las filas ya vistas se corren apenas hacia arriba para hacer lugar a la nueva

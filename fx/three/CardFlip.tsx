@@ -47,8 +47,9 @@ export function CardFlip(p: CardFlipProps) {
   // La transformación solo se emite mientras la tarjeta se mueve o gira (en reposo no queda `translateY(0px) scale(1, 1)`).
   const cardStyle: React.CSSProperties = {
     position: "absolute",
-    left: (width - cw) / 2,
-    top: (height - ch) / 2,
+    // posiciones de layout enteras (en una caja de ancho impar un `.5` hacía que el texto bajo `scaleX` se rasterizara distinto según el historial)
+    left: Math.round((width - cw) / 2),
+    top: Math.round((height - ch) / 2),
     width: cw,
     height: ch,
     boxSizing: "border-box",

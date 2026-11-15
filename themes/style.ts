@@ -47,6 +47,7 @@ export const STYLE_FIELDS: readonly StyleFieldSpec[] = [
   nn("motion.staggerList", 0, 60, "cuadros entre filas de la lista de la apertura (vacío = según stagger)"),
   nn("motion.staggerRows", 0, 60, "cuadros entre filas de interfaces y de la vuelta al listado (vacío = según stagger)"),
   nn("motion.staggerItems", 0, 60, "cuadros entre elementos pequeños (vacío = según stagger)"),
+  nn("motion.handoffHold", 0, 40, "cuadros de velo cerrado (en blanco) antes de entrar a la escena siguiente (vacío = lo de siempre: unos 20)"),
   nf("motion.staggerChips", 0, 10, "cuadros por pieza entre las piezas del muro (vacío = 0,5 de siempre)"),
   bo("motion.cameraBlur", true, "desenfoque de movimiento de la cámara"),
   nu("motion.cameraTilt", 0, 3, 1, "multiplicador de la inclinación de la cámara"),

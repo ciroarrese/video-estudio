@@ -154,6 +154,13 @@ export interface ThemeStyle {
     staggerItems: number | null;
     /** Paso (cuadros por pieza, 0 a 10, admite decimales) con que aparecen las piezas del muro de la apertura (0,5 de siempre). `null`: el de siempre. */
     staggerChips: number | null;
+    /**
+     * Cuadros (a la duración de referencia del bloque: se escalan con `timing`) que la apertura y la vuelta al listado se quedan con el velo cerrado, en blanco, antes de
+     * entrar a la escena que sigue. `null` (por defecto): lo de siempre, unos 20 cuadros en la apertura y 18 en la vuelta. Menos cuadros = el atravesado y el velo ocurren más
+     * tarde y la escena entra antes; 0 = el velo se cierra justo en el último cuadro. En la vuelta el blanco no pasa de 22 cuadros (antes empezaría el atravesado sobre la lista que todavía se arma). No afecta a
+     * `handoff: "dock"`/`"through"`, a la vuelta compacta ni a la de revelación (no tienen velo).
+     */
+    handoffHold: number | null;
     /** `false` apaga el desenfoque de movimiento de la cámara en los viajes. */
     cameraBlur: boolean;
     /** Multiplicador de la inclinación de la cámara (0 a 3; 1 = la de siempre). */

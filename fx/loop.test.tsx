@@ -3,7 +3,7 @@ import { renderToString } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 import { FrameProvider, useFrame } from "../engine";
 import { ThemeProvider, neutral } from "../themes";
-import { Loop, fxDensity, loopState, LineDraw, TileDone, NotificationStack, DigitRoll, CardFlip, FlowSteps, RadarMorph } from "./index";
+import { Loop, fxDensity, loopState, LineDraw, TileDone, NotificationStack, DigitRoll, CardFlip, FlowSteps, RadarMorph, ChatThread, CommandPalette, BeforeAfter, MarkerDraw } from "./index";
 
 const config = { fps: 30, width: 1920, height: 1080, durationInFrames: 400 };
 const html = (node: React.ReactNode, frame: number) =>
@@ -83,6 +83,7 @@ describe("density", () => {
     const fxs: [string, (d?: any) => React.ReactElement][] = [
       ["LineDraw", (d) => <LineDraw density={d} />], ["TileDone", (d) => <TileDone density={d} />], ["NotificationStack", (d) => <NotificationStack density={d} />],
       ["DigitRoll", (d) => <DigitRoll value={1200} density={d} />], ["CardFlip", (d) => <CardFlip density={d} />], ["FlowSteps", (d) => <FlowSteps density={d} />], ["RadarMorph", (d) => <RadarMorph density={d} />],
+      ["ChatThread", (d) => <ChatThread density={d} />], ["CommandPalette", (d) => <CommandPalette density={d} />], ["BeforeAfter", (d) => <BeforeAfter density={d} />], ["MarkerDraw", (d) => <MarkerDraw density={d} />],
     ];
     for (const [name, make] of fxs) for (const f of [0, 20, 45, 80, 200]) expect(html(make(1), f), `${name} ${f}`).toBe(html(make(undefined), f));
   });
@@ -96,12 +97,19 @@ describe("density", () => {
   });
   it("en una caja chica con auto, nada queda con medidas negativas ni NaN", () => {
     const box = { width: 330, height: 150 };
-    for (const el of [<LineDraw {...box} density="auto" />, <TileDone {...box} density="auto" />, <NotificationStack {...box} density="auto" />, <CardFlip {...box} density="auto" />, <FlowSteps {...box} density="auto" />, <RadarMorph {...box} density="auto" />]) {
+    for (const el of [<LineDraw {...box} density="auto" />, <TileDone {...box} density="auto" />, <NotificationStack {...box} density="auto" />, <CardFlip {...box} density="auto" />, <FlowSteps {...box} density="auto" />, <RadarMorph {...box} density="auto" />, <ChatThread {...box} density="auto" />, <CommandPalette {...box} density="auto" />, <BeforeAfter {...box} density="auto" />, <MarkerDraw {...box} density="auto" />]) {
       for (const f of [0, 30, 100]) {
         const h = html(el, f);
         expect(h).not.toMatch(/NaN|Infinity|="-\d/);
       }
     }
+  });
+  it("CommandPalette y ChatThread: con auto, la caja de búsqueda y las burbujas bajan con la caja (y sin density siguen iguales)", () => {
+    const small = html(<CommandPalette width={330} height={150} density="auto" />, 60);
+    const big = html(<CommandPalette width={330} height={150} />, 60);
+    expect(small).toContain('width="9.6"'); // lupa: 32 * 0,3
+    expect(big).toContain('width="32"');
+    expect(html(<ChatThread width={330} height={150} density="auto" />, 100)).not.toBe(html(<ChatThread width={330} height={150} />, 100));
   });
   it("RadarMorph: con auto, el radar de una caja chica se dibuja", () => {
     const small = html(<RadarMorph width={330} height={150} density="auto" />, 100);

@@ -2,7 +2,7 @@ import React from "react";
 import { renderToString } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 import { FrameProvider } from "../engine";
-import { ThemeProvider, editorial, neon, neutral, themeFromTokens } from "../themes";
+import { ThemeProvider, editorial, handoffShift, neon, neutral, themeFromTokens } from "../themes";
 import type { Theme } from "../themes";
 import { Opening, validateSpec } from "./index";
 import type { StorySpec } from "./index";
@@ -110,5 +110,26 @@ describe("línea de apoyo de la lista: caption", () => {
     expect(h).not.toContain("text-transform");
     const up = themeFromTokens({}, neutral, { style: { type: { captionCase: "upper", captionTracking: 0.1 } } });
     expect(html(<Opening spec={spec()} />, 200, up)).toContain("text-transform:uppercase");
+  });
+});
+
+describe("motion.handoffHold: el blanco entre la apertura o la vuelta y la escena", () => {
+  const hold = (n: number | null) => themeFromTokens({}, neutral, { style: { motion: { handoffHold: n } } });
+  it("sin handoffHold (o vacío) todo queda como siempre", () => {
+    for (const f of [230, 270, 285, 299]) expect(html(<Opening spec={spec()} />, f, hold(null))).toBe(html(<Opening spec={spec()} />, f, neutral));
+    expect(handoffShift(neutral, 20)).toBe(0);
+  });
+  it("con menos blanco el velo se cierra más tarde (el cuadro 290 ya no es todo velo) y con 20 queda igual que antes", () => {
+    const veil = (n: number | null, f: number) => html(<Opening spec={spec()} />, f, hold(n)).match(/data-qa-veil="([\d.]+)"/)?.[1];
+    expect(veil(null, 290)).toBe("1.000");
+    expect(Number(veil(0, 290))).toBeLessThan(1);
+    expect(html(<Opening spec={spec()} />, 285, hold(20))).toBe(html(<Opening spec={spec()} />, 285, neutral));
+  });
+  it("storyCues mueve el atravesado con handoffHold", async () => {
+    const { storyCues } = await import("./index");
+    const fly = (t: Theme) => storyCues(spec(), spec().topics.map((tp) => ({ id: `e-${tp.id}`, durationInFrames: 120, component: () => null })), { theme: t }).filter((c) => c.kind === "fly-in").map((c) => c.frame);
+    expect(fly(hold(0))[0]).toBeGreaterThan(fly(neutral)[0]!);
+    expect(handoffShift(hold(5), 18, -4)).toBe(13);
+    expect(handoffShift(hold(40), 18, -4)).toBe(-4);
   });
 });

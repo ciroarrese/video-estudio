@@ -1,7 +1,7 @@
 import type React from "react";
 import { Easing } from "../../engine";
 import { cornerRadius, entrance } from "../../themes";
-import { fade, fxBox, progress, styleKey, useFx, xform } from "../core";
+import { fade, fxBox, fxDensity, progress, styleKey, useFx, xform } from "../core";
 import { bareShadow, svgSurface } from "../data/styleKit";
 import type { FxProps } from "../core";
 
@@ -30,10 +30,12 @@ export function chatSchedule(messages: ChatMessage[], duration: number): { typin
 export function ChatThread(p: ChatThreadProps) {
   const { local, theme, style } = useFx(p);
   const { width: w, height: h } = fxBox(p, { width: 760, height: 560 });
+  // `density` (fx/core/density.ts): letra, relleno, separación y puntos de "escribiendo" bajan juntos en una caja chica; sin él, k = 1 (el de siempre)
+  const k = fxDensity(p.density, { width: w, height: h }, { width: 760, height: 560 });
   const messages = p.messages ?? DEFAULT;
   const dur = p.duration ?? 80;
   const sched = chatSchedule(messages, dur);
-  const fs = theme.type.caption * 0.85;
+  const fs = theme.type.caption * 0.85 * k;
   // El "pop" escala solo el fondo de la burbuja; el texto no se escala (se desvanece), así el trazado de las letras no depende del historial.
   // Opacidad y escala solo mientras la burbuja aparece: en reposo no queda `scale(1)` ni `opacity: 0.99`.
   // Estilo del diseño: superficie (relleno, borde, filo duro o halo) y esquinas de las burbujas.
@@ -43,8 +45,8 @@ export function ChatThread(p: ChatThreadProps) {
   // Con la entrada propia (`motion.entrance: "auto"`) el fondo "salta" con `scale`; con otra, la burbuja entera entra como dice el diseño.
   const auto = style.motion.entrance === "auto";
   const bubble = (key: string, mine: boolean, scale: number, idx: number, children: React.ReactNode) => {
-    const ent = auto ? {} : entrance(theme, Math.min(1, scale), idx, { native: "rise", distance: 18, side: mine ? "right" : "left" });
-    const outer: React.CSSProperties = { position: "relative", alignSelf: mine ? "flex-end" : "flex-start", maxWidth: "76%", boxSizing: "border-box", padding: "16px 24px", color: mine ? theme.color.onAccent : theme.color.text, fontSize: fs, lineHeight: 1.3, opacity: auto ? fade(Math.min(1, scale * 1.4)) : undefined, ...ent };
+    const ent = auto ? {} : entrance(theme, Math.min(1, scale), idx, { native: "rise", distance: 18 * k, side: mine ? "right" : "left" });
+    const outer: React.CSSProperties = { position: "relative", alignSelf: mine ? "flex-end" : "flex-start", maxWidth: "76%", boxSizing: "border-box", padding: `${16 * k}px ${24 * k}px`, color: mine ? theme.color.onAccent : theme.color.text, fontSize: fs, lineHeight: 1.3, opacity: auto ? fade(Math.min(1, scale * 1.4)) : undefined, ...ent };
     const tf = auto ? xform({ scale }) : undefined;
     const back: React.CSSProperties = { position: "absolute", inset: 0, background: mine ? theme.color.accent : surf.fill === theme.color.surface ? theme.color.surfaceAlt : surf.fill, border: mine ? (surf.edge === theme.color.border ? "none" : edged(surf.edge)) : edged(surf.edge), boxShadow: bareShadow(surf), borderRadius: radius, boxSizing: "border-box", transform: tf, transformOrigin: tf ? (mine ? "100% 100%" : "0% 100%") : undefined };
     const txt: React.CSSProperties = { position: "relative", opacity: auto ? fade(Math.min(1, Math.max(0, (scale - 0.55) / 0.45))) : undefined };
@@ -63,14 +65,14 @@ export function ChatThread(p: ChatThreadProps) {
     const typing = s.typingAt !== null && local >= s.typingAt && local < s.popAt;
     if (typing) {
       out.push(bubble(`t${i}`, false, Easing.out(progress(local, s.typingAt!, 6)), i, (
-        <span style={{ display: "inline-flex", gap: 8, alignItems: "center", height: fs * 0.9 }}>
-          {[0, 1, 2].map((d) => <span key={d} style={{ width: 12, height: 12, borderRadius: theme.radius.pill, background: theme.color.textMuted, transform: xform({ y: Math.sin(local * 0.55 - d * 0.9) * -5, round: true }), display: "inline-block" }} />)}
+        <span style={{ display: "inline-flex", gap: 8 * k, alignItems: "center", height: fs * 0.9 }}>
+          {[0, 1, 2].map((d) => <span key={d} style={{ width: 12 * k, height: 12 * k, borderRadius: theme.radius.pill, background: theme.color.textMuted, transform: xform({ y: Math.sin(local * 0.55 - d * 0.9) * -5 * k, round: true }), display: "inline-block" }} />)}
         </span>
       )));
     }
     if (local >= s.popAt) out.push(bubble(`m${i}`, mine, pop, i, m.text));
   });
   return (
-    <div style={{ width: w, height: h, overflow: "hidden", display: "flex", flexDirection: "column", justifyContent: "flex-end", gap: 16, fontFamily: theme.font.family, ...p.style }}>{out}</div>
+    <div style={{ width: w, height: h, overflow: "hidden", display: "flex", flexDirection: "column", justifyContent: "flex-end", gap: 16 * k, fontFamily: theme.font.family, ...p.style }}>{out}</div>
   );
 }

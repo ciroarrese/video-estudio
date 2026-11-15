@@ -4,21 +4,29 @@ import type { Theme } from "../../themes";
 import { Eyebrow, NestedScene, Stage } from "../../kit";
 import {
   BarsGrow, CardFlip, ChatThread, DigitRoll, DonutRing, FlowSteps, Globe, LineDraw, Loop, MaskedRise, NotificationStack,
-  RadarMorph, ScrambleDecode, SplitFlap, TileDone, TileGrid, Typewriter, BeforeAfter,
+  RadarMorph, ScrambleDecode, SplitFlap, TileDone, TileGrid, Typewriter, BeforeAfter, CommandPalette, MarkerDraw,
 } from "../../fx";
 import type { Density, LoopProps } from "../../fx";
 import { AnnotationDemo } from "../annotation-demo/AnnotationDemo";
 
 /**
- * Muestrario de efectos en baldosas chicas (los que hoy aguantan una caja de 330 x 150; faltan `CommandPalette` y `MarkerDraw`, ver `docs/animaciones.md`), todo en lazo (`Loop`): ningún efecto queda quieto con su imagen final, y cada baldosa lleva su propio desfase.
- * Es el caso de prueba de `density` ("auto" achica letra, trazos y márgenes de LineDraw, TileDone, NotificationStack, DigitRoll y CardFlip a la caja) y de
- * `NestedScene` (una escena entera, la de `annotation-demo`, mostrada chica y viva). Con `density: "off"` cada efecto usa su tamaño de diseño, para compararlos.
+ * Muestrario de efectos en baldosas chicas (285 x 150 de contenido), todo en lazo (`Loop`): ningún efecto queda quieto con su imagen final, y cada baldosa
+ * lleva su propio desfase. Es el caso de prueba de `density` ("auto" achica letra, trazos y márgenes de LineDraw, TileDone, NotificationStack, DigitRoll,
+ * CardFlip, FlowSteps, RadarMorph, ChatThread, BeforeAfter, CommandPalette y MarkerDraw a la caja) y de `NestedScene` (una escena entera, la de
+ * `annotation-demo`, mostrada chica y viva). Con `density: "off"` cada efecto usa su tamaño de diseño, para compararlos.
+ *
+ * ChatThread y CommandPalette llevan 0,55 fijo (con `auto` el piso de 0,3 las deja ilegibles: su caja de diseño es de 760 x 560 y 900 x 560, muy distinta de una baldosa ancha y baja).
+ *
+ * Por qué las baldosas son `data-qa-decor` (decisión única, vale para todas): un muestrario chico es adorno. Cada baldosa es una reproducción reducida de un efecto
+ * cuyo texto es de muestra ("Hecho", "Aprobado", "Clave") y su letra es la de una baldosa, no la de un cuadro completo; con `density="auto"` baja por debajo
+ * de los 18 px a propósito. `qa` no juzga `min-size` ni `contrast` ahí, pero sí `clip`, `overlap` y `safe-area`. Lo que una persona tiene que leer
+ * (el rótulo con el nombre del efecto, fuera de la marca) cumple tamaño y contraste del tema.
  */
 export type FxMuroProps = { theme?: "neutral" | "dark" | "editorial" | "neon" | "papel" | Theme; density?: "auto" | "off" };
 export const DURATION = 240;
 
 const TEMAS: Record<string, Theme> = { neutral, dark, editorial, neon, papel };
-const COLS = 5, TW = 330, TH = 190, GAP = 20, X0 = 90, Y0 = 70, LABEL = 40;
+const COLS = 6, TW = 285, TH = 190, GAP = 14, X0 = 70, Y0 = 70, LABEL = 40;
 const DUR = 60;
 
 type Baldosa = { name: string; loop?: Partial<LoopProps>; /** regla de `qa` que esta baldosa calla a propósito (con su motivo en la lista) */ ignore?: string; render: (w: number, h: number, d?: Density) => React.ReactNode };
@@ -32,14 +40,16 @@ const BALDOSAS: Baldosa[] = [
   { name: "DonutRing", render: (w, h) => <DonutRing width={w} height={h} duration={DUR} value={72} max={100} label="" /> },
   { name: "BarsGrow", render: (w, h) => <BarsGrow width={w} height={h} duration={DUR} data={[40, 64, 52]} labels={["A", "B", "C"]} format={() => ""} /> },
   { name: "FlowSteps", render: (w, h, d) => <FlowSteps width={w} height={h} density={d} duration={DUR} steps={[{ title: "Leer" }, { title: "Armar" }, { title: "Revisar" }]} /> },
-  { name: "ChatThread", render: (w, h) => <ChatThread width={w} height={h} duration={DUR} messages={[{ from: "them", text: "¿Aprobás?" }, { from: "me", text: "Aprobado." }]} /> },
-  { name: "BeforeAfter", loop: { mode: "pingpong" }, render: (w, h) => <BeforeAfter width={w} height={h} duration={DUR} /> },
+  { name: "ChatThread", render: (w, h, d) => <ChatThread width={w} height={h} density={d && 0.55} duration={DUR} messages={[{ from: "them", text: "¿Aprobás?" }, { from: "me", text: "Aprobado." }]} /> },
+  { name: "BeforeAfter", loop: { mode: "pingpong" }, render: (w, h, d) => <BeforeAfter width={w} height={h} density={d} duration={DUR} /> },
   { name: "TileGrid", render: (w, h) => <TileGrid width={w - 40} height={h - 30} cols={6} rows={3} duration={DUR} lit={0.7} /> },
   { name: "MaskedRise", render: (_w, _h) => <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center" }}><MaskedRise duration={DUR} text="Título" /></div> },
   { name: "Typewriter", render: (_w, _h) => <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center" }}><Typewriter duration={DUR} text="Listo" /></div> },
   { name: "ScrambleDecode", render: (_w, _h) => <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center" }}><ScrambleDecode duration={DUR} text="Listo" /></div> },
   { name: "SplitFlap", render: (_w, _h) => <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center" }}><SplitFlap duration={DUR} text="OK" /></div> },
   { name: "RadarMorph", render: (w, h, d) => <RadarMorph width={w} height={h} density={d} duration={DUR} /> },
+  { name: "CommandPalette", render: (w, h, d) => <CommandPalette width={w} height={h} density={d && 0.55} duration={DUR} items={[{ label: "Nuevo", hint: "N" }, { label: "Nueva carpeta", hint: "C" }]} /> },
+  { name: "MarkerDraw", render: (w, h, d) => <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center" }}><MarkerDraw width={w - 40} height={h - 30} density={d} duration={DUR} text="Clave" /></div> },
   { name: "Globe", render: (w, h) => <Globe width={w} height={h} duration={DUR} bg="surface" /> },
 ];
 
