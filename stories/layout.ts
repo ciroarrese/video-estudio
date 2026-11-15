@@ -1,4 +1,5 @@
 import type { Theme } from "../themes";
+import { textWidth as kitTextWidth } from "../kit/text";
 import { listOptions, wallOptions } from "./types";
 import type { StorySpec } from "./types";
 import { random } from "../engine";
@@ -95,6 +96,13 @@ export type ListLayout = {
   numH: number;
   numGap: number;
   lineRows: string[][];
+  /**
+   * Renglones del nombre de cada fila (formatos angostos: vertical y cuadrado, donde el nombre puede ocupar hasta dos renglones; con letra ya achicada
+   * al piso, tres). Sin él (formato ancho) el nombre es `names[i]` en un solo renglón. `names[i]` es lo mismo con los renglones unidos por un espacio.
+   */
+  nameRows?: string[][];
+  /** Ancho (px, medido) del renglón de texto más ancho de la lista, sin contar el número (solo los formatos angostos). */
+  textW?: number;
   /** Arriba y a la izquierda del subrayado dentro de la fila. */
   barTop: number;
   barLeft: number;
@@ -103,6 +111,89 @@ export type ListLayout = {
   /** Largo (px) del subrayado completo de cada fila: `barW` (`list.underline: "row"`) o lo que mide el nombre (`"name"`). */
   barWs: number[];
 };
+
+
+// ---------------------------------------------------------------- ajuste de texto medido (formatos angostos)
+
+/** Mide un texto (px) con la tipografía real del tema (`kit/textWidth`, puro: canvas en el navegador, estimación por glifo en jsdom). */
+export type RowMeter = (text: string, size: number) => number;
+/** Holgura sobre lo medido: una fuente de reemplazo apenas más ancha no desborda la fila. */
+const FIT_SAFETY = 1.03;
+/** Medidor del nombre de una fila (rol `title`, el peso y el interletrado del design system). */
+export const nameMeter = (theme: Theme): RowMeter => (text, size) => kitTextWidth(theme, text, { size, role: "title" }) * FIT_SAFETY;
+/** Medidor de la línea de apoyo (rol `caption`). */
+export const lineMeter = (theme: Theme): RowMeter => (text, size) => kitTextWidth(theme, text, { size, role: "caption" }) * FIT_SAFETY;
+
+/** Parte un texto por palabras en renglones de a lo sumo `maxW` px medidos; una palabra sola más ancha que `maxW` queda en su renglón (desborda). */
+export function wrapMeasured(text: string, maxW: number, size: number, meter: RowMeter): string[] {
+  const words = text.split(/\s+/).filter(Boolean);
+  const rows: string[] = [];
+  let cur = "";
+  for (const w of words) {
+    const next = cur ? `${cur} ${w}` : w;
+    if (cur && meter(next, size) > maxW) { rows.push(cur); cur = w; } else cur = next;
+  }
+  if (cur) rows.push(cur);
+  return rows.length ? rows : [""];
+}
+
+/** Corta `text` con "…" hasta que entre en `maxW` (solo para la bajada, y solo como último recurso). */
+function ellipsize(text: string, maxW: number, size: number, meter: RowMeter): string {
+  const chars = Array.from(text);
+  let n = chars.length;
+  while (n > 1 && meter(chars.slice(0, n).join("").trimEnd() + "…", size) > maxW) n--;
+  return chars.slice(0, n).join("").replace(/[\s.,;:]+$/, "") + "…";
+}
+
+/** Reparte el texto en `n` renglones lo más parejos posible (sin pasar de `maxW`): evita una palabra huérfana en el segundo renglón. */
+function balancedRows(text: string, maxW: number, size: number, meter: RowMeter, n: number): string[] {
+  let lo = maxW / n, hi = maxW;
+  let best = wrapMeasured(text, maxW, size, meter);
+  for (let k = 0; k < 14; k++) {
+    const mid = (lo + hi) / 2;
+    const r = wrapMeasured(text, mid, size, meter);
+    if (r.length <= n && r.every((x) => meter(x, size) <= maxW)) { best = r; hi = mid; } else lo = mid;
+  }
+  return best;
+}
+
+export type RowsFit = { size: number; rows: string[][] };
+
+/**
+ * Acomoda varios textos con UN solo tamaño de letra (el del que más necesita), midiéndolos. El orden es siempre el mismo: primero usar todo el
+ * ancho (`width`), después partir en hasta `maxRows` renglones y recién al final achicar la letra, de `size` hacia `min`. Si ni así entra:
+ *  - sin `ellipsis` (el nombre de un tema): un renglón más y letra hasta `hardMin`; un nombre nunca se corta con "…";
+ *  - con `ellipsis` (la bajada): se corta con "…" el último renglón, con la letra en `min`.
+ */
+export function fitRowsUniform(texts: string[], o: { width: number; size: number; min: number; hardMin?: number; maxRows: number; meter: RowMeter; ellipsis?: boolean }): RowsFit {
+  const min = Math.min(o.min, o.size);
+  const hardMin = Math.min(o.hardMin ?? min, min);
+  const fits = (t: string, s: number, maxRows: number) => {
+    const r = wrapMeasured(t, o.width, s, o.meter);
+    return r.length <= maxRows && r.every((x) => o.meter(x, s) <= o.width);
+  };
+  const sizeFor = (t: string): number => {
+    for (let s = Math.floor(o.size); s >= Math.floor(min); s--) if (fits(t, s, o.maxRows)) return s;
+    if (o.ellipsis) return Math.floor(min);
+    for (let s = Math.floor(min); s >= Math.floor(hardMin); s--) if (fits(t, s, o.maxRows + 1)) return s;
+    return Math.floor(hardMin);
+  };
+  const size = texts.length ? Math.min(...texts.map(sizeFor)) : Math.floor(o.size);
+  const rows = texts.map((t) => {
+    const r = wrapMeasured(t, o.width, size, o.meter);
+    if (!o.ellipsis) return r.length > 1 ? balancedRows(t, o.width, size, o.meter, r.length) : r;
+    if (r.length <= o.maxRows && r.every((x) => o.meter(x, size) <= o.width)) return r.length > 1 ? balancedRows(t, o.width, size, o.meter, r.length) : r;
+    const kept = r.slice(0, o.maxRows - 1);
+    return [...kept, ellipsize(r.slice(o.maxRows - 1).join(" "), o.width, size, o.meter)];
+  });
+  return { size, rows };
+}
+
+/** Ancho (px) del renglón más ancho de unos renglones. */
+const widest = (rows: string[][], size: number, meter: RowMeter) => Math.max(0, ...rows.flat().map((r) => meter(r, size) / FIT_SAFETY));
+
+/** Formatos angostos (vertical y cuadrado): la lista acomoda el texto midiéndolo (ver `fitRowsUniform`). */
+const isNarrow = (width: number, height: number) => width / height < 1.3;
 
 /** Parte un texto en renglones de a lo sumo `maxW` px (estimado sin medir); si pasa de `maxLines`, corta el último con "…". */
 export function wrapText(text: string, maxW: number, size: number, maxLines: number, avg = AVG_REG): string[] {
@@ -131,45 +222,107 @@ function stackedLayout(spec: StorySpec, theme: Theme, width: number, height: num
   const region = width - 2 * marginX;
   const H = height - 2 * Math.round(height * 0.07);
   const GAP = { num: 14, pad: 30 };
+  const nm = nameMeter(theme), lm = lineMeter(theme);
   const build = (sc: number) => {
-    let nameSize = Math.round(theme.type.hero * sc);
-    const floor = Math.round(Math.max(48, nameSize * 0.6));
-    for (const t of spec.topics) nameSize = Math.min(nameSize, fitText(t.name, region, nameSize, { min: floor }).size);
-    nameSize = Math.floor(nameSize);
-    const names = spec.topics.map((t) => fitText(t.name, region, nameSize, { min: nameSize }).text);
+    const base0 = Math.round(theme.type.hero * sc);
+    const floor = Math.round(Math.max(48, base0 * 0.6));
+    // el nombre: todo el ancho, después hasta dos renglones y recién al final letra más chica; nunca "…"
+    const nf = fitRowsUniform(spec.topics.map((t) => t.name), { width: region, size: base0, min: floor, hardMin: Math.round(Math.max(30, theme.type.caption)), maxRows: 2, meter: nm });
+    const nameSize = Math.floor(nf.size);
+    const nameRows = nf.rows;
+    const nameRowsN = Math.max(...nameRows.map((r) => r.length));
     const base = Math.round(Math.max(30, theme.type.body * 1.15 * sc));
-    let lineSize = base;
-    // el mismo tamaño para todas: el más grande con el que cada línea entra en 2 renglones
-    for (const t of spec.topics) {
-      while (lineSize > 30 && wrapText(t.line, region, lineSize, 3).length > 2) lineSize -= 2;
-    }
-    const lineRows = spec.topics.map((t) => wrapText(t.line, region, lineSize, 2));
+    // la bajada: el mismo tamaño para todas, en hasta 2 renglones; "…" solo si ni con la letra mínima entra
+    const lf = fitRowsUniform(spec.topics.map((t) => t.line), { width: region, size: base, min: 30, maxRows: 2, meter: lm, ellipsis: true });
+    const lineSize = lf.size;
+    const lineRows = lf.rows;
     const rowsN = Math.max(...lineRows.map((r) => r.length));
     const numSize = Math.round(Math.max(36, nameSize * 0.62));
     const numH = Math.round(numSize * 1.1);
     const nameH = Math.round(nameSize * 1.1);
     const lineH = Math.round(lineSize * 1.25);
-    const blockH = numH + GAP.num + nameH + ROW_GAP.a + lineH * rowsN + ROW_GAP.b + ROW_GAP.bar;
-    return { nameSize, names, lineSize, lineRows, rowsN, numSize, numH, nameH, lineH, blockH };
+    const blockH = numH + GAP.num + nameH * nameRowsN + ROW_GAP.a + lineH * rowsN + ROW_GAP.b + ROW_GAP.bar;
+    const textW = Math.max(widest(nameRows, nameSize, nm), widest(lineRows, lineSize, lm));
+    return { nameSize, nameRows, nameRowsN, lineSize, lineRows, rowsN, numSize, numH, nameH, lineH, blockH, textW };
   };
   let sc = 1;
   let b = build(sc);
-  for (let k = 0; k < 6 && b.blockH + GAP.pad > H / n; k++) {
-    sc *= Math.max(0.5, (H / n - GAP.pad) / b.blockH);
+  // si no entra en el alto, se achica todo parejo (con paso mínimo: al achicar, un nombre de dos renglones puede pasar a uno) hasta el piso legible de la letra
+  const scMin = Math.min(1, 52 / theme.type.hero);
+  for (let k = 0; k < 40 && b.blockH + GAP.pad > H / n && sc > scMin; k++) {
+    sc = Math.max(scMin, sc * Math.min(0.97, Math.max(0.5, (H / n - GAP.pad) / b.blockH)));
     b = build(sc);
   }
-  const rowH = Math.floor(Math.min(H / n, b.blockH * 1.8));
+  // con la letra ya en el piso y sin entrar: la lista usa casi todo el alto del cuadro (más vale pasar el área segura que cortar un nombre)
+  const Hrow = b.blockH + GAP.pad > H / n ? Math.max(H, height - 2 * Math.round(height * 0.03)) : H;
+  const rowH = Math.floor(Math.min(Hrow / n, b.blockH * 1.8));
   const blockTop = Math.floor((rowH - b.blockH) / 2);
   const top = Math.round((height - n * rowH) / 2);
   const nameTop = blockTop + b.numH + GAP.num;
-  const barTop = nameTop + b.nameH + ROW_GAP.a + b.lineH * b.rowsN + ROW_GAP.b;
+  const barTop = nameTop + b.nameH * b.nameRowsN + ROW_GAP.a + b.lineH * b.rowsN + ROW_GAP.b;
   const left = marginX;
   return {
     left, top, rowW: region, rowH, nameSize: b.nameSize, lineSize: b.lineSize, numSize: b.numSize, numW: 0, nameH: b.nameH, lineH: b.lineH,
-    blockTop, blockH: b.blockH, barW: region, names: b.names, lines: b.lineRows.map((r) => r.join(" ")),
+    blockTop, blockH: b.blockH, barW: region, names: b.nameRows.map((r) => r.join(" ")), lines: b.lineRows.map((r) => r.join(" ")),
     // Lista apilada: se atraviesa por el centro del ancho de la fila (no por las primeras letras del nombre), así el zoom no empuja la línea hacia fuera del cuadro angosto.
     target: (i) => ({ x: left + region / 2, y: top + i * rowH + nameTop + b.nameH / 2 }),
-    stacked: true, numH: b.numH, numGap: GAP.num, lineRows: b.lineRows, barTop, barLeft: 0,
+    stacked: true, numH: b.numH, numGap: GAP.num, lineRows: b.lineRows, nameRows: b.nameRows, textW: Math.round(b.textW), barTop, barLeft: 0,
+  };
+}
+
+/**
+ * Lista de un cuadro angosto que no es alto (cuadrado, 4:5): como la de formato ancho, con el número a la izquierda y el texto en columna, pero el
+ * nombre y la bajada se acomodan midiéndolos: todo el ancho seguro, después hasta dos renglones cada uno y recién al final letra más chica (hasta un
+ * piso legible). Nunca "…" en el nombre; en la bajada, solo si ni así entra.
+ */
+function columnLayout(spec: StorySpec, theme: Theme, width: number, height: number): Omit<ListLayout, "barWs"> {
+  const n = spec.topics.length;
+  const region = Math.max(600, width - 2 * theme.safe.x);
+  const H = Math.max(300, height - 2 * theme.safe.y - 20);
+  const nm = nameMeter(theme), lm = lineMeter(theme);
+  const nameBase = theme.type.h1 * 0.8;
+  const lineBase = theme.type.body * 0.9;
+  const build = (sc: number) => {
+    const base = nameBase * sc;
+    const numSize = Math.max(26, Math.round(base * 0.6));
+    const numW = Math.round(Math.max(base * 1.45, numSize * 2.2));
+    const avail = region - numW;
+    const floor = Math.min(base, Math.max(44, base * 0.6));
+    const nf = fitRowsUniform(spec.topics.map((t) => t.name), { width: avail, size: base, min: floor, hardMin: Math.round(Math.max(30, theme.type.caption)), maxRows: 2, meter: nm });
+    const nameSize = Math.floor(nf.size);
+    const baseLine = Math.max(26, Math.min(lineBase * sc, nameSize * 0.55));
+    const lf = fitRowsUniform(spec.topics.map((t) => t.line), { width: avail, size: baseLine, min: 26, maxRows: 2, meter: lm, ellipsis: true });
+    const lineSize = lf.size;
+    const nameRowsN = Math.max(...nf.rows.map((r) => r.length));
+    const lineRowsN = Math.max(...lf.rows.map((r) => r.length));
+    const nameH = Math.round(nameSize * 1.1);
+    const lineH = Math.round(lineSize * 1.2);
+    const blockH = nameH * nameRowsN + ROW_GAP.a + lineH * lineRowsN + ROW_GAP.b + ROW_GAP.bar;
+    const textW = Math.max(widest(nf.rows, nameSize, nm), widest(lf.rows, lineSize, lm));
+    return { numSize, numW, nameSize, nameRows: nf.rows, nameRowsN, lineSize, lineRows: lf.rows, lineRowsN, nameH, lineH, blockH, textW };
+  };
+  let sc = 1;
+  let b = build(sc);
+  // el alto de la fila no pasa de lo que da el área segura dividida por los temas; si el bloque no entra, se achica todo parejo hasta el piso legible
+  const scMin = Math.min(1, 52 / nameBase);
+  for (let k = 0; k < 40 && b.blockH + 22 > H / n && sc > scMin; k++) {
+    sc = Math.max(scMin, sc * Math.min(0.97, Math.max(0.5, (H / n - 22) / b.blockH)));
+    b = build(sc);
+  }
+  // con la letra ya en el piso y sin entrar: casi todo el alto del cuadro (más vale pasar el área segura que cortar un nombre)
+  const Hrow = b.blockH + 22 > H / n ? Math.max(H, height - 2 * Math.round(height * 0.03)) : H;
+  const rowH = Math.floor(Math.min(b.blockH + 22, Hrow / n));
+  const blockTop = Math.floor((rowH - b.blockH) / 2);
+  const top = Math.round((height - n * rowH) / 2);
+  const rowW = Math.round(Math.min(region, Math.max(b.numW + b.textW, region * 0.78)));
+  const left = Math.round((width - rowW) / 2);
+  const barW = rowW - b.numW;
+  return {
+    left, top, rowW, rowH, nameSize: b.nameSize, lineSize: b.lineSize, numSize: b.numSize, numW: b.numW, nameH: b.nameH, lineH: b.lineH, blockTop, blockH: b.blockH, barW,
+    names: b.nameRows.map((r) => r.join(" ")), lines: b.lineRows.map((r) => r.join(" ")),
+    target: (i) => ({ x: left + b.numW + Math.round(barW * 0.35), y: top + i * rowH + blockTop + b.nameH / 2 }),
+    stacked: false, numH: b.nameH, numGap: 0, lineRows: b.lineRows, nameRows: b.nameRows, textW: Math.round(b.textW),
+    barTop: blockTop + b.nameH * b.nameRowsN + ROW_GAP.a + b.lineH * b.lineRowsN + ROW_GAP.b, barLeft: b.numW,
   };
 }
 
@@ -229,12 +382,24 @@ function inlineLayout(spec: StorySpec, theme: Theme, width: number, height: numb
 export function listLayout(spec: StorySpec, theme: Theme, width: number, height: number): ListLayout {
   const L = baseLayout(spec, theme, width, height);
   const byName = listOptions(spec.design).underline === "name";
+  if (L.nameRows) { // formatos angostos: el subrayado "name" llega hasta el renglón más ancho del nombre (medido)
+    const nm = nameMeter(theme);
+    return { ...L, barWs: L.nameRows.map((rows) => (byName ? Math.max(24, Math.min(L.barW, Math.round(widest([rows], L.nameSize, nm)))) : L.barW)) };
+  }
   return { ...L, barWs: L.names.map((nm) => (byName ? Math.max(24, Math.min(L.barW, Math.round(textWidth(nm, L.nameSize, AVG_BOLD)))) : L.barW)) };
 }
 
 function baseLayout(spec: StorySpec, theme: Theme, width: number, height: number): Omit<ListLayout, "barWs"> {
   if (height / width > 1.3) return stackedLayout(spec, theme, width, height);
-  if (listOptions(spec.design).layout === "inline" && width / height >= 1.3) return inlineLayout(spec, theme, width, height);
+  if (isNarrow(width, height)) return columnLayout(spec, theme, width, height);
+  // formato ancho: la lista de siempre; solo si esa lista cortaría con "…" un nombre o una bajada (más de lo que entra con la estimación y la letra mínima)
+  // se arma en columna con el texto medido y partido en renglones (`columnLayout`). Mientras nada se corte, el marcado y los píxeles son los de siempre.
+  const wide = listOptions(spec.design).layout === "inline" && width / height >= 1.3 ? inlineLayout(spec, theme, width, height) : wideLayout(spec, theme, width, height);
+  const cuts = wide.names.some((nm, i) => nm !== spec.topics[i]!.name) || wide.lines.some((ln, i) => ln !== spec.topics[i]!.line);
+  return cuts ? columnLayout(spec, theme, width, height) : wide;
+}
+
+function wideLayout(spec: StorySpec, theme: Theme, width: number, height: number): Omit<ListLayout, "barWs"> {
   const n = spec.topics.length;
   const region = Math.max(600, width - 2 * theme.safe.x);
   const H = Math.max(300, height - 2 * theme.safe.y - 20);
@@ -392,13 +557,35 @@ const PILL_MIN = 0.68;
 
 /**
  * Tamaño y texto de la píldora del cierre. Sin `maxW`: letra `caption * 1.06` y hasta 560 px de texto. Con `maxW` (ancho total de la
- * píldora, bordes incluidos): se achica la letra hasta `PILL_MIN * caption` y después se corta con "…", para que dos píldoras vecinas no se pisen.
+ * píldora, bordes incluidos): se achica la letra hasta `PILL_MIN * caption`, para que dos píldoras vecinas no se pisen. Si el nombre no entra en un
+ * renglón ni así, se mide de verdad y se parte en dos renglones con esa letra mínima (después, tres con letra aún menor): **un nombre nunca se corta con "…"**.
+ * Cuando el nombre entra con la estimación de siempre, el resultado es el de siempre (un renglón, las mismas medidas).
  */
-export function pillFit(theme: Theme, name: string, maxW?: number): { text: string; size: number; numSize: number; w: number; h: number } {
+export function pillFit(theme: Theme, name: string, maxW?: number): { text: string; size: number; numSize: number; w: number; h: number; /** Renglones del nombre (uno casi siempre; dos o tres solo si no entra en uno ni con la letra mínima). */ rows: string[] } {
   const base = theme.type.caption * 1.06;
   const over = (size: number) => 2 * size * 0.9 + 6 + 16 + Math.max(26, size * 0.8) * 0.56 * 2;
-  const t = maxW === undefined ? fitText(name, 560, base, { min: theme.type.caption * 0.8 }) : fitText(name, Math.max(60, maxW - over(base)), base, { min: theme.type.caption * PILL_MIN });
-  return { text: t.text, size: t.size, numSize: Math.max(26, t.size * 0.8), w: Math.round(textWidth(t.text, t.size) + over(t.size)), h: Math.round(t.size * 1.25 + 2 * t.size * 0.42 + 6) };
+  const minSize = maxW === undefined ? theme.type.caption * 0.8 : theme.type.caption * PILL_MIN;
+  const t = maxW === undefined ? fitText(name, 560, base, { min: minSize }) : fitText(name, Math.max(60, maxW - over(base)), base, { min: minSize });
+  if (t.text === name) {
+    // entra en un renglón (con la estimación de siempre): la píldora de siempre
+    return { text: t.text, size: t.size, numSize: Math.max(26, t.size * 0.8), w: Math.round(textWidth(t.text, t.size) + over(t.size)), h: Math.round(t.size * 1.25 + 2 * t.size * 0.42 + 6), rows: [t.text] };
+  }
+  // No entra con la estimación: se mide de verdad. Primero un renglón (con la letra bajando hasta el mínimo); si no, dos renglones con la letra mínima
+  // (la píldora crece en alto, que es lo que la banda de arriba del panel admite) y, solo si ni así, se sigue achicando. Un nombre nunca se corta con "…".
+  const meter = nameMeter(theme);
+  const budget = maxW ?? 560 + over(base);
+  const width = (s: number) => Math.max(60, budget - over(s));
+  const rowsAt = (s: number) => wrapMeasured(name, width(s), s, meter);
+  const ok = (r: string[], s: number) => r.every((x) => meter(x, s) <= width(s));
+  const hardMin = Math.floor(theme.type.caption * 0.6);
+  let size = Math.floor(minSize);
+  let rows: string[] | null = null;
+  for (let s = Math.floor(base); s >= Math.floor(minSize) && !rows; s--) { const r = rowsAt(s); if (r.length === 1 && ok(r, s)) { size = s; rows = r; } }
+  for (let s = Math.floor(minSize); s >= hardMin && !rows; s--) { const r = rowsAt(s); if (r.length <= 2 && ok(r, s)) { size = s; rows = r; } }
+  for (let s = hardMin; s >= Math.floor(hardMin * 0.8) && !rows; s--) { const r = rowsAt(s); if (r.length <= 3 && ok(r, s)) { size = s; rows = r; } }
+  if (!rows) { size = Math.floor(hardMin * 0.8); rows = rowsAt(size); }
+  const textW = Math.max(...rows.map((r) => meter(r, size)));
+  return { text: rows.join(" "), size, numSize: Math.max(26, size * 0.8), w: Math.round(textW + over(size)), h: Math.round(size * 1.25 * rows.length + 2 * size * 0.42 + 6), rows };
 }
 
 /** Zoom máximo de la cámara del cierre (arranca en 1,1) y holgura (px) que se deja por la perspectiva y la inclinación de los paneles. */

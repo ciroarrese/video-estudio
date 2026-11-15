@@ -4,7 +4,7 @@ import { GradientText, Highlight, kf } from "../kit";
 import { accentMark, chartStyle, cornerRadius, numeralStyle, resolveColor, resolveStyle, staggerFrames, surfaceStyle, textStyle, transitionVeil, useTheme, withAlpha } from "../themes";
 import type { Theme } from "../themes";
 import { fade, styleKey, xform } from "../fx/core/math";
-import { PILL_OFF, closingWall, fitText, panelEntryLift, panelLayout, closingCamStart, pillBudget, pillFit, rigProject, rigTransform } from "./layout";
+import { PILL_OFF, closingWall, fitText, nameMeter, panelEntryLift, panelLayout, closingCamStart, pillBudget, pillFit, rigProject, rigTransform } from "./layout";
 import { Chip, Logo, Pill, RichText, StoryStage, pillNumberColor, scaler, useEase, useStorySpec } from "./shared";
 import { plainRich, wallOptions } from "./types";
 import type { StorySpec, TopicScene } from "./types";
@@ -30,7 +30,9 @@ const seedOf = (text: string, k: number) => random(`thumb-${text}-${k}`);
  */
 export function DefaultThumbnail({ index, name }: { index: number; name: string }) {
   const theme = useTheme();
-  const t = fitText(name, PANEL.w - 150, 28, { min: 22 });
+  const t0 = fitText(name, PANEL.w - 150, 28, { min: 22 });
+  // el título de la tarjeta no se corta con "…": si no entra con la estimación de siempre, se mide y la letra baja hasta que entre (es una vista reducida)
+  const t = t0.text === name ? t0 : { text: name, size: Math.max(10, Math.min(22, Math.floor((PANEL.w - 150) / (nameMeter(theme)(name, 100) / 100)))) };
   const chart = theme.color.chart;
   const col = (k: number) => chart[(index + k) % chart.length]!;
   const variant = index % 4;

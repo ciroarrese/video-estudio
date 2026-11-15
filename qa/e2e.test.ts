@@ -40,6 +40,12 @@ describe.skipIf(!chromium)('qa on the qa-defects video (e2e)', () => {
     expect(summary.errors).toBe(6);
   }, 180_000);
 
+  it('clip: a name cut by hand with a literal "…" is an error, silenced only by data-qa-ignore="clip"; an ellipsis that cuts nothing is not', async () => {
+    const { findings } = await runQa({ videoId: 'qa-defects', frames: `${F.literalEllipsis},${F.literalEllipsisMarked},${F.ellipsisFits}` });
+    const errs = findings.filter((f) => f.severity === 'error');
+    expect(errs.map((f) => [f.frame, f.rule, f.element.testid])).toEqual([[F.literalEllipsis, 'clip', 'literal-ellipsis']]);
+  }, 180_000);
+
   it('seeded NON-defects (wash over fading text, card flying over text, faint decorative text, text leaving while moving) give no errors', async () => {
     const { findings } = await runQa({ videoId: 'qa-defects', frames: '8-14' });
     expect(findings.filter((f) => f.severity === 'error'), JSON.stringify(findings.filter((f) => f.severity === 'error'))).toEqual([]);

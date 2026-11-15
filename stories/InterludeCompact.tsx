@@ -4,7 +4,7 @@ import { accentMark, cornerRadius, resolveStyle, textStyle, useTheme } from "../
 import { fade, styleKey } from "../fx/core/math";
 import type React from "react";
 import { INTERLUDE_COMPACT_FRAMES } from "./durations";
-import { fitText } from "./layout";
+import { fitRowsUniform, fitText, nameMeter } from "./layout";
 import { nextTopic } from "./Interlude";
 import { CheckMark, StoryStage, moveIn, scaler, useEase, useStorySpec } from "./shared";
 import { lateStart, withoutLate } from "./types";
@@ -49,6 +49,14 @@ export function InterludeCompact({ spec: specIn, done, skip = [], next: nextProp
 
   const nameFit = fitText(last.name, maxW - theme.type.h2 * 1.4, theme.type.h2, { min: theme.type.body, avg: 0.55 });
   const nextFit = next ? fitText(next.name, maxW, theme.type.h2 * 0.62, { min: theme.type.body * 0.8, avg: 0.55 }) : null;
+  // un nombre que no entra en un renglón con la estimación de siempre se mide y se parte en dos renglones (nunca "…"); si entra, queda como siempre
+  const rowsOf = (name: string, fit: { text: string; size: number }, width: number, size: number, min: number): { size: number; rows: string[] } => {
+    if (fit.text === name) return { size: fit.size, rows: [name] };
+    const r = fitRowsUniform([name], { width, size, min, hardMin: Math.round(theme.type.caption), maxRows: 2, meter: nameMeter(theme) });
+    return { size: r.size, rows: r.rows[0]! };
+  };
+  const nameRows = rowsOf(last.name, nameFit, maxW - theme.type.h2 * 1.4, theme.type.h2, theme.type.body);
+  const nextRows = next && nextFit ? rowsOf(next.name, nextFit, maxW, theme.type.h2 * 0.62, theme.type.body * 0.8) : null;
   const cs = Math.round(theme.type.h2 * 0.95);
   // la tira sigue al design system: forma de las esquinas, relleno (degradado de marca o acento sólido) y, con `decor.accent: "underline"`, un filete más fino
   const mark = accentMark(theme, { length: segW, thickness: 10 });
@@ -78,13 +86,13 @@ export function InterludeCompact({ spec: specIn, done, skip = [], next: nextProp
         </div>
         <div key={`name-${styleKey(nameRow)}`} style={nameRow}>
           <div style={{ flexShrink: 0, width: cs, height: cs }}>{check > 0 && <CheckMark p={check} size={cs} id={`c${done}`} />}</div>
-          <div style={{ fontSize: nameFit.size, fontWeight: title.fontWeight, color: theme.color.text, letterSpacing: title.letterSpacing, whiteSpace: "nowrap" }}>{nameFit.text}</div>
+          <div style={{ fontSize: nameRows.size, fontWeight: title.fontWeight, color: theme.color.text, letterSpacing: title.letterSpacing, whiteSpace: "nowrap" }}>{nameRows.rows.length === 1 ? nameRows.rows[0] : nameRows.rows.map((r, k) => <div key={k}>{r}</div>)}</div>
         </div>
         <div key={`next-${styleKey(nextBox)}`} style={nextBox}>
           {nextFit ? (
             <>
               <div style={{ fontSize: theme.type.caption * 0.9, letterSpacing: eyebrow.letterSpacing, textTransform: "uppercase", fontWeight: theme.font.weights.medium }}>{`Sigue · ${pos + 2} de ${m}`}</div>
-              <div style={{ fontSize: nextFit.size, color: theme.color.text, fontWeight: theme.font.weights.medium, marginTop: 6, whiteSpace: "nowrap" }}>{nextFit.text}</div>
+              <div style={{ fontSize: nextRows!.size, color: theme.color.text, fontWeight: theme.font.weights.medium, marginTop: 6, whiteSpace: "nowrap" }}>{nextRows!.rows.length === 1 ? nextRows!.rows[0] : nextRows!.rows.map((r, k) => <div key={k}>{r}</div>)}</div>
             </>
           ) : (
             <div style={{ fontSize: theme.type.eyebrow * 1.3, fontWeight: theme.font.weights.medium }}>Sigue el resumen</div>

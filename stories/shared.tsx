@@ -79,7 +79,9 @@ export const scaler = (dur: number, base: number) => (n: number) => (n * dur) / 
 export function Chip({ text, lit, pop, faint }: { text: string; lit: number; pop: number; faint?: boolean }) {
   const theme = useTheme();
   const on = lit > 0.5;
-  const t = fitText(text, 400, theme.type.caption * 0.94, { min: theme.type.caption * 0.75, avg: 0.54 });
+  const t0 = fitText(text, 400, theme.type.caption * 0.94, { min: theme.type.caption * 0.75, avg: 0.54 });
+  // la palabra del muro no se corta con "…": si no entra en 400 px ni con la letra mínima, va entera con esa letra (la pieza se ensancha)
+  const t = t0.text === text ? t0 : { text, size: t0.size };
   // superficie, borde y sombra del design system (`surfaceStyle`); el borde nominal es de 2 px: si el tema lo cambia, el relleno lo compensa
   // y la pieza mide lo mismo (la medida no depende del estilo)
   const surf = surfaceStyle(theme, "chip", { on, faint, glow: pop });
@@ -178,7 +180,9 @@ export function Pill({ index, name, scale = 1, glow = 0, maxW }: { index: number
       }}
     >
       <span style={{ fontSize: t.numSize, fontWeight: theme.font.weights.stat, ...numeral }}>{String(index + 1).padStart(2, "0")}</span>
-      <span style={{ fontSize: t.size, fontWeight: title.fontWeight, ...(title.letterSpacing ? { letterSpacing: title.letterSpacing } : {}), color: theme.color.text }}>{t.text}</span>
+      {t.rows.length > 1
+        ? <div style={{ fontSize: t.size, lineHeight: 1.25, fontWeight: title.fontWeight, ...(title.letterSpacing ? { letterSpacing: title.letterSpacing } : {}), color: theme.color.text }}>{t.rows.map((r, k) => <div key={k}>{r}</div>)}</div>
+        : <span style={{ fontSize: t.size, fontWeight: title.fontWeight, ...(title.letterSpacing ? { letterSpacing: title.letterSpacing } : {}), color: theme.color.text }}>{t.text}</span>}
     </div>
   );
 }
@@ -274,6 +278,8 @@ export function HeadlineRow({
   const nameStyle = { fontWeight: title.fontWeight, color: theme.color.text, letterSpacing: title.letterSpacing };
   // la línea de apoyo lleva la caja, el interletrado y el peso del rol `caption` solo si el design system los fijó (`follow: false`: no hereda los del eyebrow)
   const cap = textStyle(theme, "caption", { follow: false });
+  // el nombre en uno o más renglones (formatos angostos); sin `nameRows` es `names[i]` en un solo renglón
+  const nameRows = L.nameRows?.[i] ?? [L.names[i]!];
   if (L.stacked) {
     const nameTop = L.blockTop + L.numH + L.numGap;
     const block: React.CSSProperties = { position: "absolute", left: 0, top: L.blockTop, width: L.rowW, opacity: fade(quiet) };
@@ -281,8 +287,10 @@ export function HeadlineRow({
       <div key={styleKey(root)} style={root}>
         <div key={`block-${styleKey(block)}`} style={block}>
           <div style={{ height: L.numH, lineHeight: `${L.numH}px`, fontSize: L.numSize, fontWeight: theme.font.weights.stat, position: "relative", whiteSpace: "nowrap" }}>{num}</div>
-          <div style={{ position: "absolute", left: 0, top: nameTop - L.blockTop, fontSize: L.nameSize, lineHeight: `${L.nameH}px`, height: L.nameH, ...nameStyle, whiteSpace: "nowrap" }}>{L.names[i]}</div>
-          <div style={{ position: "absolute", left: 0, top: nameTop - L.blockTop + L.nameH + ROW_GAP.a, fontSize: L.lineSize, lineHeight: `${L.lineH}px`, color: theme.color.textMuted, whiteSpace: "nowrap", ...cap }}>
+          <div style={{ position: "absolute", left: 0, top: nameTop - L.blockTop, fontSize: L.nameSize, lineHeight: `${L.nameH}px`, height: L.nameH * nameRows.length, ...nameStyle, whiteSpace: "nowrap" }}>
+            {nameRows.map((r, k) => <div key={k}>{r}</div>)}
+          </div>
+          <div style={{ position: "absolute", left: 0, top: nameTop - L.blockTop + L.nameH * nameRows.length + ROW_GAP.a, fontSize: L.lineSize, lineHeight: `${L.lineH}px`, color: theme.color.textMuted, whiteSpace: "nowrap", ...cap }}>
             {L.lineRows[i]!.map((r, k) => <div key={k}>{r}</div>)}
           </div>
         </div>
@@ -291,6 +299,24 @@ export function HeadlineRow({
     );
   }
   const block: React.CSSProperties = { position: "absolute", left: 0, top: L.blockTop, width: L.rowW, opacity: fade(quiet) };
+  if (L.nameRows) {
+    // formato angosto sin apilar (cuadrado): el número a la izquierda y, a su lado, el nombre y la línea en hasta dos renglones cada uno
+    return (
+      <div key={styleKey(root)} style={root}>
+        <div key={`block-${styleKey(block)}`} style={block}>
+          <div style={{ display: "flex", alignItems: "baseline", height: L.nameH, whiteSpace: "nowrap" }}>
+            <span style={{ width: L.numW, flexShrink: 0, fontSize: L.numSize, fontWeight: theme.font.weights.stat, position: "relative" }}>{num}</span>
+            <span style={{ fontSize: L.nameSize, lineHeight: `${L.nameH}px`, ...nameStyle }}>{nameRows[0]}</span>
+          </div>
+          {nameRows.slice(1).map((r, k) => <div key={k} style={{ marginLeft: L.numW, height: L.nameH, fontSize: L.nameSize, lineHeight: `${L.nameH}px`, whiteSpace: "nowrap", ...nameStyle }}>{r}</div>)}
+          <div style={{ marginLeft: L.numW, marginTop: ROW_GAP.a, fontSize: L.lineSize, lineHeight: `${L.lineH}px`, color: theme.color.textMuted, whiteSpace: "nowrap", ...cap }}>
+            {L.lineRows[i]!.map((r, k) => <div key={k}>{r}</div>)}
+          </div>
+        </div>
+        {bar && <div key={`bar-${styleKey(bar)}`} style={bar} />}
+      </div>
+    );
+  }
   return (
     <div key={styleKey(root)} style={root}>
       <div key={`block-${styleKey(block)}`} style={block}>

@@ -127,5 +127,9 @@ export function TopicHeadline({ start = 0, hide = 0, frame, title, number, layou
   const k = sz === "sm" ? 0.85 : 1;
   const titleFit = fitText(name, lay === "inline" && sub ? Math.min(760, room * 0.6) : 760, 32, { min: 22 });
   const subFit = sub && lay === "inline" ? fitText(sub, Math.max(120, room - textWidth(titleFit.text, theme.type.caption * k) - 60), theme.type.eyebrow * k, { min: theme.type.eyebrow * k, avg: AVG_REG }).text : sub;
-  return <DockedHeadline index={number ?? (t ? t.index + 1 : 1)} title={titleFit.text} subtitle={subFit} layout={lay} size={sz} gradientLoop={def?.gradientLoop} start={at} hide={hide} frame={frame} />;
+  // un nombre que no entra no se corta con "…": va entero y pasa a otro renglón dentro del ancho de la píldora
+  const cut = titleFit.text !== name;
+  const titleCap = lay === "inline" && sub ? Math.min(760, room * 0.6) : Math.min(760, room + 140 - 2 * theme.type.caption * k);
+  const subRoomFit = cut && sub && lay === "inline" ? fitText(sub, Math.max(120, room - titleCap - 60), theme.type.eyebrow * k, { min: theme.type.eyebrow * k, avg: AVG_REG }).text : subFit;
+  return <DockedHeadline index={number ?? (t ? t.index + 1 : 1)} title={cut ? name : titleFit.text} subtitle={cut ? subRoomFit : subFit} layout={lay} size={sz} gradientLoop={def?.gradientLoop} start={at} hide={hide} frame={frame} titleMaxWidth={cut ? titleCap : undefined} />;
 }

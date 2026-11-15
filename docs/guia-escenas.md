@@ -215,7 +215,7 @@ Criterios:
 | Error | Cómo se nota | Qué lo detecta |
 |---|---|---|
 | `useState`/`useRef` que acumulan, `Math.random()`, `Date.now()`, CSS `transition` | el video sale distinto según el orden de render | `npm run render -- <id> --check` |
-| Rótulo más largo que su caja (`overflow: hidden`, `…`) | texto cortado | `qa`: `clip` |
+| Rótulo más largo que su caja (`overflow: hidden`, `text-overflow: ellipsis`) o texto acortado a mano con "…" | texto cortado: un nombre o una bajada que no se lee entero | `qa`: `clip` (error; solo se calla con `data-qa-ignore="clip"` y su motivo). Maquetá para que entre: ancho completo, dos renglones y recién después letra más chica |
 | Titular encima de contenido al acercar | dos textos se pisan o uno queda tapado | `qa`: `overlap`, `covered` (y la hoja de cuadros) |
 | Texto que se sale del cuadro o del área segura | recortado en un borde | `qa`: `offscreen`, `safe-area` |
 | Letra de 14 px en una escena que no se acerca | ilegible en pantalla | `qa`: `min-size` |

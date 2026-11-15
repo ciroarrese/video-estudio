@@ -106,7 +106,9 @@ export function Interlude({ spec: specIn, done, skip = [], next: nextProp, ticks
   const rowMidY = rowTop + L.blockTop + L.nameH / 2; // centro del renglón del nombre de la fila nueva
   // extremo derecho estimado del texto de la fila nueva (solo para ubicar la miniatura en el lugar libre y acotar el barrido)
   // (la estimación por glifo medio sobra un poco: se descuenta para que la miniatura no quede diminuta)
-  const textEnd = L.stacked
+  const textEnd = L.textW !== undefined
+    ? L.left + L.numW + L.textW // formatos angostos: ancho medido del renglón más ancho
+    : L.stacked
     ? L.left + 0.88 * Math.max(textWidth(L.names[lateI]!, L.nameSize, AVG_BOLD), Math.min(L.rowW, textWidth(L.lines[lateI]!, L.lineSize, AVG_REG))) // en columna, el nombre y la línea van en renglones aparte
     : L.left + L.numW + 0.88 * (textWidth(L.names[lateI]!, L.nameSize, AVG_BOLD) + (L.inline ? textWidth(` · ${L.lines[lateI]!}`, L.lineSize, AVG_REG) : textWidth(L.lines[lateI]!, L.lineSize, AVG_REG)));
   const appear = kf(f, [0, u(14)], [0, 1], ease.out);
