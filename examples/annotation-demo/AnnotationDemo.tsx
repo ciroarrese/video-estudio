@@ -1,7 +1,7 @@
 import { useFrame } from "../../engine";
 import { ThemeProvider, annotationLook, cornerRadius, dark, editorial, entrance, neon, neutral, papel, staggerFrames, surfaceStyle, textStyle, useTheme } from "../../themes";
 import type { AnnotationMarkSetting, Theme } from "../../themes";
-import { Callout, CountUp, Eyebrow, Highlight, Stage, Wash, kf } from "../../kit";
+import { Callout, CountUp, Eyebrow, FocusGroup, Highlight, Stage, Wash, kf } from "../../kit";
 
 /** Temas que la demo conoce por nombre. */
 const TEMAS: Record<string, Theme> = { neutral, dark, editorial, neon, papel };
@@ -25,6 +25,28 @@ const STATS = [
   { label: "En curso", value: 42 },
   { label: "Cerrados", value: 87 },
 ];
+const TARGET_INDEX = 1;
+
+/** Una ficha de estadística: entrada escalonada y número que cuenta (función pura del cuadro). */
+function Ficha({ s, i }: { s: (typeof STATS)[number]; i: number }) {
+  const t = useTheme();
+  const f = useFrame();
+  const d = staggerFrames(t, i, { base: 4 });
+  const a = kf(f, [4 + d, 18 + d], [0, 1]);
+  return (
+    <div
+      style={{
+        position: "absolute", left: cardX(i), top: CARD_Y, width: CARD.w, minHeight: CARD.h, boxSizing: "border-box", padding: 30,
+        ...surfaceStyle(t, "card", { level: "sm", bold: true, corner: "panel" }), ...entrance(t, a, i, { native: "rise", distance: 30 }),
+      }}
+    >
+      <Eyebrow style={{ display: "block", lineHeight: 1.2 }}>{s.label}</Eyebrow>
+      <div style={{ fontSize: t.type.stat * 0.6, lineHeight: 1.2, fontWeight: t.font.weights.stat, color: t.color.chart[i % t.color.chart.length] }}>
+        <CountUp frame={f} from={0} to={s.value} start={10 + d} duration={34} />
+      </div>
+    </div>
+  );
+}
 const FILAS = ["Elemento alfa", "Elemento beta"];
 const T = { callout: [44, 128] as [number, number], wash: [132, 149] as [number, number] };
 const SAFE = { x: 140, y: 110, w: 1640, h: 860 };
@@ -47,39 +69,27 @@ function Escena({ variant }: { variant?: AnnotationMarkSetting }) {
         </div>
       </div>
 
-      <div style={{ position: "absolute", left: PANEL.x, top: PANEL.y, width: PANEL.w, height: PANEL.h, ...surfaceStyle(t, "window", { level: "lg" }), background: surfaceStyle(t, "window").background === t.color.surface ? t.color.surfaceAlt : surfaceStyle(t, "window").background, opacity: kf(f, [0, 12], [0, 1]) }} />
+      {/* Lo demás (panel, fichas que no son el objetivo, filas): con la señal `focus` del design system se atenúa; con cualquier otra, `FocusGroup` no hace nada. */}
+      <FocusGroup range={T.callout} variant={variant}>
+        <div style={{ position: "absolute", left: PANEL.x, top: PANEL.y, width: PANEL.w, height: PANEL.h, ...surfaceStyle(t, "window", { level: "lg" }), background: surfaceStyle(t, "window").background === t.color.surface ? t.color.surfaceAlt : surfaceStyle(t, "window").background, opacity: kf(f, [0, 12], [0, 1]) }} />
 
-      {STATS.map((s, i) => {
-        const d = staggerFrames(t, i, { base: 4 });
-        const a = kf(f, [4 + d, 18 + d], [0, 1]);
-        return (
+        {STATS.map((s, i) => (i === TARGET_INDEX ? null : <Ficha key={s.label} s={s} i={i} />))}
+        {FILAS.map((r, i) => (
           <div
-            key={s.label}
+            key={r}
             style={{
-              position: "absolute", left: cardX(i), top: CARD_Y, width: CARD.w, minHeight: CARD.h, boxSizing: "border-box", padding: 30,
-              ...surfaceStyle(t, "card", { level: "sm", bold: true, corner: "panel" }), ...entrance(t, a, i, { native: "rise", distance: 30 }),
+              position: "absolute", left: PANEL.x + 60, top: PANEL.y + 480 + i * 92, width: PANEL.w - 120, minHeight: 72, boxSizing: "border-box", display: "flex", alignItems: "center", padding: "0 28px",
+              ...surfaceStyle(t, "card", { level: "sm", corner: "control" }), borderRadius: cornerRadius(t, "control"),
+              fontSize: t.type.caption, lineHeight: 1.2, color: t.color.text, opacity: kf(f, [14 + i * 4, 28 + i * 4], [0, 1]),
             }}
           >
-            <Eyebrow style={{ display: "block", lineHeight: 1.2 }}>{s.label}</Eyebrow>
-            <div style={{ fontSize: t.type.stat * 0.6, lineHeight: 1.2, fontWeight: t.font.weights.stat, color: t.color.chart[i % t.color.chart.length] }}>
-              <CountUp frame={f} from={0} to={s.value} start={10 + d} duration={34} />
-            </div>
+            {r}
           </div>
-        );
-      })}
+        ))}
 
-      {FILAS.map((r, i) => (
-        <div
-          key={r}
-          style={{
-            position: "absolute", left: PANEL.x + 60, top: PANEL.y + 480 + i * 92, width: PANEL.w - 120, minHeight: 72, boxSizing: "border-box", display: "flex", alignItems: "center", padding: "0 28px",
-            ...surfaceStyle(t, "card", { level: "sm", corner: "control" }), borderRadius: cornerRadius(t, "control"),
-            fontSize: t.type.caption, lineHeight: 1.2, color: t.color.text, opacity: kf(f, [14 + i * 4, 28 + i * 4], [0, 1]),
-          }}
-        >
-          {r}
-        </div>
-      ))}
+      </FocusGroup>
+      {/* El objetivo va fuera del grupo: nunca se atenúa. */}
+      <Ficha s={STATS[TARGET_INDEX]!} i={TARGET_INDEX} />
 
       {/* La señal: no es un garabato ni una flecha elegida a mano; la forma la decide `style.annotation.mark` del tema (o `variant`, como excepción). */}
       <Callout target={TARGET} text="Subió 12 % en la semana" range={T.callout} within={SAFE} prefer={["below", "above"]} variant={variant} id="demo-callout" />

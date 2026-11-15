@@ -1,6 +1,6 @@
 import React from "react";
 import { Easing } from "../../engine";
-import { clamp, lerp, progress, roleColor, styleKey, useFx, xform } from "../core";
+import { clamp, fxDensity, lerp, progress, roleColor, styleKey, useFx, xform } from "../core";
 import type { ColorRole, FxProps } from "../core";
 import { textLook } from "../../themes";
 import { baseText } from "./shared";
@@ -36,7 +36,18 @@ export function wheelPos(v: number, k: number): number {
 export function DigitRoll(props: DigitRollProps) {
   const { value, from = 0, suffix, suffixColor = "accent", thousands = ".", style } = props;
   const { local, theme } = useFx(props);
-  const fs = props.fontSize ?? theme.type.stat;
+  // `density` (fx/core/density.ts): con un número, la letra se escala por él; con `"auto"` y un `width`, baja lo justo para que la cifra con su sufijo entre
+  // en ese ancho (nunca crece). Sin `density`, el tamaño de siempre.
+  const fs0 = props.fontSize ?? theme.type.stat;
+  let fs = fs0;
+  if (props.density !== undefined) {
+    if (props.density === "auto") {
+      const N0 = Math.max(digitCount(value), digitCount(from));
+      const est = N0 * fs0 * 0.62 + (thousands ? Math.floor((N0 - 1) / 3) * fs0 * 0.3 : 0) + (suffix ? measureWidth(suffix, fs0, { family: theme.font.family, weight: props.weight ?? theme.font.weights.stat }) + fs0 * 0.08 : 0);
+      const room = props.width ?? props.size;
+      fs = room !== undefined && est > room ? fs0 * Math.max(0.3, room / est) : fs0;
+    } else fs = fs0 * fxDensity(props.density, { width: 1, height: 1 }, { width: 1, height: 1 });
+  }
   const duration = props.duration ?? 60;
   const p = progress(local, 0, duration, Easing.out);
   const v = lerp(from, value, p);

@@ -204,14 +204,15 @@ export function roundedRect(x0: number, y0: number, x1: number, y1: number, r: n
  * - `guide`: tarjeta de fondo (construcción): el borde toma el carácter de `style.line.dash` (discontinuo o punteado).
  * El grosor del borde sigue a `style.line.weight` y, con `style.line.glow`, el borde de acento suma un halo.
  */
-export function cardSurface(theme: Theme, o: { alt?: boolean; accent?: string; guide?: boolean } = {}): React.CSSProperties {
+export function cardSurface(theme: Theme, o: { alt?: boolean; accent?: string; guide?: boolean } = {}, k = 1): React.CSSProperties {
   const s = surfaceStyle(theme, "card", { bold: true });
   const out: React.CSSProperties = {};
   out.background = o.alt && s.background === theme.color.surface ? theme.color.surfaceAlt : s.background;
   const w = borderWidth(theme, "card", { bold: true });
   if (w > 0 && s.border) {
     const L = lineLook(theme);
-    const bw = L.widthK === 1 ? w : Math.max(1, Math.round(w * L.widthK * 2) / 2);
+    const bw0 = L.widthK === 1 ? w : Math.max(1, Math.round(w * L.widthK * 2) / 2);
+    const bw = k === 1 ? bw0 : Math.max(1, Math.round(bw0 * k * 2) / 2); // `k`: densidad de la pieza (cajas chicas)
     const kind = o.guide && L.dash !== "solid" ? L.dash : "solid";
     out.border = o.accent ? `${bw}px ${kind} ${o.accent}` : String(s.border).replace(/^[\d.]+px/, `${bw}px`).replace(" solid ", ` ${kind} `);
   }

@@ -5,7 +5,7 @@ import { dark, editorial, neon, neutral, papel, themeCharacter } from "../themes
 describe("afinidad del catálogo", () => {
   it("cada efecto del catálogo tiene su entrada, y cada entrada es un efecto real", () => {
     for (const name of Object.keys(fx.FX_AFFINITY)) expect(typeof (fx as Record<string, unknown>)[name], name).toBe("function");
-    const efectos = Object.keys(fx).filter((k) => /^[A-Z][a-z]/.test(k) && typeof (fx as Record<string, unknown>)[k] === "function" && !["Clip", "SvgShadow", "CountUpSlots", "FrameCanvas"].includes(k));
+    const efectos = Object.keys(fx).filter((k) => /^[A-Z][a-z]/.test(k) && typeof (fx as Record<string, unknown>)[k] === "function" && !["Clip", "SvgShadow", "CountUpSlots", "FrameCanvas", "Loop"].includes(k));
     const sinEntrada = efectos.filter((k) => !(k in fx.FX_AFFINITY));
     expect(sinEntrada).toEqual([]);
   });

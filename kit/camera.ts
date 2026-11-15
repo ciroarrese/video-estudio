@@ -64,6 +64,8 @@ export function cameraAt(frame: number, keys: CameraKey[], opts: CameraOptions =
  * Convierte una cámara en un atravesado de `target`: entre `start` y `end` el foco se
  * desliza al objetivo y la escala se multiplica por `power ** p` (p con curva de aceleración).
  * Antes de `start` devuelve la cámara intacta. Con `start === end` es un salto (escalón).
+ * `opts.slide`: cuadros que tarda el foco en llegar al objetivo (por defecto un tercio del tramo, entre 1 y 12: el deslizamiento rápido de siempre).
+ * Un `slide` largo (todo el tramo) da el empuje lento y sin sacudidas de `motion.exit: "settle"` (ver `exitThrough`).
  */
 export function zoomThrough(
   frame: number,
@@ -71,10 +73,11 @@ export function zoomThrough(
   cam: { x: number; y: number; scale: number },
   target: { x: number; y: number },
   power = 70,
+  opts: { slide?: number } = {},
 ): { x: number; y: number; scale: number } {
   const p = end > start ? kf(frame, [start, end], [0, 1], bezier(0.7, 0, 0.84, 0)) : frame >= start ? 1 : 0;
   if (p <= 0) return cam;
-  const slide = Math.max(1, Math.min(12, (end - start) / 3));
+  const slide = opts.slide !== undefined ? Math.max(1, opts.slide) : Math.max(1, Math.min(12, (end - start) / 3));
   return {
     x: kf(frame, [start, start + slide], [cam.x, target.x]),
     y: kf(frame, [start, start + slide], [cam.y, target.y]),

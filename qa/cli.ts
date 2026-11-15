@@ -14,6 +14,7 @@ import { canonicalReport as canonical, diffReports } from './repeat';
 import { parseOverrides } from './thresholds';
 import { ALL_RULES, type Finding, type JudgedSummary, type RuleId } from './types';
 import { buildMatrix, formatDifferences, formatMatrix, parseThemes, runQaThemes } from './themes';
+import { formatResolved, resolveThemes } from './resolved';
 
 const USAGE = {
   sheet: `Uso: ve-sheet <videoId> [--frames 0,60,120 | --every N | --count 12] [--props json] [--format horizontal|vertical|cuadrado] [--scene id|índice] [--list-scenes]
@@ -212,9 +213,9 @@ async function main(cmd: string, argv: string[]): Promise<number> {
       }
       for (const t of themes) { console.log(`\n===== sistema: ${t} =====`); printSummary(reports[t]!, `[${t}] `); }
       const matrix = buildMatrix(reports);
-      console.log(`\n===== matriz (${id}) =====\n${formatMatrix(matrix)}\n\n${formatDifferences(matrix, max === Infinity ? 1e9 : max)}`);
+      console.log(`\n===== matriz (${id}) =====\n${formatMatrix(matrix)}\n\n${formatResolved(resolveThemes(themes))}\n\n${formatDifferences(matrix, max === Infinity ? 1e9 : max)}`);
       if (themes.length > 1 && themes.every((t) => canonical(reports[t]!) === canonical(reports[themes[0]!]!))) console.log('\nnota: los informes de todos los sistemas son iguales; si el video no lee props.theme, la matriz no prueba nada (hello y audio-check no lo leen)');
-      writeReport(one(p, 'out') ?? one(p, 'json'), { themes, reports, matrix });
+      writeReport(one(p, 'out') ?? one(p, 'json'), { themes, reports, matrix, resolved: resolveThemes(themes) });
       if (repeat > 1) console.log(unstable ? `\nrepeticiones: NO reproducible (algún informe de ${repeat} difiere del primero)` : `\nrepeticiones: ${repeat} corridas con informes idénticos (salvo el tiempo)`);
       if (unstable) return 3;
       return themes.some((t) => failsAt(reports[t]!, failOn)) ? 1 : 0;

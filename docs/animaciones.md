@@ -7,20 +7,21 @@ import { MaskedRise, BarsGrow } from "../../fx";   // todo sale de fx/index.ts
 <MaskedRise text="Resultados del año" start={10} />
 ```
 
-Todos aceptan `frame?`, `start?`, `duration?`, `width?`, `height?`, `seed?` y `style?` (ver `fx/README.md`); con valores por defecto ya funcionan. Dentro de una escena sin `frame`, usan el cuadro del motor.
+Todos aceptan `frame?`, `start?`, `duration?`, `width?`, `height?`, `seed?` y `style?` (ver `fx/README.md`); con valores por defecto ya funcionan. Los que lo dicen en "Cajas chicas" aceptan además `density`. Dentro de una escena sin `frame`, usan el cuadro del motor.
 
 ## Cómo ver cada efecto
 
-Tres galerías, un efecto por tramo de 90 cuadros (75 de animación y 15 de pausa con la imagen final), con el nombre en una etiqueta:
+Tres galerías con un efecto por tramo de 90 cuadros (75 de animación y 15 de pausa con la imagen final, con el nombre en una etiqueta), más dos ejemplos que no son galerías (`fx-muro`: muestrario en lazo; `fx-in-scene`: regresión):
 
 | Galería | Qué muestra | Ver en el navegador | Hoja de cuadros |
 |---|---|---|---|
 | `fx-text` | los 8 efectos de texto | `npm run dev` y `/?video=fx-text` | `npm run sheet -- fx-text --count 16` |
 | `fx-3d` | los 16 efectos 3D (17 tramos: `PhoneOrbit` con y sin pantalla) | `/?video=fx-3d` | `npm run sheet -- fx-3d --count 17` |
 | `fx-data-ui-art` | datos, interfaz y arte (25 tramos) | `/?video=fx-data-ui-art` | `npm run sheet -- fx-data-ui-art --count 25` |
+| `fx-muro` | muestrario de referencia: 17 efectos en baldosas chicas (más una escena anidada), todos en `Loop`, con `density`, más una escena anidada (`NestedScene`) | `/?video=fx-muro` (`&props={"density":"off"}` para compararlo) | `npm run sheet -- fx-muro --count 8` |
 | `fx-in-scene` | ejemplo de regresión: efectos montados desde el cuadro 0 dentro de una escena real, antes de su `start` y después de terminar | `/?video=fx-in-scene` | `npm run sheet -- fx-in-scene --count 12` |
 
-Las tres galerías admiten `&props={"theme":"dark"}`; `fx-in-scene` no es una galería de efectos: es la prueba de que un efecto puede quedar montado todo el tiempo sin ensuciar el render (ver "Efectos montados"). Para ver un solo efecto: el tramo `i` (desde 0, en el orden de las tablas de abajo, o el de la etiqueta) ocupa los cuadros `i*90` a `i*90+89`: `npm run render -- fx-3d --frames 270-359 --scale 0.5 --crf 23` (`CubeFold`, el cuarto de `fx-3d`, es el tramo 3). En `fx-data-ui-art` el orden es datos (0 a 5), interfaz (6 a 13, con `TileDone` en el 13), arte (14 a 24).
+Las galerías admiten `&props={"theme":"dark"}`; `fx-in-scene` no es una galería de efectos: es la prueba de que un efecto puede quedar montado todo el tiempo sin ensuciar el render (ver "Efectos montados"). Para ver un solo efecto: el tramo `i` (desde 0, en el orden de las tablas de abajo, o el de la etiqueta) ocupa los cuadros `i*90` a `i*90+89`: `npm run render -- fx-3d --frames 270-359 --scale 0.5 --crf 23` (`CubeFold`, el cuarto de `fx-3d`, es el tramo 3). En `fx-data-ui-art` el orden es datos (0 a 5), interfaz (6 a 13, con `TileDone` en el 13), arte (14 a 24).
 
 ## Cómo elegir
 
@@ -39,7 +40,8 @@ Esta tabla da el efecto por función; después filtrá por el carácter del desi
 | Notificación o aviso | `NotificationStack` | `ChatThread`, `CommandPalette` |
 | Mostrar una app | `PhoneFrame` / `PhoneScroll` con tu contenido | `PhoneOrbit` (gira hacia el espectador; acepta tu interfaz como `children` o `screen`) |
 | Cierre con logo | `LogoLand` | `SealSpin`, `MaskedRise` con `dot` |
-| Señalar o llamar la atención sobre algo | `Callout` (la señal la decide el tema) | `MarkerDraw` y los garabatos del kit, solo si el design system es de trazo a mano |
+| Señalar o llamar la atención sobre algo | `Callout` (la señal la decide el tema; con `focus`, más `FocusGroup`) | `MarkerDraw` y los garabatos del kit, solo si el design system es de trazo a mano |
+| Que un efecto se repita mientras se muestra | `Loop` (envuelve cualquier efecto: pausa, desfase, fundido o ida y vuelta) | - |
 | Transición entre escenas | `Wash` (sigue a `motion.transition`) | `DotWipe` (lúdico), `Tunnel`, `HalftoneWave`, `MarqueeBands` (separador) |
 | Fondo animado | `WaveDots`, `TerrainMesh` | `HalftoneWave`, `LiquidBlob` |
 | Plano técnico, arquitectura | `BlueprintDraw` | `LayerExplode`, `CubeStack` |
@@ -141,7 +143,7 @@ Notas: **`PixelBuild` muestrea la cobertura de los glifos en un canvas fuera de 
 
 ## Afinidad con el design system
 
-Antes de elegir un efecto mirá el **carácter** del design system que te dieron: `geométrico-sobrio` (formas limpias, flechas rectas, sin adornos), `editorial` (esquinas rectas, contorno, serif, subrayados y corchetes), `lúdico-manual` (trazo a mano, superficies cálidas, marcador) y `técnico-oscuro` (fondo oscuro, líneas finas, halos, mallas). `themeCharacter(theme)` (en `themes/`) lo deduce del estilo de los cinco temas de ejemplo (`neutral` geométrico-sobrio, `dark` y `neon` técnico-oscuro, `editorial`, `papel` lúdico-manual); un design system propio puede no encajar del todo: decidilo vos y anotalo en el guion. "Evitar" no es una prohibición: es lo que desentona con ese carácter salvo que el guion lo justifique y lo adaptes con `theme.style`. El dato también está en código (`FX_AFFINITY`, `affinityOf(nombre)` y `fxFor(carácter | tema)` en `fx/affinity.ts`, que se exportan de `fx/`).
+Antes de elegir un efecto mirá el **carácter** del design system que te dieron: `geométrico-sobrio` (formas limpias, flechas rectas, sin adornos), `editorial` (esquinas rectas, contorno, serif, subrayados y corchetes), `lúdico-manual` (trazo a mano, superficies cálidas, marcador) y `técnico-oscuro` (fondo oscuro, líneas finas, halos, mallas). `themeCharacter(theme)` (en `themes/`) devuelve el que el tema declara (`style.decor.character`, token `--style-decor-character`) y, si no declara ninguno, lo deduce del estilo (en los cinco temas de ejemplo: `neutral` geométrico-sobrio, `dark` y `neon` técnico-oscuro, `editorial`, `papel` lúdico-manual); la deducción es solo el respaldo, y un design system propio puede no encajar del todo: declaralo en el tema o decidilo vos y anotalo en el guion. "Evitar" no es una prohibición: es lo que desentona con ese carácter salvo que el guion lo justifique y lo adaptes con `theme.style`. El dato también está en código (`FX_AFFINITY`, `affinityOf(nombre)` y `fxFor(carácter | tema)` en `fx/affinity.ts`, que se exportan de `fx/`).
 
 **Señalar no es un efecto del catálogo: lo decide el tema.** Para llamar la atención sobre algo usá `Callout` (kit), que dibuja la señal de `style.annotation.mark` (flecha recta, línea con codo y punto, corchete, anillo, trazo a mano, etiqueta pegada, foco, subrayado o ninguna). `MarkerDraw` y los garabatos del kit son para sistemas de trazo a mano; no uses flechas por costumbre. La transición entre escenas es `Wash` (sigue a `motion.transition`); `DotWipe` es una elección lúdica, no la de siempre.
 
@@ -198,6 +200,40 @@ Antes de elegir un efecto mirá el **carácter** del design system que te dieron
 | `SealSpin` | editorial, lúdico-manual, geométrico-sobrio | técnico-oscuro | Sello de cierre. |
 | `RibbonTwist` | lúdico-manual, geométrico-sobrio | editorial, técnico-oscuro | Decoración con cinta. |
 
+
+## Lazo: `Loop` (un muestrario nunca queda estático)
+
+**Regla: un efecto que se muestra solo (un muestrario, un muro de baldosas, el catálogo en pantalla) no queda quieto con su imagen final: se repite mientras está a la vista.** Un efecto termina en un still (su último cuadro es una imagen compuesta), y un still de varios segundos en una baldosa parece un error. `Loop` (de `fx/`, también `loopState` para sincronizar otra cosa con el lazo) lo resuelve con una función pura del cuadro, sin estado ni temporizadores:
+
+```tsx
+import { Loop, Globe } from "../../fx";
+// el efecto corre 60 cuadros, se queda 24 quieto, se funde y vuelve a empezar; cada baldosa con su desfase para que no pulsen juntas
+<Loop duration={60} pause={24} offset={i * 9}>
+  <Globe start={0} duration={60} width={W} height={H} />
+</Loop>
+```
+
+| Prop | Qué hace |
+|---|---|
+| `duration` | cuadros que dura el efecto (el mismo `duration` que le das al efecto; hace falta para saber cuándo termina) |
+| `pause` | cuadros con la imagen final quieta antes de volver a empezar (20 por defecto) |
+| `offset` | desfase en cuadros (`i * 9`): la primera vuelta ya empieza avanzada; cada baldosa con el suyo |
+| `start` | cuadro en que arranca la primera vuelta (antes, el efecto está en su cuadro 0) |
+| `mode` | `fade` (por defecto): la imagen final se funde y la vuelta siguiente entra con fundido (`fadeOut` 8 y `fadeIn` 6 cuadros): nunca hay una pieza vacía; `pingpong`: ida, pausa y vuelta por el mismo camino, sin cortes; `restart`: corte seco al cuadro 0 (solo si ese cuadro ya es una imagen completa) |
+| `times`, `fadeFirst` | cantidad de vueltas (después queda en la imagen final) y fundido también en la primera |
+| hijos | el efecto, o una función `(local, estado) => nodo` (`estado.index` es el número de vuelta: sirve para variar la `seed` en cada vuelta) |
+
+Adentro, `useFrame()` es el cuadro local (0 al empezar cada vuelta): el efecto va con `start={0}`. El contenedor ocupa a su padre (`position: relative; width/height: 100%`; `style` lo pisa) y solo lleva `opacity` mientras funde, así que pasa `--check` (los efectos del catálogo no dejan residuos antes de `start` ni al terminar). `examples/fx-muro` es el muestrario de referencia: 17 efectos en baldosas chicas, todos en lazo, más una escena anidada.
+
+## Cajas chicas: `density`
+
+Los efectos se diseñan para una caja (`LineDraw` 900 x 520, `NotificationStack` 760 x 560...). En una baldosa de 330 x 150, sin ayuda, la letra, los trazos y los márgenes quedan a escala de diseño y el efecto se ve apretado o recortado. La prop `density` los achica todos juntos:
+
+- sin `density` (por defecto): el efecto de siempre, píxel a píxel (los videos ya hechos no cambian);
+- `density="auto"`: el factor sale de la caja (`min(ancho / ancho de diseño, alto / alto de diseño)`, nunca más que 1 ni menos que 0,3);
+- `density={0.6}`: un factor explícito (0,25 a 2).
+
+Lo implementan `LineDraw`, `TileDone`, `NotificationStack` (la caja de diseño tiene el alto justo para las tarjetas que hay), `DigitRoll` (con `auto` y `width`, la letra baja lo justo para que la cifra con su sufijo entre), `CardFlip` (borde, elevación y, con tus propias caras, la escala a la que se dibujan: se diseñan para una tarjeta de 620 x 400), `FlowSteps` y `RadarMorph`. Los de `fx/three` ya escalan sus trazos con la caja (`strokeScale`). Revisado a ojo en una baldosa de 330 x 150 (`examples/fx-muro` con `{"density":"off"}` contra el valor por defecto `auto`; `qa` del muro con `data-qa-decor` en cada baldosa): `DonutRing`, `BarsGrow`, `TileGrid`, `MaskedRise`, `Typewriter`, `ScrambleDecode`, `SplitFlap` y `Globe` se adaptan bien con `width`/`height`; `ChatThread` y `BeforeAfter` aguantan la baldosa; `CommandPalette` (la caja de búsqueda con su letra del tema se corta en 330 px de ancho) y `MarkerDraw` (con la caja que le das, no hay `density`) quedaron fuera del muro (pendiente: `density` en `CommandPalette`).
 
 ## Principios
 

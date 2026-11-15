@@ -1,5 +1,5 @@
 import { useFormat, useFrame } from "../../engine";
-import { CountUp, Cursor, Wash, World, cameraAt, hideFromScale, kf, zoomThrough } from "../../kit";
+import { CountUp, Cursor, Wash, World, cameraAt, hideFromScale, kf, exitThrough } from "../../kit";
 import type { CameraKey } from "../../kit";
 import { borderWidth, cornerRadius, surfaceStyle, useTheme } from "../../themes";
 import { HighlightedTitle, TopicHeadline, defineStory, useTopicOrNull } from "../../stories";
@@ -92,7 +92,7 @@ export function DemoScene({ variant }: { variant: number }) {
         // sin salida la cámara queda quieta sobre la tarjeta: la escena siguiente arranca desde ahí
         ...(exits ? [{ f: 112, x: cx, y: cy, scale: 1 }, { f: 149, x: cx, y: cy, scale: 1 }] : [{ f: 149, x: target.x, y: target.y, scale: zoom }]),
       ];
-  const cam = cameraAt(f, keys, { map: exits ? (fr, c) => zoomThrough(fr, THROUGH, c, through, 40) : (_fr, c) => c, noBlurFrom: THROUGH[0] });
+  const cam = cameraAt(f, keys, { map: exits ? (fr, c) => exitThrough(theme, fr, THROUGH, c, through, 40) : (_fr, c) => c, noBlurFrom: THROUGH[0] });
   const appear = cont ? 1 : kf(f, [0, 20 - lead], [0, 1]);
   // Con la cámara acercada a la tarjeta elegida, el título, las otras tarjetas y las filas quedan cortados por el borde a propósito: es el encuadre
   // (la cámara sostiene una parte de un diseño más grande). Solo se silencia `offscreen`, solo mientras dura el zoom y solo en esos elementos:

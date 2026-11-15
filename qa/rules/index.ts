@@ -6,6 +6,7 @@ import { minSizeRule } from './minSize';
 import { offscreenRule } from './offscreen';
 import { overlapRule } from './overlap';
 import { safeAreaRule } from './safeArea';
+import { signalRule } from './signal';
 import { judgement } from './judged';
 import { unjudgedRule } from './unjudged';
 import { visibleRuns } from './visible';
@@ -13,11 +14,11 @@ import { visibleRuns } from './visible';
 export { visibleRuns } from './visible';
 export { addJudged, emptyJudged, judgement } from './judged';
 
-export const RULES: Rule[] = [clipRule, offscreenRule, safeAreaRule, overlapRule, minSizeRule, contrastRule, coveredRule, unjudgedRule];
+export const RULES: Rule[] = [clipRule, offscreenRule, safeAreaRule, overlapRule, minSizeRule, contrastRule, coveredRule, unjudgedRule, signalRule];
 
 export function runRules(ctx: RuleContext, enabled?: RuleId[]): Finding[] {
   const vis = { ...ctx, runs: visibleRuns(ctx) };
-  return RULES.filter((r) => !enabled || enabled.includes(r.id)).flatMap((r) => r.check(r.id === 'covered' || r.id === 'unjudged' ? ctx : vis));
+  return RULES.filter((r) => !enabled || enabled.includes(r.id)).flatMap((r) => r.check(r.id === 'covered' || r.id === 'unjudged' || r.id === 'signal' ? ctx : vis));
 }
 
 /**

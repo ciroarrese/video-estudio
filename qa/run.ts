@@ -119,7 +119,7 @@ async function runQaPass(o: QaOptions, honorFixedScale: boolean): Promise<{ resu
             neighbours.push(await collectRuns(vp, meta.width, meta.height, keys));
           }
           applyMotion(data, neighbours);
-          const r = runRulesCounted({ frame: f, width: meta.width, height: meta.height, runs: data.runs, thresholds }, rules);
+          const r = runRulesCounted({ frame: f, width: meta.width, height: meta.height, runs: data.runs, thresholds, signals: data.signals }, rules);
           findings.push(...r.findings);
           addJudged(judged, r.judged);
           for (const [rule, c] of Object.entries(r.silenced)) {

@@ -43,6 +43,7 @@ export const STYLE_ENUMS = {
   tile: ["card", "flat", "outline"],
   charset: ["caps", "hex", "binary", "symbols"],
   decoration: ["none", "underline", "marker", "box"],
+  character: ["auto", "geometrico-sobrio", "editorial", "ludico-manual", "tecnico-oscuro"],
 } as const;
 
 type Of<K extends keyof typeof STYLE_ENUMS> = (typeof STYLE_ENUMS)[K][number];
@@ -76,6 +77,8 @@ export type CaretStyle = Of<"caret">;
 export type TileStyle = Of<"tile">;
 export type Charset = Of<"charset">;
 export type TextDecoration = Of<"decoration">;
+/** Carácter declarado de un design system (`style.decor.character`); `auto` lo deduce `themeCharacter` del resto del estilo. */
+export type CharacterSetting = Of<"character">;
 
 export interface ThemeStyle {
   /** Lenguaje de esquinas y bordes de chips, píldoras, tarjetas y paneles. */
@@ -129,6 +132,12 @@ export interface ThemeStyle {
     kind: BackgroundKind;
     /** 0 a 1: multiplica la opacidad de las nubes (`theme.cloud.opacity`) o la fuerza del patrón. */
     intensity: number;
+    /**
+     * Deriva de las nubes (`clouds`), como multiplicador de la velocidad del vaivén lento de cada mancha (y de su amplitud, hasta el doble; 0 a 4). 1 (por defecto) es el
+     * movimiento de siempre (unos 120 px de amplitud en ciclos de 570 a 1070 cuadros: a simple vista, casi quieto); 0 las deja quietas; 2 a 3 se nota
+     * en un video corto sin llamar la atención. Una escena puede pasar `cloud.drift` para pisarlo.
+     */
+    drift: number;
   };
   motion: {
     /** Cómo entran los elementos genéricos (tarjetas, filas, chips). `auto` (por defecto): cada pieza conserva su entrada propia de siempre. */
@@ -178,6 +187,11 @@ export interface ThemeStyle {
     doodles: boolean;
     /** `hand` (temblor de mano) o `geometric` (trazo limpio, sin temblor). */
     doodleStroke: "hand" | "geometric";
+    /**
+     * Carácter del design system para elegir efectos (`docs/animaciones.md`, "Afinidad"): `auto` (por defecto) lo deduce `themeCharacter` de
+     * la señal, las líneas, las esquinas, la superficie y el fondo; con un valor, el design system lo declara y la deducción queda de respaldo.
+     */
+    character: CharacterSetting;
     /** Multiplicador de la viñeta (0 = apagada; hasta 2). */
     vignette: number;
     /** Rol del tema con que se tiñe la viñeta (`accent` por defecto, como siempre). Una escena puede pasar su propio `color`. */

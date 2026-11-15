@@ -204,7 +204,7 @@
       rect: { x: x0, y: y0, w: x1 - x0, h: y1 - y0 }, lines: rects,
       opacity: opacityUp(el), fontPx: fontPx, scale: scale, transformed: transformed, screenPx: fontPx * scale, bold: weight >= 700,
       color: 'rgba(' + fill.r + ',' + fill.g + ',' + fill.b + ',' + fill.a + ')', transparentFill: fill.a < 0.05,
-      fadingBg: fadingSurface(el), ignore: ignoreOf(el), decor: decorOf(el).decor, decorMain: decorOf(el).main, fixedScale: fixedScaleOf(el), clips: clips,
+      fadingBg: fadingSurface(el), ignore: ignoreOf(el), decor: decorOf(el).decor, decorMain: decorOf(el).main, fixedScale: fixedScaleOf(el), focusDim: !!(el.closest && el.closest('[data-qa-focus]')), clips: clips,
       own: {
         sw: el.scrollWidth, cw: el.clientWidth, sh: el.scrollHeight, ch: el.clientHeight,
         ox: cs.overflowX, oy: cs.overflowY, ellipsis: cs.textOverflow === 'ellipsis',
@@ -315,5 +315,12 @@
   probe.remove();
   var fixedRoots = [];
   Array.prototype.forEach.call(stage.querySelectorAll('[data-qa-fixed-scale]'), function (e) { fixedRoots.push(rectOf(e.getBoundingClientRect())); });
-  return { width: W, height: H, runs: runs, elems: elems, opac: opac, fixedRoots: fixedRoots };
+  // Piezas que señalan algo (`data-ve-signal`, ver kit/signal.ts): para la regla `signal`; solo las que se ven (no vacías, con opacidad)
+  var signals = [];
+  Array.prototype.forEach.call(stage.querySelectorAll('[data-ve-signal]'), function (e) {
+    var r = e.getBoundingClientRect();
+    if (getComputedStyle(e).visibility !== 'visible') return;
+    signals.push({ kind: e.getAttribute('data-ve-signal'), piece: e.getAttribute('data-ve-piece') || '', mark: e.getAttribute('data-ve-mark') || '', forced: e.getAttribute('data-ve-forced') === 'true', tag: e.tagName.toLowerCase(), rect: rectOf(r) });
+  });
+  return { width: W, height: H, runs: runs, elems: elems, opac: opac, fixedRoots: fixedRoots, signals: signals };
 })

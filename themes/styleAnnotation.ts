@@ -1,6 +1,6 @@
 import type { Theme } from "./types";
 import { resolveStyle } from "./style";
-import type { AnnotationMarkSetting } from "./styleTypes";
+import type { AnnotationMarkSetting, CharacterSetting } from "./styleTypes";
 import { relativeLuminance } from "./contrast";
 
 /*
@@ -71,16 +71,25 @@ export function exitPower(theme: Theme, native: number): number {
 const SETTLE_POWER = 1.5;
 
 /** Carácter de un design system, para elegir efectos con `docs/animaciones.md` y `fx/affinity.ts`. */
-export type DesignCharacter = "geometrico-sobrio" | "editorial" | "ludico-manual" | "tecnico-oscuro";
+export type DesignCharacter = Exclude<CharacterSetting, "auto">;
 
 export const DESIGN_CHARACTERS: readonly DesignCharacter[] = ["geometrico-sobrio", "editorial", "ludico-manual", "tecnico-oscuro"];
 
 /**
- * Carácter del design system, deducido de su estilo: trazo a mano o temblor de línea (`ludico-manual`); esquinas rectas con superficie de contorno o
+ * Carácter del design system. Si el tema lo declara (`style.decor.character`), es ese; si no (`auto`), se deduce de su estilo (la heurística es solo el
+ * respaldo, ver `inferCharacter`).
+ */
+export function themeCharacter(theme: Theme): DesignCharacter {
+  const declared = resolveStyle(theme).decor.character;
+  return declared !== "auto" ? declared : inferCharacter(theme);
+}
+
+/**
+ * Carácter deducido del estilo, sin mirar lo que el tema declara: trazo a mano o temblor de línea (`ludico-manual`); esquinas rectas con superficie de contorno o
  * eyebrows en mayúsculas con subrayado (`editorial`); fondo oscuro (`tecnico-oscuro`); el resto (`geometrico-sobrio`). Es una guía para elegir
  * efectos, no una regla: el design system puede no encajar del todo en ninguno.
  */
-export function themeCharacter(theme: Theme): DesignCharacter {
+export function inferCharacter(theme: Theme): DesignCharacter {
   const st = resolveStyle(theme);
   if (resolveAnnotationMark(theme) === "hand" || st.line.sketch >= 0.4) return "ludico-manual";
   if (st.shape.corners === "sharp" && (st.surface.kind === "outline" || st.type.highlight === "underline")) return "editorial";

@@ -17,11 +17,11 @@ import React from "react";
 import { useFormat, useFrame } from "../../engine";
 import {
   Callout, Cursor, DockedHeadline, Eyebrow, Stage, Wash, World,
-  hideFromScale, kf, useCameraAt, zoomThrough,
+  hideFromScale, kf, useCameraAt, exitThrough,
 } from "../../kit";
 import type { CameraKey } from "../../kit";
 import { MaskedRise } from "../../fx";
-import { ThemeProvider, borderWidth, dark, editorial, entrance, exitPower, neon, neutral, papel, staggerFrames, surfaceStyle, useTheme } from "../../themes";
+import { ThemeProvider, borderWidth, dark, editorial, entrance, neon, neutral, papel, staggerFrames, surfaceStyle, useTheme } from "../../themes";
 import { theme as videoTheme } from "../theme";
 
 /** Duración de la escena en cuadros (30 fps = 5 s). La historia la lee de acá. */
@@ -112,7 +112,7 @@ export function SceneBody({ title, subtitle }: SceneProps) {
   });
   const { panel: PANEL, card: CARD } = L;
   const cam = useCameraAt(f, cameraKeys(L, width / 2, height / 2), {
-    map: (fr, c) => zoomThrough(fr, T.through, c, L.through, exitPower(t, 40)),
+    map: (fr, c) => exitThrough(t, fr, T.through, c, L.through, 40),
     noBlurFrom: T.through[0],
   });
   const picked = f >= T.click;

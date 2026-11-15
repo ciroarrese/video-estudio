@@ -4,6 +4,7 @@ import type { AnnotationMark, AnnotationMarkSetting, Theme } from "../themes";
 import { arrowPoints, circlePoints, pointsToString } from "./doodle";
 import { calloutState, placeBeside } from "./layout";
 import type { Placement, Rect, Side } from "./layout";
+import { signalAttrs } from "./signal";
 import { textWidth } from "./text";
 import { clamp, useFrameOr } from "./util";
 
@@ -31,7 +32,7 @@ export interface CalloutLayoutOptions {
 }
 
 /** Aire con el objetivo por defecto de cada señal (px): las que unen con una línea necesitan lugar para dibujarla. */
-const MARK_GAP: Record<AnnotationMark, number> = { hand: 92, arrow: 64, elbow: 64, bracket: 28, tag: 6, ring: 38, focus: 38, underline: 26, none: 16 };
+const MARK_GAP: Record<AnnotationMark, number> = { hand: 92, arrow: 96, elbow: 88, bracket: 44, tag: 6, ring: 38, focus: 38, underline: 26, none: 16 };
 
 /** La señal que se dibuja de verdad: sin texto, las que necesitan un rótulo pasan a `ring`. */
 function effectiveMark(theme: Theme, o: Pick<CalloutLayoutOptions, "text" | "variant">): AnnotationMark {
@@ -96,7 +97,7 @@ function roundRectPath(x: number, y: number, w: number, h: number, rx: number): 
 /**
  * Pastilla o señal anclada a un objetivo, **con la forma que usa el design system** (`style.annotation.mark`): `hand` (flecha curva a mano), `arrow`
  * (flecha recta con cabeza), `elbow` (línea con codo y punto en el objetivo), `bracket` (corchete al margen), `tag` (etiqueta pegada, sin flecha),
- * `ring` (anillo con las esquinas del tema y su halo), `focus` (anillo; la escena atenúa el resto con `focusOpacity`), `underline` (subrayado) o `none` (solo el
+ * `ring` (anillo con las esquinas del tema y su halo), `focus` (anillo; lo demás lo atenúa `FocusGroup`), `underline` (subrayado) o `none` (solo el
  * rótulo). Un tema que no declara `annotation` se deriva de `decor` (ver `annotationLook`). Para forzar otra: `variant`, como excepción explícita.
  * Se pone sola en el lugar libre al lado (`placeBeside`) en vez de a un píxel fijo que pisa otra etiqueta, y si no hay lugar libre se pone sobre lo
  * menos importante y la escena apaga lo que queda debajo (`calloutState` / `coveredOpacity`).
@@ -115,9 +116,9 @@ function roundRectPath(x: number, y: number, w: number, h: number, rx: number): 
  * El trazo de la señal es de acento con el grosor, la terminación y el halo de `style.line`; se dibuja con el progreso de `calloutState` (el mismo que
  * la pastilla). Función pura del cuadro: no guarda estado. Sin `frame` toma el del motor.
  *
- * `focus` dibuja el anillo y deja a la escena atenuar el resto: `focusOpacity(theme, calloutState(frame, range), variant?)` da la opacidad (1 con la señal
- * apagada, `1 - annotation.dim` con ella puesta) para el contenedor de lo que NO es el objetivo (una capa grande translúcida que se monta y se desmonta
- * rasteriza distinto según el historial de cuadros, así que la pieza no la dibuja). Con las otras señales vale 1.
+ * `focus` dibuja el anillo y deja atenuar el resto a `FocusGroup` (kit/FocusGroup.tsx), que envuelve todo lo que NO es el objetivo y le aplica `focusOpacity(theme, calloutState(frame, range), variant?)`
+ * (1 con la señal apagada, `1 - annotation.dim` con ella puesta). La pieza no dibuja una capa translúcida encima: tapa el objetivo y hay que recortarle un hueco; una opacidad en
+ * el contenedor, sin `isolation`, `will-change` ni `filter`, pasa `render --check --check-all`. Con las otras señales vale 1.
  */
 export function Callout({ frame, range, ramp, ...o }: CalloutLayoutOptions & { range: [number, number]; frame?: number; ramp?: number }) {
   const theme = useTheme();
@@ -135,12 +136,12 @@ export function Callout({ frame, range, ramp, ...o }: CalloutLayoutOptions & { r
   return (
     <>
       <CalloutMark theme={theme} mark={mark} target={o.target} pill={showPill ? pill : null} side={at.side} p={p} frame={f} seed={seed} look={look} />
-      {showPill && <CalloutPill theme={theme} text={o.text!} size={size} at={at} p={p} />}
+      {showPill && <CalloutPill theme={theme} text={o.text!} size={size} at={at} p={p} forced={look.forced} />}
     </>
   );
 }
 
-function CalloutPill({ theme, text, size, at, p }: { theme: Theme; text: string; size: number; at: { x: number; y: number }; p: number }) {
+function CalloutPill({ theme, text, size, at, p, forced }: { theme: Theme; text: string; size: number; at: { x: number; y: number }; p: number; forced: boolean }) {
   const box = calloutBox(theme, text, size);
   const surf = surfaceStyle(theme, "chip", { on: true });
   const ent = entrance(theme, p, 0, { native: "rise", distance: 16 });
@@ -148,6 +149,7 @@ function CalloutPill({ theme, text, size, at, p }: { theme: Theme; text: string;
   return (
     <div
       key={Object.keys(ent).join("-")}
+      {...signalAttrs(theme, "callout", "Callout", forced)}
       style={{
         position: "absolute", left: at.x, top: at.y, minWidth: box.w, height: box.h, boxSizing: "border-box",
         display: "flex", alignItems: "center", justifyContent: "center", whiteSpace: "nowrap", padding: `0 ${box.padX}px`,
@@ -175,7 +177,7 @@ function CalloutMark({ theme, mark, target, pill, side, p, frame, seed, look }: 
   );
   const halo = (d: string) => (look.glow > 0 ? <path d={d} fill="none" stroke={withAlpha(accent, 0.35 * look.glow)} strokeWidth={sw * 3.2} strokeLinecap={cap} strokeLinejoin={join} {...draw} /> : null);
   const svg = (children: React.ReactNode, z = 79) => (
-    <svg key={full ? "full" : "part"} style={{ position: "absolute", left: 0, top: 0, overflow: "visible", pointerEvents: "none", zIndex: z }} width={1} height={1}>{children}</svg>
+    <svg key={full ? "full" : "part"} {...signalAttrs(theme, "callout", "Callout", look.forced)} style={{ position: "absolute", left: 0, top: 0, overflow: "visible", pointerEvents: "none", zIndex: z }} width={1} height={1}>{children}</svg>
   );
   const A = pill ? pillAnchor(side, pill) : null;
 
@@ -203,7 +205,7 @@ function CalloutMark({ theme, mark, target, pill, side, p, frame, seed, look }: 
       return svg(<>{halo(d)}{stroke(d)}<circle cx={r1(B.x)} cy={r1(B.y)} r={sw * 1.7 + 1} fill={accent} opacity={full ? undefined : +p.toFixed(4)} /></>);
     }
     if (mark === "arrow") {
-      const hl = 10 + sw * 2.6, hw = hl * 0.46;
+      const hl = 14 + sw * 3, hw = hl * 0.46;
       const base = { x: tip.x - ux * hl, y: tip.y - uy * hl };
       const d = pathOf([A, base]);
       const head = `M${r1(tip.x)} ${r1(tip.y)} L${r1(base.x - uy * hw)} ${r1(base.y + ux * hw)} L${r1(base.x + uy * hw)} ${r1(base.y - ux * hw)} Z`;
@@ -237,14 +239,15 @@ function CalloutMark({ theme, mark, target, pill, side, p, frame, seed, look }: 
   }
 
   if (mark === "bracket") {
-    const pad = 10, tick = 9;
+    // el corchete es la señal más discreta: con un trazo fino (hairline) se perdía bajo la tarjeta, así que lleva remates largos y un trazo de al menos 3 px
+    const pad = 14, tick = 18, over = 6;
     const horiz = side === "right" || side === "left";
     const s = side === "right" || side === "below" ? 1 : -1;
     let pts: Pt[];
     let stubTo: Pt | null = null;
     if (horiz) {
       const sx = s > 0 ? target.x + target.w + pad : target.x - pad;
-      const y1 = target.y - 2, y2 = target.y + target.h + 2;
+      const y1 = target.y - over, y2 = target.y + target.h + over;
       pts = [{ x: sx - s * tick, y: y1 }, { x: sx, y: y1 }, { x: sx, y: y2 }, { x: sx - s * tick, y: y2 }];
       if (pill) {
         const y = clamp(clamp(pill.y + pill.h / 2, y1, y2), pill.y + 3, pill.y + pill.h - 3);
@@ -253,7 +256,7 @@ function CalloutMark({ theme, mark, target, pill, side, p, frame, seed, look }: 
       }
     } else {
       const sy = s > 0 ? target.y + target.h + pad : target.y - pad;
-      const x1 = target.x - 2, x2 = target.x + target.w + 2;
+      const x1 = target.x - over, x2 = target.x + target.w + over;
       pts = [{ x: x1, y: sy - s * tick }, { x: x1, y: sy }, { x: x2, y: sy }, { x: x2, y: sy - s * tick }];
       if (pill) {
         const x = clamp(clamp(pill.x + pill.w / 2, x1, x2), pill.x + 3, pill.x + pill.w - 3);
@@ -265,7 +268,7 @@ function CalloutMark({ theme, mark, target, pill, side, p, frame, seed, look }: 
     const spine = cut < 0 ? pts : pts.slice(0, cut);
     const stub = cut < 0 ? null : pts.slice(cut + 1);
     const d = pathOf(spine) + (stub ? " " + pathOf(stub) : "");
-    return svg(<>{stroke(d, { width: Math.max(2, Math.round(3 * look.widthK)) })}</>);
+    return svg(<>{halo(d)}{stroke(d, { width: Math.max(3, Math.round(4 * look.widthK)) })}</>);
   }
 
   if (mark === "underline") {

@@ -1,5 +1,6 @@
 export { kf, track, typed } from "./kf";
 export { cameraAt, zoomThrough } from "./camera";
+export { exitThrough } from "./exit";
 export type { CameraKey, Camera, CameraOptions } from "./camera";
 export { useCameraAt } from "./useCameraAt";
 export { World } from "./World";
@@ -30,3 +31,6 @@ export { placeBeside, calloutState, coveredOpacity, headlineStrip, cameraView, c
 export type { Rect, Side, Placement, PlaceOptions, CalloutStateOptions, HeadlineStripOptions, KeepClearOptions } from "./layout";
 export { textWidth } from "./text";
 export type { TextWidthOptions } from "./text";
+export { FocusGroup } from "./FocusGroup";
+export { signalAttrs } from "./signal";
+export { NestedScene } from "./NestedScene";

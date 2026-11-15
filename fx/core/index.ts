@@ -5,3 +5,7 @@ export type { FxProps, FxBox, ColorRole } from "./types";
 export { Clip } from "./Clip";
 export { FrameCanvas, Easing, back, random } from "../../engine";
 export type { FrameCanvasProps } from "../../engine";
+export { fxDensity, DENSITY_MIN } from "./density";
+export type { Density } from "./density";
+export { Loop, loopState } from "./Loop";
+export type { LoopProps, LoopState } from "./Loop";
