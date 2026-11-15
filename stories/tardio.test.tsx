@@ -162,10 +162,13 @@ describe("revelación escenificada (design.reveal: stage)", () => {
     expect(ring(tick - 8)).toBeUndefined();
     expect(Number(ring(tick + 4))).toBeLessThan(Number(ring(tick + 14)));
   });
-  it("renderiza todos los cuadros en los tres formatos sin lanzar (en vertical y cuadrado, sin miniatura)", () => {
+  it("renderiza todos los cuadros en los tres formatos sin lanzar (la miniatura también está en vertical y cuadrado: encima de la fila nueva, sin NaN)", () => {
     for (const [w, h] of [[1920, 1080], [1080, 1920], [1080, 1080]]) {
       for (let f = 0; f < 200; f += 7) expect(() => html(el(st), f, { ...cfg, width: w, height: h })).not.toThrow();
-      expect(html(el(st), 90, { ...cfg, width: w, height: h }).includes("MINIATURA-REAL")).toBe(w === 1920);
+      const mid = html(el(st), 90, { ...cfg, width: w, height: h });
+      expect(mid).toContain("MINIATURA-REAL");
+      expect(html(el(st), 5, { ...cfg, width: w, height: h })).not.toContain("MINIATURA-REAL");
+      for (let f = 0; f < 200; f += 7) expect(html(el(st), f, { ...cfg, width: w, height: h })).not.toMatch(/NaN|Infinity/);
     }
   });
   it("con la duración por defecto (150) los tiempos se acortan en proporción", () => {
