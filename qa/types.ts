@@ -80,7 +80,7 @@ export type TextRun = {
 };
 
 /** Pieza que señala algo (`data-ve-signal`, kit/signal.ts): qué es, la señal que resuelve el tema (`mark`) y si la escena la forzó. */
-export type SignalMark = { kind: 'callout' | 'doodle' | 'marker' | string; piece: string; mark: string; forced: boolean; tag: string; rect: Rect };
+export type SignalMark = { kind: 'callout' | 'doodle' | 'marker' | string; piece: string; mark: string; forced: boolean; tag: string; rect: Rect; /** Reglas que una marca `data-qa-ignore` (propia o de un ancestro) calla para esta pieza. */ ignore?: string[] };
 
 export type PageData = { frame: number; width: number; height: number; runs: TextRun[]; elems: Record<string, Rect>; /** Cajas de los elementos `data-qa-fixed-scale` del cuadro. */ fixedRoots?: Rect[]; /** Coverage alpha of the elements in `elems` (same keys). */ opac?: Record<string, number>; /** Piezas que señalan algo en el cuadro (regla `signal`). */ signals?: SignalMark[] };
 

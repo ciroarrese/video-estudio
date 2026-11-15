@@ -22,11 +22,13 @@ Etapa 1 entregada y buena parte de las siguientes, salvo lo que figura como pend
 
 Realista, en este orden:
 
-1. `density` en `ChatThread`, `CommandPalette` y `BeforeAfter` (en una baldosa muy chica quedan con la letra del tema) y revisar `PhoneFrame`, `CardFan` y `CommandPalette` bajo `--themes all` con el muestrario `fx-muro`.
-2. `--font-scale` acumula la escala en elementos con tamaño redondo (defecto de `qa/session.ts`, ver la sección 15 de la guía): corregirlo y volver a correr el estrés de los ejemplos.
-3. Subtítulos y vista previa interactiva con línea de tiempo (etapa 4, a demanda: hoy se mira con `npm run dev` sin controles).
-4. Lottie y video embebido (sin empezar); `backdrop-filter` bajo `--check`.
-5. Mirar `story-demo-sorpresa` (`reveal: "late"`, `design.reveal: "stage"`) bajo los cinco temas con `npm run sheet` y `qa --themes all`: la salida `settle` de `editorial` ya se corrigió, la revelación escenificada no se revisó con ese tema.
+1. `--font-scale` acumula la escala en elementos con tamaño redondo (defecto de `qa/session.ts`, ver la sección 15 de la guía): corregirlo y volver a correr el estrés de los ejemplos.
+2. Subtítulos y vista previa interactiva con línea de tiempo (etapa 4, a demanda: hoy se mira con `npm run dev` sin controles).
+3. Lottie y video embebido (sin empezar); `backdrop-filter` bajo `--check`.
+4. Revelación escenificada: la miniatura en vertical y cuadrado es una tarjeta flotante sobre la lista (tapa algo de la fila de arriba); un diseño con más lugar (lista más corta o miniatura propia por formato) sería mejor.
+5. `PhoneFrame`, `CardFan` y `PhoneScroll` no tienen `density` ni baldosa en `fx-muro`; se pide cuando haga falta.
+
+Cerrado en la etapa 7: `density` en `ChatThread`, `CommandPalette`, `BeforeAfter` y `MarkerDraw` (y las dos últimas baldosas del muro), `motion.handoffHold` (el blanco entre la apertura o la vuelta y la escena), la revelación escenificada bajo los cinco temas y en vertical y cuadrado (`story-demo-sorpresa-stage`), y los `--check-all` de `fx-muro` y `story-demo`.
 
 Herramienta propia para generar videos animados de nivel profesional a partir de un cuestionario, con el design system como variable. Nace de la experiencia de producir un video anterior, hecho a mano escena por escena.
 

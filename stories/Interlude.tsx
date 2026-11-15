@@ -1,7 +1,7 @@
 import React from "react";
 import { Easing, useFrame, useVideoConfig } from "../engine";
 import { Wash, World, kf, useCameraAt, exitThrough } from "../kit";
-import { cornerRadius, resolveStyle, settle, staggerFrames, surfaceStyle, useTheme, withAlpha } from "../themes";
+import { cornerRadius, handoffShift, resolveStyle, settle, staggerFrames, surfaceStyle, useTheme, withAlpha } from "../themes";
 import { fade, xform } from "../fx/core/math";
 import { AVG_BOLD, AVG_REG, ROW_GAP, listLayout, textWidth } from "./layout";
 import { DefaultThumbnail } from "./Closing";
@@ -19,6 +19,10 @@ export const interludeFrames = (spec: StorySpec) => spec.timing?.interlude ?? IN
 export const interludeRevealFrames = (spec: StorySpec) => spec.timing?.interludeReveal ?? INTERLUDE_REVEAL_FRAMES;
 
 /** Tiempos (cuadros de la duración por defecto, 120) de la vuelta común: la tilde, el subrayado del que sigue y el atravesado. Los usa `storyCues`. */
+/** Cuadros de referencia (a `INTERLUDE_FRAMES`) con el velo cerrado entre el atravesado y la escena que sigue: lo de siempre, que `motion.handoffHold` puede cambiar. */
+export const INTERLUDE_BLANK = 18;
+/** Cuánto se puede adelantar el atravesado (cuadros de referencia): hasta que empiece justo al terminar de aparecer la fila que sigue (62). */
+export const INTERLUDE_SHIFT_MIN = -4;
 export const INTERLUDE_T = { check: [14, 34] as [number, number], next: [40, 62] as [number, number], fly: [66, 112] as [number, number] };
 /** Tiempos (cuadros de la duración por defecto, 150) de la vuelta de revelación: tilde(s) de lo anterior, entrada de la fila nueva, su número, su subrayado y su tilde. */
 export const REVEAL_T = { check: [14, 34] as [number, number], enter: [48, 62] as [number, number], number: [56, 70] as [number, number], next: [74, 96] as [number, number], lateCheck: [104, 124] as [number, number] };
@@ -89,9 +93,11 @@ export function Interlude({ spec: specIn, done, skip = [], next: nextProp, ticks
   const sc = (r: [number, number]) => [u(r[0]), u(r[1])] as [number, number];
   const R = stage ? REVEAL_STAGE_T : REVEAL_T;
   const Z: [number, number] = [0, 0];
+  const flyShift = handoffShift(theme, INTERLUDE_BLANK, INTERLUDE_SHIFT_MIN);
+  const flySc = sc([INTERLUDE_T.fly[0] + flyShift, INTERLUDE_T.fly[1] + flyShift]);
   const T = reveal
-    ? { check: sc(R.check), next: sc(R.next), fly: sc(INTERLUDE_T.fly), enter: sc(R.enter), number: sc(R.number), lateCheck: sc(R.lateCheck) }
-    : { check: sc(INTERLUDE_T.check), next: sc(INTERLUDE_T.next), fly: sc(INTERLUDE_T.fly), enter: Z, number: Z, lateCheck: Z };
+    ? { check: sc(R.check), next: sc(R.next), fly: flySc, enter: sc(R.enter), number: sc(R.number), lateCheck: sc(R.lateCheck) }
+    : { check: sc(INTERLUDE_T.check), next: sc(INTERLUDE_T.next), fly: flySc, enter: Z, number: Z, lateCheck: Z };
   const S = stage ? { room: sc(REVEAL_STAGE_T.room), sweep: sc(REVEAL_STAGE_T.sweep), thumbIn: sc(REVEAL_STAGE_T.thumbIn), thumbFly: sc(REVEAL_STAGE_T.thumbFly) } : null;
   const motion = resolveStyle(theme).motion;
   const room = S ? kf(f, S.room, [0, 1], ease.inOut) : 0; // las filas ya vistas se corren apenas hacia arriba para hacer lugar a la nueva
@@ -100,7 +106,9 @@ export function Interlude({ spec: specIn, done, skip = [], next: nextProp, ticks
   const rowMidY = rowTop + L.blockTop + L.nameH / 2; // centro del renglón del nombre de la fila nueva
   // extremo derecho estimado del texto de la fila nueva (solo para ubicar la miniatura en el lugar libre y acotar el barrido)
   // (la estimación por glifo medio sobra un poco: se descuenta para que la miniatura no quede diminuta)
-  const textEnd = L.left + L.numW + 0.88 * (textWidth(L.names[lateI]!, L.nameSize, AVG_BOLD) + (L.inline ? textWidth(` · ${L.lines[lateI]!}`, L.lineSize, AVG_REG) : textWidth(L.lines[lateI]!, L.lineSize, AVG_REG)));
+  const textEnd = L.stacked
+    ? L.left + 0.88 * Math.max(textWidth(L.names[lateI]!, L.nameSize, AVG_BOLD), Math.min(L.rowW, textWidth(L.lines[lateI]!, L.lineSize, AVG_REG))) // en columna, el nombre y la línea van en renglones aparte
+    : L.left + L.numW + 0.88 * (textWidth(L.names[lateI]!, L.nameSize, AVG_BOLD) + (L.inline ? textWidth(` · ${L.lines[lateI]!}`, L.lineSize, AVG_REG) : textWidth(L.lines[lateI]!, L.lineSize, AVG_REG)));
   const appear = kf(f, [0, u(14)], [0, 1], ease.out);
   const nextP = kf(f, T.next, [0, 1], ease.out);
   const end = next < 0 ? kf(f, [dur - u(30), dur], [0, 1]) : 0;
@@ -123,22 +131,26 @@ export function Interlude({ spec: specIn, done, skip = [], next: nextProp, ticks
   const Thumb = thumbnail ?? (() => <DefaultThumbnail index={lateI} name={spec.topics[lateI]!.name} />);
   const PANEL_W = 560, PANEL_H = 340;
   const free = width - theme.safe.x - textEnd - 40; // lugar libre a la derecha del texto de la fila nueva
-  const tScale = Math.min(0.62, free / PANEL_W); // con menos de 0,4 no hay lugar sin tapar texto: no se muestra
-  const tx0 = width - theme.safe.x - (PANEL_W * tScale) / 2, ty0 = rowMidY - L.rowH * 0.42; // un poco más arriba que el renglón: ahí no hay texto a la derecha
-  const tx1 = L.left + Math.round(L.numSize * 1.5 * 0.36), ty1 = rowMidY; // donde queda la tilde
+  // Formatos sin lugar a la derecha del texto (vertical y cuadrado): la miniatura no vuela (en una lista que llena el alto taparía la fila de arriba o se saldría del cuadro):
+  // aparece chica directamente sobre el lugar del número, crece hasta ser legible, se queda un momento y se encoge hasta ser la tilde.
+  const side = free >= 0.4 * PANEL_W; // hay lugar a la derecha del texto de la fila nueva
   const endScale = Math.round(L.numSize * 1.5) / PANEL_W;
+  const tScale = side ? Math.min(0.62, free / PANEL_W) : Math.min(0.62, endScale * 1.9, Math.max(endScale * 1.3, L.numW > 0 ? (L.numW - 6) / PANEL_W : 1)); // sin pasar del ancho de la columna del número (si la hay)
+  const tx1 = L.left + Math.round(L.numSize * 1.5 * 0.36), ty1 = rowTop + L.blockTop + L.numH / 2; // donde queda la tilde (centro del número)
+  const tx0 = side ? width - theme.safe.x - (PANEL_W * tScale) / 2 : L.left - Math.round(L.numSize * 1.5 * 0.14) + (PANEL_W * tScale) / 2; // sin lugar al costado: con el borde izquierdo en el de la tilde
+  const ty0 = side ? rowMidY - L.rowH * 0.42 : ty1; // en el horizontal, un poco más arriba que el renglón: ahí no hay texto a la derecha
   const tIn = S ? kf(f, S.thumbIn, [0, 1], ease.out) : 0;
   const tFly = S ? kf(f, S.thumbFly, [0, 1], ease.inOut) : 0;
   const tOut = kf(tFly, [0.7, 1], [0, 1]);
-  const tPresent = S !== null && !L.stacked && tScale >= 0.4 && tIn > 0 && tFly < 1;
+  const tPresent = S !== null && (!side || tScale >= 0.4) && tIn > 0 && tFly < 1;
   const tX = tx0 + (tx1 - tx0) * tFly;
-  const tY = ty0 + (ty1 - ty0) * tFly - Math.sin(Math.PI * tFly) * 70 + (1 - tIn) * 28;
-  const tSc = (tScale * (0.86 + 0.14 * tIn)) * (1 - tFly) + endScale * tFly;
+  const tY = ty0 + (ty1 - ty0) * tFly - Math.sin(Math.PI * tFly) * (side ? 70 : 0) + (side ? (1 - tIn) * 28 : 0);
+  const tSc = (tScale * (side ? 0.86 + 0.14 * tIn : 0.35 + 0.65 * tIn)) * (1 - tFly) + endScale * tFly;
   const panelSurf = surfaceStyle(theme, "window");
   const panelShadow = resolveStyle(theme).surface.elevation === "shadow" ? `0 30px 60px -24px ${withAlpha(theme.color.text, 0.4)}` : panelSurf.boxShadow;
   const thumb = tPresent ? (
     // la miniatura es una vista chica de la escena: su texto es detalle, no se le pide el tamaño mínimo; al volar pasa por encima del texto de la fila (`overlap`)
-    <div data-qa-ignore="min-size overlap covered" style={{ position: "absolute", left: 0, top: 0, width: PANEL_W, height: PANEL_H, transform: `translate(${(tX - PANEL_W / 2).toFixed(2)}px, ${(tY - PANEL_H / 2).toFixed(2)}px) scale(${tSc.toFixed(4)})`, borderRadius: panelSurf.borderRadius, boxShadow: panelShadow, overflow: "hidden", opacity: fade(tIn * (1 - tOut)), zIndex: 5 }}>
+    <div data-qa-ignore="min-size overlap covered" style={{ position: "absolute", left: 0, top: 0, width: PANEL_W, height: PANEL_H, transform: `translate(${(tX - PANEL_W / 2).toFixed(2)}px, ${(tY - PANEL_H / 2).toFixed(2)}px) scale(${tSc.toFixed(4)})`, borderRadius: panelSurf.borderRadius, boxShadow: panelShadow, overflow: "hidden", opacity: fade(Math.min(1, tIn * (side ? 1 : 3)) * (1 - tOut)), zIndex: 5 }}>
       <Thumb />
     </div>
   ) : null;

@@ -8,6 +8,7 @@ Este motor (`engine/`) se escribió desde cero para este repositorio.
   - Curva cúbica de Bézier (`Easing.bezier`): formulación estándar de Bézier unitaria (como en CSS `cubic-bezier`), resuelta con Newton y bisección de respaldo. Es matemática estándar, sin código de terceros.
   - Azar determinista (`random`): hash de cadenas tipo xmur3 + generador mulberry32. Ambos son de dominio público.
 - No se incluyen dependencias de otros motores de video. Dependencias de ejecución: React y React DOM (licencia MIT).
+- Herramientas externas que no se redistribuyen: Playwright (Apache-2.0, opcional) con su Chromium, y ffmpeg del sistema. La lista completa de terceros y sus licencias está en `NOTICE`; el repo no incluye fuentes, música ni imágenes de terceros.
 - Las dependencias de desarrollo (Vite, Vitest, TypeScript, jsdom, Testing Library) se usan como herramientas y no se redistribuyen.
 
 ## Catálogo de efectos (`fx/`)

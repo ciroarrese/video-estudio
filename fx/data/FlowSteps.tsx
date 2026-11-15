@@ -79,7 +79,7 @@ export function FlowSteps(p: FlowStepsProps) {
         // opacidad y escala solo mientras la tarjeta aterriza (en reposo no queda `scale(1)`)
         const gp = { opacity: fade(Math.min(1, t * 1.6)), transform: svgScale(cx, cy, sc) };
         return (
-          <g key={`${i}:${styleKey(gp)}`} {...gp}>
+          <g key={`${i}:${styleKey(gp)}`} {...gp} textRendering="geometricPrecision">
             <SvgShadow shadow={surf.shadow} x={c.x} y={c.y} width={cw} height={ch} rx={rx} />
             <rect x={c.x} y={c.y} width={cw} height={ch} rx={rx} fill={surf.fill} stroke={state === "pending" ? theme.color.border : col} strokeWidth={(state === "active" ? 4 : 2.5) * k} strokeDasharray={state === "pending" ? `${10 * k} ${8 * k}` : undefined} />
             <circle cx={c.x + 44 * k} cy={cy} r={22 * k} fill={state === "pending" ? "none" : state === "done" ? col : withAlpha(col, 0.15)} stroke={col} strokeWidth={3 * k} />

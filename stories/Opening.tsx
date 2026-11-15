@@ -1,7 +1,7 @@
 import type React from "react";
 import { Easing, useFrame, useVideoConfig } from "../engine";
 import { Wash, World, kf, useCameraAt, exitThrough } from "../kit";
-import { entrance, staggerFrames, staggerOverride, surfaceStyle, textStyle, useTheme } from "../themes";
+import { entrance, handoffShift, staggerFrames, staggerOverride, surfaceStyle, textStyle, useTheme } from "../themes";
 import { fade, styleKey, xform } from "../fx/core/math";
 import { fitText, listLayout, openingWall, rigTransform } from "./layout";
 import { Chip, HeadlineRow, HighlightedTitle, StoryStage, rowEntrance, scaler, useEase, useStorySpec } from "./shared";
@@ -15,17 +15,21 @@ export const openingFrames = (spec: StorySpec) => spec.timing?.opening ?? OPENIN
 
 const WALL_P = 1400;
 
+/** Cuadros de referencia (a `OPENING_FRAMES`) con el velo cerrado, en blanco, entre el atravesado y la escena que sigue: lo de siempre, que `motion.handoffHold` puede cambiar. */
+export const OPENING_BLANK = 20;
+
 /** Cuadros que dura el acople final del titular (`design.handoff: "dock"`) antes de terminar la apertura. */
 const DOCK_FRAMES = 26;
 
 /**
  * Cuadros (locales de la apertura) en que se atraviesa el titular del primer tema: con acople la lista se queda hasta `DOCK_FRAMES` antes del final
- * (la píldora termina de entrar en el último cuadro menos 8); sin acople, con velo o sin él (`through`). Lo usan la apertura y `storyCues`.
+ * (la píldora termina de entrar en el último cuadro menos 8); sin acople, con velo o sin él (`through`). Con velo, `shift` (de `handoffShift`, por `motion.handoffHold`) lo corre: el blanco
+ * que queda antes de la escena es `OPENING_BLANK - shift` cuadros de referencia. Lo usan la apertura y `storyCues`.
  */
-export const openingFly = (dur: number, docking: boolean, flying: boolean): [number, number] => {
+export const openingFly = (dur: number, docking: boolean, flying: boolean, shift = 0): [number, number] => {
   const u = scaler(dur, OPENING_FRAMES);
   if (docking) { const at = Math.max(Math.round(u(120)), dur - DOCK_FRAMES); return [at, at + 1]; }
-  return flying ? [u(246), u(292)] : [u(236), u(282)];
+  return flying ? [u(246), u(292)] : [u(236 + shift), u(282 + shift)];
 };
 /** Cuadro (local) en que entra la lista de titulares de la apertura. */
 export const openingListAt = (dur: number): number => scaler(dur, OPENING_FRAMES)(104);
@@ -67,7 +71,7 @@ export function Opening({ spec: specIn, first = 0, dock, through }: { spec: Stor
   const heads = (i: number) => staggerFrames(theme, i, { base: gap, context: "list", scale: dur / OPENING_FRAMES });
   // cuadros que tarda cada pieza del muro en aparecer respecto de la anterior (0,5 de siempre; `motion.staggerChips` lo cambia)
   const chipStep = staggerOverride(theme, "chips") ?? 0.5;
-  const T = { titleOut: [u(78), u(100)] as [number, number], wallOff: [u(94), u(126)] as [number, number], heads: u(104), fly: openingFly(dur, docking, flying) };
+  const T = { titleOut: [u(78), u(100)] as [number, number], wallOff: [u(94), u(126)] as [number, number], heads: u(104), fly: openingFly(dur, docking, flying, handoffShift(theme, OPENING_BLANK)) };
   const underStart = T.heads + heads(n - 1) + u(20);
 
   // muro: avance lento de cámara con inclinación; al irse la lista se aleja

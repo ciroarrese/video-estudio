@@ -290,6 +290,16 @@ const STAGGER_KEY = { list: "staggerList", rows: "staggerRows", items: "staggerI
 /** Paso (cuadros) que el design system fija para un contexto (`motion.staggerList`, `staggerRows`, `staggerItems`, `staggerChips`), o `null` si no lo fija. */
 export const staggerOverride = (theme: Theme, context: StaggerContext): number | null => resolveStyle(theme).motion[STAGGER_KEY[context]];
 
+/**
+ * Corrimiento (cuadros de referencia) del atravesado y del velo de la apertura o de la vuelta al listado según `motion.handoffHold`: `native` son los cuadros de blanco que tiene hoy
+ * el bloque (20 la apertura, 18 la vuelta). Sin `handoffHold` es 0 (lo de siempre); con él, `native - handoffHold` (positivo: todo ocurre más tarde y el blanco se acorta;
+ * negativo: más temprano y el blanco se alarga). `min` evita que un blanco largo choque con lo que ocurre antes.
+ */
+export function handoffShift(theme: Theme, native: number, min = -Infinity): number {
+  const hold = resolveStyle(theme).motion.handoffHold;
+  return hold === null ? 0 : Math.max(min, native - hold);
+}
+
 export interface StaggerOptions {
   /** Paso propio de la pieza, en cuadros: el tema lo escala respecto del paso por defecto (4 = sin cambio). Lo ignora un paso de contexto. */
   base?: number;

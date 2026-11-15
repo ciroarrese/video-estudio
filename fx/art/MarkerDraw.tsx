@@ -1,6 +1,6 @@
 import { annotationLook, doodleStyle, resolveAnnotationMark, textStyle, withAlpha } from "../../themes";
 import { Easing, random } from "../../engine";
-import { fxBox, progress, roleColor, useFx } from "../core";
+import { fxBox, fxDensity, progress, roleColor, useFx } from "../core";
 import type { ColorRole, FxProps } from "../core";
 import { catmullRom, toPath, trimPolyline } from "../data/geom";
 import type { Pt } from "../data/geom";
@@ -52,17 +52,20 @@ export function MarkerDraw(p: MarkerDrawProps) {
   const mark = annotationLook(theme).mark;
   const themed: MarkerKind = style.type.highlight === "marker" ? "highlight" : asUnderline || mark === "underline" ? "underline" : mark === "ring" || mark === "hand" ? "circle" : "highlight";
   const kind: MarkerKind = p.kind === undefined ? themed : p.kind === "highlight" && asUnderline ? "underline" : p.kind;
+  // `density` (fx/core/density.ts): el trazo y el tope de la letra (la parte que depende del alto) bajan con la densidad; el ancho ya lo sigue la
+  // letra sola. Sin `density`, k = 1 (el de siempre).
+  const k = fxDensity(p.density, { width: w, height: h }, { width: 560, height: 160 });
   const dur = p.duration ?? 40;
   const color = roleColor(theme, p.color ?? (kind === "highlight" ? "warning" : "accent"));
   const t = Easing.inOut(progress(local, dur * 0.1, dur * 0.8));
   const pts = trimPolyline(markerPoints(kind, w, h, p.seed ?? "marker", jitter), t);
-  const sw = kind === "highlight" ? h * 0.82 : kind === "underline" ? h * 0.11 : kind === "circle" ? h * 0.07 : h * 0.09;
+  const sw = (kind === "highlight" ? h * 0.82 : kind === "underline" ? h * 0.11 : kind === "circle" ? h * 0.07 : h * 0.09) * k;
   const alpha = kind === "highlight" ? 0.4 : 0.9;
   const stroke = pts.length > 1 ? <path d={toPath(pts)} fill="none" stroke={kind === "highlight" ? withAlpha(color, alpha) : color} strokeWidth={sw} strokeLinecap="round" strokeLinejoin="round" /> : null;
   const label = p.text ?? "palabra clave";
   // Tamaño de letra: 0,58 del alto, pero sin pasar del ancho de la caja con una letra ancha (0,62 em por carácter): un texto largo se achica
   // en vez de salirse del svg, que recorta lo que desborda.
-  const fontSize = Math.min(h * 0.58, (w * 0.94) / (Math.max(1, label.length) * 0.62));
+  const fontSize = Math.min(h * 0.58 * k, (w * 0.94) / (Math.max(1, label.length) * 0.62));
   return (
     <svg width={w} height={h} viewBox={`0 0 ${w} ${h}`} data-ve-signal="marker" data-ve-piece="MarkerDraw" data-ve-mark={resolveAnnotationMark(theme)} style={{ display: "block", fontFamily: theme.font.family, ...p.style }}>
       {kind === "highlight" && stroke}

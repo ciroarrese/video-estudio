@@ -114,7 +114,8 @@ export function DemoScene({ variant }: { variant: number }) {
           return (
             <div
               key={label}
-              data-qa-ignore={i === v.pick ? undefined : framing}
+              // la tarjeta elegida es el sujeto del encuadre, salvo mientras la escena continúa a la anterior y la cámara todavía está sobre la tarjeta que aquella dejó (cuadros 0 a 34)
+              data-qa-ignore={i === v.pick && !(cont && f < 34) ? undefined : framing}
               style={{
                 position: "absolute", left: cardPos(i).x, top: cardPos(i).y + (1 - a) * 30, width: CARD.w, height: CARD.h, opacity: a,
                 background: theme.color.surfaceAlt, borderRadius: cornerRadius(theme, "panel"), padding: 30, boxSizing: "border-box",
