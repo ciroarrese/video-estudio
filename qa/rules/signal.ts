@@ -22,9 +22,11 @@ export const signalRule: Rule = {
       const key = `${s.piece}|${s.mark}|${forced}|${Math.round(s.rect.x / 40)}|${Math.round(s.rect.y / 40)}`;
       if (seen.has(key)) continue;
       seen.add(key);
+      // con `data-qa-ignore="signal"` (propio o de un ancestro) el aviso baja a info y lo dice: callar tiene que verse
+      const muted = (s.ignore ?? []).includes('signal');
       out.push({
-        rule: 'signal', severity: handPiece ? 'warn' : 'info', frame: ctx.frame,
-        message: handPiece
+        rule: 'signal', severity: handPiece && !muted ? 'warn' : 'info', frame: ctx.frame,
+        message: muted ? `${s.piece} con la señal del tema "${s.mark}" (data-qa-ignore="signal": el guion o el comentario de la marca justifica el trazo)` : handPiece
           ? `${s.piece} dibuja un trazo a mano y la señal de este design system es "${s.mark}": señalá con Callout (dibuja la del tema) o dejá que el guion justifique el trazo`
           : `Callout con variant forzada (el tema usa "${s.mark}"): la excepción tiene que decir en un comentario por qué`,
         element: { tag: s.tag, testid: null, text: `${s.piece} (señal del tema: ${s.mark})`, rect: s.rect },

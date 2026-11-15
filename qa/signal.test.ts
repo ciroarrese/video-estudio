@@ -22,6 +22,13 @@ describe('regla signal', () => {
       expect(f[0]!.message).toContain('Callout');
     }
   });
+  it('con data-qa-ignore="signal" (propio o de un ancestro) el aviso baja a info y lo dice', () => {
+    const f = runRules(ctx([sig({ piece: 'MarkerDraw', kind: 'marker', ignore: ['signal'] })]), ['signal']);
+    expect(f).toHaveLength(1);
+    expect(f[0]).toMatchObject({ rule: 'signal', severity: 'info' });
+    expect(f[0]!.message).toContain('data-qa-ignore="signal"');
+    expect(runRules(ctx([sig({ piece: 'MarkerDraw', kind: 'marker', ignore: ['clip'] })]), ['signal'])[0]).toMatchObject({ severity: 'warn' });
+  });
   it('no avisa si la señal del tema es hand, ni por DoodleUnderline', () => {
     expect(runRules(ctx([sig({ mark: 'hand' })]), ['signal'])).toEqual([]);
     expect(runRules(ctx([sig({ piece: 'DoodleUnderline' })]), ['signal'])).toEqual([]);

@@ -320,7 +320,7 @@
   Array.prototype.forEach.call(stage.querySelectorAll('[data-ve-signal]'), function (e) {
     var r = e.getBoundingClientRect();
     if (getComputedStyle(e).visibility !== 'visible') return;
-    signals.push({ kind: e.getAttribute('data-ve-signal'), piece: e.getAttribute('data-ve-piece') || '', mark: e.getAttribute('data-ve-mark') || '', forced: e.getAttribute('data-ve-forced') === 'true', tag: e.tagName.toLowerCase(), rect: rectOf(r) });
+    signals.push({ kind: e.getAttribute('data-ve-signal'), piece: e.getAttribute('data-ve-piece') || '', mark: e.getAttribute('data-ve-mark') || '', forced: e.getAttribute('data-ve-forced') === 'true', tag: e.tagName.toLowerCase(), rect: rectOf(r), ignore: ignoreOf(e) });
   });
   return { width: W, height: H, runs: runs, elems: elems, opac: opac, fixedRoots: fixedRoots, signals: signals };
 })
