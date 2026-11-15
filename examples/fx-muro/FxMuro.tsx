@@ -49,7 +49,7 @@ const BALDOSAS: Baldosa[] = [
   { name: "SplitFlap", render: (_w, _h) => <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center" }}><SplitFlap duration={DUR} text="OK" /></div> },
   { name: "RadarMorph", render: (w, h, d) => <RadarMorph width={w} height={h} density={d} duration={DUR} /> },
   { name: "CommandPalette", render: (w, h, d) => <CommandPalette width={w} height={h} density={d && 0.55} duration={DUR} items={[{ label: "Nuevo", hint: "N" }, { label: "Nueva carpeta", hint: "C" }]} /> },
-  { name: "MarkerDraw", render: (w, h, d) => <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center" }}><MarkerDraw width={w - 40} height={h - 30} density={d} duration={DUR} text="Clave" /></div> },
+  { name: "MarkerDraw", ignore: "signal" /* es una baldosa del muestrario, no una escena que señale algo: la regla `signal` avisaría de un trazo a mano bajo un tema que no señala así */, render: (w, h, d) => <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center" }}><MarkerDraw width={w - 40} height={h - 30} density={d} duration={DUR} text="Clave" /></div> },
   { name: "Globe", render: (w, h) => <Globe width={w} height={h} duration={DUR} bg="surface" /> },
 ];
 
