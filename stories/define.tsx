@@ -4,6 +4,7 @@ import type { FormatsOption } from "../engine";
 import { ThemeProvider, dark, editorial, neon, neutral, papel } from "../themes";
 import type { Theme } from "../themes";
 import { composeStory } from "./compose";
+import { checkStoryFit, formatFitReport, registerStoryFit } from "./fit";
 import type { ComposeOptions } from "./compose";
 import type { StorySpec, TopicScene } from "./types";
 
@@ -19,8 +20,10 @@ export const resolveTheme = (t: ThemeInput | undefined): Theme => (typeof t === 
  * (`formats: ["vertical", "cuadrado"]`) obliga a que las escenas de tema tengan su propio diseño (`useFormat()`), así que se pide a propósito.
  */
 export function defineStory({
-  id, spec, scenes, fps = 30, width = 1920, height = 1080, theme = "neutral", formats, ...opts
-}: { id: string; spec: StorySpec; scenes: (TopicScene | null)[]; fps?: number; width?: number; height?: number; theme?: ThemeInput; formats?: FormatsOption } & ComposeOptions) {
+  id, spec, scenes, fps = 30, width = 1920, height = 1080, theme = "neutral", formats, fitCheck = true, ...opts
+}: { id: string; spec: StorySpec; scenes: (TopicScene | null)[]; fps?: number; width?: number; height?: number; theme?: ThemeInput; formats?: FormatsOption;
+  /** Avisa en la consola (una vez por formato) si un nombre, una bajada o el título no entran en el área segura sin bajar del piso legible (`checkStoryFit`). `false` lo apaga. Solo avisa: no cambia lo que se dibuja. */
+  fitCheck?: boolean } & ComposeOptions) {
   const { component: Story, durationInFrames, timeline } = composeStory(spec, scenes, opts);
   // Cada bloque (apertura, temas, vueltas, cierre) es una escena: `--scene <id|índice>` y `--list-scenes`.
   const sceneList = timeline.map((e) => ({ id: e.id, name: e.kind === "topic" && e.topic !== undefined ? spec.topics[e.topic]?.name : undefined, from: e.from, durationInFrames: e.durationInFrames }));
@@ -29,6 +32,24 @@ export function defineStory({
       <Story />
     </ThemeProvider>
   );
-  return defineVideo<StoryProps>({ id, component: Video, fps, width, height, durationInFrames, formats, scenes: sceneList, // con un objeto `Theme` no se publica como prop (no es serializable): `t ?? theme` lo usa; `--props '{"theme":"dark"}'` lo pisa
+  const reg = defineVideo<StoryProps>({ id, component: Video, fps, width, height, durationInFrames, formats, scenes: sceneList, // con un objeto `Theme` no se publica como prop (no es serializable): `t ?? theme` lo usa; `--props '{"theme":"dark"}'` lo pisa
     defaultProps: typeof theme === "string" ? { theme } : {} });
+  // Largos de nombres, bajadas y título por formato: `qa` lo pide desde la página (regla `story-fit`) y, al componer, se avisa por consola (con el tema por defecto del video).
+  const fitOf = (format: string, themeName?: ThemeInput) => {
+    const size = reg.formatSizes?.[format as keyof typeof reg.formatSizes];
+    if (!size) return null;
+    const r = checkStoryFit(spec, resolveTheme(themeName ?? theme), size, { width, height });
+    // con el nombre del formato (`cuadrado`), no con su tamaño, en los mensajes
+    return { ...r, format, issues: r.issues.map((i) => ({ ...i, message: i.message.replace(`Formato ${r.format}`, `Formato ${format}`) })) };
+  };
+  registerStoryFit(id, (format, themeName) => fitOf(format, themeName as ThemeInput | undefined));
+  if (fitCheck) {
+    const warn = () => {
+      for (const format of Object.keys(reg.formatSizes ?? {})) for (const m of formatFitReport(fitOf(format)!)) if (typeof console !== "undefined") console.warn(`aviso (${id}): ${m}`);
+    };
+    // en el navegador la medida real necesita las fuentes cargadas; fuera de él (pruebas, Node) se mide con la estimación por glifo
+    if (typeof document !== "undefined" && document.fonts?.ready) void document.fonts.ready.then(warn, () => {});
+    else warn();
+  }
+  return reg;
 }

@@ -3,7 +3,7 @@ import { Easing, useFrame, useVideoConfig } from "../engine";
 import { Wash, World, kf, useCameraAt, exitThrough } from "../kit";
 import { entrance, handoffShift, staggerFrames, staggerOverride, surfaceStyle, textStyle, useTheme } from "../themes";
 import { fade, styleKey, xform } from "../fx/core/math";
-import { fitText, listLayout, openingWall, rigTransform } from "./layout";
+import { fitText, fitTitleNarrow, listLayout, openingWall, rigTransform, titleCardMax } from "./layout";
 import { Chip, HeadlineRow, HighlightedTitle, StoryStage, rowEntrance, scaler, useEase, useStorySpec } from "./shared";
 import { TopicContext, TopicHeadline, headlineDefaults } from "./topic";
 import { wallOptions, withoutLate } from "./types";
@@ -88,7 +88,8 @@ export function Opening({ spec: specIn, first = 0, dock, through }: { spec: Stor
   // en formatos angostos el título baja a más renglones y el cartel se queda dentro del ancho seguro
   const narrow = width / height < 1.3;
   const titleW = Math.min(1560, width - 2 * theme.safe.x);
-  const tf = fitText(spec.title.text, titleW, theme.type.hero, { min: theme.type.hero * (narrow ? 0.45 : 0.5), lines: narrow ? 3 : 2, avg: 0.55 });
+  // (angosto: se mide con la tipografía del tema y nunca se corta con "…": hasta 3 renglones, después letra más chica; formato ancho: la estimación de siempre)
+  const tf = narrow ? fitTitleNarrow(theme, spec.title.text, width) : fitText(spec.title.text, titleW, theme.type.hero, { min: theme.type.hero * 0.5, lines: 2, avg: 0.55 });
 
   // atravesado del primer titular
   const cam = useCameraAt(f, [{ f: 0, x: cx, y: cy, scale: 1 }], {
@@ -130,7 +131,7 @@ export function Opening({ spec: specIn, first = 0, dock, through }: { spec: Stor
         const transform = [enter.transform, exit].filter(Boolean).join(" ") || undefined;
         const tt = textStyle(theme, "title", { tracking: -0.03 });
         const card: React.CSSProperties = {
-          maxWidth: Math.min(1700, width - theme.safe.x),
+          maxWidth: titleCardMax(theme, width),
           boxSizing: "border-box",
           padding: `${Math.round(tf.size * 0.3)}px ${Math.round(tf.size * 0.55)}px`,
           ...surf,

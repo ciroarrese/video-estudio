@@ -1,7 +1,7 @@
 import { cpus } from 'node:os';
 import { applyMotion, coverKeys } from './motion';
 import { collectRuns, sampleBackgrounds } from './page';
-import { ALL_RULES, type DecorSummary, type DetailSummary, type FixedScaleSummary, type JudgedSummary, type SilencedSummary, type Finding, type RuleId, type Severity } from './types';
+import { QA_RULES, type DecorSummary, type DetailSummary, type FixedScaleSummary, type JudgedSummary, type SilencedSummary, type Finding, type RuleId, type Severity } from './types';
 import { addJudged, emptyJudged, runRulesCounted } from './rules';
 import { anchoredFrames, DEFAULT_PER_SCENE, sampleFrames, type SampleSpec } from './sampling';
 import { openSession, sceneFrames, type Stress } from './session';
@@ -77,7 +77,7 @@ export async function runQa(o: QaOptions): Promise<QaResult> {
 async function runQaPass(o: QaOptions, honorFixedScale: boolean): Promise<{ result: QaResult; fixed: { texts: number; frames: number; refuse: boolean } | null }> {
   const t0 = Date.now();
   const thresholds = mergeThresholds(o.thresholds);
-  const rules = o.rules ?? ALL_RULES;
+  const rules = o.rules ?? QA_RULES;
   const session = await openSession({ videoId: o.videoId, props: o.props, format: o.format, assets: o.assets, allowMissingFonts: o.allowMissingFonts, stress: o.stress, honorFixedScale, log: o.log });
   try {
     const { meta } = session;
@@ -149,6 +149,14 @@ async function runQaPass(o: QaOptions, honorFixedScale: boolean): Promise<{ resu
       findings.length = 0;
       findings.push(...r.findings);
       detail = r.detail;
+    }
+    // Largos del guion de una historia (regla `story-fit`): una sola vez por corrida, no por cuadro.
+    if (rules.includes('story-fit') && !o.scene) {
+      const fit = await session.storyFit();
+      if (fit && !fit.ok) {
+        const el = { tag: 'story', testid: o.videoId, text: '', rect: { x: 0, y: 0, w: meta.width, h: meta.height } };
+        for (const message of fit.messages) findings.push({ rule: 'story-fit', severity: 'error', frame: 0, message, element: { ...el, text: 'guion de la historia' } });
+      }
     }
     findings.sort((a, b) => a.frame - b.frame || a.rule.localeCompare(b.rule));
     const byRule: Record<string, number> = {};

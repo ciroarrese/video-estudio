@@ -280,6 +280,15 @@ Con 2 a 6 temas usá `defineStory` (ver `stories/README.md` y `templates/story/`
 - **Historia parcial**: `scenes` va parejo a `spec.topics`; un tema sin escena se indica con `null` (sale en la lista y en el cierre, sin vuelta al listado) y una lista vacía deja solo apertura y cierre.
 - **`spec.design`** (opcional): `titleCard: "glass"`, `list: "inline"`, `handoff: "dock"` (la apertura entrega la píldora del titular ya puesta, así que la escena del primer tema arranca con `<TopicHeadline />` completo), `wall: { columns, rows, blur }` y `clouds`. Tabla en `stories/README.md`, "Opciones de diseño".
 - La firma del cierre acepta negrita (`signoff.text`, `signoff.tagline`: `"Gracias por **mirar**"`) o una marca propia (`signoff.slot`). Si `composeStory` no alcanza, las piezas (`Opening`, `Interlude`, `Closing`, `TopicProvider`, `StoryStage`) se arman a mano dentro de `Sequence`.
+- **Largos del guion por formato (revisalos al escribirlo, antes de armar escenas).** Título de la apertura, nombre y bajada de cada tema:
+
+| Formato | Título de la apertura | Nombre del tema | Bajada (`line`) | Límite que `checkStoryFit` da por válido |
+| --- | --- | --- | --- | --- |
+| horizontal | hasta 60 | hasta 45 | hasta 80 | título ~80; nombre y bajada casi sin tope (2 renglones) |
+| vertical | hasta 45 | hasta 40 con 3 o 4 temas; 30 con 5 o 6 | hasta 90 | título ~90; nombre 50 a 75; bajada ~115 |
+| cuadrado | hasta 45 | hasta 35 con 3 temas; 30 con 4; 25 con 5 o 6 | hasta 45 | título ~90; nombre ~60; bajada ~110 |
+
+  Lo ideal sigue siendo un nombre de hasta 18 caracteres (un renglón con letra grande); la tabla es lo máximo que se lee bien en dos renglones. Cifras aproximadas (caracteres, medidas con la letra del tema `neutral`; otra tipografía las mueve un poco). El título no se corta con "…": baja a hasta 3 renglones y después achica la letra hasta ~45 % de `type.hero`; la columna de la derecha es el límite duro, y arriba de lo recomendado la letra ya baja del tamaño de siempre. Para chequear el guion sin armar nada: `checkStoryFit(spec, theme, "cuadrado")` (de `stories/`) dice qué nombre o bajada acortar y a cuántos caracteres; `defineStory` avisa por consola al componer y `npm run qa -- <id> --format cuadrado --rules story-fit` lo informa como error. Detalle en `stories/README.md`, "Límites".
 - **Verificá por bloque**: `--check` de la historia entera toma cuadros parejos más 6 por escena; un fallo del cartel de la apertura se vio con `--scene opening` y no con el muestreo parejo. Corré también `--check --scene opening`, `--scene interlude-1` y `--scene closing` en cada formato (`--check-per-scene N`, `--check-count N` y `--check-all` cambian el muestreo).
 
 Probá cada escena sola (su propio `defineVideo`, como en `templates/scene/index.ts`) y recién después en la historia. `defineStory` publica por defecto solo el formato base: los formatos extra se piden con `formats: ["vertical"]` y cada escena de tema tiene que tener su disposición. El presupuesto de cuadros de la historia entera se ve con `npm run qa -- <id> --list-scenes`.

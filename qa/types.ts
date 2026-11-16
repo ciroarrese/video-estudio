@@ -2,8 +2,11 @@ export type Rect = { x: number; y: number; w: number; h: number };
 
 /** `info`: probably intentional (element in motion, faded out); hidden by default, shown with --verbose. */
 export type Severity = 'error' | 'warn' | 'info';
-export type RuleId = 'clip' | 'offscreen' | 'safe-area' | 'overlap' | 'min-size' | 'contrast' | 'covered' | 'unjudged' | 'signal';
+export type RuleId = 'clip' | 'offscreen' | 'safe-area' | 'overlap' | 'min-size' | 'contrast' | 'covered' | 'unjudged' | 'signal' | 'story-fit';
+/** Las reglas que juzgan el texto de cada cuadro. `story-fit` no mira cuadros (mide los largos del guion de una historia): va aparte, ver `QA_RULES`. */
 export const ALL_RULES: RuleId[] = ['clip', 'offscreen', 'safe-area', 'overlap', 'min-size', 'contrast', 'covered', 'unjudged', 'signal'];
+/** Todas las reglas que corre `qa` por defecto: las de cada cuadro y `story-fit` (largos de títulos, nombres y bajadas de una historia por formato; solo para videos hechos con `defineStory`). */
+export const QA_RULES: RuleId[] = [...ALL_RULES, 'story-fit'];
 
 /** Short, serialisable description of an element (tag, test id, text excerpt, on-screen box). */
 export type ElementInfo = { tag: string; testid: string | null; text: string; rect: Rect; /** DOM child-index path from the stage ("0.2.1"), a fallback id when there is no test id. */ path?: string };

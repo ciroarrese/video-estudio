@@ -40,6 +40,7 @@ Sin cambios (no tienen forma ni superficie): `Cursor`, `FlyingCard` (dibuja lo q
 - **Una escena dentro de otra**: `<NestedScene scene start? frame? format? scale | width | height>` (vista previa viva o miniatura).
 - **Tema por ámbito**: `<ThemeScope theme paint? style?>` cambia el tema de un subárbol (se anida); con `paint` pinta fondo, texto y tipografía del tema; declara el `@font-face` de sus fuentes y espera su carga. Ver `themes/README.md`.
 - **Escena**: `<Stage>` fondo, tipografía y nubes opcionales del tema.
+- **Subtítulos**: `<Subtitles cues estilo?>` (bloque o karaoke), hasta dos renglones medidos con `textWidth`, en el área segura de cada formato; `subtitleBand` es la franja que hay que dejar libre; lectores y escritores de JSON, SRT y VTT y `subtitulosDeGuion` en `kit/subtitulos.ts`. Guía completa: `docs/subtitulos.md`.
 - **Maquetar sin píxeles fijos** (ver "Disposición y medidas" abajo): `textWidth(theme, texto, opts)` ancho medido; `<Callout>`, `placeBeside`, `calloutState` y `coveredOpacity` para una pastilla que se pone en lugar libre; `headlineStrip` y `cameraKeepClear` para dejar libre la franja del titular; `cameraView` para saber qué ve la cámara. Atenuar texto: `dimOpacity` / `dimmedColor` (en `themes/`).
 
 ## Referencia de firmas
@@ -56,6 +57,7 @@ Props exactas de las piezas que más se usan (todas aceptan `frame?` para fijar 
 | `DoodleArrow` | `id`, `start`, `end`, `x1`, `y1`, `x2`, `y2`, `bend = 0.25`, `boil = 3`, `width = 6` | De `(x1, y1)` a `(x2, y2)` con la punta en el segundo; `bend` curva el trazo (el signo elige el lado). |
 | `DoodleUnderline` | `id`, `start`, `end`, `x`, `y`, `length`, `boil = 3`, `width = 5` | Raya horizontal desde `(x, y)` hacia la derecha. |
 | `Wash` | `range: [ini, fin]`, `color?` | Velo de cuadro completo (color del fondo del tema por defecto). Va fuera de `World`, al final del contenido. Lleva `data-qa-veil` para que `qa` lo trate como transición. |
+| `Subtitles` | `cues: Subtitulo[]` (segundos), `estilo = "bloque"` (o `"karaoke"`), `offsetSec = 0`, `size?`, `bottom?` | Subtítulo activo de hasta dos renglones, abajo y al centro; en vertical por encima de la zona de las redes. Sale todo del tema (`surfaceStyle`, `entrance`, `cornerRadius`); no corta con "…": si no entra en dos renglones, pagina. Va en la escena raíz, sobre los velos. `subtitleBand(theme, { width, height })` da la franja (`Rect`) para dejarla libre. |
 | `ThemeScope` | `theme: Theme`, `paint = false`, `style?`, `children` | Cambia el tema de un subárbol. Con `paint`, pinta una superficie (el `style` le da posición, tamaño, radio y sombra). Ver `docs/guia-escenas.md`, sección 10. |
 | `World` | `camera`, `width`, `height`, `perspective = 2400`, `children` | `width`/`height` del formato (`useFormat()`), no 1920x1080 escritos a mano. |
 | `Stage` | `clouds = true`, `cloudOpacity?`, `cloud?: CloudOptions`, `children` | Fondo, tipografía y nubes del tema. `cloud` (`colors`, `count`, `seed`, `blobs`, `opacity`, `blur`) pisa lo que declara `theme.cloud` solo en esa escena. |

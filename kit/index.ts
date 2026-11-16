@@ -34,3 +34,10 @@ export type { TextWidthOptions } from "./text";
 export { FocusGroup } from "./FocusGroup";
 export { signalAttrs } from "./signal";
 export { NestedScene } from "./NestedScene";
+export { Subtitles, subtitleBand } from "./Subtitles";
+export type { SubtitlesProps, SubtitleStyle, SubtitleBandOptions } from "./Subtitles";
+export {
+  leerSubtitulosJson, parsearSrt, parsearVtt, parsearSubtitulos, aSrt, aVtt, aJson, subtitulosDeGuion, partirEnFrases, cortesDeEscenas,
+  palabrasDe, subtituloActivo, paginarSubtitulo, parsearTiempo, formatearTiempo, partirPorCaracteres, normalizarTexto, ordenar as ordenarSubtitulos,
+} from "./subtitulos";
+export type { Subtitulo, PalabraSubtitulo, PistaSubtitulos, EscenaDeGuion, OpcionesGuion, PaginaSubtitulo, Renglon, Medir, OpcionesLayout } from "./subtitulos";

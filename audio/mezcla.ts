@@ -5,6 +5,7 @@
 import { existsSync } from 'node:fs';
 import { basename, extname, isAbsolute, join, resolve } from 'node:path';
 import { analizarEfecto, aplicarCurva, curvaDeDucking, limitar, type VentanaDuck } from './dinamica';
+import { colocarVoz, type VozOpts } from './voz';
 import { avisoMp3SinEtiqueta, codificar, decodificar, runFfmpeg, sondear } from './ffmpeg';
 import { picoVerdaderoDb } from './medidas';
 import { sonoridadIntegrada } from './sonoridad';
@@ -32,6 +33,8 @@ export interface MusicaOpts {
   /** Caída al final del video (1 s por defecto). */
   fadeOutSec?: number;
 }
+
+export type { VozOpts } from './voz';
 
 export interface DuckOpts {
   /** Cuánto baja la música (dB) mientras suena cada efecto; 5 por defecto; 0 apaga el ducking. No depende del nivel del efecto. */
@@ -64,6 +67,8 @@ export interface MezclaOpts {
   sfxDir?: string;
   sr?: number;
   musica?: MusicaOpts;
+  /** Pista de locución provista por la persona (wav/mp3 local): va como capa de la mezcla y baja la música mientras habla (ver `voz.ts`). */
+  voz?: VozOpts;
   duck?: DuckOpts;
   /** Sonoridad integrada objetivo en LUFS (típicos: -16 para web y redes, -14 plataformas de video, -23 TV). Sin esto no se normaliza. */
   lufs?: number;
@@ -77,7 +82,7 @@ export interface PlanMezcla {
   /** Genera la señal `outLabel`: 4 canales (música estéreo y efectos estéreo) si hay las dos cosas; si no, 2. */
   filterComplex: string;
   outLabel: string;
-  stems: 'ambos' | 'musica' | 'sfx';
+  stems: 'ambos' | 'musica' | 'sfx' | 'ninguno';
   totalSamples: number;
   sr: number;
   /** Muestra de salida del cuadro de cada cue (donde cae el ancla: el inicio o el pico del efecto). */
@@ -150,7 +155,7 @@ export function planMezcla(o: MezclaOpts, infoPorRuta: Readonly<Record<string, I
   const dir = o.sfxDir ?? 'public/sfx';
   const advertencias: string[] = [];
   const cues = cuesValidos(o, advertencias);
-  if (cues.length === 0 && !o.musica) throw new Error('No hay nada que mezclar: ni cues ni música');
+  if (cues.length === 0 && !o.musica && !o.voz) throw new Error('No hay nada que mezclar: ni cues ni música ni voz');
 
   const inputs: string[] = [];
   const f: string[] = [];
@@ -198,6 +203,10 @@ export function planMezcla(o: MezclaOpts, infoPorRuta: Readonly<Record<string, I
   }
 
   let stems: PlanMezcla['stems'];
+  if (!musLabel && !sfxLabel) {
+    // Solo voz: no hay nada que pedirle a ffmpeg; la capa de voz se arma en memoria.
+    return { inputs, filterComplex: '', outLabel: '', stems: 'ninguno', totalSamples, sr, cueSamples, efectoSamples, advertencias };
+  }
   if (musLabel && sfxLabel) {
     f.push(`[${musLabel}][${sfxLabel}]amerge=inputs=2[out]`);
     stems = 'ambos';
@@ -240,12 +249,17 @@ export interface InfoMezcla {
   picoVerdaderoDbtp: number;
   /** Muestras de cada ventana de ducking (para verificar). */
   ventanasDuck: VentanaDuck[];
+  /** Tramos (muestras de salida) donde se detectó voz; vacío sin `voz`. La música baja `voz.duckDb` mientras duran (más la subida). */
+  ventanasVoz: VentanaDuck[];
+  /** Los mismos tramos en segundos, para cruzar con los subtítulos y los cortes de escena (`locucion` en la CLI). */
+  tramosVozSec: Array<{ desde: number; hasta: number }>;
 }
 
 /** Falla de entrada, nombrando el cue, si falta algún archivo. */
 export function verificarArchivos(o: MezclaOpts): void {
   const dir = o.sfxDir ?? 'public/sfx';
   if (o.musica && !existsSync(resolve(o.musica.archivo))) throw new Error(`No existe el archivo de música: ${o.musica.archivo}`);
+  if (o.voz && !existsSync(resolve(o.voz.archivo))) throw new Error(`No existe el archivo de voz: ${o.voz.archivo}. La voz la aporta la persona (wav o mp3 local, nunca al repo).`);
   o.cues.forEach((c, i) => {
     if (!(c.frame >= o.durationFrames)) {
       const ruta = rutaDeEfecto(c.sfx, dir);
@@ -288,16 +302,21 @@ export async function mezclar(opts: MezclaOpts & { salida: string }): Promise<Pl
   const cues = o.cues.filter((c) => !(c.frame >= o.durationFrames));
   const nCan = plan.stems === 'ambos' ? 4 : 2;
 
-  const args = ['-y'];
-  // Rutas absolutas: una que empiece con "-" ffmpeg la leería como opción.
-  for (const i of plan.inputs) args.push('-i', resolve(i));
-  args.push('-filter_complex', plan.filterComplex, '-map', `[${plan.outLabel}]`, '-f', 'f32le', '-ac', String(nCan), 'pipe:1');
-  const buf = await runFfmpeg(args);
-  const todo = new Float32Array(buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength - (buf.byteLength % 4)));
-  const n = Math.floor(todo.length / nCan);
+  let todo: Float32Array<ArrayBufferLike> = new Float32Array(0);
+  if (plan.stems !== 'ninguno') {
+    const args = ['-y'];
+    // Rutas absolutas: una que empiece con "-" ffmpeg la leería como opción.
+    for (const i of plan.inputs) args.push('-i', resolve(i));
+    args.push('-filter_complex', plan.filterComplex, '-map', `[${plan.outLabel}]`, '-f', 'f32le', '-ac', String(nCan), 'pipe:1');
+    const buf = await runFfmpeg(args);
+    todo = new Float32Array(buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength - (buf.byteLength % 4)));
+  }
+  const n = plan.stems === 'ninguno' ? plan.totalSamples : Math.floor(todo.length / nCan);
   let mus: Float32Array | null = null;
   let sfx: Float32Array | null = null;
-  if (plan.stems === 'ambos') {
+  if (plan.stems === 'ninguno') {
+    // solo voz
+  } else if (plan.stems === 'ambos') {
     mus = new Float32Array(n * 2);
     sfx = new Float32Array(n * 2);
     for (let i = 0; i < n; i++) {
@@ -312,13 +331,33 @@ export async function mezclar(opts: MezclaOpts & { salida: string }): Promise<Pl
   // Ducking de la música bajo cada efecto: profundidad fija, atack y release previsibles.
   const d = o.duck ?? {};
   let ventanas: VentanaDuck[] = [];
+  let curvaSfx: Float32Array | null = null;
   if (mus && sfx) {
     const activo = cues.map((c) => analizarEfecto(monos.get(rutaDeEfecto(c.sfx, dir))!, sr, c.gain ?? 1, d.umbral ?? 0.02).activoSamples);
     ventanas = ventanasDeDucking(cues, plan, activo, d);
-    if (ventanas.length > 0) aplicarCurva(mus, curvaDeDucking(ventanas, plan.totalSamples, sr, d.attackMs ?? 10, d.releaseMs ?? 250), 2);
+    if (ventanas.length > 0) curvaSfx = curvaDeDucking(ventanas, plan.totalSamples, sr, d.attackMs ?? 10, d.releaseMs ?? 250);
   }
+
+  // Locución: capa propia (estéreo, en su lugar del video) y, si hay música, ducking por la voz. Con efectos y voz a la vez manda el más profundo (no se suman).
+  let voz: Float32Array | null = null;
+  let ventanasVoz: VentanaDuck[] = [];
+  if (o.voz) {
+    const crudo = await decodificar(o.voz.archivo, { sr, canales: 2 });
+    const av = avisoMp3SinEtiqueta(o.voz.archivo);
+    if (av) plan.advertencias.push(av);
+    const colocada = colocarVoz(crudo, sr, n, o.voz);
+    voz = colocada.estereo;
+    plan.advertencias.push(...colocada.avisos);
+    ventanasVoz = colocada.ventanas;
+    if (mus && ventanasVoz.length > 0) {
+      const curvaVoz = curvaDeDucking(ventanasVoz, plan.totalSamples, sr, o.voz.duckAtaqueMs ?? 60, o.voz.duckReleaseMs ?? 450);
+      if (curvaSfx) for (let i = 0; i < curvaVoz.length; i++) curvaVoz[i] = Math.min(curvaVoz[i]!, curvaSfx[i]!);
+      curvaSfx = curvaVoz;
+    }
+  }
+  if (mus && curvaSfx) aplicarCurva(mus, curvaSfx, 2);
   const mix = new Float32Array(n * 2);
-  for (let i = 0; i < mix.length; i++) mix[i] = (mus?.[i] ?? 0) + (sfx?.[i] ?? 0);
+  for (let i = 0; i < mix.length; i++) mix[i] = (mus?.[i] ?? 0) + (sfx?.[i] ?? 0) + (voz?.[i] ?? 0);
 
   const lufsAntes = sonoridadIntegrada(mix, sr, 2);
   let gananciaLufsDb = 0;
@@ -343,6 +382,8 @@ export async function mezclar(opts: MezclaOpts & { salida: string }): Promise<Pl
       lufsFinal: Number.isFinite(lufsFinal) ? Math.round(lufsFinal * 10) / 10 : null,
       picoVerdaderoDbtp: Math.round(picoVerdaderoDb(mix, 2, 8) * 100) / 100,
       ventanasDuck: ventanas,
+      ventanasVoz,
+      tramosVozSec: ventanasVoz.map((v) => ({ desde: Math.round((v.iniSample / sr) * 1000) / 1000, hasta: Math.round((v.finSample / sr) * 1000) / 1000 })),
     },
   };
 }

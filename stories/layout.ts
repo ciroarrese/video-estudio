@@ -682,12 +682,14 @@ export function panelLayout(n: number, width = 1920, height = 1080): PanelPlace[
  * entra en el ancho seguro y en el alto. Entre filas queda `ROW_GAP_Y` (la píldora del panel de abajo) y arriba `PILL_BAND`.
  */
 function panelGrid(n: number, width: number, height: number): PanelPlace[] {
-  const cols = width >= height || n > 3 ? 2 : 1;
-  const rows = Math.ceil(n / cols);
   const gapX = 36;
-  const availW = width - 2 * 80;
-  const top = PILL_BAND + 40, availH = height - top - 80;
-  const k = Math.min(1.4, (availW - (cols - 1) * gapX) / (cols * PANEL_W), (availH - (rows - 1) * ROW_GAP_Y) / (rows * PANEL_H));
+  const availW = width - 2 * 64;
+  const top = PILL_BAND + 28, availH = height - top - 56;
+  // una o dos columnas: se elige la que da los paneles más grandes (en vertical, con pocos temas, una columna; con cuatro o más y en cuadrado, dos)
+  const fitK = (cols: number) => Math.min(1.75, (availW - (cols - 1) * gapX) / (cols * PANEL_W), (availH - (Math.ceil(n / cols) - 1) * ROW_GAP_Y) / (Math.ceil(n / cols) * PANEL_H));
+  const cols = fitK(2) > fitK(1) + 1e-9 ? 2 : 1;
+  const rows = Math.ceil(n / cols);
+  const k = fitK(cols);
   const zs = [30, -90, -60, 50, 0, -40];
   const cw = PANEL_W * k, ch = PANEL_H * k;
   const block = rows * ch + (rows - 1) * ROW_GAP_Y;
@@ -740,4 +742,97 @@ export function rigProject(x: number, y: number, z: number, rig: Rig, persp: num
   if (persp - z3 < 60) return null;
   const fac = persp / (persp - z3);
   return { x: x1 * fac, y: y2 * fac, s: fac, z: z3 };
+}
+
+// ---------------------------------------------------------------- título de la apertura (formatos angostos)
+
+/** Piso legible del título (relativo a `type.hero`) y piso de emergencia con el que, como último recurso, el título entra sin cortarse con "…". */
+export const TITLE_FLOOR = 0.45;
+export const TITLE_HARD_FLOOR = 0.3;
+/** Renglones del título en formatos angostos antes de bajar la letra. */
+export const TITLE_ROWS = 3;
+
+export type TitleFit = { text: string; size: number; rows: string[]; /** `true` si entra en `TITLE_ROWS` renglones sin bajar de `TITLE_FLOOR × hero`. */ ok: boolean };
+
+/** Ancho máximo del cartel del título (px) en un cuadro de ancho `width`. */
+export const titleCardMax = (theme: Theme, width: number) => Math.min(1700, width - theme.safe.x);
+
+/**
+ * Acomoda el título de la apertura en un formato angosto midiéndolo con la tipografía del tema: primero hasta `TITLE_ROWS` renglones a `type.hero`, después una letra más
+ * chica (hasta `TITLE_FLOOR × hero`); si ni así entra, sigue bajando hasta `TITLE_HARD_FLOOR` (con un renglón más) y `ok` queda en `false`. **Nunca corta con "…"**.
+ * El cartel tiene un relleno de `0,55 × letra` por lado (ver `Opening`), que se descuenta del ancho.
+ */
+export function fitTitleNarrow(theme: Theme, text: string, width: number): TitleFit {
+  const meter = nameMeter(theme);
+  const maxW = titleCardMax(theme, width);
+  const room = (s: number) => maxW - 2 * Math.round(s * 0.55) - 8;
+  const rowsAt = (s: number) => wrapMeasured(text, room(s), s, meter);
+  const fits = (r: string[], s: number, max: number) => r.length <= max && r.every((x) => meter(x, s) <= room(s));
+  const hero = theme.type.hero;
+  const floor = Math.round(hero * TITLE_FLOOR), hard = Math.round(hero * TITLE_HARD_FLOOR);
+  for (let s = Math.round(hero); s >= floor; s--) { const r = rowsAt(s); if (fits(r, s, TITLE_ROWS)) return { text, size: s, rows: r, ok: true }; }
+  for (let s = floor - 1; s >= hard; s--) { const r = rowsAt(s); if (fits(r, s, TITLE_ROWS + 1)) return { text, size: s, rows: r, ok: false }; }
+  return { text, size: hard, rows: rowsAt(hard), ok: false };
+}
+
+// ---------------------------------------------------------------- miniatura de la revelación (formatos angostos)
+
+export type RevealThumb = {
+  /** `"free"`: hay un lugar libre al costado del texto (a la derecha, sin pisarlo). `"spotlight"`: no lo hay; la lista se aparta un momento y la miniatura se muestra en el centro. */
+  mode: "free" | "spotlight";
+  /** Centro (px del cuadro) y tamaño de la miniatura en reposo. */
+  x: number; y: number; w: number; h: number;
+};
+
+/** Ancho mínimo y máximo de la miniatura de la revelación, como parte del ancho del cuadro. */
+export const REVEAL_THUMB = { min: 0.3, max: 0.42, spotlight: 0.42 };
+
+type TextRect = { x: number; y: number; w: number; h: number };
+
+/** Cajas de todo el texto de la lista (número, nombre, bajada y, en la fila `lateI`, el subrayado), medidas con la tipografía del tema. */
+export function listTextRects(L: ListLayout, theme: Theme, lateI = -1, lift = 0): TextRect[] {
+  const nm = nameMeter(theme), lm = lineMeter(theme);
+  const out: TextRect[] = [];
+  const n = L.names.length;
+  for (let i = 0; i < n; i++) {
+    const rowTop = L.top + i * L.rowH - (i === lateI ? 0 : lift); // `lift`: lo que las filas ya vistas suben en la revelación escenificada
+    const nameRows = L.nameRows?.[i] ?? [L.names[i]!];
+    const lineRows = L.lineRows[i] ?? [L.lines[i]!];
+    const x0 = L.stacked ? L.left : L.left + L.numW;
+    const nameTop = rowTop + L.blockTop + (L.stacked ? L.numH + L.numGap : 0);
+    if (L.stacked) out.push({ x: L.left - 6, y: rowTop + L.blockTop, w: Math.round(L.numSize * 1.7), h: L.numH });
+    else out.push({ x: L.left, y: nameTop, w: L.numW, h: L.nameH });
+    nameRows.forEach((r, k) => out.push({ x: x0, y: nameTop + k * L.nameH, w: nm(r, L.nameSize), h: L.nameH }));
+    const lineTop = nameTop + nameRows.length * L.nameH + ROW_GAP.a;
+    lineRows.forEach((r, k) => out.push({ x: x0, y: lineTop + k * L.lineH, w: lm(r, L.lineSize), h: L.lineH }));
+    if (i === lateI) out.push({ x: L.left + L.barLeft, y: rowTop + L.barTop, w: L.barWs[i] ?? L.barW, h: ROW_GAP.bar });
+  }
+  return out;
+}
+
+/**
+ * Dónde va la miniatura de la tarjeta que se revela (`design.reveal: "stage"`) en un formato angosto. Se busca, contra las cajas medidas de todo el texto de la lista,
+ * el lugar más grande (de `REVEAL_THUMB.max` a `REVEAL_THUMB.min` del ancho del cuadro) pegado al borde derecho de la lista, dentro del cuadro y sin tocar ningún
+ * texto (14 px de aire), lo más cerca posible del renglón de la fila nueva. Si no hay ninguno (cuadrado con la lista llena), vuelve `"spotlight"`: la miniatura en el centro.
+ */
+export function revealThumbRect(L: ListLayout, theme: Theme, lateI: number, width: number, height: number): RevealThumb {
+  const rects = listTextRects(L, theme, lateI, L.rowH * 0.14); // las filas ya vistas se corren 0,14 filas hacia arriba (Interlude: `room`)
+  const air = 14;
+  const hit = (a: TextRect, b: TextRect) => a.x < b.x + b.w + air && a.x + a.w + air > b.x && a.y < b.y + b.h + air && a.y + a.h + air > b.y;
+  const right = Math.min(L.left + L.rowW, width - Math.round(width * 0.06));
+  const yMin = Math.round(height * 0.06), yMax = height - Math.round(height * 0.06);
+  const prefer = L.top + lateI * L.rowH + L.blockTop + (L.stacked ? L.numH + L.numGap + L.nameH / 2 : L.nameH / 2);
+  for (let w = Math.round(width * REVEAL_THUMB.max); w >= Math.round(width * REVEAL_THUMB.min); w -= 4) {
+    const h = Math.round((w * 340) / 560);
+    let best: { y: number; d: number } | null = null;
+    for (let top = yMin; top + h <= yMax; top += 4) {
+      const box = { x: right - w, y: top, w, h };
+      if (rects.some((r) => hit(box, r))) continue;
+      const d = Math.abs(top + h / 2 - prefer);
+      if (!best || d < best.d) best = { y: top, d };
+    }
+    if (best) return { mode: "free", x: right - w / 2, y: best.y + h / 2, w, h };
+  }
+  const w = Math.round(width * REVEAL_THUMB.spotlight);
+  return { mode: "spotlight", x: width / 2, y: height / 2, w, h: Math.round((w * 340) / 560) };
 }

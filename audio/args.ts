@@ -108,3 +108,32 @@ export function leerGainPorEfecto(op: Map<string, string>): Record<string, numbe
   }
   return out;
 }
+
+/**
+ * Lista de instantes de `--<k>` separados por comas: segundos (`12.5`) o cuadros con prefijo `f` (`f375`, se pasan a segundos con `fps`).
+ * Devuelve undefined si no se pasó. Lo usan `--cortes` (cortes de escena) y similares.
+ */
+export function leerInstantes(op: Map<string, string>, k: string, fps: number): number[] | undefined {
+  const v = op.get(k);
+  if (v === undefined) return undefined;
+  if (v.trim() === '') throw new Error(`--${k} necesita un valor: segundos o cuadros con prefijo f (por ejemplo --${k} 5,f300)`);
+  return v.split(',').map((t) => {
+    const txt = t.trim();
+    const esCuadro = txt.startsWith('f');
+    const n = Number(esCuadro ? txt.slice(1) : txt);
+    if (txt === '' || txt === 'f' || !Number.isFinite(n) || n < 0) throw new Error(`--${k}: "${txt}" no es un segundo ni un cuadro (f<n>) válido`);
+    return esCuadro ? n / fps : n;
+  });
+}
+
+/** Lista de números positivos separados por comas (`--escenas 150,120,90`). Undefined si no se pasó. */
+export function leerListaPositiva(op: Map<string, string>, k: string): number[] | undefined {
+  const v = op.get(k);
+  if (v === undefined) return undefined;
+  if (v.trim() === '') throw new Error(`--${k} necesita una lista de números separados por comas`);
+  return v.split(',').map((t) => {
+    const n = Number(t.trim());
+    if (t.trim() === '' || !Number.isFinite(n) || n <= 0) throw new Error(`--${k}: "${t.trim()}" no es un número mayor que 0`);
+    return n;
+  });
+}

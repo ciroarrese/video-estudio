@@ -12,7 +12,7 @@ import { failsAt, runQa } from './run';
 import { RULES } from './rules';
 import { canonicalReport as canonical, diffReports } from './repeat';
 import { parseOverrides } from './thresholds';
-import { ALL_RULES, type Finding, type JudgedSummary, type RuleId } from './types';
+import { QA_RULES, type Finding, type JudgedSummary, type RuleId } from './types';
 import { buildMatrix, formatDifferences, formatMatrix, parseThemes, runQaThemes } from './themes';
 import { formatResolved, resolveThemes } from './resolved';
 
@@ -22,7 +22,7 @@ const USAGE = {
   qa: `Uso: ve-qa <videoId> [--frames 0,60,120 | --every N | --count 24] [--props json] [--format horizontal|vertical|cuadrado] [--scene id|índice] [--list-scenes] [--json salida.json | --out salida.json] [--fail-on error|warn] [--verbose] [--max 40]
              [--per-scene 4] [--assets dir]... [--allow-missing-fonts] [--rules clip,overlap,...] [--skip regla,...] [--set regla.umbral=valor]... [--concurrency N] [--repeat N]
              [--themes neutral,dark,editorial,neon,papel|all] [--font-scale 1.2] [--font-fallback wide|narrow]
-Reglas: ${ALL_RULES.join(', ')}  (silenciar: data-qa-ignore="regla" en el elemento o un ancestro; adorno de interfaz: data-qa-decor)`,
+Reglas: ${QA_RULES.join(', ')}  (silenciar: data-qa-ignore="regla" en el elemento o un ancestro; adorno de interfaz: data-qa-decor)`,
   privacy: `Uso: ve-privacy [<videoId>] --deny lista.txt [--deny otra.txt]... [--allow lista.txt]...  [--frames … | --every N | --count 24] [--props json] [--format …] [--scene id|índice] [--scan-source dir]... [--assets dir]... [--allow-missing-fonts] [--json salida.json | --out salida.json]`,
 };
 
@@ -62,11 +62,14 @@ export function groupFindings(findings: Finding[]): { first: Finding; severity: 
   return [...groups.values()];
 }
 
+/** Regla de la historia (no mira cuadros: ver `stories/fit.ts`); se imprime con las demás. */
+const STORY_FIT = { id: 'story-fit' as const, description: 'Largos del guion de la historia (título, nombres, bajadas) que no entran en este formato' };
+
 function printQa(findings: Finding[], sampled: number[], o: { verbose: boolean; max: number }) {
   const shown = o.verbose ? findings : findings.filter((f) => f.severity !== 'info');
   let lines = 0;
   let more = 0;
-  for (const rule of RULES) {
+  for (const rule of [...RULES, STORY_FIT]) {
     const groups = groupFindings(shown.filter((f) => f.rule === rule.id));
     if (!groups.length) continue;
     const room = Math.max(0, o.max - lines);
@@ -150,7 +153,7 @@ async function main(cmd: string, argv: string[]): Promise<number> {
     for (const f of ['allow', 'deny']) if (p.flags.has(f)) throw new Error(`--${f} es de \`privacy\` (npm run privacy -- <id> --deny lista.txt [--allow lista.txt]...); \`qa\` no lo usa`);
     const only = one(p, 'rules')?.split(',').filter(Boolean) as RuleId[] | undefined;
     const skip = (one(p, 'skip')?.split(',').filter(Boolean) ?? []) as RuleId[];
-    for (const r of [...(only ?? []), ...skip]) if (!ALL_RULES.includes(r)) throw new Error(`Regla desconocida: ${r}`);
+    for (const r of [...(only ?? []), ...skip]) if (!QA_RULES.includes(r)) throw new Error(`Regla desconocida: ${r}`);
     const failOn = one(p, 'fail-on') ?? 'error';
     if (failOn !== 'error' && failOn !== 'warn') throw new Error('--fail-on debe ser error o warn');
     const repeat = num(p, 'repeat') ?? 1;
@@ -166,7 +169,7 @@ async function main(cmd: string, argv: string[]): Promise<number> {
     const perScene = num(p, 'per-scene');
     if (perScene !== undefined && (!Number.isInteger(perScene) || perScene < 0)) throw new Error('--per-scene debe ser un entero >= 0');
     const qaOpts = {
-      videoId: id, props, format, scene, ...sample(p), perScene, rules: (only ?? ALL_RULES).filter((x) => !skip.includes(x)),
+      videoId: id, props, format, scene, ...sample(p), perScene, rules: (only ?? QA_RULES).filter((x) => !skip.includes(x)),
       thresholds: parseOverrides(p.flags.get('set') ?? []), concurrency: num(p, 'concurrency'), stress, ...common(p), log,
     };
     const verbose = p.bools.has('verbose');
