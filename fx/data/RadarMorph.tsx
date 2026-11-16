@@ -56,7 +56,7 @@ export function RadarMorph(p: RadarMorphProps) {
   const rings = cs.grid === "on" ? [0.125, 0.25, 0.375, 0.5, 0.625, 0.75, 0.875, 1] : cs.grid === "off" ? [1] : [0.25, 0.5, 0.75, 1];
   const ring = (k: number) => toPath(radarPoints(cx, cy, R * grid, Array(n).fill(k)), true);
   return (
-    <svg width={w} height={h} viewBox={`0 0 ${w} ${h}`} style={{ display: "block", fontFamily: theme.font.family, ...p.style }}>
+    <svg width={w} height={h} viewBox={`0 0 ${w} ${h}`} style={{ display: "block", fontFamily: theme.font.family, textRendering: "geometricPrecision", ...p.style }}>
       {areaFill.kind !== "solid" && <defs><FillDef fill={areaFill} /></defs>}
       {rings.map((k) => <path key={k} d={ring(k)} fill="none" stroke={theme.color.border} strokeWidth={1.5 * k} opacity={k % 0.25 === 0 ? undefined : 0.5} />)}
       {cs.grid !== "off" && radarPoints(cx, cy, R * grid, Array(n).fill(1)).map((q, i) => <line key={i} x1={cx} y1={cy} x2={q.x} y2={q.y} stroke={theme.color.border} strokeWidth={1.5 * k} />)}

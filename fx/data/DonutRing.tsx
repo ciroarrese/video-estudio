@@ -50,7 +50,7 @@ export function DonutRing(p: DonutRingProps) {
   const tickIn = R + sw / 2 + 12, tickOut = R + sw / 2 + 28;
   const shown = (value * k);
   return (
-    <svg width={w} height={h} viewBox={`0 0 ${w} ${h}`} style={{ display: "block", fontFamily: theme.font.family, ...p.style, ...hiddenBefore(local) }}>
+    <svg width={w} height={h} viewBox={`0 0 ${w} ${h}`} style={{ display: "block", fontFamily: theme.font.family, textRendering: "geometricPrecision", ...p.style, ...hiddenBefore(local) }}>
       {Array.from({ length: n }, (_, i) => {
         const a = -Math.PI / 2 + (i / n) * Math.PI * 2;
         const on = i / n < frac - 1e-9;

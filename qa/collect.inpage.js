@@ -270,6 +270,7 @@
       rect: { x: x0, y: y0, w: x1 - x0, h: y1 - y0 }, lines: rects,
       opacity: opacityUp(el), fontPx: fontPx, scale: scale, transformed: transformed, screenPx: fontPx * scale, bold: weight >= 700,
       color: 'rgba(' + fill.r + ',' + fill.g + ',' + fill.b + ',' + fill.a + ')', transparentFill: fill.a < 0.05,
+      svgText: el.namespaceURI === 'http://www.w3.org/2000/svg', svgPrecise: String(cs.textRendering).toLowerCase() === 'geometricprecision',
       fadingBg: fadingSurface(el), ignore: ignoreOf(el), decor: decorOf(el).decor, decorMain: decorOf(el).main, fixedScale: fixedScaleOf(el), focusDim: !!(el.closest && el.closest('[data-qa-focus]')), clips: clips,
       own: {
         sw: el.scrollWidth, cw: el.clientWidth, sh: el.scrollHeight, ch: el.clientHeight,

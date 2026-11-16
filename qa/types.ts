@@ -2,9 +2,9 @@ export type Rect = { x: number; y: number; w: number; h: number };
 
 /** `info`: probably intentional (element in motion, faded out); hidden by default, shown with --verbose. */
 export type Severity = 'error' | 'warn' | 'info';
-export type RuleId = 'clip' | 'offscreen' | 'safe-area' | 'overlap' | 'min-size' | 'texto-chico' | 'contrast' | 'covered' | 'unjudged' | 'signal' | 'vacio' | 'story-fit';
+export type RuleId = 'clip' | 'offscreen' | 'safe-area' | 'overlap' | 'min-size' | 'texto-chico' | 'contrast' | 'covered' | 'unjudged' | 'signal' | 'vacio' | 'story-fit' | 'svg-escala';
 /** Las reglas que juzgan el texto de cada cuadro. `story-fit` no mira cuadros (mide los largos del guion de una historia): va aparte, ver `QA_RULES`. */
-export const ALL_RULES: RuleId[] = ['clip', 'offscreen', 'safe-area', 'overlap', 'min-size', 'texto-chico', 'contrast', 'covered', 'unjudged', 'signal'];
+export const ALL_RULES: RuleId[] = ['clip', 'offscreen', 'safe-area', 'overlap', 'min-size', 'texto-chico', 'contrast', 'covered', 'unjudged', 'signal', 'svg-escala'];
 /** Todas las reglas que corre `qa` por defecto: las de cada cuadro y `story-fit` (largos de títulos, nombres y bajadas de una historia por formato; solo para videos hechos con `defineStory`). */
 /** `vacio` no juzga texto sino la composición del cuadro (franjas sin nada): va aparte de `ALL_RULES`. */
 export const QA_RULES: RuleId[] = [...ALL_RULES, 'vacio', 'story-fit'];
@@ -54,6 +54,9 @@ export type TextRun = {
   decorMain?: boolean;
   /** El texto está bajo `data-qa-fixed-scale` (reproducción a escala fija): queda fuera del estrés de tipografía, no de las reglas. */
   fixedScale?: boolean;
+  /** El texto es de un SVG (`<text>`, `<tspan>`, `<textPath>`) y si su `text-rendering` computado es `geometricPrecision` (regla `svg-escala`). */
+  svgText?: boolean;
+  svgPrecise?: boolean;
   /** El texto está bajo un `FocusGroup` que lo atenúa a propósito (`data-qa-focus`, kit/FocusGroup.tsx): su contraste bajo es el efecto buscado (`contrast` lo baja a info). */
   focusDim?: boolean;
   clips: ClipBox[];

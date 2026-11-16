@@ -390,3 +390,26 @@ describe('texto-chico: texto por debajo del piso en un plano sostenido (aviso)',
     expect(check([k(24)], ['texto-chico'], t)).toHaveLength(1);
   });
 });
+
+describe('svg-escala: texto SVG bajo un scale() sin geometricPrecision (aviso)', () => {
+  const svg = (p: Partial<TextRun>) => run({ tag: 'text', svgText: true, svgPrecise: false, fontPx: 32, screenPx: 32, ...p });
+  const f = (runs: TextRun[]) => check(runs, ['svg-escala']);
+  it('avisa si el texto SVG está escalado y no lleva geometricPrecision', () => {
+    const out = f([svg({ scale: 0.45, screenPx: 14.4 })]);
+    expect(out).toHaveLength(1);
+    expect(out[0]).toMatchObject({ rule: 'svg-escala', severity: 'warn', data: { scale: 0.45 } });
+  });
+  it('no avisa con geometricPrecision, sin escala, con texto HTML o con data-qa-ignore', () => {
+    expect(f([svg({ scale: 0.45, svgPrecise: true })])).toEqual([]);
+    expect(f([svg({ scale: 1 })])).toEqual([]);
+    expect(f([svg({ scale: 1.005 })])).toEqual([]);
+    expect(f([run({ scale: 0.45, svgText: false })])).toEqual([]);
+    expect(f([run({ scale: 0.45 })])).toEqual([]);
+    expect(f([svg({ scale: 0.45, ignore: ['svg-escala'] })])).toEqual([]);
+  });
+  it('un aviso por elemento aunque tenga varios nodos de texto', () => {
+    const a = svg({ scale: 2 });
+    const b = { ...svg({ scale: 2 }), elId: a.elId };
+    expect(f([a, b])).toHaveLength(1);
+  });
+});

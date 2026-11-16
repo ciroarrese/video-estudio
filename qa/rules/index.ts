@@ -7,6 +7,7 @@ import { offscreenRule } from './offscreen';
 import { overlapRule } from './overlap';
 import { safeAreaRule } from './safeArea';
 import { signalRule } from './signal';
+import { svgEscalaRule } from './svgEscala';
 import { textoChicoRule } from './textoChico';
 import { vacioRule } from './vacio';
 import { judgement } from './judged';
@@ -16,7 +17,7 @@ import { visibleRuns } from './visible';
 export { visibleRuns } from './visible';
 export { addJudged, emptyJudged, judgement } from './judged';
 
-export const RULES: Rule[] = [clipRule, offscreenRule, safeAreaRule, overlapRule, minSizeRule, textoChicoRule, contrastRule, coveredRule, unjudgedRule, signalRule, vacioRule];
+export const RULES: Rule[] = [clipRule, offscreenRule, safeAreaRule, overlapRule, minSizeRule, textoChicoRule, contrastRule, coveredRule, unjudgedRule, signalRule, svgEscalaRule, vacioRule];
 
 export function runRules(ctx: RuleContext, enabled?: RuleId[]): Finding[] {
   const vis = { ...ctx, runs: visibleRuns(ctx) };

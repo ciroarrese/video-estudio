@@ -65,7 +65,7 @@ export function BlueprintDraw(p: BlueprintDrawProps) {
     </g>
   );
   return (
-    <svg width={w} height={h} viewBox={`0 0 ${w} ${h}`} style={{ display: "block", fontFamily: theme.font.family, ...p.style }}>
+    <svg width={w} height={h} viewBox={`0 0 ${w} ${h}`} style={{ display: "block", fontFamily: theme.font.family, textRendering: "geometricPrecision", ...p.style }}>
       <SvgShadow shadow={surf.shadow} x={0} y={0} width={w} height={h} rx={surf.radius} />
       <rect width={w} height={h} fill={paper} rx={surf.radius} {...(rim ? { stroke: surf.edge, strokeWidth: surf.border } : {})} />
       <path d={minor.join(" ")} stroke={theme.color.border} strokeWidth={1} opacity={0.55 * gridIn} fill="none" />
