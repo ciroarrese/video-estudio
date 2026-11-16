@@ -317,20 +317,38 @@ export function HeadlineRow({
       </div>
     );
   }
+  const nameSpan = <span style={{ fontSize: L.nameSize, lineHeight: `${L.nameH}px`, ...nameStyle }}>{L.names[i]}</span>;
+  const numSpan = <span style={{ width: L.numW, flexShrink: 0, fontSize: L.numSize, fontWeight: theme.font.weights.stat, position: "relative" }}>{num}</span>;
+  if (L.inline) {
+    // En un renglón `01 Nombre · línea`. El texto se acomodó con medidas estimadas: si con otra tipografía (más ancha, o letra más grande) el renglón no entra, la línea
+    // baja entera a un segundo renglón bajo el nombre (`flex-wrap`) y, si ni así entra, se parte por palabras; nunca se sale del cuadro ni se corta. Con la
+    // medida estimada entra en un renglón y el marcado de adentro es el de siempre.
+    return (
+      <div key={styleKey(root)} style={root}>
+        <div key={`block-${styleKey(block)}`} style={block}>
+          <div style={{ display: "flex", alignItems: "baseline", height: L.nameH, whiteSpace: "nowrap" }}>
+            {numSpan}
+            <div style={{ display: "flex", flexWrap: "wrap", alignItems: "baseline", flex: "1 1 0", minWidth: 0 }}>
+              {nameSpan}
+              <span style={{ display: "flex", minWidth: 0, maxWidth: "100%" }}>
+                <span style={{ fontSize: L.lineSize, lineHeight: `${L.nameH}px`, color: theme.color.textMuted, whiteSpace: "pre" }}>{` ${INLINE_SEP} `}</span>
+                <span style={{ fontSize: L.lineSize, lineHeight: `${L.nameH}px`, color: theme.color.textMuted, whiteSpace: "normal", ...cap }}>{L.lines[i]}</span>
+              </span>
+            </div>
+          </div>
+        </div>
+        {bar && <div key={`bar-${styleKey(bar)}`} style={bar} />}
+      </div>
+    );
+  }
   return (
     <div key={styleKey(root)} style={root}>
       <div key={`block-${styleKey(block)}`} style={block}>
         <div style={{ display: "flex", alignItems: "baseline", height: L.nameH, whiteSpace: "nowrap" }}>
-          <span style={{ width: L.numW, flexShrink: 0, fontSize: L.numSize, fontWeight: theme.font.weights.stat, position: "relative" }}>{num}</span>
-          <span style={{ fontSize: L.nameSize, lineHeight: `${L.nameH}px`, ...nameStyle }}>{L.names[i]}</span>
-          {L.inline && (
-            <>
-              <span style={{ fontSize: L.lineSize, lineHeight: `${L.nameH}px`, color: theme.color.textMuted, whiteSpace: "pre" }}>{` ${INLINE_SEP} `}</span>
-              <span style={{ fontSize: L.lineSize, lineHeight: `${L.nameH}px`, color: theme.color.textMuted, ...cap }}>{L.lines[i]}</span>
-            </>
-          )}
+          {numSpan}
+          {nameSpan}
         </div>
-        {!L.inline && <div style={{ marginLeft: L.numW, marginTop: ROW_GAP.a, height: L.lineH, fontSize: L.lineSize, lineHeight: `${L.lineH}px`, color: theme.color.textMuted, whiteSpace: "nowrap", ...cap }}>{L.lines[i]}</div>}
+        <div style={{ marginLeft: L.numW, marginTop: ROW_GAP.a, height: L.lineH, fontSize: L.lineSize, lineHeight: `${L.lineH}px`, color: theme.color.textMuted, whiteSpace: "nowrap", ...cap }}>{L.lines[i]}</div>
       </div>
       {bar && <div key={`bar-${styleKey(bar)}`} style={bar} />}
     </div>
