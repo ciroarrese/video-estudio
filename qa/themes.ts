@@ -79,9 +79,42 @@ export function formatDifferences(m: Matrix, max = 40): string {
   return out.join('\n');
 }
 
-/** Corre el mismo control bajo cada sistema, uno por vez (un navegador a la vez: la maquina se comparte). */
-export async function runQaThemes(o: QaOptions, themes: string[]): Promise<Record<string, QaResult>> {
+/**
+ * El error de un tema que no declara un color de datos (`theme.data.<nombre>`) que el video lee: `Tema "neutral": no hay un color de datos "libre". ...`
+ * (themes/data.ts). Ese tema no puede dibujar el video: no es un defecto del video sino un sistema donde no aplica.
+ */
+const FALTA_DATO = /Tema "([^"]*)": no hay un color de datos "([^"]+)"/;
+
+/** Si `e` es el error de un color de datos que el tema no declara: el nombre que falta; si no, `null` (cualquier otro error se propaga). */
+export function datoFaltante(e: unknown): { theme: string; name: string } | null {
+  const m = FALTA_DATO.exec(e instanceof Error ? e.message : String(e));
+  return m ? { theme: m[1]!, name: m[2]! } : null;
+}
+
+export type ThemeSkip = { theme: string; reason: string };
+
+/**
+ * Corre el mismo control bajo cada sistema, uno por vez (un navegador a la vez: la maquina se comparte). Un sistema que no declara un color de
+ * datos que el video pide (`theme.data.libre`) no puede dibujarlo: se saltea con un aviso (`skipped`, y `log`) y el resto de la matriz corre.
+ * Si ningún sistema puede, lanza un error que lo dice.
+ */
+export async function runQaThemes(o: QaOptions, themes: string[], skipped: ThemeSkip[] = []): Promise<Record<string, QaResult>> {
   const out: Record<string, QaResult> = {};
-  for (const t of themes) out[t] = await runQa({ ...o, props: { ...(o.props ?? {}), theme: t } });
+  let first = false;
+  for (const t of themes) {
+    try {
+      out[t] = await runQa({ ...o, props: { ...(o.props ?? {}), theme: t } });
+    } catch (e) {
+      const d = datoFaltante(e);
+      if (!d) throw e;
+      first = true;
+      const reason = `el video lee el color de datos "${d.name}" (theme.data.${d.name}) y el sistema "${t}" no lo declara`;
+      skipped.push({ theme: t, reason });
+      (o.log ?? (() => {}))(`aviso: se saltea el sistema "${t}": ${reason}. Declaralo en ese tema o corré --themes solo con los sistemas que lo tienen.`);
+    }
+  }
+  if (!Object.keys(out).length && first) {
+    throw new Error(`ningún sistema de --themes puede dibujar este video (${skipped.map((x) => `${x.theme}: ${x.reason}`).join('; ')}). El video usa colores de datos propios: --themes no aplica; corré el control sin --themes (con el tema del video).`);
+  }
   return out;
 }

@@ -1,5 +1,5 @@
 import type { CSSProperties, ReactNode } from 'react';
-import { Fill, useFrame } from '../../engine';
+import { Fill, useFormat, useFrame } from '../../engine';
 
 /**
  * Test scene for the QA tools: every frame holds exactly ONE deliberately seeded defect (or none).
@@ -41,9 +41,18 @@ import { Fill, useFrame } from '../../engine';
  * Frames 93-95 son `data-qa-fixed-scale` (reproduccion de una herramienta a tamanos fijos), SOLO con `--font-scale 1.25` (sin estres los tres estan limpios): 93 un rotulo que entra justo
  * en su caja dentro de la marca (sin hallazgo, el resumen cuenta el texto exento del estres); 94 el MISMO rotulo sin la marca (error `clip` con el estres); 95 la marca puesta en el escenario entero,
  * sin otro texto fuera de ella: la exencion se RECHAZA (aviso, `summary.fixedScale.refused`), el estres se aplica y el rotulo da `clip`.
+ * Frames 99-102 son el velo que NO llega a cerrarse del todo (el último cuadro de un `Wash` con `range` que termina después del final del video): 99 un lavado liso y marcado
+ * (`data-qa-veil`, `data-qa-ignore="covered"`) a 0,985 sobre texto claro: el texto de abajo no se ve, se cuenta como tapado por una capa opaca y no da hallazgos (antes: error de `contrast`, 1,09:1); 100-102 el mismo
+ * lavado a 0,86 / 0,94 / 0,97: sigue siendo un velo que cruza (sube ~0,08 por cuadro), `contrast` es `info` en el 101.
+ * Frames 103-114 son la regla `vacio` (aviso; SOLO en vertical y cuadrado: `--format vertical`), cada caso en tres cuadros idénticos (A, B, C: el aviso es del B, que tiene vecinos iguales): 103-105 dos tarjetas con un hueco de
+ * ~40 % del alto entre ellas (aviso `vacio` en el 104); 106-108 una tarjeta centrada con 35 % de aire arriba y abajo (composición: nada); 109-111 una tarjeta pegada arriba con un hueco de
+ * ~65 % debajo (aviso, "abajo"); 112-114 el mismo hueco del primer caso con un velo de transición a medias (`data-qa-veil`): nada. 115-117 el hueco del primer caso cruzado por una franja de color de
+ * lado a lado (es un elemento visible: nada); 118-120 la misma franja con `data-qa-ignore="vacio"` (adorno que no cuenta: aviso en el 119).
+ * Frames 121-129 son la regla `texto-chico` (aviso, cualquier formato; el piso es 20 px a 1080 de lado corto = 13,3 px a 720): 121-123 un texto de 12,8 px quieto (aviso en el 122); 124-126 el mismo texto desplazándose
+ * 20 px por cuadro (nada: no es un plano sostenido); 127-129 el mismo texto quieto dentro de `data-qa-decor` (nada).
  * Frame 18 builds a term and an e-mail out of one span per letter / per part: only the privacy check cares (block-level scan).
  */
-export const QA_DEFECT_FRAMES = { clean: 0, clip: 1, offscreen: 2, overlap: 3, tiny: 4, contrast: 5, covered: 6, privacy: 7, wash: 8, flyingA: 9, flyingB: 10, faint: 11, leavingA: 12, leavingB: 13, leavingC: 14, stillFaint: 15, sideCover: 16, hiddenStatic: 17, split: 18, veilCrossA: 19, veilCrossB: 20, veilCrossC: 21, veilStaticA: 22, veilStaticB: 23, veilStaticC: 24, slowFadeA: 25, slowFadeB: 26, slowFadeC: 27, slowStaticA: 28, slowStaticB: 29, slowStaticC: 30, crossMoveA: 31, crossMoveB: 32, crossMoveC: 33, crossStillA: 34, crossStillB: 35, crossStillC: 36, overlapMoveA: 37, overlapMoveB: 38, overlapMoveC: 39, overlapStillA: 40, overlapStillB: 41, overlapStillC: 42, coverMoveA: 43, coverMoveB: 44, coverMoveC: 45, coverStillA: 46, coverStillB: 47, coverStillC: 48, camMoveA: 49, camMoveB: 50, camMoveC: 51, camStillA: 52, camStillB: 53, camStillC: 54, splitBlocks: 55, splitLine: 56, zoomOut: 57, zoomIn: 59, neverReadable: 61, svgFillDark: 63, svgFillPale: 64, svgStroke: 65, hiddenCovers: 66, inheritedHidden: 67, visibleCanvas: 68, decorOk: 69, decorStrict: 70, decorClip: 71, decorOverlap: 72, decorOffscreen: 73, decorMainOffscreen: 74, ignoreCounted: 75, vigContrastA: 76, vigContrastB: 77, vigOverlapA: 78, vigOverlapB: 79, vigCoveredA: 80, vigCoveredB: 81, vigFadeA: 82, vigFadeB: 83, vigFadeC: 84, washCrossA: 85, washCrossB: 86, washCrossC: 87, washStillA: 88, washStillB: 89, washStillC: 90, washClosed: 91, gradientOverlap: 92, fixedOk: 93, fixedStrict: 94, fixedWhole: 95, literalEllipsis: 96, literalEllipsisMarked: 97, ellipsisFits: 98 } as const;
+export const QA_DEFECT_FRAMES = { clean: 0, clip: 1, offscreen: 2, overlap: 3, tiny: 4, contrast: 5, covered: 6, privacy: 7, wash: 8, flyingA: 9, flyingB: 10, faint: 11, leavingA: 12, leavingB: 13, leavingC: 14, stillFaint: 15, sideCover: 16, hiddenStatic: 17, split: 18, veilCrossA: 19, veilCrossB: 20, veilCrossC: 21, veilStaticA: 22, veilStaticB: 23, veilStaticC: 24, slowFadeA: 25, slowFadeB: 26, slowFadeC: 27, slowStaticA: 28, slowStaticB: 29, slowStaticC: 30, crossMoveA: 31, crossMoveB: 32, crossMoveC: 33, crossStillA: 34, crossStillB: 35, crossStillC: 36, overlapMoveA: 37, overlapMoveB: 38, overlapMoveC: 39, overlapStillA: 40, overlapStillB: 41, overlapStillC: 42, coverMoveA: 43, coverMoveB: 44, coverMoveC: 45, coverStillA: 46, coverStillB: 47, coverStillC: 48, camMoveA: 49, camMoveB: 50, camMoveC: 51, camStillA: 52, camStillB: 53, camStillC: 54, splitBlocks: 55, splitLine: 56, zoomOut: 57, zoomIn: 59, neverReadable: 61, svgFillDark: 63, svgFillPale: 64, svgStroke: 65, hiddenCovers: 66, inheritedHidden: 67, visibleCanvas: 68, decorOk: 69, decorStrict: 70, decorClip: 71, decorOverlap: 72, decorOffscreen: 73, decorMainOffscreen: 74, ignoreCounted: 75, vigContrastA: 76, vigContrastB: 77, vigOverlapA: 78, vigOverlapB: 79, vigCoveredA: 80, vigCoveredB: 81, vigFadeA: 82, vigFadeB: 83, vigFadeC: 84, washCrossA: 85, washCrossB: 86, washCrossC: 87, washStillA: 88, washStillB: 89, washStillC: 90, washClosed: 91, gradientOverlap: 92, fixedOk: 93, fixedStrict: 94, fixedWhole: 95, literalEllipsis: 96, literalEllipsisMarked: 97, ellipsisFits: 98, veilNearClosed: 99, veilNearA: 100, veilNearB: 101, veilNearC: 102, vacioMedioA: 103, vacioMedioB: 104, vacioMedioC: 105, vacioCentradoA: 106, vacioCentradoB: 107, vacioCentradoC: 108, vacioAbajoA: 109, vacioAbajoB: 110, vacioAbajoC: 111, vacioVeloA: 112, vacioVeloB: 113, vacioVeloC: 114, vacioFranjaA: 115, vacioFranjaB: 116, vacioFranjaC: 117, vacioFranjaMarcadaA: 118, vacioFranjaMarcadaB: 119, vacioFranjaMarcadaC: 120, chicoA: 121, chicoB: 122, chicoC: 123, chicoMueveA: 124, chicoMueveB: 125, chicoMueveC: 126, chicoAdornoA: 127, chicoAdornoB: 128, chicoAdornoC: 129 } as const;
 
 const font: CSSProperties = { fontFamily: 'Arial, Helvetica, sans-serif', color: '#1b1f2a' };
 const abs = (left: number, top: number, extra: CSSProperties = {}): CSSProperties => ({ position: 'absolute', left, top, margin: 0, whiteSpace: 'nowrap', ...font, ...extra });
@@ -68,6 +77,32 @@ function Card({ top = 200, children }: { top?: number; children?: ReactNode }) {
     <div style={{ position: 'absolute', left: 96, top, width: 640, height: 300, background: '#eef1f6', borderRadius: 16, border: '1px solid #c9d0dc' }}>
       {children}
     </div>
+  );
+}
+
+/** Casos de `vacio` (frames 103-120): tarjetas ubicadas por proporción del alto, para que valgan en vertical (720x1280) y en cuadrado. */
+function VacioCase({ f }: { f: number }) {
+  const { width, height } = useFormat();
+  const caso = Math.floor((f - 103) / 3); // 0 hueco en el medio, 1 centrado, 2 pegado arriba, 3 con velo, 4 franja que lo cruza, 5 la franja marcada para no contar
+  const box = (top: number, h: number, testid: string, extra: CSSProperties = {}, attrs: Record<string, string> = {}) => (
+    <div data-testid={testid} {...attrs} style={{ position: 'absolute', left: 48, top: Math.round(height * top), width: width - 96, height: Math.round(height * h), background: '#eef1f6', borderRadius: 16, border: '1px solid #c9d0dc', ...extra }}>
+      <p style={abs(32, 28, { fontSize: 32, fontWeight: 600 })}>{testid}</p>
+    </div>
+  );
+  let body: ReactNode;
+  if (caso === 1) body = box(0.35, 0.3, 'tarjeta-central');
+  else if (caso === 2) body = box(0.06, 0.25, 'tarjeta-arriba');
+  else {
+    const franja = caso >= 4 && (
+      <div data-testid="franja-color" {...(caso === 5 ? { 'data-qa-ignore': 'vacio' } : {})} style={{ position: 'absolute', left: 0, top: Math.round(height * 0.3), width, height: Math.round(height * 0.4), background: '#dbe3f3' }} />
+    );
+    body = (<>{franja}{box(0.06, 0.22, 'tarjeta-1')}{box(0.7, 0.22, 'tarjeta-2')}</>);
+  }
+  return (
+    <Fill style={{ background: '#ffffff' }}>
+      {body}
+      {caso === 3 && <div data-testid="vacio-velo" data-qa-veil="0.400" data-qa-ignore="covered" style={{ position: 'absolute', left: 0, top: 0, width: '100%', height: '100%', background: '#ffffff', opacity: 0.4 }} />}
+    </Fill>
   );
 }
 
@@ -454,6 +489,31 @@ export function QaDefects() {
             <p data-testid="wash-text" style={abs(32, 70, { fontSize: 36, fontWeight: 700, color: '#ffffff' })}>Texto claro sobre acento</p>
           </div>
           <div data-testid="marked-wash" data-qa-veil={veil.toFixed(3)} data-qa-ignore="covered" style={{ position: 'absolute', left: 0, top: 0, width: '100%', height: '100%', background: '#ffffff', opacity: veil }} />
+        </>
+      );
+      break;
+    }
+    case 103: case 104: case 105: case 106: case 107: case 108: case 109: case 110: case 111: case 112: case 113: case 114: case 115: case 116: case 117: case 118: case 119: case 120:
+      return <VacioCase f={f} />;
+    case 121: case 122: case 123: case 124: case 125: case 126: case 127: case 128: case 129: {
+      const quieto = f < 124 || f >= 127;
+      const x = quieto ? 96 : 96 + (f - 124) * 20;
+      const texto = <p data-testid="chico-text" style={abs(x, 70, { fontSize: 12.8 })}>Etiqueta del eje vertical</p>;
+      body = <Card>{f >= 127 ? <div data-qa-decor="">{texto}</div> : texto}</Card>;
+      break;
+    }
+    case 99:
+    case 100:
+    case 101:
+    case 102: {
+      // el velo que no termina de cerrarse: 0,985 (tapa), 0,86 / 0,94 / 0,97 (cruza)
+      const veil = f === 99 ? 0.985 : f === 100 ? 0.86 : f === 101 ? 0.94 : 0.97;
+      body = (
+        <>
+          <div style={{ position: 'absolute', left: 96, top: 200, width: 640, height: 200, background: '#2b4a8c', borderRadius: 16 }}>
+            <p data-testid="near-text" style={abs(32, 70, { fontSize: 36, fontWeight: 700, color: '#ffffff' })}>Texto claro sobre acento</p>
+          </div>
+          <div data-testid="near-wash" data-qa-veil={veil.toFixed(3)} data-qa-ignore="covered" style={{ position: 'absolute', left: 0, top: 0, width: '100%', height: '100%', background: '#ffffff', opacity: veil }} />
         </>
       );
       break;

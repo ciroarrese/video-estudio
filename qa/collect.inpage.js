@@ -3,6 +3,8 @@
 (function qaCollect(opts) {
   var stage = document.getElementById('stage') || document.body;
   var W = opts.width, H = opts.height;
+  // Opacidad efectiva desde la que un velo de cuadro completo tapa del todo el texto de abajo (ver mas abajo `hiddenBy` y `veil`).
+  var VEIL_HIDES = 0.98;
   var onlyKeys = opts.onlyKeys ? new Set(opts.onlyKeys) : null;
   var ids = new Map();
   function idOf(el) { if (!ids.has(el)) ids.set(el, ids.size); return ids.get(el); }
@@ -135,6 +137,70 @@
   probe.textContent = '*{pointer-events:auto !important}';
   document.head.appendChild(probe);
 
+  // Tramos verticales (px, unidos y ordenados) ocupados por algo que se ve: texto, fondo de color, imagen o degradado, borde, img/video/canvas/svg. Quedan fuera los
+  // fondos que cubren (casi) todo el cuadro (el escenario, un velo, una viñeta: no son contenido), lo casi transparente (opacidad efectiva < 0.05), lo ya marcado
+  // `data-qa-ignore="vacio"` (o `all`) y los trazos finos (menos de 4 px de ancho o de alto, que no llenan una franja). Con `veil`, la opacidad mas alta de un `data-qa-veil`.
+  function occupancyOf() {
+    var spans = [];
+    var opMemo = new Map();
+    function effOpacity(e) {
+      if (e === stage.parentElement || !e) return 1;
+      if (opMemo.has(e)) return opMemo.get(e);
+      var v = parseFloat(getComputedStyle(e).opacity) * effOpacity(e.parentElement);
+      opMemo.set(e, v);
+      return v;
+    }
+    var rng = document.createRange();
+    var all = stage.querySelectorAll('*');
+    for (var i = 0; i < all.length; i++) {
+      var e = all[i];
+      var tg = e.tagName;
+      if (tg === 'SCRIPT' || tg === 'STYLE' || tg === 'NOSCRIPT' || tg === 'DEFS' || tg === 'defs') continue;
+      var svgChild = e.namespaceURI === 'http://www.w3.org/2000/svg' && tg.toLowerCase() !== 'svg';
+      if (svgChild) continue; // el svg entero cuenta como una pieza
+      var cs = getComputedStyle(e);
+      if (cs.visibility !== 'visible' || cs.display === 'none') continue;
+      var op = effOpacity(e);
+      if (op < 0.05) continue;
+      if (e.closest('[data-qa-ignore]')) { var ig = ignoreOf(e); if (ig.indexOf('vacio') >= 0 || ig.indexOf('all') >= 0) continue; }
+      var r = e.getBoundingClientRect();
+      var big = r.width * r.height >= 0.85 * W * H || (r.width >= W * 0.98 && r.height >= H * 0.9);
+      var paints = false;
+      var tagL = tg.toLowerCase();
+      if (tagL === 'img' || tagL === 'video' || tagL === 'canvas' || tagL === 'svg') paints = true;
+      else {
+        var bg = parseRgba(cs.backgroundColor);
+        if (bg.a * op >= 0.05 && cs.backgroundColor !== 'rgba(0, 0, 0, 0)') paints = true;
+        else if (cs.backgroundImage && cs.backgroundImage !== 'none' && !translucentImage(cs) && !clipText0(cs)) paints = true;
+        else {
+          var bw = parseFloat(cs.borderTopWidth) + parseFloat(cs.borderBottomWidth) + parseFloat(cs.borderLeftWidth) + parseFloat(cs.borderRightWidth);
+          if (bw > 0 && cs.borderTopStyle !== 'none' && parseRgba(cs.borderTopColor).a * op >= 0.05) paints = true;
+        }
+      }
+      if (paints && !big && r.width >= 4 && r.height >= 4 && r.right > 0 && r.left < W && r.bottom > 0 && r.top < H) spans.push([Math.max(0, r.top), Math.min(H, r.bottom)]);
+      // texto propio del elemento: la caja de sus lineas (no la del contenedor, que puede ser mucho mas ancha o alta)
+      for (var c = e.firstChild; c; c = c.nextSibling) {
+        if (c.nodeType !== 3 || !c.data.trim()) continue;
+        rng.selectNodeContents(c);
+        var rl = rng.getClientRects();
+        for (var k = 0; k < rl.length; k++) {
+          var q = rl[k];
+          if (q.width < 1 || q.height < 1 || q.right <= 0 || q.left >= W || q.bottom <= 0 || q.top >= H) continue;
+          spans.push([Math.max(0, q.top), Math.min(H, q.bottom)]);
+        }
+      }
+    }
+    spans.sort(function (a, b) { return a[0] - b[0]; });
+    var merged = [];
+    spans.forEach(function (sp) {
+      var last = merged[merged.length - 1];
+      if (last && sp[0] <= last[1]) { if (sp[1] > last[1]) last[1] = sp[1]; } else merged.push([sp[0], sp[1]]);
+    });
+    var veil = 0;
+    Array.prototype.forEach.call(stage.querySelectorAll('[data-qa-veil]'), function (v) { var n = parseFloat(v.getAttribute('data-qa-veil')); if (n > veil) veil = n; });
+    return { bands: merged.map(function (m) { return [Math.round(m[0]), Math.round(m[1])]; }), veil: veil };
+  }
+
   var runs = [];
   var walker = document.createTreeWalker(stage, NodeFilter.SHOW_TEXT);
   var range = document.createRange();
@@ -258,7 +324,9 @@
             if (coverIgnorable(c)) {
               skippedCover = true;
               var cr = c.getBoundingClientRect();
-              if (solidColor && bg.a * op >= 0.99 && cr.width * cr.height >= 0.9 * W * H) {
+              // Un velo de transicion (`data-qa-veil`, el `Wash` del kit) o cualquier capa lisa de cuadro completo con opacidad efectiva >= 0.98 deja el texto de abajo
+              // sin verse (el ultimo cuadro de un lavado que no llega a 1, o la capa a medias de un fundido que cierra): se cuenta como tapado, no se juzga.
+              if (solidColor && bg.a * op >= VEIL_HIDES && cr.width * cr.height >= 0.9 * W * H) {
                 hiddenN++;
                 if (!hiddenBy) hiddenBy = { key: keyOf(c), testid: testidOf(c) };
                 break;
@@ -301,7 +369,8 @@
           var vr = vc.getBoundingClientRect();
           if (vr.width * vr.height < 0.9 * W * H) continue;
           var va = veilAlpha(vc);
-          if (va < 0.02 || va >= 0.9) continue;
+          // un velo marcado (`data-qa-veil`) entre 0.9 y VEIL_HIDES sigue siendo un velo que cruza (un lavado sube ~0.08 por cuadro); sin marca, desde 0.9 es una capa opaca (`cover`)
+          if (va < 0.02 || va >= (vc.closest('[data-qa-veil]') ? VEIL_HIDES : 0.9)) continue;
           run.veil = { key: keyOf(vc), opacity: va, testid: testidOf(vc) };
           break;
         }
@@ -309,6 +378,8 @@
     }
     runs.push(run);
   }
+  // Ocupacion del cuadro para la regla `vacio` (solo formatos angostos, `opts.occupancy`): tramos verticales donde algun elemento visible pinta algo.
+  var occupancy = opts.occupancy ? occupancyOf() : undefined;
   var elems = {};
   var opac = {};
   (opts.elemKeys || []).forEach(function (k) { var e = resolveKey(k); if (e) { elems[k] = rectOf(e.getBoundingClientRect()); opac[k] = veilAlpha(e); } });
@@ -322,5 +393,5 @@
     if (getComputedStyle(e).visibility !== 'visible') return;
     signals.push({ kind: e.getAttribute('data-ve-signal'), piece: e.getAttribute('data-ve-piece') || '', mark: e.getAttribute('data-ve-mark') || '', forced: e.getAttribute('data-ve-forced') === 'true', tag: e.tagName.toLowerCase(), rect: rectOf(r), ignore: ignoreOf(e) });
   });
-  return { width: W, height: H, runs: runs, elems: elems, opac: opac, fixedRoots: fixedRoots, signals: signals };
+  return { width: W, height: H, runs: runs, elems: elems, opac: opac, fixedRoots: fixedRoots, signals: signals, occupancy: occupancy };
 })

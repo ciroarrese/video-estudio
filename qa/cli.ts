@@ -14,14 +14,14 @@ import { RULES } from './rules';
 import { canonicalReport as canonical, diffReports } from './repeat';
 import { parseOverrides } from './thresholds';
 import { QA_RULES, type Finding, type JudgedSummary, type RuleId } from './types';
-import { buildMatrix, formatDifferences, formatMatrix, parseThemes, runQaThemes } from './themes';
+import { buildMatrix, formatDifferences, formatMatrix, parseThemes, runQaThemes, type ThemeSkip } from './themes';
 import { formatResolved, resolveThemes } from './resolved';
 
 const USAGE = {
   sheet: `Uso: ve-sheet <videoId> [--frames 0,60,120 | --every N | --count 12] [--props json] [--format horizontal|vertical|cuadrado] [--scene id|índice] [--list-scenes]
-             [--assets dir]... [--allow-missing-fonts] [--cols 4] [--scale 0.25] [--out out/<id>[-<formato>]-sheet.png] [--no-labels]   (--out acepta cualquier ruta, se crean las carpetas)`,
+             [--assets dir]... [--allow-missing-fonts] [--strict-fonts] [--cols 4] [--scale 0.25] [--out out/<id>[-<formato>]-sheet.png] [--no-labels]   (--out acepta cualquier ruta, se crean las carpetas)`,
   qa: `Uso: ve-qa <videoId> [--frames 0,60,120 | --every N | --count 24] [--props json] [--format horizontal|vertical|cuadrado] [--scene id|índice] [--list-scenes] [--json salida.json | --out salida.json] [--fail-on error|warn] [--verbose] [--max 40]
-             [--per-scene 4] [--assets dir]... [--allow-missing-fonts] [--rules clip,overlap,...] [--skip regla,...] [--set regla.umbral=valor]... [--concurrency N] [--repeat N]
+             [--per-scene 4] [--assets dir]... [--allow-missing-fonts] [--strict-fonts] [--rules clip,overlap,...] [--skip regla,...] [--set regla.umbral=valor]... [--concurrency N] [--repeat N]
              [--themes neutral,dark,editorial,neon,papel|all] [--font-scale 1.2] [--font-fallback wide|narrow]
 Reglas: ${QA_RULES.join(', ')}  (silenciar: data-qa-ignore="regla" en el elemento o un ancestro; adorno de interfaz: data-qa-decor)`,
   privacy: `Uso: ve-privacy [<videoId>] --deny lista.txt [--deny otra.txt]... [--allow lista.txt]...  [--frames … | --every N | --count 24] [--props json] [--format …] [--scene id|índice] [--scan-source dir]... [--assets dir]... [--allow-missing-fonts] [--json salida.json | --out salida.json]`,
@@ -29,6 +29,8 @@ Reglas: ${QA_RULES.join(', ')}  (silenciar: data-qa-ignore="regla" en el element
 
 /** Opciones comunes de estáticos y fuentes (`--assets`, `--allow-missing-fonts`) que entienden sheet, qa y privacy. */
 const common = (p: Parsed) => ({ assets: p.flags.get('assets'), allowMissingFonts: p.bools.has('allow-missing-fonts') || undefined });
+/** `--strict-fonts` (qa y sheet): una familia del sistema que falta hace fallar en vez de avisar. */
+const strict = (p: Parsed) => ({ strictFonts: p.bools.has('strict-fonts') || undefined });
 
 const sample = (p: Parsed) => ({ frames: one(p, 'frames'), every: num(p, 'every'), count: num(p, 'count') });
 
@@ -144,7 +146,7 @@ async function main(cmd: string, argv: string[]): Promise<number> {
 
   if (cmd === 'sheet') {
     if (!id) throw new Error('Falta <videoId>');
-    const r = await makeSheet({ videoId: id, props, format, scene, ...sample(p), cols: num(p, 'cols'), scale: num(p, 'scale'), out: one(p, 'out') ?? salidaPorDefecto(`${id}${suffixOf({ format, scene })}-sheet.png`), labels: !p.bools.has('no-labels'), ...common(p), log });
+    const r = await makeSheet({ videoId: id, props, format, scene, ...sample(p), cols: num(p, 'cols'), scale: num(p, 'scale'), out: one(p, 'out') ?? salidaPorDefecto(`${id}${suffixOf({ format, scene })}-sheet.png`), labels: !p.bools.has('no-labels'), ...common(p), ...strict(p), log });
     console.log(`hoja: ${r.out} (${r.width}x${r.height}, ${r.frames.length} cuadros: ${r.frames.join(',')})`);
     return 0;
   }
@@ -171,7 +173,7 @@ async function main(cmd: string, argv: string[]): Promise<number> {
     if (perScene !== undefined && (!Number.isInteger(perScene) || perScene < 0)) throw new Error('--per-scene debe ser un entero >= 0');
     const qaOpts = {
       videoId: id, props, format, scene, ...sample(p), perScene, rules: (only ?? QA_RULES).filter((x) => !skip.includes(x)),
-      thresholds: parseOverrides(p.flags.get('set') ?? []), concurrency: num(p, 'concurrency'), stress, ...common(p), log,
+      thresholds: parseOverrides(p.flags.get('set') ?? []), concurrency: num(p, 'concurrency'), stress, ...common(p), ...strict(p), log,
     };
     const verbose = p.bools.has('verbose');
     const max = verbose && one(p, 'max') === undefined ? Infinity : num(p, 'max') ?? 40;
@@ -194,19 +196,21 @@ async function main(cmd: string, argv: string[]): Promise<number> {
       }
       console.log('');
       if (s.sampling) console.log(`muestreo: ${s.sampling.even} cuadros repartidos + ${s.sampling.anchored} anclados al cuadro local de ${s.sampling.scenes} ${s.sampling.scenes === 1 ? 'escena' : 'escenas'} (hasta ${s.sampling.perScene} por escena: no se mueven si cambia la duración del resto del video; --per-scene 0 los apaga)`);
-      for (const l of formatJudged(s.judged)) console.log(l);
+      if (s.frames.length) for (const l of formatJudged(s.judged)) console.log(l);
       const per = Object.entries(s.byRule).map(([k, v]) => `${k}=${v}`).join(' ') || 'ninguno';
-      console.log(`\n${label}${id}: ${s.frames.length} cuadros revisados en ${s.seconds}s; ${s.errors} errores, ${s.warnings} avisos, ${s.infos} info${verbose ? '' : ' (ocultos; --verbose)'} (${per})`);
+      console.log(`\n${label}${id}: ${s.frames.length ? `${s.frames.length} cuadros revisados` : 'sin cuadros (solo el largo del guion)'} en ${s.seconds}s; ${s.errors} errores, ${s.warnings} avisos, ${s.infos} info${verbose ? '' : ' (ocultos; --verbose)'} (${per})`);
     };
     if (stress) console.log(`estres de tipografia: ${[stress.fontScale !== undefined ? `letra x${stress.fontScale}` : '', stress.fontFallback ? `fuente de reemplazo ${stress.fontFallback}` : ''].filter(Boolean).join(', ')}`);
 
     // --themes: el mismo control bajo cada design system, con una matriz y las diferencias entre ellos.
     if (themes) {
-      const reports = await runQaThemes(qaOpts, themes);
+      const skipped: ThemeSkip[] = [];
+      const reports = await runQaThemes(qaOpts, themes, skipped);
+      const ran = themes.filter((t) => reports[t]);
       let unstable = false;
       for (let i = 2; i <= repeat; i++) {
-        const again = await runQaThemes(qaOpts, themes);
-        for (const t of themes) {
+        const again = await runQaThemes(qaOpts, ran);
+        for (const t of ran) {
           const diff = diffReports(reports[t]!, again[t]!);
           if (diff.length) {
             unstable = true;
@@ -215,14 +219,15 @@ async function main(cmd: string, argv: string[]): Promise<number> {
           }
         }
       }
-      for (const t of themes) { console.log(`\n===== sistema: ${t} =====`); printSummary(reports[t]!, `[${t}] `); }
+      for (const t of ran) { console.log(`\n===== sistema: ${t} =====`); printSummary(reports[t]!, `[${t}] `); }
+      if (skipped.length) console.log(`\nsistemas salteados (no pueden dibujar este video): ${skipped.map((x) => `${x.theme} (${x.reason})`).join('; ')}`);
       const matrix = buildMatrix(reports);
-      console.log(`\n===== matriz (${id}) =====\n${formatMatrix(matrix)}\n\n${formatResolved(resolveThemes(themes))}\n\n${formatDifferences(matrix, max === Infinity ? 1e9 : max)}`);
-      if (themes.length > 1 && themes.every((t) => canonical(reports[t]!) === canonical(reports[themes[0]!]!))) console.log('\nnota: los informes de todos los sistemas son iguales; si el video no lee props.theme, la matriz no prueba nada (hello y audio-check no lo leen)');
-      writeReport(one(p, 'out') ?? one(p, 'json'), { themes, reports, matrix, resolved: resolveThemes(themes) });
+      console.log(`\n===== matriz (${id}) =====\n${formatMatrix(matrix)}\n\n${formatResolved(resolveThemes(ran))}\n\n${formatDifferences(matrix, max === Infinity ? 1e9 : max)}`);
+      if (ran.length > 1 && ran.every((t) => canonical(reports[t]!) === canonical(reports[ran[0]!]!))) console.log('\nnota: los informes de todos los sistemas son iguales; si el video no lee props.theme, la matriz no prueba nada (hello y audio-check no lo leen)');
+      writeReport(one(p, 'out') ?? one(p, 'json'), { themes: ran, ...(skipped.length ? { skipped } : {}), reports, matrix, resolved: resolveThemes(ran) });
       if (repeat > 1) console.log(unstable ? `\nrepeticiones: NO reproducible (algún informe de ${repeat} difiere del primero)` : `\nrepeticiones: ${repeat} corridas con informes idénticos (salvo el tiempo)`);
       if (unstable) return 3;
-      return themes.some((t) => failsAt(reports[t]!, failOn)) ? 1 : 0;
+      return ran.some((t) => failsAt(reports[t]!, failOn)) ? 1 : 0;
     }
 
     const r = await runQa(qaOpts);

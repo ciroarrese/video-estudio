@@ -1,7 +1,7 @@
 import { deriveFormatSizes } from "../engine";
 import type { FormatName } from "../engine";
 import type { Theme } from "../themes";
-import { fitText, fitTitleNarrow, listLayout, listTextRects } from "./layout";
+import { LINE_FLOOR, NAME_FLOOR, fitText, fitTitleNarrow, listLayout, listTextRects } from "./layout";
 import { resolveStorySpec } from "./shared";
 import { withoutLate } from "./types";
 import type { StorySpec } from "./types";
@@ -17,8 +17,7 @@ import type { StorySpec } from "./types";
 /** Margen del área segura por lado, como parte del cuadro: el mismo de la regla `safe-area` de `qa` (3 %). */
 export const FIT_MARGIN = 0.03;
 /** Pisos legibles (px a 1080 de lado corto): letra del nombre y de la bajada. Por debajo, la lista "entra" pero no se lee. */
-export const NAME_FLOOR = 44;
-export const LINE_FLOOR = 26;
+export { NAME_FLOOR, LINE_FLOOR };
 /** Renglones máximos del nombre y de la bajada en la lista (un tercer renglón del nombre es el último recurso del diseño: no se considera legible). */
 export const MAX_NAME_ROWS = 2;
 /** Largo mínimo al que se propone acortar (con menos no tiene sentido seguir: sobran temas o hay que cambiar el diseño). */
@@ -66,14 +65,15 @@ export function fitSize(format: FormatArg, from: { width: number; height: number
 type Probe = { causes: string[]; list: FitReport["list"]; title: FitReport["title"] };
 
 /** Mide un `spec` en un tamaño: devuelve las causas por las que no entra (vacío si entra) y las medidas. */
-function probe(spec: StorySpec, theme: Theme, width: number, height: number): Probe {
-  const L = listLayout(resolveStorySpec(theme, spec, width, height), theme, width, height);
+function probe(spec: StorySpec, theme: Theme, width: number, height: number, reserve = 0): Probe {
+  // con subtítulos la historia dibuja la lista en el cuadro menos la franja de abajo (`reserve`, ver `stories/subtitles.tsx`)
+  const L = listLayout(resolveStorySpec(theme, spec, width, height), theme, width, height - reserve, { strict: true });
   const causes: string[] = [];
   const rects = listTextRects(L, theme, -1);
   const mx = width * FIT_MARGIN, my = height * FIT_MARGIN;
   const top = Math.min(...rects.map((r) => r.y)), bottom = Math.max(...rects.map((r) => r.y + r.h));
   const left = Math.min(...rects.map((r) => r.x)), right = Math.max(...rects.map((r) => r.x + r.w));
-  const overflowPx = Math.round(Math.max(0, my - top, bottom - (height - my), mx - left, right - (width - mx)));
+  const overflowPx = Math.round(Math.max(0, my - top, bottom - (height - reserve - my), mx - left, right - (width - mx)));
   if (overflowPx > 1) causes.push(`la lista se pasa ${overflowPx} px del área segura`);
   const nameRows = Math.max(...(L.nameRows ?? L.names.map(() => [""])).map((r) => r.length));
   if (L.nameSize < NAME_FLOOR) causes.push(`la letra de los nombres baja a ${L.nameSize} px (el piso legible es ${NAME_FLOOR})`);
@@ -111,11 +111,11 @@ function largest(lo: number, hi: number, good: (c: number) => boolean): number |
  * ¿La historia entra en este formato? Mide la lista de la apertura (sin el tema tardío) y la de la vuelta de revelación (con todos), y el título de la apertura.
  * `theme` es el design system (por defecto, el que use el video); `from` el tamaño base de la historia (1920 x 1080) del que se derivan vertical y cuadrado.
  */
-export function checkStoryFit(spec: StorySpec, theme: Theme, format: FormatArg, from: { width: number; height: number } = base): FitReport {
+export function checkStoryFit(spec: StorySpec, theme: Theme, format: FormatArg, from: { width: number; height: number } = base, reserve = 0): FitReport {
   const size = fitSize(format, from);
   const { width, height } = size;
   const variants = (s: StorySpec) => [withoutLate(s), s].filter((v, i, a) => a.indexOf(v) === i);
-  const run = (s: StorySpec): Probe[] => variants(s).map((v) => probe(v, theme, width, height));
+  const run = (s: StorySpec): Probe[] => variants(s).map((v) => probe(v, theme, width, height, reserve));
   const first = run(spec);
   const causes = [...new Set(first.flatMap((p) => p.causes))];
   const worst = first.reduce((a, b) => (b.list.overflowPx > a.list.overflowPx ? b : a));

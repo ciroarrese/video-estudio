@@ -181,8 +181,8 @@ export function Pill({ index, name, scale = 1, glow = 0, maxW }: { index: number
     >
       <span style={{ fontSize: t.numSize, fontWeight: theme.font.weights.stat, ...numeral }}>{String(index + 1).padStart(2, "0")}</span>
       {t.rows.length > 1
-        ? <div style={{ fontSize: t.size, lineHeight: 1.25, fontWeight: title.fontWeight, ...(title.letterSpacing ? { letterSpacing: title.letterSpacing } : {}), color: theme.color.text }}>{t.rows.map((r, k) => <div key={k}>{r}</div>)}</div>
-        : <span style={{ fontSize: t.size, fontWeight: title.fontWeight, ...(title.letterSpacing ? { letterSpacing: title.letterSpacing } : {}), color: theme.color.text }}>{t.text}</span>}
+        ? <div style={{ fontSize: t.size, lineHeight: 1.25, fontFamily: title.fontFamily, fontWeight: title.fontWeight, ...(title.letterSpacing ? { letterSpacing: title.letterSpacing } : {}), color: theme.color.text }}>{t.rows.map((r, k) => <div key={k}>{r}</div>)}</div>
+        : <span style={{ fontSize: t.size, fontFamily: title.fontFamily, fontWeight: title.fontWeight, ...(title.letterSpacing ? { letterSpacing: title.letterSpacing } : {}), color: theme.color.text }}>{t.text}</span>}
     </div>
   );
 }
@@ -275,7 +275,7 @@ export function HeadlineRow({
     background: mark.style.background, boxShadow: mark.kind === "bar" && underline > 0.02 ? `0 0 18px ${withAlpha(theme.color.accent, 0.5)}` : undefined, opacity: mark.kind === "dot" ? mark.style.opacity : fade(underlineOpacity),
   };
   const num = number ?? <StoryNumeral loop={gradientLoop}>{String(i + 1).padStart(2, "0")}</StoryNumeral>;
-  const nameStyle = { fontWeight: title.fontWeight, color: theme.color.text, letterSpacing: title.letterSpacing };
+  const nameStyle = { fontFamily: title.fontFamily, fontWeight: title.fontWeight, color: theme.color.text, letterSpacing: title.letterSpacing };
   // la línea de apoyo lleva la caja, el interletrado y el peso del rol `caption` solo si el design system los fijó (`follow: false`: no hereda los del eyebrow)
   const cap = textStyle(theme, "caption", { follow: false });
   // el nombre en uno o más renglones (formatos angostos); sin `nameRows` es `names[i]` en un solo renglón

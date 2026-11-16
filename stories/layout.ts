@@ -108,6 +108,8 @@ export type ListLayout = {
   barLeft: number;
   /** Fila en un solo renglón (`01 Nombre · línea`); en `lines` va la línea ya ajustada y `lineSize` es su tamaño. */
   inline?: boolean;
+  /** Holgura con la que se acomodó el texto medido (formatos angostos, ver `NARROW_SLACK`): lo medido por `listTextRects` se multiplica por ella. */
+  slack?: number;
   /** Largo (px) del subrayado completo de cada fila: `barW` (`list.underline: "row"`) o lo que mide el nombre (`"name"`). */
   barWs: number[];
 };
@@ -115,14 +117,26 @@ export type ListLayout = {
 
 // ---------------------------------------------------------------- ajuste de texto medido (formatos angostos)
 
-/** Mide un texto (px) con la tipografía real del tema (`kit/textWidth`, puro: canvas en el navegador, estimación por glifo en jsdom). */
-export type RowMeter = (text: string, size: number) => number;
+/**
+ * Mide un texto (px) con la tipografía real del tema (`kit/textWidth`, puro: canvas en el navegador, estimación por glifo en jsdom), ya multiplicado por `factor`
+ * (la holgura con la que se acomoda). `factor` es lo que hay que dividir para recuperar el ancho medido.
+ */
+export type RowMeter = ((text: string, size: number) => number) & { factor?: number };
 /** Holgura sobre lo medido: una fuente de reemplazo apenas más ancha no desborda la fila. */
 const FIT_SAFETY = 1.03;
-/** Medidor del nombre de una fila (rol `title`, el peso y el interletrado del design system). */
-export const nameMeter = (theme: Theme): RowMeter => (text, size) => kitTextWidth(theme, text, { size, role: "title" }) * FIT_SAFETY;
+/**
+ * Holgura de los formatos angostos (vertical y cuadrado), donde una fila que sobrepasa su ancho se sale del cuadro: el texto se acomoda para que entre con la
+ * tipografía del tema **más ancha de lo medido** (`--font-fallback wide` de `qa`: una familia de reserva hasta ~10-15 % más ancha) **y con la letra 25 % más grande**
+ * (`--font-scale 1.25`). El texto se mide con la fuente declarada en el tema; si la máquina la reemplaza o la persona agranda la letra, un renglón que entraba justo
+ * se sale del cuadro. Cuesta una letra algo más chica o un renglón más en vertical y cuadrado; el horizontal no la usa (no cambia ni un píxel).
+ */
+export const NARROW_SLACK = 1.4;
+const meterOf = (theme: Theme, role: "title" | "caption", factor: number): RowMeter =>
+  Object.assign((text: string, size: number) => kitTextWidth(theme, text, { size, role }) * factor, { factor });
+/** Medidor del nombre de una fila (rol `title`, con su familia `font.display`, el peso y el interletrado del design system). */
+export const nameMeter = (theme: Theme, factor = FIT_SAFETY): RowMeter => meterOf(theme, "title", factor);
 /** Medidor de la línea de apoyo (rol `caption`). */
-export const lineMeter = (theme: Theme): RowMeter => (text, size) => kitTextWidth(theme, text, { size, role: "caption" }) * FIT_SAFETY;
+export const lineMeter = (theme: Theme, factor = FIT_SAFETY): RowMeter => meterOf(theme, "caption", factor);
 
 /** Parte un texto por palabras en renglones de a lo sumo `maxW` px medidos; una palabra sola más ancha que `maxW` queda en su renglón (desborda). */
 export function wrapMeasured(text: string, maxW: number, size: number, meter: RowMeter): string[] {
@@ -190,7 +204,7 @@ export function fitRowsUniform(texts: string[], o: { width: number; size: number
 }
 
 /** Ancho (px) del renglón más ancho de unos renglones. */
-const widest = (rows: string[][], size: number, meter: RowMeter) => Math.max(0, ...rows.flat().map((r) => meter(r, size) / FIT_SAFETY));
+const widest = (rows: string[][], size: number, meter: RowMeter) => Math.max(0, ...rows.flat().map((r) => meter(r, size) / (meter.factor ?? FIT_SAFETY)));
 
 /** Formatos angostos (vertical y cuadrado): la lista acomoda el texto midiéndolo (ver `fitRowsUniform`). */
 const isNarrow = (width: number, height: number) => width / height < 1.3;
@@ -216,13 +230,13 @@ export function wrapText(text: string, maxW: number, size: number, maxLines: num
  * Lista apilada para formato vertical (alto/ancho > 1,3): ocupa casi todo el ancho y buena parte del alto. Cada fila:
  * número (o tilde) arriba, nombre grande (~h1) y la línea debajo en hasta 2 renglones. Los tamaños salen de `theme.type`.
  */
-function stackedLayout(spec: StorySpec, theme: Theme, width: number, height: number): Omit<ListLayout, "barWs"> {
+function stackedLayout(spec: StorySpec, theme: Theme, width: number, height: number, slack: number): Omit<ListLayout, "barWs"> {
   const n = spec.topics.length;
   const marginX = Math.round(width * 0.085);
   const region = width - 2 * marginX;
   const H = height - 2 * Math.round(height * 0.07);
   const GAP = { num: 14, pad: 30 };
-  const nm = nameMeter(theme), lm = lineMeter(theme);
+  const nm = nameMeter(theme, slack), lm = lineMeter(theme, slack);
   const build = (sc: number) => {
     const base0 = Math.round(theme.type.hero * sc);
     const floor = Math.round(Math.max(48, base0 * 0.6));
@@ -266,7 +280,7 @@ function stackedLayout(spec: StorySpec, theme: Theme, width: number, height: num
     blockTop, blockH: b.blockH, barW: region, names: b.nameRows.map((r) => r.join(" ")), lines: b.lineRows.map((r) => r.join(" ")),
     // Lista apilada: se atraviesa por el centro del ancho de la fila (no por las primeras letras del nombre), así el zoom no empuja la línea hacia fuera del cuadro angosto.
     target: (i) => ({ x: left + region / 2, y: top + i * rowH + nameTop + b.nameH / 2 }),
-    stacked: true, numH: b.numH, numGap: GAP.num, lineRows: b.lineRows, nameRows: b.nameRows, textW: Math.round(b.textW), barTop, barLeft: 0,
+    stacked: true, numH: b.numH, numGap: GAP.num, lineRows: b.lineRows, nameRows: b.nameRows, textW: Math.round(b.textW), barTop, barLeft: 0, slack,
   };
 }
 
@@ -275,11 +289,11 @@ function stackedLayout(spec: StorySpec, theme: Theme, width: number, height: num
  * nombre y la bajada se acomodan midiéndolos: todo el ancho seguro, después hasta dos renglones cada uno y recién al final letra más chica (hasta un
  * piso legible). Nunca "…" en el nombre; en la bajada, solo si ni así entra.
  */
-function columnLayout(spec: StorySpec, theme: Theme, width: number, height: number): Omit<ListLayout, "barWs"> {
+function columnLayout(spec: StorySpec, theme: Theme, width: number, height: number, slack: number): Omit<ListLayout, "barWs"> {
   const n = spec.topics.length;
   const region = Math.max(600, width - 2 * theme.safe.x);
   const H = Math.max(300, height - 2 * theme.safe.y - 20);
-  const nm = nameMeter(theme), lm = lineMeter(theme);
+  const nm = nameMeter(theme, slack), lm = lineMeter(theme, slack);
   const nameBase = theme.type.h1 * 0.8;
   const lineBase = theme.type.body * 0.9;
   const build = (sc: number) => {
@@ -314,10 +328,12 @@ function columnLayout(spec: StorySpec, theme: Theme, width: number, height: numb
   const rowH = Math.floor(Math.min(b.blockH + 22, Hrow / n));
   const blockTop = Math.floor((rowH - b.blockH) / 2);
   const top = Math.round((height - n * rowH) / 2);
-  const rowW = Math.round(Math.min(region, Math.max(b.numW + b.textW, region * 0.78)));
+  // el ancho de la fila cuenta el texto con su holgura (`NARROW_SLACK`): con la letra más ancha o más grande el texto sigue dentro de la fila y la fila dentro del cuadro
+  const rowW = Math.round(Math.min(region, Math.max(b.numW + b.textW * slack, region * 0.78)));
   const left = Math.round((width - rowW) / 2);
   const barW = rowW - b.numW;
   return {
+    slack,
     left, top, rowW, rowH, nameSize: b.nameSize, lineSize: b.lineSize, numSize: b.numSize, numW: b.numW, nameH: b.nameH, lineH: b.lineH, blockTop, blockH: b.blockH, barW,
     names: b.nameRows.map((r) => r.join(" ")), lines: b.lineRows.map((r) => r.join(" ")),
     target: (i) => ({ x: left + b.numW + Math.round(barW * 0.35), y: top + i * rowH + blockTop + b.nameH / 2 }),
@@ -379,24 +395,46 @@ function inlineLayout(spec: StorySpec, theme: Theme, width: number, height: numb
  * 4 temas; con 5 o 6 todo se escala parejo (el nombre nunca baja de ~44 px). Todo en enteros: las posiciones
  * fraccionarias de capas compuestas se rasterizan según el historial de cuadros.
  */
-export function listLayout(spec: StorySpec, theme: Theme, width: number, height: number): ListLayout {
-  const L = baseLayout(spec, theme, width, height);
+export function listLayout(spec: StorySpec, theme: Theme, width: number, height: number, o: { strict?: boolean } = {}): ListLayout {
+  const L = baseLayout(spec, theme, width, height, !!o.strict);
   const byName = listOptions(spec.design).underline === "name";
   if (L.nameRows) { // formatos angostos: el subrayado "name" llega hasta el renglón más ancho del nombre (medido)
-    const nm = nameMeter(theme);
+    const nm = nameMeter(theme, L.slack ?? FIT_SAFETY);
     return { ...L, barWs: L.nameRows.map((rows) => (byName ? Math.max(24, Math.min(L.barW, Math.round(widest([rows], L.nameSize, nm)))) : L.barW)) };
   }
   return { ...L, barWs: L.names.map((nm) => (byName ? Math.max(24, Math.min(L.barW, Math.round(textWidth(nm, L.nameSize, AVG_BOLD)))) : L.barW)) };
 }
 
-function baseLayout(spec: StorySpec, theme: Theme, width: number, height: number): Omit<ListLayout, "barWs"> {
-  if (height / width > 1.3) return stackedLayout(spec, theme, width, height);
-  if (isNarrow(width, height)) return columnLayout(spec, theme, width, height);
+/** Pisos legibles (px a 1080 de lado corto): letra del nombre y de la bajada. Por debajo, la lista "entra" pero no se lee (`stories/fit.ts`). */
+export const NAME_FLOOR = 44;
+export const LINE_FLOOR = 26;
+/** Holguras que se prueban en orden en los formatos angostos: la de `NARROW_SLACK` y una intermedia; si ni así entra sin cortar ni bajar de los pisos, la de siempre (`FIT_SAFETY`). */
+const SLACKS = [NARROW_SLACK, 1.2];
+
+/** La lista entera, sin cortar con "…" y con la letra por encima de los pisos legibles. */
+function listOk(L: Omit<ListLayout, "barWs">, spec: StorySpec): boolean {
+  const norm = (x: string) => x.replace(/\s+/g, " ");
+  return L.nameSize >= NAME_FLOOR && L.lineSize >= LINE_FLOOR && L.names.every((n, i) => norm(n) === norm(spec.topics[i]!.name)) && L.lines.every((n, i) => norm(n) === norm(spec.topics[i]!.line));
+}
+
+/**
+ * Lista de un formato angosto con la mayor holgura (`NARROW_SLACK`, `SLACKS`) con la que entra entera y legible. `strict`: solo con la mayor (para `checkStoryFit`, que dice si el
+ * guion entra con la tipografía más ancha o más grande); sin `strict`, si no entra con ninguna usa la de siempre, para dibujar igual (más vale una lista justa que cortar un nombre).
+ */
+function narrowList(build: (slack: number) => Omit<ListLayout, "barWs">, spec: StorySpec, strict: boolean): Omit<ListLayout, "barWs"> {
+  if (strict) return build(NARROW_SLACK);
+  for (const sl of SLACKS) { const L = build(sl); if (listOk(L, spec)) return L; }
+  return build(FIT_SAFETY);
+}
+
+function baseLayout(spec: StorySpec, theme: Theme, width: number, height: number, strict: boolean): Omit<ListLayout, "barWs"> {
+  if (height / width > 1.3) return narrowList((sl) => stackedLayout(spec, theme, width, height, sl), spec, strict);
+  if (isNarrow(width, height)) return narrowList((sl) => columnLayout(spec, theme, width, height, sl), spec, strict);
   // formato ancho: la lista de siempre; solo si esa lista cortaría con "…" un nombre o una bajada (más de lo que entra con la estimación y la letra mínima)
   // se arma en columna con el texto medido y partido en renglones (`columnLayout`). Mientras nada se corte, el marcado y los píxeles son los de siempre.
   const wide = listOptions(spec.design).layout === "inline" && width / height >= 1.3 ? inlineLayout(spec, theme, width, height) : wideLayout(spec, theme, width, height);
   const cuts = wide.names.some((nm, i) => nm !== spec.topics[i]!.name) || wide.lines.some((ln, i) => ln !== spec.topics[i]!.line);
-  return cuts ? columnLayout(spec, theme, width, height) : wide;
+  return cuts ? narrowList((sl) => columnLayout(spec, theme, width, height, sl), spec, strict) : wide;
 }
 
 function wideLayout(spec: StorySpec, theme: Theme, width: number, height: number): Omit<ListLayout, "barWs"> {
@@ -764,10 +802,15 @@ export const titleCardMax = (theme: Theme, width: number) => Math.min(1700, widt
  */
 export function fitTitleNarrow(theme: Theme, text: string, width: number): TitleFit {
   const meter = nameMeter(theme);
+  const wide = nameMeter(theme, NARROW_SLACK);
   const maxW = titleCardMax(theme, width);
   const room = (s: number) => maxW - 2 * Math.round(s * 0.55) - 8;
   const rowsAt = (s: number) => wrapMeasured(text, room(s), s, meter);
-  const fits = (r: string[], s: number, max: number) => r.length <= max && r.every((x) => meter(x, s) <= room(s));
+  // el título se parte solo en el navegador (texto que fluye en el cartel): con una letra más ancha o más grande pasa a más renglones, pero una palabra sola no se parte:
+  // cada palabra tiene que entrar en el cartel con la holgura de los formatos angostos
+  const words = text.split(/\s+/).filter(Boolean);
+  const wordsFit = (s: number) => words.every((w) => wide(w, s) <= room(s));
+  const fits = (r: string[], s: number, max: number) => r.length <= max && r.every((x) => meter(x, s) <= room(s)) && wordsFit(s);
   const hero = theme.type.hero;
   const floor = Math.round(hero * TITLE_FLOOR), hard = Math.round(hero * TITLE_HARD_FLOOR);
   for (let s = Math.round(hero); s >= floor; s--) { const r = rowsAt(s); if (fits(r, s, TITLE_ROWS)) return { text, size: s, rows: r, ok: true }; }
@@ -791,7 +834,7 @@ type TextRect = { x: number; y: number; w: number; h: number };
 
 /** Cajas de todo el texto de la lista (número, nombre, bajada y, en la fila `lateI`, el subrayado), medidas con la tipografía del tema. */
 export function listTextRects(L: ListLayout, theme: Theme, lateI = -1, lift = 0): TextRect[] {
-  const nm = nameMeter(theme), lm = lineMeter(theme);
+  const nm = nameMeter(theme, L.slack ?? FIT_SAFETY), lm = lineMeter(theme, L.slack ?? FIT_SAFETY);
   const out: TextRect[] = [];
   const n = L.names.length;
   for (let i = 0; i < n; i++) {

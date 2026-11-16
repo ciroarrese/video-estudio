@@ -333,3 +333,60 @@ describe('transiciones con movimiento lento y fundidos al final del easing', () 
     expect(check([run({ ...gray, motion: 0, fade: 0.01 })], ['contrast'])).toEqual([]);
   });
 });
+
+describe('vacio: franja horizontal sin nada durante un plano sostenido (aviso, solo formatos angostos)', () => {
+  const VW = 1080, VH = 1920;
+  const ctx = (bands: number[][], extra: Partial<RuleContext> = {}): RuleContext => ({ frame: 3, width: VW, height: VH, runs: [], thresholds: DEFAULT_THRESHOLDS, occupancy: { bands, veil: 0 }, ...extra });
+  const same = (bands: number[][]) => [{ bands, veil: 0 }, { bands, veil: 0 }];
+  const gaps = (bands: number[][], extra: Partial<RuleContext> = {}) => runRules(ctx(bands, { neighbourOccupancy: same(bands), ...extra }), ['vacio']);
+
+  it('un hueco de más del 30 % entre dos elementos avisa (warn), con su posición', () => {
+    const f = gaps([[100, 500], [1200, 1800]]);
+    expect(f).toHaveLength(1);
+    expect(f[0]).toMatchObject({ rule: 'vacio', severity: 'warn', data: { y0: 500, y1: 1200, pct: 36 } });
+    expect(f[0]!.message).toMatch(/en el medio/);
+  });
+  it('un hueco menor que el 30 % no avisa', () => {
+    expect(gaps([[100, 800], [1300, 1800]])).toEqual([]); // 500 px = 26 %
+  });
+  it('un hueco en el borde (debajo de la ventana) avisa si el contenido no está centrado', () => {
+    const f = gaps([[150, 1200]]); // abajo 720 px (37 %), arriba 150 px
+    expect(f.map((x) => [x.rule, x.element.text])).toEqual([['vacio', 'franja vacía abajo']]);
+  });
+  it('un contenido centrado (márgenes parecidos arriba y abajo) es una composición: no avisa', () => {
+    expect(gaps([[700, 1200]])).toEqual([]); // 700 arriba y 720 abajo
+  });
+  it('no es un plano sostenido si el hueco no está en un cuadro vecino, ni con un velo cruzando', () => {
+    const bands = [[100, 500], [1200, 1800]];
+    expect(runRules(ctx(bands, { neighbourOccupancy: [{ bands: [[100, 1800]], veil: 0 }, { bands, veil: 0 }] }), ['vacio'])).toEqual([]);
+    expect(runRules(ctx(bands, { occupancy: { bands, veil: 0.5 }, neighbourOccupancy: same(bands) }), ['vacio'])).toEqual([]);
+    expect(runRules(ctx(bands, { neighbourOccupancy: [{ bands, veil: 0.3 }, { bands, veil: 0 }] }), ['vacio'])).toEqual([]);
+  });
+  it('en horizontal no corre, y un cuadro en blanco (sin ningún tramo) no tiene huecos que medir', () => {
+    expect(runRules({ ...ctx([[100, 500], [1200, 1800]]), width: 1920, height: 1080, neighbourOccupancy: same([[100, 500], [1200, 1800]]) }, ['vacio'])).toEqual([]);
+    expect(gaps([])).toEqual([]);
+  });
+  it('el umbral se cambia con --set vacio.minFraction', () => {
+    const t = mergeThresholds(parseOverrides(['vacio.minFraction=0.2']));
+    expect(runRules(ctx([[100, 800], [1300, 1800]], { thresholds: t, neighbourOccupancy: same([[100, 800], [1300, 1800]]) }), ['vacio'])).toHaveLength(1);
+  });
+});
+
+describe('texto-chico: texto por debajo del piso en un plano sostenido (aviso)', () => {
+  const k = (px: number, p: Partial<TextRun> = {}) => run({ screenPx: px, motion: 0, fade: 0, ...p });
+  it('avisa (warn) entre el mínimo de min-size y el piso; no por encima del piso ni por debajo de min-size (ahí es error de min-size)', () => {
+    const chico = k(19), justo = k(20), grande = k(30), error = k(15);
+    const f = check([chico, justo, grande, error], ['texto-chico']);
+    expect(f.map((x) => [x.element.testid, x.severity])).toEqual([[chico.testid, 'warn']]);
+  });
+  it('no avisa si el texto se mueve o está en fundido (no es un plano sostenido), si es adorno o si lo calla data-qa-ignore', () => {
+    const mueve = k(19, { motion: 30 }), funde = k(19, { fade: 0.2 }), adorno = k(19, { decor: true }), callado = k(19, { ignore: ['texto-chico'] });
+    expect(check([mueve, funde, adorno, callado], ['texto-chico'])).toEqual([]);
+  });
+  it('el piso sigue al lado corto del cuadro y se cambia con --set texto-chico.minPx1080', () => {
+    expect(runRules({ frame: 1, width: 1080, height: 1920, runs: [k(19)], thresholds: DEFAULT_THRESHOLDS } as RuleContext, ['texto-chico'])).toHaveLength(1);
+    expect(runRules({ frame: 1, width: 720, height: 1280, runs: [k(12.5)], thresholds: DEFAULT_THRESHOLDS } as RuleContext, ['texto-chico'])).toHaveLength(1); // piso 13,3 px a 720
+    const t = mergeThresholds(parseOverrides(['texto-chico.minPx1080=26']));
+    expect(check([k(24)], ['texto-chico'], t)).toHaveLength(1);
+  });
+});

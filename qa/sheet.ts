@@ -4,6 +4,7 @@ import { sampleFrames, type SampleSpec } from './sampling';
 import { openSession, sceneFrames } from './session';
 import { salidaPorDefecto } from '../render/dirs';
 import type { FormatName } from '../engine';
+import { comprobarFuentesDelSistema } from '../render/fuentesSistema';
 
 export type Cell = { frame: number; x: number; y: number; w: number; h: number; labelY: number };
 export type Layout = { width: number; height: number; cols: number; rows: number; labelH: number; cells: Cell[] };
@@ -48,6 +49,8 @@ export type SheetOptions = SampleSpec & {
   assets?: string[];
   /** Borrador: una fuente que no carga solo avisa. */
   allowMissingFonts?: boolean;
+  /** Una familia del sistema que el tema nombra sin archivo y no está instalada hace fallar (por defecto solo avisa). */
+  strictFonts?: boolean;
   log?: (m: string) => void;
 };
 export type SheetResult = { out: string; frames: number[]; width: number; height: number };
@@ -78,6 +81,8 @@ export async function makeSheet(o: SheetOptions): Promise<SheetResult> {
     const fontPx = Math.max(11, Math.min(18, Math.round(cellW / 22)));
     const layout = sheetLayout(frames, { cols: o.cols ?? 4, cellW, cellH, labelH: showLabels ? fontPx + 10 : 0, gap: 8, pad: 8 });
     const vp = await session.openPage();
+    // La hoja con otra tipografía que la del tema engaña: avisa (o falla con --strict-fonts) si una familia del sistema no está instalada.
+    await comprobarFuentesDelSistema(vp.page, meta.durationInFrames, { strict: !!o.strictFonts || /^(1|true|si|sí|yes)$/i.test(process.env.VE_STRICT_FONTS ?? ''), log: o.log ?? (() => {}) });
     const thumbs: string[] = [];
     for (const f of frames) {
       await vp.setFrame(f);

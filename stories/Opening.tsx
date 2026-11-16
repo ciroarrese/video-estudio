@@ -3,6 +3,7 @@ import { Easing, useFrame, useVideoConfig } from "../engine";
 import { Wash, World, kf, useCameraAt, exitThrough } from "../kit";
 import { entrance, handoffShift, staggerFrames, staggerOverride, surfaceStyle, textStyle, useTheme } from "../themes";
 import { fade, styleKey, xform } from "../fx/core/math";
+import { useStoryReserve } from "./subtitles";
 import { fitText, fitTitleNarrow, listLayout, openingWall, rigTransform, titleCardMax } from "./layout";
 import { Chip, HeadlineRow, HighlightedTitle, StoryStage, rowEntrance, scaler, useEase, useStorySpec } from "./shared";
 import { TopicContext, TopicHeadline, headlineDefaults } from "./topic";
@@ -53,10 +54,11 @@ export function Opening({ spec: specIn, first = 0, dock, through }: { spec: Stor
   const ease = useEase();
   const f = useFrame();
   const { width, height } = useVideoConfig();
+  const reserve = useStoryReserve(); // franja de los subtítulos (0 sin ellos): la lista y el cartel se acomodan en el resto del cuadro
   const dur = openingFrames(spec);
   const u = scaler(dur, OPENING_FRAMES);
   const n = spec.topics.length;
-  const L = listLayout(spec, theme, width, height);
+  const L = listLayout(spec, theme, width, height - reserve);
   const wall = openingWall(spec, height, width);
   const cx = width / 2, cy = height / 2;
 
@@ -139,13 +141,14 @@ export function Opening({ spec: specIn, first = 0, dock, through }: { spec: Stor
           transform,
           textAlign: "center",
           fontSize: tf.size,
+          fontFamily: tt.fontFamily,
           fontWeight: tt.fontWeight,
           color: theme.color.text,
           letterSpacing: tt.letterSpacing,
           lineHeight: 1.08,
         };
         return (
-          <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", pointerEvents: "none", zIndex: 3 }}>
+          <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", pointerEvents: "none", zIndex: 3, ...(reserve ? { paddingBottom: reserve } : {}) }}>
             <div key={styleKey(card)} style={card}>
               <HighlightedTitle text={tf.text} highlight={spec.title.highlight} loop={design.gradient?.loop} progress={kf(f, [u(10), u(46)], [0, 1], ease.out)} />
             </div>

@@ -31,7 +31,7 @@ npm run privacy -- <id> --deny videos/<slug>/prohibidos.txt --scan-source videos
 npm run sheet -- <id> --count 12        # y mirar la hoja
 ```
 
-Con `VE_VIDEOS_DIR` (videos fuera del repo) las rutas `videos/<slug>/...` de `--deny`, `--allow`, `--scan-source` y `--assets` se buscan también en esa carpeta; `npm run audio` pide rutas absolutas.
+Con `VE_VIDEOS_DIR` (videos fuera del repo) las rutas `videos/<slug>/...` de `--deny`, `--allow`, `--scan-source` y `--assets` se buscan también en esa carpeta; `npm run audio` las resuelve igual (las entradas tal cual y, si no existen, contra esa carpeta; las salidas caen en la carpeta del video).
 
 Cómo leer `qa`: la línea **`juzgados: N de M textos x cuadros (P%)`** dice cuánto texto se juzgó de verdad y por qué no se juzgó el resto (fuera del cuadro, casi transparente, tapado por una capa opaca, excluido con `data-qa-ignore="all"`); con menos de la mitad juzgado, un "0 errores" no dice nada. Mirá también cuántos hallazgos callaron las marcas (`callados`). `--repeat 2` corre el control dos veces y sale con código 3 si los informes difieren. Una marca `data-qa-ignore` lleva un comentario que dice por qué y nunca va en un contenedor más ancho que el elemento del que habla (`docs/reglas.md`). Reglas de maquetación para otro design system: `docs/guia-escenas.md`, sección 15.
 

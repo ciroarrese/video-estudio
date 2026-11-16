@@ -8,6 +8,7 @@ import { openSession, sceneFrames, type Stress } from './session';
 import type { FormatName } from '../engine';
 import { mergeThresholds, type ThresholdOverrides } from './thresholds';
 import { candidatesOf, probeReadable, reclassifyDetail } from './zoom';
+import { comprobarFuentesDelSistema } from '../render/fuentesSistema';
 
 export type QaOptions = SampleSpec & {
   videoId: string;
@@ -30,6 +31,8 @@ export type QaOptions = SampleSpec & {
   assets?: string[];
   /** Borrador: una fuente que no carga solo avisa. */
   allowMissingFonts?: boolean;
+  /** Una familia del sistema que el tema nombra sin archivo y no está instalada hace fallar (por defecto solo avisa; `--strict-fonts`). */
+  strictFonts?: boolean;
   /** Prueba de estres de tipografia (`--font-scale`, `--font-fallback`): ver qa/session.ts `Stress`. */
   stress?: Stress;
   log?: (m: string) => void;
@@ -81,17 +84,27 @@ async function runQaPass(o: QaOptions, honorFixedScale: boolean): Promise<{ resu
   const session = await openSession({ videoId: o.videoId, props: o.props, format: o.format, assets: o.assets, allowMissingFonts: o.allowMissingFonts, stress: o.stress, honorFixedScale, log: o.log });
   try {
     const { meta } = session;
-    const range = await sceneFrames(session, o.scene);
+    // `--rules story-fit` (solo el largo del guion de la historia): no mira cuadros, así que no hay muestreo ni páginas que abrir.
+    const soloFit = rules.length > 0 && rules.every((r) => r === 'story-fit');
+    const range = soloFit ? undefined : await sceneFrames(session, o.scene);
     const perScene = o.perScene ?? DEFAULT_PER_SCENE;
     if (!Number.isInteger(perScene) || perScene < 0) throw new Error('--per-scene debe ser un entero >= 0');
     // Cuadros anclados a cada escena (ver `anchoredFrames`): solo con el muestreo por defecto, sin rango ni cuadros pedidos.
     const porDefecto = !range && o.frames === undefined && o.every === undefined && perScene > 0;
     const scenesAll = porDefecto ? await session.scenes().catch(() => []) : [];
     const anchored = porDefecto ? anchoredFrames(scenesAll, meta.durationInFrames, perScene) : [];
-    const frames = sampleFrames(o, meta.durationInFrames, 24, range, anchored);
+    const frames = soloFit ? [] : sampleFrames(o, meta.durationInFrames, 24, range, anchored);
     const evenCount = porDefecto && (o.count ?? 24) > 0 ? sampleFrames({ count: o.count }, meta.durationInFrames, 24).length : porDefecto ? 0 : frames.length;
     const sampling = porDefecto && anchored.length ? { even: evenCount, anchored: anchored.length, perScene, scenes: scenesAll.length } : undefined;
-    const workers = Math.max(1, Math.min(o.concurrency ?? Math.min(cpus().length, 3), frames.length));
+    // La ocupación del cuadro (regla `vacio`) solo se mide en formatos angostos y con la regla activa.
+    const wantOccupancy = rules.includes('vacio') && meta.width / meta.height < 1.3;
+    const workers = soloFit ? 0 : Math.max(1, Math.min(o.concurrency ?? Math.min(cpus().length, 3), frames.length));
+    // Fuentes del sistema que el tema nombra sin archivo y no están instaladas (como `render`): avisa o, con `--strict-fonts`, falla. Una sola vez por corrida
+    // y no con el estrés de fuente de reemplazo (que pisa toda la pila y haría ver como faltante a la fuente de reemplazo).
+    if (honorFixedScale && !soloFit && !o.stress?.fontFallback) {
+      const chk = await session.openPage();
+      await comprobarFuentesDelSistema(chk.page, meta.durationInFrames, { strict: !!o.strictFonts || /^(1|true|si|sí|yes)$/i.test(process.env.VE_STRICT_FONTS ?? ''), log: o.log ?? (() => {}) });
+    }
     const queue = [...frames];
     const findings: Finding[] = [];
     const silenced: SilencedSummary = {};
@@ -107,7 +120,7 @@ async function runQaPass(o: QaOptions, honorFixedScale: boolean): Promise<{ resu
         const vp = await session.openPage();
         for (let f = queue.shift(); f !== undefined; f = queue.shift()) {
           await vp.setFrame(f);
-          const data = await collectRuns(vp, meta.width, meta.height);
+          const data = await collectRuns(vp, meta.width, meta.height, [], undefined, wantOccupancy);
           // Capturas (normal y con el texto oculto): el fondo para `contrast` y la evidencia de que el texto se ve para `visibleRuns` y `unjudged`.
           if (rules.includes('contrast') || rules.includes('unjudged')) await sampleBackgrounds(vp, data.runs, { bg: rules.includes('contrast'), ink: true });
           // Motion: compare with the neighbouring frames (f-1, f+1) to tell transitions from static defects.
@@ -116,10 +129,10 @@ async function runQaPass(o: QaOptions, honorFixedScale: boolean): Promise<{ resu
           for (const n of [f - 1, f + 1]) {
             if (n < 0 || n >= meta.durationInFrames) continue;
             await vp.setFrame(n);
-            neighbours.push(await collectRuns(vp, meta.width, meta.height, keys));
+            neighbours.push(await collectRuns(vp, meta.width, meta.height, keys, undefined, wantOccupancy));
           }
           applyMotion(data, neighbours);
-          const r = runRulesCounted({ frame: f, width: meta.width, height: meta.height, runs: data.runs, thresholds, signals: data.signals }, rules);
+          const r = runRulesCounted({ frame: f, width: meta.width, height: meta.height, runs: data.runs, thresholds, signals: data.signals, occupancy: data.occupancy, neighbourOccupancy: neighbours.flatMap((n) => (n.occupancy ? [n.occupancy] : [])) }, rules);
           findings.push(...r.findings);
           addJudged(judged, r.judged);
           for (const [rule, c] of Object.entries(r.silenced)) {
@@ -151,7 +164,8 @@ async function runQaPass(o: QaOptions, honorFixedScale: boolean): Promise<{ resu
       detail = r.detail;
     }
     // Largos del guion de una historia (regla `story-fit`): una sola vez por corrida, no por cuadro.
-    if (rules.includes('story-fit') && !o.scene) {
+    // Con `--scene` solo si la escena pedida es de la historia (apertura, vuelta o cierre: lo que arma `defineStory`; el contenido de un tema lo escribe cada video).
+    if (rules.includes('story-fit') && (!o.scene || (await isStoryBlock(session, o.scene)))) {
       const fit = await session.storyFit();
       if (fit && !fit.ok) {
         const el = { tag: 'story', testid: o.videoId, text: '', rect: { x: 0, y: 0, w: meta.width, h: meta.height } };
@@ -180,6 +194,13 @@ async function runQaPass(o: QaOptions, honorFixedScale: boolean): Promise<{ resu
   } finally {
     await session.close();
   }
+}
+
+/** `--scene <id|índice>` es una escena que arma la historia misma (`opening`, `interlude-N`, `interlude-reveal`, `closing`). */
+async function isStoryBlock(session: Awaited<ReturnType<typeof openSession>>, scene: string): Promise<boolean> {
+  const list = await session.scenes().catch(() => []);
+  const sc = /^\d+$/.test(scene) ? list[Number(scene)] : list.find((x) => x.id === scene || x.name === scene);
+  return !!sc && /^(opening|closing|interlude(-.+)?)$/.test(sc.id);
 }
 
 export const failsAt = (r: QaResult, level: Severity) => (level === 'warn' ? r.summary.errors + r.summary.warnings > 0 : r.summary.errors > 0);

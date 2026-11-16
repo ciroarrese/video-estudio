@@ -1,3 +1,4 @@
+import { useStoryReserve } from "./subtitles";
 import React from "react";
 import { Easing, random, useFrame, useVideoConfig } from "../engine";
 import { GradientText, Highlight, kf } from "../kit";
@@ -103,7 +104,7 @@ export function DefaultThumbnail({ index, name }: { index: number; name: string 
     <div style={{ width: PANEL.w, height: PANEL.h, ...surfaceStyle(theme, "card", { level: "lg" }), overflow: "hidden", position: "relative" }}>
       <div style={{ height: 52, display: "flex", alignItems: "center", gap: 12, padding: "0 24px", borderBottom: `1px solid ${theme.color.border}`, background: theme.color.surfaceAlt }}>
         <span style={{ width: 14, height: 14, borderRadius: pillR, background: col(0), flexShrink: 0 }} />
-        <span style={{ fontSize: t.size, fontWeight: title.fontWeight, color: theme.color.text, whiteSpace: "nowrap" }}>{t.text}</span>
+        <span style={{ fontSize: t.size, fontFamily: title.fontFamily, fontWeight: title.fontWeight, color: theme.color.text, whiteSpace: "nowrap" }}>{t.text}</span>
         <span style={{ marginLeft: "auto", fontSize: 26, fontWeight: theme.font.weights.stat, ...numStyle }}>{String(index + 1).padStart(2, "0")}</span>
       </div>
       {guides}
@@ -154,16 +155,17 @@ export function Closing({ spec: specIn, scenes = [] }: { spec: StorySpec; scenes
   const ease = useEase();
   const f = useFrame();
   const { width, height } = useVideoConfig();
+  const reserve = useStoryReserve(); // franja de los subtítulos (0 sin ellos): los paneles y la firma se acomodan en el resto del cuadro
   const dur = closingFrames(spec);
   const u = scaler(dur, CLOSING_FRAMES);
   const n = spec.topics.length;
   const cx = width / 2, cy = height / 2;
   const { inner, outer, slots } = closingWall(spec, width, height);
-  const panels = panelLayout(n, width, height);
+  const panels = panelLayout(n, width, height - reserve);
   const stagger = Math.min(6, 30 / n);
   // cuánto se acerca cada panel a la cámara al entrar (menos en los formatos donde los paneles llenan el cuadro)
-  const camStart = closingCamStart(panels, theme, spec.topics.map((t) => t.name), width, height);
-  const lifts = panels.map((c, i) => panelEntryLift(c, theme, spec.topics[i]!.name, pillBudget(panels, i, width), width, height, camStart));
+  const camStart = closingCamStart(panels, theme, spec.topics.map((t) => t.name), width, height - reserve);
+  const lifts = panels.map((c, i) => panelEntryLift(c, theme, spec.topics[i]!.name, pillBudget(panels, i, width), width, height - reserve, camStart));
   const T = { wall: u(130), fold: [u(170), u(200)] as [number, number], fly: [u(200), u(254)] as [number, number], light: u(262), pull: u(372), wash: [u(368), u(398)] as [number, number], logo: closingLogoAt(dur), sign: u(418) };
 
   const cam = {
@@ -318,7 +320,7 @@ export function Closing({ spec: specIn, scenes = [] }: { spec: StorySpec; scenes
           con `visibility: hidden`: ocupa su lugar (la columna no se corre al entrar la siguiente) pero no tapa ni cuenta como texto */}
       {/* el telón es una transición, como `Wash`: lleva `data-qa-veil` y `covered` callado (tapar el muro es su trabajo; el texto del muro es adorno) */}
       {wash > 0 && cover && <div key={`${cover.kind}-${wash >= 1 ? "full" : "part"}`} data-qa-veil={Math.min(1, wash).toFixed(3)} data-qa-ignore="covered" style={{ position: "absolute", inset: 0, ...cover.style, zIndex: 500 }} />}
-      <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", flexDirection: "column", gap: 40, zIndex: 600 }}>
+      <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", flexDirection: "column", gap: 40, zIndex: 600, ...(reserve ? { paddingBottom: reserve } : {}) }}>
         {signLines.slot && <div key={`slot-${styleKey({ ...fadeIn(logo), t: xform({ scale: 0.92 + logo * 0.08 }) })}`} style={{ ...fadeIn(logo), transform: xform({ scale: 0.92 + logo * 0.08 }), maxWidth: signW, display: "flex", justifyContent: "center" }}>{signLines.slot}</div>}
         {!signLines.slot && signLines.logo && (
           <div key={`logo-${styleKey({ ...fadeIn(logo), t: xform({ scale: 0.92 + logo * 0.08 }) })}`} style={{ ...fadeIn(logo), transform: xform({ scale: 0.92 + logo * 0.08 }), display: "flex" }}>
@@ -328,7 +330,7 @@ export function Closing({ spec: specIn, scenes = [] }: { spec: StorySpec; scenes
         {sf && (
           <div
             key={`text-${styleKey({ ...fadeIn(textIn), t: xform({ y: Math.round((1 - textIn) * 16) }) })}`}
-            style={{ maxWidth: signW, textAlign: "center", fontSize: sf.size, lineHeight: 1.12, fontWeight: titleStyle.fontWeight, color: theme.color.text, letterSpacing: titleStyle.letterSpacing, ...fadeIn(textIn), transform: xform({ y: Math.round((1 - textIn) * 16) }) }}
+            style={{ maxWidth: signW, textAlign: "center", fontSize: sf.size, lineHeight: 1.12, fontFamily: titleStyle.fontFamily, fontWeight: titleStyle.fontWeight, color: theme.color.text, letterSpacing: titleStyle.letterSpacing, ...fadeIn(textIn), transform: xform({ y: Math.round((1 - textIn) * 16) }) }}
           >
             {hasMark ? <RichText text={sf.text} /> : signText(<RichText text={sf.text} />)}
           </div>

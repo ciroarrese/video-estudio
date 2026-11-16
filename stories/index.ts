@@ -24,3 +24,5 @@ export { storyBudget, formatStoryBudget, budgetFromScenes, MIN_BLOCK_FRAMES } fr
 export type { StoryBudget } from "./budget";
 export { checkStoryFit, formatFitReport, fitSize, FIT_MARGIN, NAME_FLOOR, LINE_FLOOR, MAX_NAME_ROWS } from "./fit";
 export type { FitReport, FitIssue, FitIssueKind } from "./fit";
+export { useStoryReserve, useSubtitleBand, subtitleReserve } from "./subtitles";
+export type { StorySubtitles } from "./subtitles";

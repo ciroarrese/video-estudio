@@ -81,20 +81,18 @@ Props: `cues` (segundos), `estilo` (`"bloque"` por defecto o `"karaoke"`), `offs
 
 **Determinismo.** Función pura del cuadro y de las props: sin estado, sin azar, sin CSS animado. Probada con `kit/Subtitles.test.tsx` (mismo cuadro, mismo HTML, en cualquier orden) y con `render --check` sobre el ejemplo en los tres formatos.
 
-**Con una historia (`defineStory`).** `defineStory` no tiene una capa superior donde poner los subtítulos. Se arma el video a mano con `composeStory`, que devuelve el componente de la historia, y se le pone `Subtitles` encima:
+**Con una historia (`defineStory`): la opción `subtitles`.** Es el camino recomendado; no hace falta armar el video a mano con `composeStory`.
 
 ```tsx
-const { component: Story, durationInFrames } = composeStory(spec, scenes);
-const Video = () => (
-  <ThemeProvider theme={theme}>
-    <Story />
-    <div style={{ position: "absolute", inset: 0, zIndex: 200, pointerEvents: "none" }}><Subtitles cues={CUES} /></div>
-  </ThemeProvider>
-);
-export default defineVideo({ id: "<slug>", component: Video, fps: 30, width: 1920, height: 1080, durationInFrames, formats: ["vertical", "cuadrado"] });
+export default defineStory({
+  id: "<slug>", spec, scenes, formats: ["vertical", "cuadrado"],
+  subtitles: { cues: CUES /* , estilo: "karaoke", offsetSec, size, bottom */ },
+});
 ```
 
-Se pierden las escenas con nombre (`--scene`, `--list-scenes`) y el aviso de largos (`story-fit`) que registra `defineStory`; si hacen falta, se pide una opción de capa superior en `stories/` (no es parte de este kit). Una escena suelta (`defineVideo` con una escena) no tiene el problema.
+`cues` son los subtítulos en segundos de **todo el video** (a mano, de `subtitulosDeGuion` o de un SRT/VTT); `estilo`, `offsetSec`, `size` y `bottom` son los de `Subtitles`. La historia los dibuja con `kit/Subtitles` por encima de todo (zIndex alto, sin tocar el orden de lo demás) y conserva todo lo de `defineStory`: `--scene`, `--list-scenes` y `story-fit`. Además **deja libre la franja `subtitleBand`** en cada formato: la lista de la apertura y de las vueltas, el cartel del título, los paneles y la firma del cierre y la tira de la vuelta compacta se acomodan en el cuadro menos esa franja (en vertical son unos 620 px de abajo; en horizontal, unos 200; el fondo de nubes y el muro de etiquetas siguen a pantalla completa, son adorno), y `checkStoryFit` / `story-fit` miden con ese espacio de menos (`subtitleReserve(theme, { width, height }, subtitles)`). **Las escenas de tema las escribe cada video**: usan `useSubtitleBand()` (el `Rect` de la franja, o `null` si la historia no lleva subtítulos) o `useStoryReserve()` (los px que se reservan abajo) para no pisarla; el ejemplo `examples/story-demo-subtitulos` (`story-demo-subtitulos`, tres formatos) muestra la escena y pasa `--check`, `qa` y el estrés de tipografía. Una escena suelta (`defineVideo` con una escena) usa `subtitleBand` directamente, como `subtitulos-demo`.
+
+El camino viejo (`composeStory` + `defineVideo` con `Subtitles` encima) ya no se recomienda: pierde `--scene`, `--list-scenes` y `story-fit`, y la lista, el cartel y el cierre no dejan libre la franja.
 
 ## Subtítulos desde el guion (sin locución)
 

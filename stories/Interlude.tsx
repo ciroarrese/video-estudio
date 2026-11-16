@@ -1,3 +1,4 @@
+import { useStoryReserve } from "./subtitles";
 import React from "react";
 import { Easing, useFrame, useVideoConfig } from "../engine";
 import { Wash, World, kf, useCameraAt, exitThrough } from "../kit";
@@ -78,12 +79,13 @@ export function Interlude({ spec: specIn, done, skip = [], next: nextProp, ticks
   const ease = useEase();
   const f = useFrame();
   const { width, height } = useVideoConfig();
+  const reserve = useStoryReserve(); // franja de los subtítulos (0 sin ellos)
   const dur = reveal ? interludeRevealFrames(spec) : interludeFrames(spec);
   const stage = reveal && isStageReveal(spec);
   const u = scaler(dur, reveal ? revealBase(spec) : INTERLUDE_FRAMES);
   const n = spec.topics.length;
   // la lista se arma para las n filas desde el primer cuadro de la vuelta de revelación (el lugar de la fila nueva ya está, sin saltos al entrar)
-  const L = listLayout(spec, theme, width, height);
+  const L = listLayout(spec, theme, width, height - reserve);
   const next = reveal ? -1 : (nextProp ?? nextTopic(n, done, skip));
   const lastTick = reveal ? [...Array(n - 1).keys()].filter((i) => !skip.includes(i)).slice(-1) : [];
   const ticks = ticksProp ?? (reveal ? lastTick : undefined);
@@ -125,7 +127,7 @@ export function Interlude({ spec: specIn, done, skip = [], next: nextProp, ticks
   // Formatos angostos (vertical y cuadrado): la miniatura se muestra grande (al menos el 30 % del ancho del cuadro) en el lugar libre más cercano a la fila nueva, sin pisar el
   // texto de la lista (`revealThumbRect`, con las cajas medidas); si no hay lugar (cuadrado con la lista llena), la lista se aparta un momento y la miniatura se muestra en el
   // centro (`spotlight`). Desde ahí vuela achicándose hasta el lugar del número.
-  const nt = S && narrowFmt ? revealThumbRect(L, theme, lateI, width, height) : null;
+  const nt = S && narrowFmt ? revealThumbRect(L, theme, lateI, width, height - reserve) : null;
   const spot = nt?.mode === "spotlight";
 
   // ---- revelación escenificada: barrido de luz sobre la fila nueva y miniatura del tema que vuela hasta el lugar del número
