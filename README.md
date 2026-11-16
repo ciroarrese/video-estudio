@@ -10,7 +10,7 @@ El nombre que ves es "Video Studio"; el repo, el paquete npm, el alias de import
 
 - **Node 22 o superior** (`node -v`).
 - **ffmpeg y ffprobe** en el PATH (`ffmpeg -version`): arman el MP4 y mezclan el sonido.
-- **Chromium vía Playwright**: lo instala el paso 2 de abajo. Si ya tenés un Chrome o Chromium, alcanza con `VE_CHROMIUM=/ruta/al/chrome` (en ese caso igual hace falta el paquete `playwright`).
+- **Chromium vía Playwright**: lo instala el paso 2 de abajo. Si ya tenés un Chrome o Chromium, alcanza con `VE_CHROMIUM=/ruta/al/chrome` (en ese caso igual hace falta el paquete `playwright`, que ya trae `npm install`).
 - Para producir un video con ayuda: un agente de código abierto en la carpeta del repo. Está desarrollado y probado con [Claude Code](https://claude.com/claude-code); con otros agentes (Codex CLI, Cursor, Gemini CLI...) el flujo es el mismo pero no está probado de punta a punta (ver [AGENTS.md](AGENTS.md)).
 
 En Windows se puede usar PowerShell nativo (sin bash) o WSL 2. <!-- CI-CONDICIONAL-3 -->La instalación se prueba en cada cambio con integración continua en Linux, macOS y Windows (ver `.github/workflows/instalacion.yml`). <!-- /CI-CONDICIONAL-3 -->Instrucciones por sistema operativo, problemas frecuentes y cómo usar la skill: **[docs/instalacion.md](docs/instalacion.md)**.
@@ -23,8 +23,7 @@ git clone https://github.com/ciroarrese/video-studio.git
 cd video-studio
 
 # 2. Instalar (una vez)
-npm install
-npm i -D playwright
+npm install                           # incluye el paquete playwright
 npx playwright install chromium       # en Linux: npx playwright install --with-deps chromium
 
 # 3. Diagnóstico: Node, Chromium, ffmpeg, carpetas de salida (dice qué falta y cómo arreglarlo)

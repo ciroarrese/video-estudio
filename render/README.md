@@ -122,7 +122,7 @@ Las pruebas que necesitan videos propios usan `withTempVideos` (`render/testing.
 
 Causa del listado vacío que había: `import.meta.glob` de vite con una ruta relativa que sale del proyecto (`../../../../tmp/...`) devuelve un mapa vacío, y se llevaba también los ejemplos. Ahora `vite.config.ts` saca los patrones de `videos/` y agrega imports dinámicos con ruta absoluta de lo que encuentra en la carpeta (se escanea al compilar; al agregar una carpeta nueva el hash del bundle cambia solo).
 
-**Armar la carpeta.** `VE_VIDEOS_DIR=/ruta/mis-videos bash templates/nuevo.sh escena <slug> <nombre>` escribe ahí (en vez de en `videos/`) con los imports por alias (`video-estudio/engine`, ...) y crea `tsconfig.json` y `env.d.ts` si faltan (`... nuevo.sh externo` solo prepara esos dos). Los modelos están en `templates/externo/` (`tsconfig.json` con `paths` a este clon, sin `baseUrl` porque TypeScript 7 lo rechaza; `types: []` porque `vite/client` no se resuelve desde afuera; `env.d.ts` declara `*?url`, `*?raw`, imágenes, fuentes y audio; `react` y `react-dom` se resuelven a los tipos del clon). `npm run typecheck` revisa también esa carpeta cuando `VE_VIDEOS_DIR` está definida; `npm run typecheck:videos` la exige. `templates/tema-informe.ts` lee el tema de `<VE_VIDEOS_DIR>/<slug>/theme.ts` (o de una ruta a un `.ts`) con el mismo vite del proyecto, así que resuelve el alias y tolera los imports `?url`.
+**Armar la carpeta.** `VE_VIDEOS_DIR=/ruta/mis-videos npm run nuevo -- escena <slug> <nombre>` escribe ahí (en vez de en `videos/`) con los imports por alias (`video-estudio/engine`, ...) y crea `tsconfig.json` y `env.d.ts` si faltan (`... npm run nuevo -- externo` solo prepara esos dos). Los modelos están en `templates/externo/` (`tsconfig.json` con `paths` a este clon, sin `baseUrl` porque TypeScript 7 lo rechaza; `types: []` porque `vite/client` no se resuelve desde afuera; `env.d.ts` declara `*?url`, `*?raw`, imágenes, fuentes y audio; `react` y `react-dom` se resuelven a los tipos del clon). `npm run typecheck` revisa también esa carpeta cuando `VE_VIDEOS_DIR` está definida; `npm run typecheck:videos` la exige. `templates/tema-informe.ts` lee el tema de `<VE_VIDEOS_DIR>/<slug>/theme.ts` (o de una ruta a un `.ts`) con el mismo vite del proyecto, así que resuelve el alias y tolera los imports `?url`.
 
 Cómo importar el motor desde un video de afuera: con el alias `video-estudio/<carpeta>`, que apunta a la carpeta del repo.
 
@@ -208,7 +208,18 @@ Render completo de `story-demo` (1590 cuadros, 53 s, 1920x1080, con 3D y desenfo
 
 ## Cache y salidas con videos privados
 
-Con `VE_VIDEOS_DIR` (videos en una carpeta fuera del clon) la cache de compilación (bundle con fuentes, logos y código de las escenas, segmentos, cuadros) y las salidas por defecto (mp4, hojas) **no se escriben en el clon público**: van a `<VE_VIDEOS_DIR>/.ve-cache/` y `<VE_VIDEOS_DIR>/out/`. Sin la variable siguen en `.ve-cache/` y `out/` del clon (ignoradas por git). Se pueden forzar con `VE_CACHE_DIR` y `VE_OUT_DIR` (rutas absolutas o relativas al directorio actual); `--out` sigue mandando sobre todo. La carpeta `out/` de la carpeta externa no cuenta como código del video ni entra en el hash.
+Con `VE_VIDEOS_DIR` (videos en una carpeta fuera del clon) la cache de compilación (bundle con fuentes, logos y código de las escenas, segmentos, cuadros) y las salidas por defecto (mp4, hojas) **no se escriben en el clon público**: van a `<VE_VIDEOS_DIR>/.ve-cache/` y `<VE_VIDEOS_DIR>/out/`. Sin la variable siguen en `.ve-cache/` y `out/` del clon (ignoradas por git). Se pueden forzar con `VE_CACHE_DIR` y `VE_OUT_DIR` (rutas absolutas o relativas al directorio actual); `--out` sigue mandando sobre todo (ver la regla de abajo). La carpeta `out/` de la carpeta externa no cuenta como código del video ni entra en el hash.
+
+**Regla de `--out` (y `--json` de `qa`/`privacy`, `--out` de `sheet`, y `--out`/`--junto-a` de `audio` cuando empiezan con `out/`)**, función `resolverSalida` de `render/dirs.ts`:
+
+1. Una ruta absoluta no cambia.
+2. Sin `VE_VIDEOS_DIR` ni `VE_OUT_DIR`, una relativa cuenta desde el directorio actual (`out/x.mp4` queda en `out/` de donde corras el comando).
+3. Con alguna de las dos, una relativa que empieza con `out/` (o `./out/`) usa la carpeta de salidas como si fuera ese `out`: `VE_OUT_DIR` si está definida, si no `<VE_VIDEOS_DIR>/out` (`--out out/x.mp4` da `<VE_VIDEOS_DIR>/out/x.mp4`; `--out out/a/x.mp4`, `<VE_VIDEOS_DIR>/out/a/x.mp4`).
+4. Con alguna de las dos, cualquier otra relativa cuelga de `VE_VIDEOS_DIR` (o, si solo hay `VE_OUT_DIR`, de esa carpeta): `--out x.mp4` da `<VE_VIDEOS_DIR>/x.mp4`.
+
+Así una ruta relativa nunca cae dentro del clon cuando hay carpeta externa. Los comandos imprimen la ruta final absoluta (`listo: ...`, `hoja: ...`, `informe: ...`).
+
+`npm run render -- --list` con `VE_VIDEOS_DIR` agrega arriba una línea que dice que las carpetas `videos/<slug>` de la lista están en `<VE_VIDEOS_DIR>/<slug>` (la lista las sigue mostrando con el prefijo `videos/`).
 
 `npm run clean` borra `.ve-cache/` y `out/` del clon y, si está definida, de la carpeta externa (o las de `VE_CACHE_DIR`/`VE_OUT_DIR`); no toca los videos.
 

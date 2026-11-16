@@ -68,7 +68,7 @@ ffmpeg -version
 ffprobe -version
 ```
 
-Después seguí **"Descargar el repo"** e **"Instalar, paso a paso"** más abajo: los comandos son los mismos (`git clone`, `npm install`, `npm i -D playwright`, `npx playwright install chromium`, `npm run doctor`, `npm run render -- hello`). La integración continua instala ffmpeg con Chocolatey (`choco install ffmpeg`); `winget` y `scoop` son equivalentes pero no se ejercitan en esa prueba. Notas para Windows:
+Después seguí **"Descargar el repo"** e **"Instalar, paso a paso"** más abajo: los comandos son los mismos (`git clone`, `npm install`, `npx playwright install chromium`, `npm run doctor`, `npm run render -- hello`). La integración continua instala ffmpeg con Chocolatey (`choco install ffmpeg`); `winget` y `scoop` son equivalentes pero no se ejercitan en esa prueba. Notas para Windows:
 
 - Para una variable de entorno se escribe `$env:VE_VIDEOS_DIR = "C:\Users\vos\mis-videos"` (dura hasta cerrar esa ventana; para dejarla fija, "Variables de entorno" del sistema). La forma `VE_X=valor comando` es de bash y no existe en PowerShell: primero se define la variable y después se corre el comando en otra línea.
 - Crear una escena: `npm run nuevo -- escena <slug> <nombre>` (no `bash templates/nuevo.sh`).
@@ -91,7 +91,7 @@ git clone https://github.com/ciroarrese/video-studio.git
 cd video-studio
 ```
 
-(El clon crea la carpeta `video-studio`; todo lo que sigue se corre desde ahí.) Sin Git: en la página del repo, "Code" y "Download ZIP"; descomprimilo y abrí una terminal en la carpeta. Un ZIP no sirve para actualizar con `git pull`: para eso conviene el clon.
+(El clon crea la carpeta `video-studio`; todo lo que sigue se corre desde ahí. Si la carpeta se llama distinto, o la renombraste, no importa: donde esta guía dice `video-studio` leé "la carpeta donde clonaste".) Sin Git: en la página del repo, "Code" y "Download ZIP"; descomprimilo y abrí una terminal en la carpeta. Un ZIP no sirve para actualizar con `git pull`: para eso conviene el clon.
 
 ## Instalar, paso a paso
 
@@ -101,20 +101,19 @@ cd video-studio
 npm install
 ```
 
-Esperado: termina con una línea como `added 96 packages` y `found 0 vulnerabilities`. Medido: unos 8 s con caché de npm; con descarga desde cero, de 20 s a un minuto.
+Incluye el paquete `playwright`, que está declarado en `package.json` (no hay que agregarlo aparte). Esperado: termina con una línea como `added 98 packages` y `found 0 vulnerabilities`. Medido: unos 8 s con caché de npm; con descarga desde cero, de 20 s a un minuto.
 
 **2. Playwright y Chromium.**
 
 ```bash
-npm i -D playwright
 npx playwright install chromium
 ```
 
-En Linux, la segunda línea es `npx playwright install --with-deps chromium`: además de bajar el navegador instala las bibliotecas del sistema que Chromium necesita (pide `sudo`); en macOS y Windows no hace falta. Es lo mismo en bash y en PowerShell.
+En Linux, el comando es `npx playwright install --with-deps chromium`: además de bajar el navegador instala las bibliotecas del sistema que Chromium necesita (pide `sudo`); en macOS y Windows no hace falta. Es lo mismo en bash y en PowerShell.
 
-Esperado: la primera línea termina en segundos; la segunda baja Chromium (cientos de MB; unos minutos según tu conexión; medido en Linux: unos 20 s con buena conexión) y no hace nada si ya lo tenés. `npm i -D playwright` agrega `playwright` a tu `package.json` y a `package-lock.json` (es una dependencia opcional del proyecto, por eso no viene incluida): ver "Actualizar" para no pelearte con `git pull`. <!-- CI-CONDICIONAL-2 -->La descarga real de Chromium con `npx playwright install chromium` se prueba en cada cambio con integración continua en Linux, macOS y Windows (ver `.github/workflows/instalacion.yml`). <!-- /CI-CONDICIONAL-2 -->
+Esperado: baja Chromium (cientos de MB; unos minutos según tu conexión; medido en Linux: unos 20 s con buena conexión) y no hace nada si ya lo tenés. El paquete `playwright` ya viene con `npm install` y este comando no modifica `package.json` ni `package-lock.json`, así que `git pull` no se traba. <!-- CI-CONDICIONAL-2 -->La descarga real de Chromium con `npx playwright install chromium` se prueba en cada cambio con integración continua en Linux, macOS y Windows (ver `.github/workflows/instalacion.yml`). <!-- /CI-CONDICIONAL-2 -->
 
-Si ya tenés Chrome o Chromium y no querés bajar otro, saltá la segunda línea y definí `VE_CHROMIUM` con la ruta del ejecutable (macOS: `/Applications/Google Chrome.app/Contents/MacOS/Google Chrome`; Linux: lo que devuelva `which chromium` o `which google-chrome`); el paquete `playwright` se instala igual. Un Chrome muy distinto del que espera Playwright puede dar capturas distintas: si el resultado te sorprende, usá el que baja Playwright.
+Si ya tenés Chrome o Chromium y no querés bajar otro, salteá este comando y definí `VE_CHROMIUM` con la ruta del ejecutable (macOS: `/Applications/Google Chrome.app/Contents/MacOS/Google Chrome`; Linux: lo que devuelva `which chromium` o `which google-chrome`); el paquete `playwright` se instala igual. Un Chrome muy distinto del que espera Playwright puede dar capturas distintas: si el resultado te sorprende, usá el que baja Playwright.
 
 **3. Diagnóstico.**
 
@@ -173,26 +172,28 @@ La skill es el archivo `.claude/skills/video-estudio/SKILL.md`; las convenciones
 
 Claude Code lee `CLAUDE.md` y carga las skills de `.claude/skills/` del proyecto abierto.
 
-- **Terminal:** `cd video-studio` y `claude`. Pedí lo que quieras ("haceme un video de...") y la skill `video-estudio` se activa por lo que pedís; si no, nombrala: "usá la skill video-estudio".
-- **App de escritorio y extensión de editor:** abrí la **carpeta `video-studio`** como proyecto (no una carpeta de más arriba) y pedí lo mismo en el chat. Es el mismo repo y las mismas skills; no se probaron una por una.
+- **Terminal:** `cd <carpeta-donde-clonaste>` (por defecto `video-studio`) y `claude`. Pedí lo que quieras ("haceme un video de...") y la skill `video-estudio` se activa por lo que pedís; si no, nombrala: "usá la skill video-estudio".
+- **App de escritorio y extensión de editor:** abrí la **carpeta del clon** (`video-studio` por defecto) como proyecto (no una carpeta de más arriba) y pedí lo mismo en el chat. Es el mismo repo y las mismas skills; no se probaron una por una.
 - **Web o nube:** el repo tiene que estar en una cuenta de GitHub tuya conectada (un fork o una copia propia). El entorno de la nube necesita Node 22 o superior, ffmpeg, ffprobe y Chromium, y salida de red para `npm install`; lo primero que conviene pedirle es `npm run doctor`. Probado: en una sesión de nube con esos programas ya instalados, `npm run render -- hello`, la hoja y `qa` anduvieron. No probado: preparar un entorno desde cero y bajar los MP4 resultantes a tu máquina (los archivos quedan en el entorno de la sesión).
 
 ### Codex CLI
 
-Codex CLI lee `AGENTS.md` de la raíz del repo, que ya está en el repo y manda al agente a seguir `SKILL.md` etapa por etapa.
+Según su documentación (no verificado acá), Codex CLI lee `AGENTS.md` de la raíz del repo; ese archivo ya está en el repo y manda al agente a leer `CLAUDE.md` y a seguir `SKILL.md` etapa por etapa.
 
-1. `cd video-studio` y abrí `codex`.
-2. Primera frase: "Leé `AGENTS.md` y `.claude/skills/video-estudio/SKILL.md` y, siguiendo la skill etapa por etapa y esperando mi aprobación en cada una, haceme un video de ...".
+1. `cd <carpeta-donde-clonaste>` y abrí `codex`.
+2. Primera frase: "Leé `AGENTS.md`, `CLAUDE.md` y `.claude/skills/video-estudio/SKILL.md` y, siguiendo la skill etapa por etapa y esperando mi aprobación en cada una, haceme un video de ...".
 
-No se asume que Codex cargue skills desde `.claude/skills/`: por eso la frase le nombra el archivo. No probado de punta a punta.
+No se asume que Codex cargue skills desde `.claude/skills/`: por eso la frase le nombra el archivo. No probado con Codex CLI.
+
+Lo que sí se verificó, con un agente simulado que solo lee `AGENTS.md` (no es una prueba con Codex CLI ni con ningún otro producto): que el contenido alcanza para llegar a la skill y producir una escena con su render, sin usar herramientas propias de un agente (solo terminal, `npm` y escritura de archivos).
 
 ### Cualquier otro agente que lea archivos y ejecute comandos (Cursor, Gemini CLI y otros)
 
-1. Abrí el agente en la carpeta `video-studio`.
+1. Abrí el agente en la carpeta donde clonaste el repo (`video-studio` por defecto).
 2. Si tu agente lee un archivo de instrucciones propio (cada uno usa un nombre y una ubicación distintos; mirá su documentación), apuntalo a `AGENTS.md` y a `CLAUDE.md`. Si no, no hace falta: alcanza con la primera frase.
 3. Primera frase, siempre la misma: "Leé `AGENTS.md`, `CLAUDE.md` y `.claude/skills/video-estudio/SKILL.md` antes de empezar. Seguí la skill al pie de la letra, etapa por etapa, esperando mi aprobación en cada una. Quiero un video de ...".
 
-Qué no se probó: ningún agente que no sea Claude Code. El repo no incluye archivos de reglas propios de Cursor ni de Gemini CLI a propósito, para no afirmar convenciones que no se verificaron: si tu agente soporta un archivo de reglas, creá uno que diga "seguí `AGENTS.md`".
+Qué no se probó: ningún agente que no sea Claude Code (ver la verificación con un agente simulado, arriba, en Codex CLI). El repo no incluye archivos de reglas propios de Cursor ni de Gemini CLI a propósito, para no afirmar convenciones que no se verificaron: si tu agente soporta un archivo de reglas, creá uno que diga "seguí `AGENTS.md`".
 
 Lo que sí pide la skill a cualquier agente: poder ejecutar `npm run ...` (y, en Linux, macOS o WSL, comandos de bash), leer imágenes (para mirar las hojas de cuadros; si el agente no las ve, mirá vos las hojas y decile qué corregir) y escribir en `videos/<slug>/`.
 
@@ -260,23 +261,23 @@ Agente:  Entendí: el Tema 2, Recordatorios. ¿Es ese? ...
 
 La skill y todos sus comandos son relativos a la raíz del repo (`npm run ...`, `docs/`, `templates/`), así que **el agente tiene que correr en el repo**. Hay dos formas.
 
-**A. Abrir el agente en el repo y que el video viva afuera (la que está probada).** Es lo de "Material privado": `export VE_VIDEOS_DIR=/ruta/a/tu/proyecto/videos` y abrí el agente en `video-studio`. Los videos, la caché y las salidas quedan en tu carpeta; el repo no se toca. Con `npm run nuevo -- escena <slug> <nombre>` la carpeta recibe un `tsconfig.json` y un `env.d.ts` para que tu editor entienda los imports. Probado acá: crear una escena en una carpeta externa, listarla con `render -- --list` y renderizar un tramo (`out/` queda en esa carpeta).
+**A. Abrir el agente en el repo y que el video viva afuera (la que está probada).** Es lo de "Material privado": `export VE_VIDEOS_DIR=/ruta/a/tu/proyecto/videos` y abrí el agente en la carpeta del clon. Los videos, la caché y las salidas quedan en tu carpeta; el repo no se toca. Con `--out out/x.mp4` la ruta relativa cae en `<VE_VIDEOS_DIR>/out/x.mp4` (y cada comando imprime la ruta final absoluta). Si tu agente corre cada comando en un shell nuevo, la variable va en cada uno: `cd <ruta-del-clon> && VE_VIDEOS_DIR=<carpeta> npm run ...`. Con `npm run nuevo -- escena <slug> <nombre>` la carpeta recibe un `tsconfig.json` y un `env.d.ts` para que tu editor entienda los imports. Probado acá: crear una escena en una carpeta externa, listarla con `render -- --list` y renderizar un tramo (`out/` queda en esa carpeta).
 
 **B. Abrir el agente en otra carpeta y tener la skill disponible (solo Claude Code).** Claude Code carga las skills personales de `~/.claude/skills/<nombre>/SKILL.md`. Podés enlazar o copiar la de este repo:
 
 ```bash
 mkdir -p ~/.claude/skills
-ln -s "$HOME/video-studio/.claude/skills/video-estudio" ~/.claude/skills/video-estudio    # o: cp -r (queda desactualizada con cada git pull)
+ln -s "<ruta-del-clon>/.claude/skills/video-estudio" ~/.claude/skills/video-estudio    # o: cp -r (queda desactualizada con cada git pull)
 ```
 
 En Windows (PowerShell) el enlace es una unión de carpetas:
 
 ```powershell
 New-Item -ItemType Directory -Force "$HOME\.claude\skills" | Out-Null
-New-Item -ItemType Junction -Path "$HOME\.claude\skills\video-estudio" -Target "$HOME\video-studio\.claude\skills\video-estudio"
+New-Item -ItemType Junction -Path "$HOME\.claude\skills\video-estudio" -Target "<ruta-del-clon>\.claude\skills\video-estudio"
 ```
 
-La skill sigue necesitando el repo clonado, con sus dependencias instaladas, y cuál es su ruta: `SKILL.md` le indica al agente que, si el directorio actual no es la raíz del repo, use la ruta que le des o la variable `VIDEO_STUDIO_DIR` (una convención de esta guía: el motor no la lee) y corra cada comando con `cd <raíz> && ...`. Entonces abrí el agente donde quieras y decile, en la primera frase: "Usá la skill video-estudio. El repo está en `/ruta/a/video-studio`; los videos van en `/ruta/a/mis-videos` (`VE_VIDEOS_DIR`)". No probado: el enlace desde `~/.claude/skills` y la búsqueda de la raíz desde otra carpeta (se probó el flujo A). En Windows nativo, `ln -s` pide permisos de administrador: copiá la carpeta.
+La skill sigue necesitando el repo clonado, con sus dependencias instaladas, y cuál es su ruta: `SKILL.md` le indica al agente que, si el directorio actual no es la raíz del repo, use la ruta que le des o la variable `VIDEO_STUDIO_DIR` (una convención de esta guía: el motor no la lee) y corra cada comando con `cd <raíz> && ...`. Entonces abrí el agente donde quieras y decile, en la primera frase: "Usá la skill video-estudio. El repo está en `<ruta-del-clon>`; los videos van en `/ruta/a/mis-videos` (`VE_VIDEOS_DIR`)". Probado de punta a punta con un agente simulado (no con Claude Code cargando la skill): con una copia del `SKILL.md` en una carpeta personal falsa y el agente parado en una carpeta ajena, la comprobación de la raíz con `VIDEO_STUDIO_DIR`, `npm run nuevo`, `typecheck`, `--check`, `qa`, `privacy`, `sheet` y el render funcionaron con `cd <raíz> &&` y `VE_VIDEOS_DIR` en cada comando. No verificado: que Claude Code cargue la skill solo desde `~/.claude/skills` (el enlace resuelve, pero la carga automática no se probó). Se probó también el flujo A. En Windows nativo, `ln -s` pide permisos de administrador: copiá la carpeta.
 
 ## Problemas frecuentes
 
@@ -288,7 +289,7 @@ Primero corré `npm run doctor`: cubre casi todo lo de esta lista. Los mensajes 
 | `tsx: not found` o `Cannot find module` al correr un `npm run` (o el aviso de `doctor` sobre `node_modules`) | Faltó `npm install` (o se hizo en otra carpeta). Corrélo en la raíz del repo. |
 | `No se pudo ejecutar ffmpeg: spawn ffmpeg ENOENT (esta ffmpeg instalado y en el PATH?)` | Falta ffmpeg o no está en el PATH. Instalalo (ver "Requisitos"), abrí una terminal nueva y comprobá `ffmpeg -version` y `ffprobe -version`. En Windows, el PATH solo se actualiza en terminales nuevas. |
 | ffmpeg corre pero el render falla al codificar | Tu ffmpeg no trae `libx264` o `aac`. `npm run doctor` lo dice. Instalá una compilación completa. |
-| `No se pudo cargar "playwright"...` | Falta el paquete: `npm i -D playwright`. |
+| `No se pudo cargar "playwright"...` | Falta el paquete (viene en las dependencias del proyecto): corré `npm install` en la carpeta del repo. |
 | `No se pudo lanzar Chromium ...: browserType.launch: Executable doesn't exist at ...` | Falta bajar el navegador: `npx playwright install chromium`. Si preferís el tuyo, `VE_CHROMIUM=/ruta/al/chrome`. Si usás `VE_CHROMIUM`, revisá que la ruta exista y sea ejecutable. |
 | Chromium se cierra al lanzar en Linux, o dice que falta una biblioteca (`libnss3`, `libatk`...) | `npx playwright install-deps chromium` (con `sudo`).  `VE_CHROMIUM_ARGS` pasa argumentos extra al navegador si tu entorno los necesita. |
 | `aviso: La fuente "X" no está instalada en esta máquina...` | El tema nombra una fuente del sistema que tu máquina no tiene, y el video sale con la tipografía de reserva (distinta en cada máquina). Instalala, o pedile al agente que la declare con archivo en `theme.font.files`. Con `--strict-fonts` (o `VE_STRICT_FONTS=1`) el aviso se vuelve un error: conviene para el render final. |
@@ -311,13 +312,13 @@ npm install
 npm run doctor
 ```
 
-Si hiciste `npm i -D playwright`, tu `package.json` y `package-lock.json` quedaron modificados y `git pull` puede negarse. Salida: `git checkout package.json package-lock.json`, `git pull`, `npm install` y otra vez `npm i -D playwright` (el Chromium ya bajado se reutiliza). Tus videos no se tocan (`videos/` y `VE_VIDEOS_DIR` están fuera del control de git). Un ZIP no se actualiza: bajá el ZIP nuevo y copiá tu carpeta `videos/` adentro.
+Si en una versión anterior de esta guía hiciste `npm i -D playwright`, tu `package.json` y `package-lock.json` quedaron modificados y `git pull` puede negarse. Salida: `git checkout package.json package-lock.json`, `git pull` y `npm install` (el paquete ya viene declarado; el Chromium ya bajado se reutiliza). Tus videos no se tocan (`videos/` y `VE_VIDEOS_DIR` están fuera del control de git). Un ZIP no se actualiza: bajá el ZIP nuevo y copiá tu carpeta `videos/` adentro.
 
 Después de actualizar, un render tarda más la primera vez porque la caché se invalida.
 
 ## Desinstalar
 
-1. Borrá la carpeta del repo (`rm -rf video-studio`; en PowerShell, `Remove-Item -Recurse -Force video-studio`). Tus videos privados en `VE_VIDEOS_DIR` **no** se borran: están afuera; copialos antes si querés conservarlos (los de `videos/` sí desaparecen con la carpeta).
+1. Borrá la carpeta del repo (`rm -rf <carpeta-del-clon>`; en PowerShell, `Remove-Item -Recurse -Force <carpeta-del-clon>`). Tus videos privados en `VE_VIDEOS_DIR` **no** se borran: están afuera; copialos antes si querés conservarlos (los de `videos/` sí desaparecen con la carpeta).
 2. Si enlazaste la skill: `rm ~/.claude/skills/video-estudio` (en PowerShell, `Remove-Item "$HOME\.claude\skills\video-estudio"`).
 3. Chromium de Playwright vive aparte y ocupa unos 400 MB: Linux `~/.cache/ms-playwright`, macOS `~/Library/Caches/ms-playwright`, Windows `%USERPROFILE%\AppData\Local\ms-playwright`.
 4. Sacá las variables `VE_*` de tu perfil de shell si las agregaste.

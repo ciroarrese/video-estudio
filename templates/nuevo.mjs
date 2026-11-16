@@ -1,6 +1,6 @@
 #!/usr/bin/env node
-// Crea archivos de un video a partir de las plantillas, con los imports ya corregidos. Es el equivalente en Node de
-// `templates/nuevo.sh` (mismos modos y mismos mensajes), pero corre igual en Windows (PowerShell o cmd), macOS y Linux.
+// Crea archivos de un video a partir de las plantillas, con los imports ya corregidos. Es la única implementación
+// (`templates/nuevo.sh` es un envoltorio que la llama) y corre igual en Windows (PowerShell o cmd), macOS y Linux.
 //   npm run nuevo -- escena <slug> <nombre-de-escena>     -> videos/<slug>/<nombre-de-escena>/
 //   npm run nuevo -- historia <slug> <escena-de-ejemplo>  -> videos/<slug>/historia/
 //   npm run nuevo -- externo                              -> solo prepara tsconfig.json y env.d.ts de VE_VIDEOS_DIR

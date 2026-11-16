@@ -1,6 +1,7 @@
 import { parseCliArgs, USAGE } from './args';
 import { installSignalHandlers, isInterrupted } from './cleanup';
 import { checkVideo, discoverVideos, listScenes, renderVideo } from './render';
+import { notaCarpetaExterna, videosDirExterna } from './dirs';
 import { budgetFromScenes, formatStoryBudget } from '../stories/budget';
 import { formatLoadErrors, formatSceneList, formatVideoList } from './meta';
 
@@ -26,6 +27,8 @@ async function main(): Promise<number> {
   try {
     if (o.list) {
       const { videos, errors } = await discoverVideos({ log });
+      const nota = notaCarpetaExterna(videosDirExterna());
+      if (nota) console.log(nota);
       console.log(formatVideoList(videos));
       if (errors.length) console.log(`\n${formatLoadErrors(errors)}`);
       return 0;

@@ -42,7 +42,7 @@ function veVideosDir(): Plugin {
     transform(code, id) {
       if (!extVideos || !id.split('?')[0]!.endsWith('engine/runtime/videos.ts')) return null;
       const sinVideos = code.replace(/\s*'\.\.\/\.\.\/videos\/[^']*',?/g, '');
-      const entradas = indicesDeVideos(extVideos).map((rel) => `  ${JSON.stringify('../../videos/' + rel)}: () => import(${JSON.stringify(join(extVideos, rel))}),`);
+      const entradas = indicesDeVideos(extVideos).map((rel) => `  ${JSON.stringify('../../videos/' + rel)}: () => import(${JSON.stringify(join(extVideos, rel).split(sep).join('/'))}),`);
       const extra = `\nObject.assign(modules, {\n${entradas.join('\n')}\n});\n`;
       return { code: sinVideos.replace(/(export const videosReady)/, extra + '$1'), map: null };
     },

@@ -27,11 +27,11 @@ jobs:
         os: [ubuntu-latest, macos-latest, windows-latest]
     steps:
       - name: Descargar el repo
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       # Node 22 es el mínimo de "engines" de package.json (la guía: "22 o superior").
       - name: Node 22
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v7
         with:
           node-version: 22
           cache: npm
@@ -60,13 +60,11 @@ jobs:
       - name: Versión de ffprobe
         run: ffprobe -version
 
-      # Guía, paso 1
+      # Guía, paso 1 (incluye el paquete playwright, declarado en package.json)
       - name: npm install
         run: npm install
 
-      # Guía, paso 2: el paquete y la descarga real de Chromium.
-      - name: npm i -D playwright
-        run: npm i -D playwright
+      # Guía, paso 2: la descarga real de Chromium.
 
       # En Linux la guía manda `--with-deps` (instala también las bibliotecas del sistema, con sudo).
       - name: npx playwright install --with-deps chromium (Linux)
@@ -112,15 +110,12 @@ jobs:
       - name: npm run typecheck
         run: npm run typecheck
 
-      # En Windows las pruebas todavía no son requisito: varias llaman a bash o a binarios sin .cmd (ver el informe de
-      # portabilidad); se corren igual para verlas y no cortan el trabajo. Quitar continue-on-error cuando pasen.
       - name: npm test
         run: npm test
-        continue-on-error: ${{ runner.os == 'Windows' }}
 
       - name: Subir el video y la hoja de cuadros
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: salidas-${{ matrix.os }}
           path: |

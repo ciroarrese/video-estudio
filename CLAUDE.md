@@ -21,8 +21,7 @@ Video Studio es el nombre visible; repo, paquete, alias `video-estudio/*` y coma
 ## Antes de dar algo por terminado
 
 ```bash
-npm run typecheck
-npm test
+npm run typecheck                       # `npm test` NO hace falta para entregar un video: solo si tocaste el toolkit (sección siguiente)
 npm run render -- <id> --check          # determinismo (repetir con --format vertical y cuadrado si el video los admite)
 npm run qa -- <id> --count 40           # control de calidad
 npm run qa -- <id> --themes all --count 40   # si el video debe funcionar con más de un design system (empezar por `editorial`); matriz y diferencias entre sistemas

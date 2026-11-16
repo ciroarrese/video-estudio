@@ -2,7 +2,7 @@ import { existsSync, mkdirSync, mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
-import { cacheDirPorDefecto, limpiar, outDirPorDefecto, salidaPorDefecto } from './dirs';
+import { cacheDirPorDefecto, limpiar, outDirPorDefecto, notaCarpetaExterna, resolverSalida, salidaPorDefecto } from './dirs';
 
 const claves = ['VE_VIDEOS_DIR', 'VE_CACHE_DIR', 'VE_OUT_DIR'] as const;
 const guardadas = Object.fromEntries(claves.map((k) => [k, process.env[k]]));
@@ -35,6 +35,32 @@ describe('carpetas de cache y salida', () => {
     process.env.VE_OUT_DIR = '/otra/salida';
     expect(cacheDirPorDefecto('/clon')).toBe('/otra/cache');
     expect(salidaPorDefecto('a.mp4')).toBe('/otra/salida/a.mp4');
+  });
+
+  it('resolverSalida: sin variables, relativa al directorio actual; absoluta, tal cual', () => {
+    expect(resolverSalida('out/x.mp4', '/trabajo', {})).toBe('/trabajo/out/x.mp4');
+    expect(resolverSalida('x.mp4', '/trabajo', { VE_VIDEOS_DIR: '' })).toBe('/trabajo/x.mp4');
+    expect(resolverSalida('/abs/x.mp4', '/trabajo', { VE_VIDEOS_DIR: '/priv' })).toBe('/abs/x.mp4');
+  });
+
+  it('resolverSalida con VE_VIDEOS_DIR: `out/` es la carpeta de salidas externa y el resto cuelga de la carpeta externa', () => {
+    const env = { VE_VIDEOS_DIR: '/priv/videos' };
+    expect(resolverSalida('out/x.mp4', '/clon', env)).toBe('/priv/videos/out/x.mp4');
+    expect(resolverSalida('./out/sub/x.mp4', '/clon', env)).toBe('/priv/videos/out/sub/x.mp4');
+    expect(resolverSalida('out\\x.mp4', '/clon', env)).toBe('/priv/videos/out/x.mp4');
+    expect(resolverSalida('salidas/x.mp4', '/clon', env)).toBe('/priv/videos/salidas/x.mp4');
+    expect(resolverSalida('outro/x.mp4', '/clon', env)).toBe('/priv/videos/outro/x.mp4');
+  });
+
+  it('resolverSalida con VE_OUT_DIR manda sobre VE_VIDEOS_DIR para `out/`; sola, también sirve', () => {
+    expect(resolverSalida('out/x.mp4', '/clon', { VE_VIDEOS_DIR: '/priv', VE_OUT_DIR: '/sal' })).toBe('/sal/x.mp4');
+    expect(resolverSalida('x.mp4', '/clon', { VE_OUT_DIR: '/sal' })).toBe('/sal/x.mp4');
+    expect(resolverSalida('out/a/x.mp4', '/clon', { VE_OUT_DIR: '/sal' })).toBe('/sal/a/x.mp4');
+  });
+
+  it('notaCarpetaExterna avisa dónde viven realmente las carpetas `videos/<slug>`', () => {
+    expect(notaCarpetaExterna(null)).toBeNull();
+    expect(notaCarpetaExterna('/priv/videos')).toContain('`/priv/videos/<slug>`');
   });
 
   it('limpiar borra las del clon y las de afuera, y solo esas', () => {

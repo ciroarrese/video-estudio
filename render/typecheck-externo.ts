@@ -1,7 +1,7 @@
 // Revisión de tipos de la carpeta de videos de afuera (VE_VIDEOS_DIR), con el tsconfig.json de esa carpeta.
 //   npm run typecheck:videos        exige VE_VIDEOS_DIR
 //   npm run typecheck               corre `tsc` del repo y, si VE_VIDEOS_DIR está definida, esta revisión (`--opcional`)
-// El tsconfig.json de la carpeta lo crea `VE_VIDEOS_DIR=... bash templates/nuevo.sh externo` (ver templates/externo/).
+// El tsconfig.json de la carpeta lo crea `VE_VIDEOS_DIR=... npm run nuevo -- externo` (ver templates/externo/).
 import { spawnSync } from 'node:child_process';
 import { existsSync, readFileSync, statSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
@@ -22,7 +22,7 @@ if (!existsSync(dir) || !statSync(dir).isDirectory()) {
 }
 const tsconfig = join(dir, 'tsconfig.json');
 if (!existsSync(tsconfig)) {
-  console.error(`Falta ${tsconfig}. Crealo con:  VE_VIDEOS_DIR=${dir} bash templates/nuevo.sh externo   (deja tsconfig.json y env.d.ts; ver templates/externo/README.txt).`);
+  console.error(`Falta ${tsconfig}. Crealo con:  VE_VIDEOS_DIR=${dir} npm run nuevo -- externo   (deja tsconfig.json y env.d.ts; ver templates/externo/README.txt).`);
   process.exit(1);
 }
 console.log(`typecheck:videos: ${tsconfig}`);
@@ -31,5 +31,6 @@ const texto = readFileSync(tsconfig, 'utf8');
 if (!/"exclude"\s*:\s*\[[^\]]*"out"/.test(texto) || !/"exclude"\s*:\s*\[[^\]]*"\.ve-cache"/.test(texto)) {
   console.warn(`aviso: ${tsconfig} no excluye "out" ni ".ve-cache" (la plantilla actual sí: "exclude": ["node_modules", "assets", "out", ".ve-cache"]); agregalos para que la revisión no mire salidas ni caché.`);
 }
-const r = spawnSync(join(repo, 'node_modules', '.bin', 'tsc'), ['--noEmit', '-p', tsconfig], { stdio: 'inherit', cwd: dir });
+// node + el script de tsc: `.bin/tsc` no se puede ejecutar directo en Windows (es un .cmd)
+const r = spawnSync(process.execPath, [join(repo, 'node_modules', 'typescript', 'bin', 'tsc'), '--noEmit', '-p', tsconfig], { stdio: 'inherit', cwd: dir });
 process.exit(r.status ?? 1);

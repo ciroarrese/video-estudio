@@ -16,4 +16,7 @@ Todos los comandos corren desde la raíz de este repo. Si algo falla al arrancar
 - El repo es público: sin nombres de empresas, clientes ni personas reales, sin credenciales. El material privado va en `VE_VIDEOS_DIR` (fuera del repo) o en `videos/` (no se versiona).
 - Para producir un video no se edita `engine/`, `kit/`, `themes/`, `render/`, `stories/`, `fx/` ni `qa/`: las escenas viven en `videos/<slug>/`. Si falta una pieza, se anota y se pide.
 - No agregar fuentes, música, imágenes ni marcas sin verificar su licencia.
+- No leer ni copiar código fuente de otros frameworks de video (`docs/ORIGEN.md`).
+- Las interfaces se recrean con su estructura y sus rótulos; no se usan capturas.
+- Para señalar se usa `Callout` (la señal la pone el tema); nada de flechas ni garabatos por costumbre.
 - Antes de dar algo por terminado, la lista de control de `CLAUDE.md` ("Antes de dar algo por terminado").

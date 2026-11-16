@@ -6,7 +6,7 @@ import { makeSheet } from './sheet';
 import { openSession } from './session';
 import { budgetFromScenes, formatStoryBudget } from '../stories/budget';
 import { formatSceneList, parseFormat, suffixOf } from '../render/index';
-import { salidaPorDefecto } from '../render/dirs';
+import { resolverSalida, salidaPorDefecto } from '../render/dirs';
 import { resolverRutaVideos } from '../render/rutas';
 import { runPrivacy } from './privacy';
 import { failsAt, runQa } from './run';
@@ -112,7 +112,7 @@ export function formatJudged(j: JudgedSummary): string[] {
 /** Escribe el informe JSON (`--out` o `--json`, cualquier ruta; crea las carpetas) y dice dónde quedó. */
 function writeReport(out: string | undefined, data: unknown) {
   if (!out) return;
-  const abs = resolve(out);
+  const abs = resolve(resolverSalida(out));
   mkdirSync(dirname(abs), { recursive: true });
   writeFileSync(abs, JSON.stringify(data, null, 2));
   console.log(`informe: ${abs}`);

@@ -107,7 +107,7 @@ async function comprobarChromium() {
   const pw = await cargarPlaywright();
   const exe = process.env.VE_CHROMIUM || undefined;
   if (!pw) {
-    return [falta('Paquete playwright', 'no se encuentra', 'Corré "npm i -D playwright" (y después "npx playwright install chromium", salvo que uses VE_CHROMIUM).')];
+    return [falta('Paquete playwright', 'no se encuentra', 'Corré "npm install" (y después "npx playwright install chromium", salvo que uses VE_CHROMIUM).')];
   }
   const chromium = pw.chromium ?? pw.default?.chromium;
   const res = [ok('Paquete playwright', 'presente')];

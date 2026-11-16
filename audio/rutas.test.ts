@@ -26,6 +26,11 @@ describe('rutas de audio con VE_VIDEOS_DIR', () => {
   it('una salida en una carpeta que existe afuera cae afuera', () => {
     expect(salida('videos/mi-video/audio/mezcla.wav', cwd, ext)).toBe(join(ext, 'mi-video', 'audio', 'mezcla.wav'));
   });
+  it('una salida out/... con carpeta externa cae en <afuera>/out, aunque exista out/ en el directorio actual', () => {
+    mkdirSync(join(cwd, 'out'), { recursive: true });
+    expect(salida('out/x.srt', cwd, ext)).toBe(join(ext, 'out', 'x.srt'));
+    expect(salida('out/x.srt', cwd, null)).toBe(join(cwd, 'out', 'x.srt'));
+  });
   it('una salida en una carpeta que falta pero cuyo video existe afuera cae afuera', () => {
     expect(salida('videos/mi-video/sfx/x.wav', cwd, ext)).toBe(join(ext, 'mi-video', 'sfx', 'x.wav'));
   });

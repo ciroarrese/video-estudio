@@ -1,6 +1,6 @@
 // @vitest-environment node
-// `templates/nuevo.mjs` (`npm run nuevo`): funciones puras, el programa completo en carpetas temporales y, donde hay bash, que
-// dé exactamente lo mismo que `templates/nuevo.sh`. Vive en render/ porque vitest.config.ts no incluye templates/**.
+// `templates/nuevo.mjs` (`npm run nuevo`): funciones puras, el programa completo en carpetas temporales y que
+// `templates/nuevo.sh` (envoltorio) delegue en él. Vive en render/ porque vitest.config.ts no incluye templates/**.
 import { execFileSync, spawnSync } from 'node:child_process';
 import { cpSync, mkdtempSync, readFileSync, readdirSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -18,7 +18,7 @@ const carpeta = (p: string) => {
 };
 afterAll(() => temporales.forEach((d) => rmSync(d, { recursive: true, force: true })));
 
-/** Un proyecto mínimo: copia de templates/ (con las dos versiones del script) y el resto no hace falta para generar. */
+/** Un proyecto mínimo: copia de templates/ y el resto no hace falta para generar. */
 const proyecto = () => {
   const d = carpeta('ve-nuevo-mjs-');
   cpSync(join(repo, 'templates'), join(d, 'templates'), { recursive: true });
@@ -113,8 +113,10 @@ describe('templates/nuevo.mjs: el programa', () => {
   });
 });
 
+// `templates/nuevo.sh` es solo un envoltorio: la lógica vive en nuevo.mjs. Se prueba donde hay bash de verdad (no en Windows, donde
+// `bash` puede ser el lanzador de WSL).
 const hayBash = (() => {
-  if (process.platform === 'win32') return false; // en Windows `bash` puede ser el lanzador de WSL: la equivalencia se prueba donde hay bash de verdad
+  if (process.platform === 'win32') return false;
   try {
     execFileSync('bash', ['--version'], { stdio: 'ignore' });
     return true;
@@ -123,8 +125,16 @@ const hayBash = (() => {
   }
 })();
 
-describe.skipIf(!hayBash)('templates/nuevo.mjs equivale a templates/nuevo.sh', () => {
-  it('genera los mismos archivos y los mismos mensajes (dentro y fuera del repo)', () => {
+describe('templates/nuevo.sh delega en templates/nuevo.mjs', () => {
+  it('es un envoltorio fino que llama a node con nuevo.mjs', () => {
+    const sh = readFileSync(join(repo, 'templates', 'nuevo.sh'), 'utf8');
+    const codigo = sh.split(/\r?\n/).filter((l) => l.trim() && !l.trim().startsWith('#'));
+    expect(codigo.filter((l) => !l.startsWith('exec node '))).toEqual([]);
+    expect(codigo.join('\n')).toContain('nuevo.mjs');
+    expect(codigo.length).toBeLessThanOrEqual(2);
+  });
+
+  it.skipIf(process.platform === 'win32' || !hayBash)('da el mismo resultado que llamar a nuevo.mjs (archivos, mensajes y código de salida)', () => {
     const a = proyecto(); // con .mjs
     const b = proyecto(); // con .sh
     const exA = carpeta('ve-eq-a-');
@@ -139,12 +149,11 @@ describe.skipIf(!hayBash)('templates/nuevo.mjs equivale a templates/nuevo.sh', (
       [['externo'], true],
     ];
     for (const [args, externo] of pasos) {
-      const envA = { ...process.env, ...(externo ? { VE_VIDEOS_DIR: exA } : { VE_VIDEOS_DIR: '' }) };
-      const envB = { ...process.env, ...(externo ? { VE_VIDEOS_DIR: exB } : { VE_VIDEOS_DIR: '' }) };
+      const envA = { ...process.env, VE_VIDEOS_DIR: externo ? exA : '' };
+      const envB = { ...process.env, VE_VIDEOS_DIR: externo ? exB : '' };
       const ra = spawnSync(process.execPath, [join(a, 'templates', 'nuevo.mjs'), ...args], { env: envA, encoding: 'utf8' });
       const rb = spawnSync('bash', [join(b, 'templates', 'nuevo.sh'), ...args], { env: envB, encoding: 'utf8' });
-      // el único texto que cambia a propósito es cómo se nombra el comando
-      const norm = (s: string, p: string, ex: string) => s.split(p).join('<P>').split(ex).join('<X>').split('npm run nuevo --').join('<CMD>').split('bash templates/nuevo.sh').join('<CMD>');
+      const norm = (s: string, p: string, ex: string) => s.split(p).join('<P>').split(ex).join('<X>');
       expect(ra.status, args.join(' ')).toBe(rb.status);
       expect(norm(ra.stdout, a, exA), args.join(' ')).toBe(norm(rb.stdout, b, exB));
       expect(norm(ra.stderr, a, exA), args.join(' ')).toBe(norm(rb.stderr, b, exB));

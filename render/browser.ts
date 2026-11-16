@@ -34,7 +34,7 @@ async function loadPlaywright(): Promise<{ chromium: { launch(o?: object): Promi
     return mod.chromium ? mod : mod.default;
   } catch {
     throw new Error(
-      'No se pudo cargar "playwright". Instalalo (npm i -D playwright) o expone una instalacion global con NODE_PATH. ' +
+      'No se pudo cargar "playwright". Corre npm install (playwright esta en las dependencias del proyecto) o expone una instalacion global con NODE_PATH. ' +
         'Chromium de Playwright es un requisito; usa VE_CHROMIUM=/ruta/al/chrome para un ejecutable propio.',
     );
   }
