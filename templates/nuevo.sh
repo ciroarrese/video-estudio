@@ -1,5 +1,7 @@
 #!/usr/bin/env bash
 # Crea archivos de un video a partir de las plantillas, con los imports ya corregidos.
+# Preferí `npm run nuevo -- ...` (templates/nuevo.mjs): hace lo mismo sin bash y anda en Windows. Este script queda por compatibilidad
+# y una prueba (render/nuevo.test.ts) verifica que los dos den lo mismo.
 #   bash templates/nuevo.sh escena <slug> <nombre-de-escena>     -> videos/<slug>/<nombre-de-escena>/
 #   bash templates/nuevo.sh historia <slug> <escena-de-ejemplo>  -> videos/<slug>/historia/
 #   bash templates/nuevo.sh externo                             -> solo prepara tsconfig.json y env.d.ts de VE_VIDEOS_DIR

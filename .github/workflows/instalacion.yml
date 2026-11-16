@@ -1,0 +1,127 @@
+# Sigue docs/instalacion.md tal cual en Linux, macOS y Windows (PowerShell, sin bash) y comprueba que sale un video.
+# Es la prueba de que la guía de instalación anda en máquinas reales; si falla, la guía o el código tienen un error.
+# Cada paso corre un solo comando: en PowerShell un comando intermedio que falla no corta el paso, por eso no se encadenan.
+name: instalacion
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main, 'wip/**']
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: instalacion-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  instalar:
+    name: ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    steps:
+      - name: Descargar el repo
+        uses: actions/checkout@v4
+
+      # Node 22 es el mínimo de "engines" de package.json (la guía: "22 o superior").
+      - name: Node 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Versión de Node
+        run: node -v
+
+      # Guía, "Linux": sudo apt update && sudo apt install -y ffmpeg git curl
+      - name: ffmpeg (Linux, apt)
+        if: runner.os == 'Linux'
+        run: sudo apt update && sudo apt install -y ffmpeg git curl
+
+      # Guía, "macOS": brew install node ffmpeg git (node ya lo pone setup-node)
+      - name: ffmpeg (macOS, brew)
+        if: runner.os == 'macOS'
+        run: brew install ffmpeg
+
+      # Guía, "Windows nativo": Chocolatey (`choco install ffmpeg`). Si el corredor ya trae ffmpeg, no se reinstala.
+      - name: ffmpeg (Windows, Chocolatey)
+        if: runner.os == 'Windows'
+        run: if (-not (Get-Command ffmpeg -ErrorAction SilentlyContinue)) { choco install ffmpeg -y --no-progress; if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE } }
+
+      - name: Versión de ffmpeg
+        run: ffmpeg -version
+
+      - name: Versión de ffprobe
+        run: ffprobe -version
+
+      # Guía, paso 1
+      - name: npm install
+        run: npm install
+
+      # Guía, paso 2: el paquete y la descarga real de Chromium.
+      - name: npm i -D playwright
+        run: npm i -D playwright
+
+      # En Linux la guía manda `--with-deps` (instala también las bibliotecas del sistema, con sudo).
+      - name: npx playwright install --with-deps chromium (Linux)
+        if: runner.os == 'Linux'
+        run: npx playwright install --with-deps chromium
+
+      - name: npx playwright install chromium (macOS y Windows)
+        if: runner.os != 'Linux'
+        run: npx playwright install chromium
+
+      # Guía, paso 3
+      - name: npm run doctor
+        run: npm run doctor
+
+      # Guía, paso 4
+      - name: npm run render -- hello
+        run: npm run render -- hello
+
+      - name: El video existe y tiene pista de video
+        run: node .github/scripts/verificar-video.mjs out/hello.mp4 --ancho 1280 --alto 720
+
+      # Determinismo dentro de una misma máquina: dos renders de cada cuadro tienen que dar lo mismo.
+      - name: npm run render -- hello --check
+        run: npm run render -- hello --check
+
+      # Guía, paso 5
+      - name: npm run sheet -- kit-demo --count 12
+        run: npm run sheet -- kit-demo --count 12
+
+      - name: npm run qa -- kit-demo --count 12
+        run: npm run qa -- kit-demo --count 12
+
+      # Primer video propio, sin bash: npm run nuevo (templates/nuevo.mjs).
+      - name: npm run nuevo -- escena demo intro
+        run: npm run nuevo -- escena demo intro
+
+      - name: npm run render -- demo-intro --seconds 0-1
+        run: npm run render -- demo-intro --seconds 0-1
+
+      - name: npm run typecheck
+        run: npm run typecheck
+
+      # En Windows las pruebas todavía no son requisito: varias llaman a bash o a binarios sin .cmd (ver el informe de
+      # portabilidad); se corren igual para verlas y no cortan el trabajo. Quitar continue-on-error cuando pasen.
+      - name: npm test
+        run: npm test
+        continue-on-error: ${{ runner.os == 'Windows' }}
+
+      - name: Subir el video y la hoja de cuadros
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: salidas-${{ matrix.os }}
+          path: |
+            out/hello.mp4
+            out/kit-demo-sheet.png
+          if-no-files-found: warn
+          retention-days: 7

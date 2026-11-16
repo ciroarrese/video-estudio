@@ -1,5 +1,5 @@
 // Historia inicial: apertura + (escena -> vuelta al listado) x n + cierre.
-// Se copia con: bash templates/nuevo.sh historia <slug> <escena> (corrige imports e id).
+// Se copia con: npm run nuevo -- historia <slug> <escena> (corrige imports e id).
 // Presupuesto de cuadros: ver spec.ts (`timing`) y `storyBudget(spec, scenes)` de stories/.
 // Después reemplazá `escena1`/`escena2` por las escenas reales (una carpeta por escena en videos/<slug>/)
 // (no hace falta registrarla: el runtime descubre toda carpeta videos/<slug>/**/index.ts).

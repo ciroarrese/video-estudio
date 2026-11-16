@@ -1,4 +1,4 @@
-// Escena inicial. Se copia con: bash templates/nuevo.sh escena <slug> <nombre-de-escena>
+// Escena inicial. Se copia con: npm run nuevo -- escena <slug> <nombre-de-escena>
 // (queda en videos/<slug>/<nombre-de-escena>/; ver docs/guia-escenas.md).
 //
 // Reglas que esta plantilla ya cumple (ver docs/reglas.md):

@@ -3,9 +3,9 @@ Carpeta de videos fuera del repo (VE_VIDEOS_DIR)
 
 Se prepara sola con:
 
-    VE_VIDEOS_DIR=/ruta/a/mis-videos bash templates/nuevo.sh externo
+    VE_VIDEOS_DIR=/ruta/a/mis-videos npm run nuevo -- externo     (PowerShell: $env:VE_VIDEOS_DIR="C:\ruta\mis-videos"; npm run nuevo -- externo)
 
-(o al crear la primera escena con `bash templates/nuevo.sh escena <slug> <nombre>` con la variable definida). Deja en la carpeta:
+(o al crear la primera escena con `npm run nuevo -- escena <slug> <nombre>` con la variable definida). Deja en la carpeta:
 
   tsconfig.json   paths a este repo (video-estudio/*) y a los tipos de react; excluye node_modules, assets, out y .ve-cache; sin baseUrl (TypeScript 7 lo rechaza) y con
                   `types: []` (vite/client no se resuelve desde afuera; env.d.ts declara los imports `?url`).
