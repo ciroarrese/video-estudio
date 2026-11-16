@@ -13,7 +13,7 @@ El nombre que ves es "Video Studio"; el repo, el paquete npm, el alias de import
 - **Chromium vía Playwright**: lo instala el paso 2 de abajo. Si ya tenés un Chrome o Chromium, alcanza con `VE_CHROMIUM=/ruta/al/chrome` (en ese caso igual hace falta el paquete `playwright`, que ya trae `npm install`).
 - Para producir un video con ayuda: un agente de código abierto en la carpeta del repo. Está desarrollado y probado con [Claude Code](https://claude.com/claude-code); con otros agentes (Codex CLI, Cursor, Gemini CLI...) el flujo es el mismo pero no está probado de punta a punta (ver [AGENTS.md](AGENTS.md)).
 
-En Windows se puede usar PowerShell nativo (sin bash) o WSL 2. <!-- CI-CONDICIONAL-3 -->La instalación se prueba en cada cambio con integración continua en Linux, macOS y Windows (ver `.github/workflows/instalacion.yml`). <!-- /CI-CONDICIONAL-3 -->Instrucciones por sistema operativo, problemas frecuentes y cómo usar la skill: **[docs/instalacion.md](docs/instalacion.md)**.
+En Windows se puede usar PowerShell nativo (sin bash) o WSL 2. La instalación se prueba en cada cambio con integración continua en Linux, macOS y Windows (ver `.github/workflows/instalacion.yml`). Instrucciones por sistema operativo, problemas frecuentes y cómo usar la skill: **[docs/instalacion.md](docs/instalacion.md)**.
 
 ## Inicio rápido (unos 5 minutos; la guía completa está en [docs/instalacion.md](docs/instalacion.md))
 

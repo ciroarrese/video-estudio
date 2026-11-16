@@ -52,7 +52,7 @@ Chromium en Linux necesita bibliotecas del sistema (fuentes, `libnss3`, etc.). E
 
 Hay dos caminos: **Windows nativo con PowerShell** (sin bash ni WSL) o **WSL 2**. Los comandos de la herramienta son `npm run ...` en los dos (incluido `npm run nuevo` para crear escenas).
 
-**Windows nativo (PowerShell).** <!-- CI-CONDICIONAL-1 -->Se prueba en cada cambio con integración continua en Linux, macOS y Windows (ver `.github/workflows/instalacion.yml`): esos pasos corren en un Windows real con la PowerShell de siempre, sin bash. <!-- /CI-CONDICIONAL-1 -->Abrí PowerShell (no hace falta que sea de administrador) y:
+**Windows nativo (PowerShell).** Se prueba en cada cambio con integración continua en Linux, macOS y Windows (ver `.github/workflows/instalacion.yml`): esos pasos corren en un Windows real con la PowerShell de siempre, sin bash. Abrí PowerShell (no hace falta que sea de administrador) y:
 
 ```powershell
 winget install OpenJS.NodeJS.LTS
@@ -111,7 +111,7 @@ npx playwright install chromium
 
 En Linux, el comando es `npx playwright install --with-deps chromium`: además de bajar el navegador instala las bibliotecas del sistema que Chromium necesita (pide `sudo`); en macOS y Windows no hace falta. Es lo mismo en bash y en PowerShell.
 
-Esperado: baja Chromium (cientos de MB; unos minutos según tu conexión; medido en Linux: unos 20 s con buena conexión) y no hace nada si ya lo tenés. El paquete `playwright` ya viene con `npm install` y este comando no modifica `package.json` ni `package-lock.json`, así que `git pull` no se traba. <!-- CI-CONDICIONAL-2 -->La descarga real de Chromium con `npx playwright install chromium` se prueba en cada cambio con integración continua en Linux, macOS y Windows (ver `.github/workflows/instalacion.yml`). <!-- /CI-CONDICIONAL-2 -->
+Esperado: baja Chromium (cientos de MB; unos minutos según tu conexión; medido en Linux: unos 20 s con buena conexión) y no hace nada si ya lo tenés. El paquete `playwright` ya viene con `npm install` y este comando no modifica `package.json` ni `package-lock.json`, así que `git pull` no se traba.La descarga real de Chromium con `npx playwright install chromium` se prueba en cada cambio con integración continua en Linux, macOS y Windows (ver `.github/workflows/instalacion.yml`).
 
 Si ya tenés Chrome o Chromium y no querés bajar otro, salteá este comando y definí `VE_CHROMIUM` con la ruta del ejecutable (macOS: `/Applications/Google Chrome.app/Contents/MacOS/Google Chrome`; Linux: lo que devuelva `which chromium` o `which google-chrome`); el paquete `playwright` se instala igual. Un Chrome muy distinto del que espera Playwright puede dar capturas distintas: si el resultado te sorprende, usá el que baja Playwright.
 
