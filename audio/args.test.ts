@@ -1,6 +1,6 @@
 // @vitest-environment node
 import { describe, expect, it } from 'vitest';
-import { leerCortes, leerFase, leerGainPorEfecto, leerFinal, leerInicio, leerNum, parsear } from './args';
+import { leerCortes, leerFase, leerGainPorEfecto, leerFinal, leerInicio, leerInstantes, leerListaPositiva, leerNum, parsear } from './args';
 
 const op = (...a: string[]) => parsear(a).op;
 
@@ -59,5 +59,17 @@ describe('args', () => {
     expect(() => leerGainPorEfecto(op('--gain', 'barrido=mucho'))).toThrow(/--gain/);
     expect(() => leerGainPorEfecto(op('--gain', 'barrido=-1'))).toThrow(/--gain/);
     expect(() => leerGainPorEfecto(op('--gain', 'barrido=1,barrido=2'))).toThrow(/más de una vez/);
+  });
+
+  it('--cortes y --escenas leen instantes y listas', () => {
+    expect(leerInstantes(op(), 'cortes', 30)).toBeUndefined();
+    expect(leerInstantes(op('--cortes', '5,f300, 7.5'), 'cortes', 30)).toEqual([5, 10, 7.5]);
+    expect(() => leerInstantes(op('--cortes'), 'cortes', 30)).toThrow(/necesita un valor/);
+    expect(() => leerInstantes(op('--cortes', '5,f'), 'cortes', 30)).toThrow(/--cortes/);
+    expect(() => leerInstantes(op('--cortes', '-1'), 'cortes', 30)).toThrow(/--cortes/);
+    expect(leerListaPositiva(op('--escenas', '150, 120'), 'escenas')).toEqual([150, 120]);
+    expect(leerListaPositiva(op(), 'escenas')).toBeUndefined();
+    expect(() => leerListaPositiva(op('--escenas', '150,0'), 'escenas')).toThrow(/mayor que 0/);
+    expect(() => leerListaPositiva(op('--escenas'), 'escenas')).toThrow(/lista/);
   });
 });

@@ -107,6 +107,12 @@ export function xform(o: { x?: number; y?: number; scale?: number; scaleX?: numb
   return parts.length ? parts.join(" ") : undefined;
 }
 
+/**
+ * Estilo de un efecto antes de su `start` (cuadro local negativo): oculto del todo (`opacity: 0`); desde `start` no emite nada, así que en reposo
+ * no deja residuos. Va al final del `style` de la raíz para que ni un `style` del llamador lo deje a la vista.
+ */
+export const hiddenBefore = (local: number): { opacity: 0 } | undefined => (local < 0 ? { opacity: 0 } : undefined);
+
 /** Opacidad para emitir: `undefined` si es (casi) 1; así en reposo no queda `opacity: 0.999`. */
 export const fade = (o: number): number | undefined => (o >= 0.9995 ? undefined : +Math.max(0, o).toFixed(4));
 

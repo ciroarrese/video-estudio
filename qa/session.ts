@@ -8,12 +8,20 @@ export const projectRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..'
 
 export type VideoMeta = RenderMeta;
 
+/** Lo que devuelve `checkStoryFit` (solo lo que usa `qa`): si entra y un mensaje accionable por cada problema. */
+export type StoryFitInfo = { ok: boolean; format: string; messages: string[]; causes: string[] };
+
 export type Session = {
   meta: VideoMeta;
   pageUrl: string;
   browser: PwBrowser;
   /** Escenas con nombre del video (declaradas o juntadas de `<Sequence name>`). */
   scenes(): Promise<SceneInfo[]>;
+  /**
+   * Revisión de los largos del guion de una historia (`defineStory`, `stories/fit.ts`) en el formato y el tema de esta corrida: la pide a la página porque ahí
+   * están registrados los videos y se mide con la tipografía real. `null` si el video no es una historia.
+   */
+  storyFit(): Promise<StoryFitInfo | null>;
   /** Opens one more page on the video (own context), ready at frame 0. */
   openPage(): Promise<VideoPage>;
   close(): Promise<void>;
@@ -189,6 +197,28 @@ export async function openSession(o: SessionOptions): Promise<Session> {
           await context.close().catch(() => {});
         }
       })()),
+    storyFit: async () => {
+      const context = await browser.newContext({ viewport: { width: 320, height: 180 }, deviceScaleFactor: 1 });
+      try {
+        const page = await context.newPage();
+        await page.goto(`${server.url}/${NOSTAGE_QUERY}`, { waitUntil: 'load' });
+        await page.evaluate(() => (window as any).__ve.ready as Promise<unknown>);
+        const theme = typeof props.theme === 'string' ? props.theme : undefined;
+        return (await page.evaluate(([id, fmt, th]: [string, string, string | undefined]) => {
+          const probe = (window as any).__veStoryFit?.[id];
+          if (!probe) return null;
+          // las fuentes del video tienen que estar cargadas para medir con la letra real
+          return ((document as any).fonts?.ready ?? Promise.resolve()).then(() => {
+            const r = probe(fmt, th);
+            return r && { ok: r.ok, format: r.format, causes: r.causes, messages: r.issues.length ? r.issues.map((i: { message: string }) => i.message) : r.ok ? [] : [`Formato ${r.format}: ${r.causes.join('; ')}.`] };
+          });
+        }, [o.videoId, meta.format ?? 'horizontal', theme] as [string, string, string | undefined])) as StoryFitInfo | null;
+      } catch {
+        return null;
+      } finally {
+        await context.close().catch(() => {});
+      }
+    },
     async close() {
       await Promise.all(pages.map((p) => p.close()));
       await browser.close().catch(() => {});

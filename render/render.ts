@@ -3,7 +3,7 @@ import { createHash, randomBytes } from 'node:crypto';
 import { cpus } from 'node:os';
 import { existsSync, mkdirSync, readFileSync, readdirSync, renameSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { writeFile } from 'node:fs/promises';
-import { dirname, join, relative, resolve } from 'node:path';
+import { dirname, join, relative, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { comparePngs, DEFAULT_TOLERANCE, formatDiff, withinTolerance, type CheckTolerance } from './compare';
 import { buildAudioGraph, resolveSrc, windowTracks, type Track } from './audio';
@@ -14,7 +14,8 @@ import { trackChild, trackCloser, trackPath, untrackPath } from './cleanup';
 import { digestFiles, ENCODER_SETTINGS, frameFile, planCheckFrames, framePattern, planSegments, planShards, segmentKey } from './plan';
 import { serveStatic } from './server';
 import { assetDirsFor, esArchivoDeAudio, explicitAssetDirs } from './assets';
-import { cacheDirPorDefecto, salidaPorDefecto } from './dirs';
+import { comprobarFuentesDelSistema, strictFonts } from './fuentesSistema';
+import { cacheDirPorDefecto, resolverSalida, salidaPorDefecto } from './dirs';
 import { cleanPageError, metaForFormat, NOSTAGE_QUERY, pageQuery, resolveScene, sceneRange, type VideoMeta } from './meta';
 import type { FormatName, SceneInfo } from '../engine';
 
@@ -47,6 +48,8 @@ export type RenderOptions = {
   assets?: string[];
   /** Borrador: una fuente que no carga solo avisa en vez de fallar (también VE_ALLOW_MISSING_FONTS=1). */
   allowMissingFonts?: boolean;
+  /** Una familia del sistema que el tema nombra sin archivo y no está instalada hace fallar (por defecto solo avisa). `--strict-fonts` / `VE_STRICT_FONTS=1`. */
+  strictFonts?: boolean;
   /** Formato de pantalla (`horizontal`, `vertical`, `cuadrado`); sin esto, el formato base del video. */
   format?: FormatName;
   /** Renderiza solo esta escena (id/nombre o índice desde 0; ver `listScenes`). No se combina con `frames`. */
@@ -178,7 +181,8 @@ export async function ensureBundle(root: string, cacheDir: string, runId: string
         name: 've-stub-broken',
         enforce: 'pre' as const,
         load: (id: string) => {
-          const msg = stubbed.get(id.split('?')[0]!);
+          // vite usa `/` en los id también en Windows; las claves de `stubbed` son rutas del sistema (resolve las normaliza)
+          const msg = stubbed.get(resolve(id.split('?')[0]!));
           return msg === undefined ? null : `throw new Error(${JSON.stringify(msg)});`;
         },
       };
@@ -191,7 +195,7 @@ export async function ensureBundle(root: string, cacheDir: string, runId: string
           type BuildErr = { id?: string; loc?: { file?: string }; file?: string; message?: string };
           const top = e as BuildErr & { errors?: BuildErr[] };
           const list = top.errors?.length ? top.errors : [top];
-          const inVideo = (abs: string) => abs.startsWith(resolve(root, 'videos') + '/') || abs.startsWith(resolve(root, 'examples') + '/') || (videosDir !== null && abs.startsWith(videosDir + '/'));
+          const inVideo = (abs: string) => abs.startsWith(resolve(root, 'videos') + sep) || abs.startsWith(resolve(root, 'examples') + sep) || (videosDir !== null && abs.startsWith(videosDir + sep));
           const mine = list
             // los errores de transformación (sintaxis) no traen `id`: el archivo va en el texto, como `[ ruta:linea:col ]`
             .map((x) => ({ x, bad: x.id ?? x.loc?.file ?? x.file ?? /\[\s*(\S+?\.[cm]?[jt]sx?)(?::\d+){0,2}\s*\]/.exec(stripAnsi(String(x.message)))?.[1] }))
@@ -200,7 +204,7 @@ export async function ensureBundle(root: string, cacheDir: string, runId: string
             .filter((r) => inVideo(r.abs) && !stubbed.has(r.abs) && existsSync(r.abs));
           if (!mine.length || mine.length < list.length || attempt >= 8) throw e; // algo que no es de un video: es un error de verdad
           for (const { x, abs } of mine) {
-            const where = videosDir && abs.startsWith(videosDir + '/') ? `videos/${relative(videosDir, abs)}` : relative(root, abs);
+            const where = videosDir && abs.startsWith(videosDir + sep) ? `videos/${relative(videosDir, abs)}` : relative(root, abs);
             const first = stripAnsi(String(x.message)).split('\n').filter(Boolean).slice(0, 2).join(' | ');
             log(`bundle: "${where}" no compila (${first}); se compila el resto sin ese archivo`);
             stubbed.set(abs, `${where} no compila: ${first}`);
@@ -414,6 +418,8 @@ async function setup(o: RenderOptions, needAudio: boolean) {
       if (shared.error) throw shared.error;
       if (!found) throw new Error(`Video desconocido "${o.videoId}". Disponibles: ${metas.map((m) => m.id).join(', ')}`);
       const meta = metaForFormat(found, o.format);
+      // Una familia del sistema que el tema nombra sin archivo y no está instalada hace que el video salga con otra tipografía: avisa (o falla con --strict-fonts).
+      await comprobarFuentesDelSistema(page, meta.durationInFrames, { strict: strictFonts(o), log });
       const scenes = async (): Promise<SceneInfo[]> => (await page.evaluate(() => (window as any).__ve.scenes())) as SceneInfo[];
       let tracks: Track[] = [];
       if (needAudio) tracks = (await page.evaluate(() => (window as any).__ve.scanAudio())) as Track[];
@@ -508,7 +514,7 @@ export async function renderVideo(options: RenderOptions): Promise<RenderResult>
       sceneIndex = sc.index;
       log(`escena "${sc.id}" (índice ${sc.index}): cuadros ${first}-${last}`);
     }
-    out = resolve(options.out ?? salidaPorDefecto(`${options.videoId}${suffixOf({ ...options, frames }, sceneIndex)}.mp4`));
+    out = resolve(options.out ? resolverSalida(options.out) : salidaPorDefecto(`${options.videoId}${suffixOf({ ...options, frames }, sceneIndex)}.mp4`));
     outTmp = `${out}.${s.runId}.tmp.mp4`;
     trackPath(outTmp);
     if (last > meta.durationInFrames - 1) throw new RangeError(`--frames ${first}-${last} excede el video (0-${meta.durationInFrames - 1})`);

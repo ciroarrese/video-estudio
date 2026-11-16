@@ -135,6 +135,16 @@ describe("opciones de diseño", () => {
     expect(out).toContain("·");
     expect(out).toContain("línea del primero");
   });
+  it("la fila en un renglón es robusta a una tipografía más ancha: la línea baja bajo el nombre (flex-wrap) en vez de salirse del cuadro", () => {
+    const out = html(<Opening spec={spec({ design: { list: "inline" } })} />, 200, 300);
+    // el renglón de la fila deja que la línea pase al renglón de abajo y se parta por palabras si hiciera falta; el nombre no se achica ni se corta
+    expect(out).toMatch(/flex-wrap:wrap/);
+    expect(out).toMatch(/min-width:0/);
+    expect(out).toMatch(/white-space:normal/);
+    // la línea no se recorta con elipsis ni se esconde (un texto cortado por CSS es un error de `qa`: `clip`)
+    expect(out).not.toMatch(/text-overflow/);
+    expect(out).not.toMatch(/overflow:hidden[^"]*white-space:normal/);
+  });
   it("el acople dibuja la píldora del tema y no el velo; la escena arranca con la píldora ya puesta", () => {
     const s = spec({ design: { handoff: "dock" } });
     const end = html(<Opening spec={s} />, 299, 300);

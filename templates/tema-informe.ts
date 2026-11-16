@@ -1,5 +1,5 @@
 // Muestra el informe del tema de un video: que roles salieron de los tokens, cuales quedaron con el
-// valor del tema base, los avisos y las fallas de contraste.
+// valor del tema base, los avisos, el informe de estilo (campos tomados, con valor base e inválidos) y las fallas de contraste.
 //   npx tsx templates/tema-informe.ts <slug>             videos/<slug>/theme.ts, o <VE_VIDEOS_DIR>/<slug>/theme.ts si VE_VIDEOS_DIR está definida
 //   npx tsx templates/tema-informe.ts /ruta/al/theme.ts  un archivo cualquiera (por ejemplo de una carpeta de afuera)
 // Requiere que el theme.ts exporte `report` (de themeFromTokensWithReport) y `theme`.
@@ -9,7 +9,7 @@ import { existsSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { createServer } from "vite";
-import { checkTheme } from "../themes";
+import { checkTheme, formatTokenReport } from "../themes";
 import type { TokenReport, Theme } from "../themes";
 
 const repo = resolve(dirname(fileURLToPath(import.meta.url)), "..");
@@ -41,15 +41,7 @@ if (!mod.theme) {
 }
 
 console.log(`Tema "${mod.theme.name}"`);
-if (mod.report) {
-  const r = mod.report;
-  console.log(`\nTomados de los tokens (${Object.keys(r.mapped).length}):`);
-  for (const [rol, token] of Object.entries(r.mapped)) console.log(`  ${rol} <- ${token}`);
-  console.log(`\nQuedaron con el valor del tema base (${r.fallback.length}): ${r.fallback.join(", ") || "ninguno"}`);
-  console.log(`Calculados (${r.derived.length}): ${r.derived.join(", ") || "ninguno"}`);
-  console.log(`Ambiguos: ${Object.keys(r.ambiguous).length ? JSON.stringify(r.ambiguous) : "ninguno"}`);
-  console.log(`Avisos de los tokens: ${r.warnings.length ? "\n  " + r.warnings.join("\n  ") : "ninguno"}`);
-}
+if (mod.report) console.log("\n" + formatTokenReport(mod.theme, mod.report).join("\n"));
 const contraste = checkTheme(mod.theme);
 console.log(`\nContraste: ${contraste.length ? "" : "sin avisos"}`);
 for (const w of contraste) console.log(`  ${w.severity === "error" ? "ERROR" : "aviso"} ${w.message}`);

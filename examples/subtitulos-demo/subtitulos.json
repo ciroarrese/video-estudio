@@ -1,0 +1,82 @@
+{
+  "unidad": "segundos",
+  "cues": [
+    {
+      "desde": 0.4,
+      "hasta": 3.0,
+      "texto": "Mirá este video sin sonido."
+    },
+    {
+      "desde": 3.4,
+      "hasta": 6.9,
+      "texto": "Escribís el texto, ajustás los tiempos y los subtítulos se leen solos.",
+      "palabras": [
+        {
+          "desde": 3.4,
+          "hasta": 3.9,
+          "texto": "Escribís"
+        },
+        {
+          "desde": 3.9,
+          "hasta": 4.05,
+          "texto": "el"
+        },
+        {
+          "desde": 4.05,
+          "hasta": 4.55,
+          "texto": "texto,"
+        },
+        {
+          "desde": 4.55,
+          "hasta": 5.05,
+          "texto": "ajustás"
+        },
+        {
+          "desde": 5.05,
+          "hasta": 5.2,
+          "texto": "los"
+        },
+        {
+          "desde": 5.2,
+          "hasta": 5.7,
+          "texto": "tiempos"
+        },
+        {
+          "desde": 5.7,
+          "hasta": 5.8,
+          "texto": "y"
+        },
+        {
+          "desde": 5.8,
+          "hasta": 5.95,
+          "texto": "los"
+        },
+        {
+          "desde": 5.95,
+          "hasta": 6.45,
+          "texto": "subtítulos"
+        },
+        {
+          "desde": 6.45,
+          "hasta": 6.55,
+          "texto": "se"
+        },
+        {
+          "desde": 6.55,
+          "hasta": 6.7,
+          "texto": "leen"
+        },
+        {
+          "desde": 6.7,
+          "hasta": 6.9,
+          "texto": "solos."
+        }
+      ]
+    },
+    {
+      "desde": 7.1,
+      "hasta": 9.7,
+      "texto": "También salen como archivo aparte, en SRT y VTT."
+    }
+  ]
+}

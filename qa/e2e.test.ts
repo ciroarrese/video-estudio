@@ -210,6 +210,15 @@ describe.skipIf(!chromium)('qa on the qa-defects video (e2e)', () => {
       expect(summary.judged.judged + summary.judged.notJudged.total).toBe(summary.judged.texts);
     }, 180_000);
 
+    it('el velo que no termina de cerrarse (0,985) tapa el texto de abajo: se cuenta como tapado, no da `contrast`; a 0,86 / 0,94 / 0,97 sigue siendo un velo que cruza (info)', async () => {
+      const { findings, summary } = await runQa({ videoId: 'qa-defects', frames: '99-102' });
+      expect(findings.filter((f) => f.frame === F.veilNearClosed)).toEqual([]);
+      expect(summary.judged.notJudged.hidden).toBeGreaterThanOrEqual(1);
+      const c = (fr: number) => findings.filter((f) => f.frame === fr && f.rule === 'contrast').map((f) => [f.element.testid, f.severity]);
+      expect(c(F.veilNearB)).toEqual([['near-text', 'info']]);
+      expect(findings.filter((f) => f.severity === 'error')).toEqual([]);
+    }, 180_000);
+
     it('el resumen dice cuanto texto se juzgo (nada ciego): en el cuadro limpio se juzgan todos', async () => {
       const { summary } = await runQa({ videoId: 'qa-defects', frames: '0' });
       expect(summary.judged.texts).toBe(4);
@@ -217,6 +226,31 @@ describe.skipIf(!chromium)('qa on the qa-defects video (e2e)', () => {
       expect(summary.judged.notJudged.total).toBe(0);
     }, 180_000);
   });
+
+  it('vacio (aviso, solo vertical y cuadrado): un hueco grande entre elementos o debajo de lo que está pegado arriba avisa; centrado, con un velo, o cruzado por una franja que cuenta, no; una franja marcada data-qa-ignore="vacio" no cuenta', async () => {
+    for (const format of ['vertical', 'cuadrado'] as const) {
+      const { findings } = await runQa({ videoId: 'qa-defects', format, frames: '103-120', rules: ['vacio'] });
+      const at = (fr: number) => findings.filter((f) => f.frame === fr).map((f) => [f.rule, f.severity, f.element.text]);
+      expect(at(F.vacioMedioB), `${format} medio`).toEqual([['vacio', 'warn', 'franja vacía en el medio']]);
+      expect(at(F.vacioCentradoB), `${format} centrado`).toEqual([]);
+      expect(at(F.vacioAbajoB), `${format} abajo`).toEqual([['vacio', 'warn', 'franja vacía abajo']]);
+      expect(at(F.vacioVeloB), `${format} velo`).toEqual([]);
+      expect(at(F.vacioFranjaB), `${format} franja que cuenta`).toEqual([]);
+      expect(at(F.vacioFranjaMarcadaB), `${format} franja marcada`).toEqual([['vacio', 'warn', 'franja vacía en el medio']]);
+      expect(findings.every((f) => f.severity === 'warn')).toBe(true);
+    }
+    // en horizontal no corre
+    const h = await runQa({ videoId: 'qa-defects', frames: '103-120', rules: ['vacio'] });
+    expect(h.findings).toEqual([]);
+  }, 300_000);
+
+  it('texto-chico (aviso): un texto de 12,8 px quieto avisa; el mismo texto desplazándose, o de adorno, no', async () => {
+    const { findings } = await runQa({ videoId: 'qa-defects', frames: '121-129', rules: ['texto-chico'] });
+    const at = (fr: number) => findings.filter((f) => f.frame === fr).map((f) => [f.rule, f.severity, f.element.testid]);
+    expect(at(F.chicoB)).toEqual([['texto-chico', 'warn', 'chico-text']]);
+    expect(at(F.chicoMueveB)).toEqual([]);
+    expect(at(F.chicoAdornoB)).toEqual([]);
+  }, 180_000);
 
   it('--themes: el mismo control bajo cada sistema, con matriz; un video que no lee props.theme da lo mismo en todos', async () => {
     const reports = await runQaThemes({ videoId: 'qa-defects', frames: '3,5' }, ['neutral', 'dark', 'neon']);
@@ -235,6 +269,14 @@ describe.skipIf(!chromium)('qa on the qa-defects video (e2e)', () => {
     const wide = await runQa({ videoId: 'qa-defects', frames: `${F.overlap}`, stress: { fontFallback: 'wide' } });
     const w = (r: typeof base, fr: number) => r.findings.find((f) => f.frame === fr && f.rule === 'overlap')?.element.rect.w;
     expect(w(wide, F.overlap)).toBeGreaterThan(w(base, F.overlap)!);
+  }, 300_000);
+
+  it('story-fit sola no muestrea cuadros (solo el largo del guion) y con --scene también corre si la escena es de la historia', async () => {
+    for (const scene of [undefined, 'opening', 'closing']) {
+      const r = await runQa({ videoId: 'story-demo', rules: ['story-fit'], scene });
+      expect(r.summary.frames, String(scene)).toEqual([]);
+      expect(r.summary.errors, String(scene)).toBe(0);
+    }
   }, 300_000);
 
   // Reproducibilidad: el control es una función determinista del video y las opciones. Antes el muestreo de fondos corría en el canvas de

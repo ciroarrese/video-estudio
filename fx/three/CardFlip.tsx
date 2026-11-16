@@ -1,5 +1,5 @@
 import React from "react";
-import { Easing, fxDensity, lerp, progress, styleKey, xform } from "../core";
+import { hiddenBefore, Easing, fxDensity, lerp, progress, styleKey, xform } from "../core";
 import { cornerRadius } from "../../themes";
 import { cardSurface, useThreeFx } from "./common";
 import type { ThreeProps } from "./common";
@@ -24,7 +24,7 @@ const snap = (k: number) => (Math.abs(k - 1) < 0.015 ? 1 : k);
 
 /** Tarjeta que da media vuelta; la cara que no mira al espectador se oculta por ángulo. Proyección a mano: escala en X y en Y, sin `rotateY`. */
 export function CardFlip(p: CardFlipProps) {
-  const { local, duration, width, height, theme, pal } = useThreeFx(p, { width: 900, height: 600, duration: 75 });
+  const { local, rawLocal, duration, width, height, theme, pal } = useThreeFx(p, { width: 900, height: 600, duration: 75 });
   const cw = p.cardWidth ?? Math.min(width * 0.8, 1000);
   const ch = p.cardHeight ?? Math.min(height * 0.8, 620);
   const sc = Math.min(cw / 620, ch / 400);
@@ -83,7 +83,7 @@ export function CardFlip(p: CardFlipProps) {
       textRendering: "geometricPrecision",
     };
     return (
-      <div style={{ position: "relative", width, height, ...p.style }}>
+      <div style={{ position: "relative", width, height, ...p.style, ...hiddenBefore(rawLocal) }}>
         <div key={styleKey(crispStyle)} style={crispStyle}>
           <div key={styleKey(inner)} style={inner}>{faceNode}</div>
           {shadeA > 0.0005 && <div style={{ position: "absolute", inset: 0, background: pal.darkest, opacity: +shadeA.toFixed(4) }} />}
@@ -107,7 +107,7 @@ export function CardFlip(p: CardFlipProps) {
     fontFamily: theme.font.family,
   };
   return (
-    <div style={{ position: "relative", width, height, ...p.style }}>
+    <div style={{ position: "relative", width, height, ...p.style, ...hiddenBefore(rawLocal) }}>
       <div
         key={styleKey(cardStyle)}
         style={cardStyle}

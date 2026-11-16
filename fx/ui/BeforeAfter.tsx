@@ -3,7 +3,7 @@ import { Easing } from "../../engine";
 import { kf } from "../../kit";
 import { cornerRadius, textStyle } from "../../themes";
 import { bareShadow, svgSurface } from "../data/styleKit";
-import { fxBox, fxDensity, progress, useFx } from "../core";
+import { hiddenBefore, fxBox, fxDensity, progress, useFx } from "../core";
 import type { FxProps } from "../core";
 
 export type BeforeAfterProps = FxProps & {
@@ -86,7 +86,7 @@ export function BeforeAfter(p: BeforeAfterProps) {
     <div style={{ position: "absolute", top: 18 * k, [left ? "left" : "right"]: 18 * k, padding: `${6 * k}px ${18 * k}px`, fontSize: fs, fontWeight: textStyle(theme, "label", { strong: true }).fontWeight, background: tag.fill, color: theme.color.text, border: tagBorder > 0 ? `${tagBorder}px solid ${tag.edge}` : "none", borderRadius: tag.radius, boxShadow: bareShadow(tag), ...textStyle(theme, "eyebrow") }}>{txt}</div>
   );
   return (
-    <div style={{ position: "relative", width: w, height: h, overflow: "hidden", fontFamily: theme.font.family, border: frame.border > 0 ? `${frame.border}px solid ${frame.edge}` : "none", borderRadius: frame.radius, boxShadow: bareShadow(frame), boxSizing: "border-box", ...p.style }}>
+    <div style={{ position: "relative", width: w, height: h, overflow: "hidden", fontFamily: theme.font.family, border: frame.border > 0 ? `${frame.border}px solid ${frame.edge}` : "none", borderRadius: frame.radius, boxShadow: bareShadow(frame), boxSizing: "border-box", ...p.style, ...hiddenBefore(local) }}>
       <div style={{ position: "absolute", inset: 0 }}>{p.before ?? <Wireframe w={w} h={h} k={k} />}</div>
       <div style={{ position: "absolute", inset: 0, clipPath: `inset(0 ${wipeInset(pos)}% 0 0)` }}>{p.after ?? <Design w={w} h={h} k={k} />}</div>
       <div style={{ position: "absolute", left: hx - 2 * k, top: 0, width: 4 * k, height: h, background: theme.color.accent }} />

@@ -1,9 +1,10 @@
+import { useStoryReserve } from "./subtitles";
 import React from "react";
 import { Easing, useFrame, useVideoConfig } from "../engine";
 import { Wash, World, kf, useCameraAt, exitThrough } from "../kit";
 import { cornerRadius, handoffShift, resolveStyle, settle, staggerFrames, surfaceStyle, useTheme, withAlpha } from "../themes";
 import { fade, xform } from "../fx/core/math";
-import { AVG_BOLD, AVG_REG, ROW_GAP, listLayout, textWidth } from "./layout";
+import { AVG_BOLD, AVG_REG, ROW_GAP, listLayout, revealThumbRect, textWidth } from "./layout";
 import { DefaultThumbnail } from "./Closing";
 import { CheckMark, HeadlineRow, StoryNumeral, StoryStage, quietOpacity, rowEntrance, scaler, useEase, useStorySpec } from "./shared";
 import { lateStart, withoutLate } from "./types";
@@ -78,12 +79,13 @@ export function Interlude({ spec: specIn, done, skip = [], next: nextProp, ticks
   const ease = useEase();
   const f = useFrame();
   const { width, height } = useVideoConfig();
+  const reserve = useStoryReserve(); // franja de los subtítulos (0 sin ellos)
   const dur = reveal ? interludeRevealFrames(spec) : interludeFrames(spec);
   const stage = reveal && isStageReveal(spec);
   const u = scaler(dur, reveal ? revealBase(spec) : INTERLUDE_FRAMES);
   const n = spec.topics.length;
   // la lista se arma para las n filas desde el primer cuadro de la vuelta de revelación (el lugar de la fila nueva ya está, sin saltos al entrar)
-  const L = listLayout(spec, theme, width, height);
+  const L = listLayout(spec, theme, width, height - reserve);
   const next = reveal ? -1 : (nextProp ?? nextTopic(n, done, skip));
   const lastTick = reveal ? [...Array(n - 1).keys()].filter((i) => !skip.includes(i)).slice(-1) : [];
   const ticks = ticksProp ?? (reveal ? lastTick : undefined);
@@ -101,6 +103,12 @@ export function Interlude({ spec: specIn, done, skip = [], next: nextProp, ticks
   const S = stage ? { room: sc(REVEAL_STAGE_T.room), sweep: sc(REVEAL_STAGE_T.sweep), thumbIn: sc(REVEAL_STAGE_T.thumbIn), thumbFly: sc(REVEAL_STAGE_T.thumbFly) } : null;
   const motion = resolveStyle(theme).motion;
   const room = S ? kf(f, S.room, [0, 1], ease.inOut) : 0; // las filas ya vistas se corren apenas hacia arriba para hacer lugar a la nueva
+  // cuánto suben (px): el 14 % del alto de la fila; en los formatos angostos, donde la lista llena el alto, no más de lo que deja libre arriba de la primera fila menos un
+  // cuarto de la letra del nombre (con una tipografía más alta de lo medido, la caja del primer renglón se saldría del cuadro al subir)
+  const roomShift = (() => {
+    const base = L.rowH * 0.14;
+    return width / height < 1.3 ? Math.max(0, Math.min(base, L.top + L.blockTop - Math.ceil(L.nameSize * 0.25))) : base;
+  })();
   const lateI = n - 1;
   const rowTop = L.top + lateI * L.rowH;
   const rowMidY = rowTop + L.blockTop + L.nameH / 2; // centro del renglón del nombre de la fila nueva
@@ -121,38 +129,49 @@ export function Interlude({ spec: specIn, done, skip = [], next: nextProp, ticks
   const others = next >= 0 ? 1 - kf(f, [T.fly[0] - u(6), T.fly[0] + u(12)], [0, 1]) : 1;
 
 
+  const narrowFmt = width / height < 1.3;
+  // Formatos angostos (vertical y cuadrado): la miniatura se muestra grande (al menos el 30 % del ancho del cuadro) en el lugar libre más cercano a la fila nueva, sin pisar el
+  // texto de la lista (`revealThumbRect`, con las cajas medidas); si no hay lugar (cuadrado con la lista llena), la lista se aparta un momento y la miniatura se muestra en el
+  // centro (`spotlight`). Desde ahí vuela achicándose hasta el lugar del número.
+  const nt = S && narrowFmt ? revealThumbRect(L, theme, lateI, width, height - reserve) : null;
+  const spot = nt?.mode === "spotlight";
+
   // ---- revelación escenificada: barrido de luz sobre la fila nueva y miniatura del tema que vuela hasta el lugar del número
   const sweepP = S ? kf(f, S.sweep, [0, 1], Easing.inOut) : 0;
   const sweepW = Math.max(200, Math.min(L.rowW, textEnd - L.left + 48));
   const sweepTop = rowTop + L.blockTop - 10;
   const sweepH = L.barTop + ROW_GAP.bar + 12 - (L.blockTop - 10);
   const sweepA = -40 + sweepP * 140; // posición (% del ancho) del borde izquierdo de la franja de luz
-  const sweep = S && !L.stacked && sweepP > 0 && sweepP < 1 ? (
+  const sweep = S && !L.stacked && !spot && sweepP > 0 && sweepP < 1 ? (
     <div data-qa-decor="" style={{ position: "absolute", left: L.left - 14, top: sweepTop, width: sweepW + 28, height: sweepH, borderRadius: cornerRadius(theme, "chip"), pointerEvents: "none", background: `linear-gradient(100deg, transparent ${sweepA.toFixed(1)}%, ${withAlpha(theme.color.accent, 0.34)} ${(sweepA + 16).toFixed(1)}%, ${withAlpha(theme.color.accent2, 0.22)} ${(sweepA + 30).toFixed(1)}%, transparent ${(sweepA + 40).toFixed(1)}%)` }} />
   ) : null;
   const Thumb = thumbnail ?? (() => <DefaultThumbnail index={lateI} name={spec.topics[lateI]!.name} />);
   const PANEL_W = 560, PANEL_H = 340;
   const free = width - theme.safe.x - textEnd - 40; // lugar libre a la derecha del texto de la fila nueva
-  // Formatos sin lugar a la derecha del texto (vertical y cuadrado): la miniatura no vuela (en una lista que llena el alto taparía la fila de arriba o se saldría del cuadro):
-  // aparece chica directamente sobre el lugar del número, crece hasta ser legible, se queda un momento y se encoge hasta ser la tilde.
-  const side = free >= 0.4 * PANEL_W; // hay lugar a la derecha del texto de la fila nueva
+  // Formato ancho sin lugar a la derecha del texto: la miniatura aparece chica directamente sobre el lugar del número, crece, se queda un momento y se encoge hasta ser la tilde.
+  const side = !narrowFmt && free >= 0.4 * PANEL_W; // hay lugar a la derecha del texto de la fila nueva
   const endScale = Math.round(L.numSize * 1.5) / PANEL_W;
-  const tScale = side ? Math.min(0.62, free / PANEL_W) : Math.min(0.62, endScale * 1.9, Math.max(endScale * 1.3, L.numW > 0 ? (L.numW - 6) / PANEL_W : 1)); // sin pasar del ancho de la columna del número (si la hay)
+  const tScale = nt ? nt.w / PANEL_W : side ? Math.min(0.62, free / PANEL_W) : Math.min(0.62, endScale * 1.9, Math.max(endScale * 1.3, L.numW > 0 ? (L.numW - 6) / PANEL_W : 1)); // sin pasar del ancho de la columna del número (si la hay)
   const tx1 = L.left + Math.round(L.numSize * 1.5 * 0.36), ty1 = rowTop + L.blockTop + L.numH / 2; // donde queda la tilde (centro del número)
-  const tx0 = side ? width - theme.safe.x - (PANEL_W * tScale) / 2 : L.left - Math.round(L.numSize * 1.5 * 0.14) + (PANEL_W * tScale) / 2; // sin lugar al costado: con el borde izquierdo en el de la tilde
-  const ty0 = side ? rowMidY - L.rowH * 0.42 : ty1; // en el horizontal, un poco más arriba que el renglón: ahí no hay texto a la derecha
+  const tx0 = nt ? nt.x : side ? width - theme.safe.x - (PANEL_W * tScale) / 2 : L.left - Math.round(L.numSize * 1.5 * 0.14) + (PANEL_W * tScale) / 2; // sin lugar al costado: con el borde izquierdo en el de la tilde
+  const ty0 = nt ? nt.y : side ? rowMidY - L.rowH * 0.42 : ty1; // en el horizontal, un poco más arriba que el renglón: ahí no hay texto a la derecha
   const tIn = S ? kf(f, S.thumbIn, [0, 1], ease.out) : 0;
   const tFly = S ? kf(f, S.thumbFly, [0, 1], ease.inOut) : 0;
   const tOut = kf(tFly, [0.7, 1], [0, 1]);
-  const tPresent = S !== null && (!side || tScale >= 0.4) && tIn > 0 && tFly < 1;
+  const tPresent = S !== null && (nt !== null || !side || tScale >= 0.4) && tIn > 0 && tFly < 1;
+  const rise = side || nt !== null; // entra con un leve ascenso y crece desde casi su tamaño (en vez de brotar chica sobre el número)
   const tX = tx0 + (tx1 - tx0) * tFly;
-  const tY = ty0 + (ty1 - ty0) * tFly - Math.sin(Math.PI * tFly) * (side ? 70 : 0) + (side ? (1 - tIn) * 28 : 0);
-  const tSc = (tScale * (side ? 0.86 + 0.14 * tIn : 0.35 + 0.65 * tIn)) * (1 - tFly) + endScale * tFly;
+  const tY = ty0 + (ty1 - ty0) * tFly - Math.sin(Math.PI * tFly) * (side ? 70 : 0) + (rise ? (1 - tIn) * 28 : 0);
+  const tSc = (tScale * (rise ? 0.86 + 0.14 * tIn : 0.35 + 0.65 * tIn)) * (1 - tFly) + endScale * tFly;
+  // spotlight: mientras la miniatura se muestra en el centro la lista se aparta (opacidad 0: no se pinta ni la juzga `qa`) y vuelve cuando la miniatura empieza a volar
+  const dimIn = spot && S ? kf(f, [S.thumbIn[0] - u(10), S.thumbIn[0] + u(4)], [0, 1], ease.out) : 0;
+  const dimOut = spot && S ? kf(f, [S.thumbFly[0] + u(12), S.thumbFly[0] + u(28)], [0, 1], ease.out) : 0; // vuelve cuando la miniatura ya se achicó
+  const listAside = dimIn * (1 - dimOut);
   const panelSurf = surfaceStyle(theme, "window");
   const panelShadow = resolveStyle(theme).surface.elevation === "shadow" ? `0 30px 60px -24px ${withAlpha(theme.color.text, 0.4)}` : panelSurf.boxShadow;
   const thumb = tPresent ? (
     // la miniatura es una vista chica de la escena: su texto es detalle, no se le pide el tamaño mínimo; al volar pasa por encima del texto de la fila (`overlap`)
-    <div data-qa-ignore="min-size overlap covered" style={{ position: "absolute", left: 0, top: 0, width: PANEL_W, height: PANEL_H, transform: `translate(${(tX - PANEL_W / 2).toFixed(2)}px, ${(tY - PANEL_H / 2).toFixed(2)}px) scale(${tSc.toFixed(4)})`, borderRadius: panelSurf.borderRadius, boxShadow: panelShadow, overflow: "hidden", opacity: fade(Math.min(1, tIn * (side ? 1 : 3)) * (1 - tOut)), zIndex: 5 }}>
+    <div data-qa-ignore="min-size overlap covered" style={{ position: "absolute", left: 0, top: 0, width: PANEL_W, height: PANEL_H, transform: `translate(${(tX - PANEL_W / 2).toFixed(2)}px, ${(tY - PANEL_H / 2).toFixed(2)}px) scale(${tSc.toFixed(4)})`, borderRadius: panelSurf.borderRadius, boxShadow: panelShadow, overflow: "hidden", opacity: fade(Math.min(1, tIn * (rise ? 1 : 3)) * (1 - tOut)), zIndex: 5 }}>
       <Thumb />
     </div>
   ) : null;
@@ -192,9 +211,9 @@ export function Interlude({ spec: specIn, done, skip = [], next: nextProp, ticks
               if (sp < 1) rowStyle = { transform: `translateY(${((1 - q) * L.rowH * 0.6).toFixed(2)}px) scale(${(0.94 + 0.06 * q).toFixed(4)})`, transformOrigin: "0 50%" };
               else rowStyle = {};
             } else if (stage && room > 0) {
-              rowStyle = { ...rowStyle, transform: [rowStyle.transform, `translateY(${(-room * L.rowH * 0.14).toFixed(2)}px)`].filter(Boolean).join(" ") };
+              rowStyle = { ...rowStyle, transform: [rowStyle.transform, `translateY(${(-room * roomShift).toFixed(2)}px)`].filter(Boolean).join(" ") };
             }
-            const rowOpacity = rowIn * (flyNext ? 1 : others) * (flyNext ? 1 - kf(f, [T.fly[1] - u(16), T.fly[1] - u(10)], [0, 1]) : 1);
+            const rowOpacity = rowIn * (flyNext ? 1 : others) * (flyNext ? 1 - kf(f, [T.fly[1] - u(16), T.fly[1] - u(10)], [0, 1]) : 1) * (1 - listAside);
             const ringP = stage && lateRow ? kf(f, [win[1] - u(2), win[1] + u(22)], [0, 1], ease.out) : 0;
             const cs = Math.round(L.numSize * 1.5);
             const cl = -Math.round(cs * 0.14);

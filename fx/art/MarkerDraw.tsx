@@ -1,6 +1,6 @@
 import { annotationLook, doodleStyle, resolveAnnotationMark, textStyle, withAlpha } from "../../themes";
 import { Easing, random } from "../../engine";
-import { fxBox, fxDensity, progress, roleColor, useFx } from "../core";
+import { hiddenBefore, fxBox, fxDensity, progress, roleColor, useFx } from "../core";
 import type { ColorRole, FxProps } from "../core";
 import { catmullRom, toPath, trimPolyline } from "../data/geom";
 import type { Pt } from "../data/geom";
@@ -67,7 +67,7 @@ export function MarkerDraw(p: MarkerDrawProps) {
   // en vez de salirse del svg, que recorta lo que desborda.
   const fontSize = Math.min(h * 0.58 * k, (w * 0.94) / (Math.max(1, label.length) * 0.62));
   return (
-    <svg width={w} height={h} viewBox={`0 0 ${w} ${h}`} data-ve-signal="marker" data-ve-piece="MarkerDraw" data-ve-mark={resolveAnnotationMark(theme)} style={{ display: "block", fontFamily: theme.font.family, ...p.style }}>
+    <svg width={w} height={h} viewBox={`0 0 ${w} ${h}`} data-ve-signal="marker" data-ve-piece="MarkerDraw" data-ve-mark={resolveAnnotationMark(theme)} style={{ display: "block", fontFamily: theme.font.family, textRendering: "geometricPrecision", ...p.style, ...hiddenBefore(local) }}>
       {kind === "highlight" && stroke}
       <text x={w / 2} y={h / 2 + h * 0.2} textAnchor="middle" fontSize={fontSize} fontWeight={tw.fontWeight} {...(tw.letterSpacing ? { letterSpacing: tw.letterSpacing } : {})} fill={theme.color.text}>{label}</text>
       {kind !== "highlight" && stroke}

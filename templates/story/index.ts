@@ -1,5 +1,5 @@
 // Historia inicial: apertura + (escena -> vuelta al listado) x n + cierre.
-// Se copia con: bash templates/nuevo.sh historia <slug> <escena> (corrige imports e id).
+// Se copia con: npm run nuevo -- historia <slug> <escena> (corrige imports e id).
 // Presupuesto de cuadros: ver spec.ts (`timing`) y `storyBudget(spec, scenes)` de stories/.
 // Después reemplazá `escena1`/`escena2` por las escenas reales (una carpeta por escena en videos/<slug>/)
 // (no hace falta registrarla: el runtime descubre toda carpeta videos/<slug>/**/index.ts).
@@ -30,4 +30,7 @@ export default defineStory({
   // interludes: "compact", // vuelta al listado de 40 cuadros (mínimo 24, `timing.interludeCompact`) en vez de la completa
   formats: ["vertical"], // opt-in: sin esto el video sale solo en horizontal. Cada formato extra exige el diseño de cada escena (useFormat().pick).
   // audio: { src: "music/pista.m4a", startFrom: 0, volume: 0.8 }, // pista que cubre todo el video (archivo en public/ o --assets)
+  // Sonido con locución y subtítulos (si el cuestionario los pidió): la mezcla con la voz de la persona sale de `npm run audio -- mezcla --voz ...`
+  // (docs/audio.md, "Locución") y se usa como `audio` de arriba; los subtítulos quemados van con <Subtitles cues={...} /> en la escena raíz (con una historia: `composeStory` + `defineVideo`, ver docs/subtitulos.md) y los
+  // archivos .srt/.vtt con `npm run audio -- subtitulos ... --junto-a out/<id>.mp4` (docs/subtitulos.md).
 });

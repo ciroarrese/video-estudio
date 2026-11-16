@@ -1,5 +1,5 @@
 import { random } from "../../engine";
-import { Easing, clamp, progress, roleColor, useFx } from "../core";
+import { hiddenBefore, Easing, clamp, progress, roleColor, useFx } from "../core";
 import { textLook } from "../../themes";
 import { decoration, decorationHost, frontCaretStyle, hasFrontCaret } from "./look";
 import { baseText } from "./shared";
@@ -44,7 +44,7 @@ export function ScrambleDecode(props: ScrambleDecodeProps) {
   // Cursor de bloque o guion bajo en el primer glifo sin resolver (con la barra, que es lo de siempre, no hay cursor acá).
   const front = hasFrontCaret(theme) ? shown.findIndex((c, i) => c !== finals[i]) : -1;
   return (
-    <div style={{ ...baseText(theme, props, true), display: "flex", ...(deco ? { width: "fit-content", ...decorationHost(theme) } : {}), ...style }}>
+    <div style={{ ...baseText(theme, props, true), display: "flex", ...(deco ? { width: "fit-content", ...decorationHost(theme) } : {}), ...style, ...hiddenBefore(local) }}>
       {finals.map((ch, i) => {
         const resolved = shown[i] === ch;
         const caret = i === front;

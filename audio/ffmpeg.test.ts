@@ -1,6 +1,7 @@
 // @vitest-environment node
 import { spawnSync } from 'node:child_process';
 import { existsSync, mkdtempSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
+import { createRequire } from 'node:module';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
@@ -8,6 +9,8 @@ import { avisoMp3SinEtiqueta, codificar, decodificar, escribirAtomico, escribirW
 import { picoVerdaderoDb } from './medidas';
 import { pistaDeClics } from './pistas-de-prueba';
 
+// tsx se corre con node (`process.execPath`): `.bin/tsx` no se ejecuta directo en Windows
+const tsxCli = createRequire(import.meta.url).resolve('tsx/cli');
 const HAY_FFMPEG = hayFfmpeg();
 if (!HAY_FFMPEG) console.warn('[audio] ffmpeg no está en el PATH: se omiten las pruebas de punta a punta de ffmpeg y la CLI.');
 
@@ -75,9 +78,8 @@ describe.skipIf(!HAY_FFMPEG)('ffmpeg y CLI (e2e)', () => {
     try {
       const sr = 48000;
       escribirWav16(join(dir, '-pista.wav'), pistaDeClics({ bpm: 120, seconds: 6, sr, padSec: 1 }), sr, 1);
-      const tsx = resolve(__dirname, '..', 'node_modules', '.bin', 'tsx');
       const cli = resolve(__dirname, 'cli.ts');
-      const r = spawnSync(tsx, [cli, 'empalme', '-pista.wav', '--out', '-salida.wav', '--segundos', '4', '--bpm', '120', '--offset', '1'], { cwd: dir, encoding: 'utf8' });
+      const r = spawnSync(process.execPath, [tsxCli, cli, 'empalme', '-pista.wav', '--out', '-salida.wav', '--segundos', '4', '--bpm', '120', '--offset', '1'], { cwd: dir, encoding: 'utf8' });
       expect(r.stderr).toBe('');
       expect(r.status).toBe(0);
       expect(existsSync(join(dir, '-salida.wav'))).toBe(true);
@@ -94,9 +96,8 @@ describe.skipIf(!HAY_FFMPEG)('ffmpeg y CLI (e2e)', () => {
       const sr = 48000;
       escribirWav16(join(dir, 'silencio.wav'), new Float32Array(sr * 6), sr, 1);
       escribirWav16(join(dir, 'clics.wav'), pistaDeClics({ bpm: 120, seconds: 6, sr }), sr, 1);
-      const tsx = resolve(__dirname, '..', 'node_modules', '.bin', 'tsx');
       const cli = resolve(__dirname, 'cli.ts');
-      const corre = (...a: string[]) => spawnSync(tsx, [cli, ...a], { cwd: dir, encoding: 'utf8' });
+      const corre = (...a: string[]) => spawnSync(process.execPath, [tsxCli, cli, ...a], { cwd: dir, encoding: 'utf8' });
       const a = corre('empalme', 'clics.wav', '--out', 'o.wav', '--segundos', '3', '--inicio', 'foo');
       expect(a.status).toBe(1);
       expect(a.stderr).toMatch(/--inicio tiene que ser un número/);

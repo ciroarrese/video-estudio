@@ -108,6 +108,8 @@ export type ListLayout = {
   barLeft: number;
   /** Fila en un solo renglón (`01 Nombre · línea`); en `lines` va la línea ya ajustada y `lineSize` es su tamaño. */
   inline?: boolean;
+  /** Holgura con la que se acomodó el texto medido (formatos angostos, ver `NARROW_SLACK`): lo medido por `listTextRects` se multiplica por ella. */
+  slack?: number;
   /** Largo (px) del subrayado completo de cada fila: `barW` (`list.underline: "row"`) o lo que mide el nombre (`"name"`). */
   barWs: number[];
 };
@@ -115,14 +117,26 @@ export type ListLayout = {
 
 // ---------------------------------------------------------------- ajuste de texto medido (formatos angostos)
 
-/** Mide un texto (px) con la tipografía real del tema (`kit/textWidth`, puro: canvas en el navegador, estimación por glifo en jsdom). */
-export type RowMeter = (text: string, size: number) => number;
+/**
+ * Mide un texto (px) con la tipografía real del tema (`kit/textWidth`, puro: canvas en el navegador, estimación por glifo en jsdom), ya multiplicado por `factor`
+ * (la holgura con la que se acomoda). `factor` es lo que hay que dividir para recuperar el ancho medido.
+ */
+export type RowMeter = ((text: string, size: number) => number) & { factor?: number };
 /** Holgura sobre lo medido: una fuente de reemplazo apenas más ancha no desborda la fila. */
 const FIT_SAFETY = 1.03;
-/** Medidor del nombre de una fila (rol `title`, el peso y el interletrado del design system). */
-export const nameMeter = (theme: Theme): RowMeter => (text, size) => kitTextWidth(theme, text, { size, role: "title" }) * FIT_SAFETY;
+/**
+ * Holgura de los formatos angostos (vertical y cuadrado), donde una fila que sobrepasa su ancho se sale del cuadro: el texto se acomoda para que entre con la
+ * tipografía del tema **más ancha de lo medido** (`--font-fallback wide` de `qa`: una familia de reserva hasta ~10-15 % más ancha) **y con la letra 25 % más grande**
+ * (`--font-scale 1.25`). El texto se mide con la fuente declarada en el tema; si la máquina la reemplaza o la persona agranda la letra, un renglón que entraba justo
+ * se sale del cuadro. Cuesta una letra algo más chica o un renglón más en vertical y cuadrado; el horizontal no la usa (no cambia ni un píxel).
+ */
+export const NARROW_SLACK = 1.4;
+const meterOf = (theme: Theme, role: "title" | "caption", factor: number): RowMeter =>
+  Object.assign((text: string, size: number) => kitTextWidth(theme, text, { size, role }) * factor, { factor });
+/** Medidor del nombre de una fila (rol `title`, con su familia `font.display`, el peso y el interletrado del design system). */
+export const nameMeter = (theme: Theme, factor = FIT_SAFETY): RowMeter => meterOf(theme, "title", factor);
 /** Medidor de la línea de apoyo (rol `caption`). */
-export const lineMeter = (theme: Theme): RowMeter => (text, size) => kitTextWidth(theme, text, { size, role: "caption" }) * FIT_SAFETY;
+export const lineMeter = (theme: Theme, factor = FIT_SAFETY): RowMeter => meterOf(theme, "caption", factor);
 
 /** Parte un texto por palabras en renglones de a lo sumo `maxW` px medidos; una palabra sola más ancha que `maxW` queda en su renglón (desborda). */
 export function wrapMeasured(text: string, maxW: number, size: number, meter: RowMeter): string[] {
@@ -190,7 +204,7 @@ export function fitRowsUniform(texts: string[], o: { width: number; size: number
 }
 
 /** Ancho (px) del renglón más ancho de unos renglones. */
-const widest = (rows: string[][], size: number, meter: RowMeter) => Math.max(0, ...rows.flat().map((r) => meter(r, size) / FIT_SAFETY));
+const widest = (rows: string[][], size: number, meter: RowMeter) => Math.max(0, ...rows.flat().map((r) => meter(r, size) / (meter.factor ?? FIT_SAFETY)));
 
 /** Formatos angostos (vertical y cuadrado): la lista acomoda el texto midiéndolo (ver `fitRowsUniform`). */
 const isNarrow = (width: number, height: number) => width / height < 1.3;
@@ -216,13 +230,13 @@ export function wrapText(text: string, maxW: number, size: number, maxLines: num
  * Lista apilada para formato vertical (alto/ancho > 1,3): ocupa casi todo el ancho y buena parte del alto. Cada fila:
  * número (o tilde) arriba, nombre grande (~h1) y la línea debajo en hasta 2 renglones. Los tamaños salen de `theme.type`.
  */
-function stackedLayout(spec: StorySpec, theme: Theme, width: number, height: number): Omit<ListLayout, "barWs"> {
+function stackedLayout(spec: StorySpec, theme: Theme, width: number, height: number, slack: number): Omit<ListLayout, "barWs"> {
   const n = spec.topics.length;
   const marginX = Math.round(width * 0.085);
   const region = width - 2 * marginX;
   const H = height - 2 * Math.round(height * 0.07);
   const GAP = { num: 14, pad: 30 };
-  const nm = nameMeter(theme), lm = lineMeter(theme);
+  const nm = nameMeter(theme, slack), lm = lineMeter(theme, slack);
   const build = (sc: number) => {
     const base0 = Math.round(theme.type.hero * sc);
     const floor = Math.round(Math.max(48, base0 * 0.6));
@@ -266,7 +280,7 @@ function stackedLayout(spec: StorySpec, theme: Theme, width: number, height: num
     blockTop, blockH: b.blockH, barW: region, names: b.nameRows.map((r) => r.join(" ")), lines: b.lineRows.map((r) => r.join(" ")),
     // Lista apilada: se atraviesa por el centro del ancho de la fila (no por las primeras letras del nombre), así el zoom no empuja la línea hacia fuera del cuadro angosto.
     target: (i) => ({ x: left + region / 2, y: top + i * rowH + nameTop + b.nameH / 2 }),
-    stacked: true, numH: b.numH, numGap: GAP.num, lineRows: b.lineRows, nameRows: b.nameRows, textW: Math.round(b.textW), barTop, barLeft: 0,
+    stacked: true, numH: b.numH, numGap: GAP.num, lineRows: b.lineRows, nameRows: b.nameRows, textW: Math.round(b.textW), barTop, barLeft: 0, slack,
   };
 }
 
@@ -275,11 +289,11 @@ function stackedLayout(spec: StorySpec, theme: Theme, width: number, height: num
  * nombre y la bajada se acomodan midiéndolos: todo el ancho seguro, después hasta dos renglones cada uno y recién al final letra más chica (hasta un
  * piso legible). Nunca "…" en el nombre; en la bajada, solo si ni así entra.
  */
-function columnLayout(spec: StorySpec, theme: Theme, width: number, height: number): Omit<ListLayout, "barWs"> {
+function columnLayout(spec: StorySpec, theme: Theme, width: number, height: number, slack: number): Omit<ListLayout, "barWs"> {
   const n = spec.topics.length;
   const region = Math.max(600, width - 2 * theme.safe.x);
   const H = Math.max(300, height - 2 * theme.safe.y - 20);
-  const nm = nameMeter(theme), lm = lineMeter(theme);
+  const nm = nameMeter(theme, slack), lm = lineMeter(theme, slack);
   const nameBase = theme.type.h1 * 0.8;
   const lineBase = theme.type.body * 0.9;
   const build = (sc: number) => {
@@ -314,10 +328,12 @@ function columnLayout(spec: StorySpec, theme: Theme, width: number, height: numb
   const rowH = Math.floor(Math.min(b.blockH + 22, Hrow / n));
   const blockTop = Math.floor((rowH - b.blockH) / 2);
   const top = Math.round((height - n * rowH) / 2);
-  const rowW = Math.round(Math.min(region, Math.max(b.numW + b.textW, region * 0.78)));
+  // el ancho de la fila cuenta el texto con su holgura (`NARROW_SLACK`): con la letra más ancha o más grande el texto sigue dentro de la fila y la fila dentro del cuadro
+  const rowW = Math.round(Math.min(region, Math.max(b.numW + b.textW * slack, region * 0.78)));
   const left = Math.round((width - rowW) / 2);
   const barW = rowW - b.numW;
   return {
+    slack,
     left, top, rowW, rowH, nameSize: b.nameSize, lineSize: b.lineSize, numSize: b.numSize, numW: b.numW, nameH: b.nameH, lineH: b.lineH, blockTop, blockH: b.blockH, barW,
     names: b.nameRows.map((r) => r.join(" ")), lines: b.lineRows.map((r) => r.join(" ")),
     target: (i) => ({ x: left + b.numW + Math.round(barW * 0.35), y: top + i * rowH + blockTop + b.nameH / 2 }),
@@ -379,24 +395,46 @@ function inlineLayout(spec: StorySpec, theme: Theme, width: number, height: numb
  * 4 temas; con 5 o 6 todo se escala parejo (el nombre nunca baja de ~44 px). Todo en enteros: las posiciones
  * fraccionarias de capas compuestas se rasterizan según el historial de cuadros.
  */
-export function listLayout(spec: StorySpec, theme: Theme, width: number, height: number): ListLayout {
-  const L = baseLayout(spec, theme, width, height);
+export function listLayout(spec: StorySpec, theme: Theme, width: number, height: number, o: { strict?: boolean } = {}): ListLayout {
+  const L = baseLayout(spec, theme, width, height, !!o.strict);
   const byName = listOptions(spec.design).underline === "name";
   if (L.nameRows) { // formatos angostos: el subrayado "name" llega hasta el renglón más ancho del nombre (medido)
-    const nm = nameMeter(theme);
+    const nm = nameMeter(theme, L.slack ?? FIT_SAFETY);
     return { ...L, barWs: L.nameRows.map((rows) => (byName ? Math.max(24, Math.min(L.barW, Math.round(widest([rows], L.nameSize, nm)))) : L.barW)) };
   }
   return { ...L, barWs: L.names.map((nm) => (byName ? Math.max(24, Math.min(L.barW, Math.round(textWidth(nm, L.nameSize, AVG_BOLD)))) : L.barW)) };
 }
 
-function baseLayout(spec: StorySpec, theme: Theme, width: number, height: number): Omit<ListLayout, "barWs"> {
-  if (height / width > 1.3) return stackedLayout(spec, theme, width, height);
-  if (isNarrow(width, height)) return columnLayout(spec, theme, width, height);
+/** Pisos legibles (px a 1080 de lado corto): letra del nombre y de la bajada. Por debajo, la lista "entra" pero no se lee (`stories/fit.ts`). */
+export const NAME_FLOOR = 44;
+export const LINE_FLOOR = 26;
+/** Holguras que se prueban en orden en los formatos angostos: la de `NARROW_SLACK` y una intermedia; si ni así entra sin cortar ni bajar de los pisos, la de siempre (`FIT_SAFETY`). */
+const SLACKS = [NARROW_SLACK, 1.2];
+
+/** La lista entera, sin cortar con "…" y con la letra por encima de los pisos legibles. */
+function listOk(L: Omit<ListLayout, "barWs">, spec: StorySpec): boolean {
+  const norm = (x: string) => x.replace(/\s+/g, " ");
+  return L.nameSize >= NAME_FLOOR && L.lineSize >= LINE_FLOOR && L.names.every((n, i) => norm(n) === norm(spec.topics[i]!.name)) && L.lines.every((n, i) => norm(n) === norm(spec.topics[i]!.line));
+}
+
+/**
+ * Lista de un formato angosto con la mayor holgura (`NARROW_SLACK`, `SLACKS`) con la que entra entera y legible. `strict`: solo con la mayor (para `checkStoryFit`, que dice si el
+ * guion entra con la tipografía más ancha o más grande); sin `strict`, si no entra con ninguna usa la de siempre, para dibujar igual (más vale una lista justa que cortar un nombre).
+ */
+function narrowList(build: (slack: number) => Omit<ListLayout, "barWs">, spec: StorySpec, strict: boolean): Omit<ListLayout, "barWs"> {
+  if (strict) return build(NARROW_SLACK);
+  for (const sl of SLACKS) { const L = build(sl); if (listOk(L, spec)) return L; }
+  return build(FIT_SAFETY);
+}
+
+function baseLayout(spec: StorySpec, theme: Theme, width: number, height: number, strict: boolean): Omit<ListLayout, "barWs"> {
+  if (height / width > 1.3) return narrowList((sl) => stackedLayout(spec, theme, width, height, sl), spec, strict);
+  if (isNarrow(width, height)) return narrowList((sl) => columnLayout(spec, theme, width, height, sl), spec, strict);
   // formato ancho: la lista de siempre; solo si esa lista cortaría con "…" un nombre o una bajada (más de lo que entra con la estimación y la letra mínima)
   // se arma en columna con el texto medido y partido en renglones (`columnLayout`). Mientras nada se corte, el marcado y los píxeles son los de siempre.
   const wide = listOptions(spec.design).layout === "inline" && width / height >= 1.3 ? inlineLayout(spec, theme, width, height) : wideLayout(spec, theme, width, height);
   const cuts = wide.names.some((nm, i) => nm !== spec.topics[i]!.name) || wide.lines.some((ln, i) => ln !== spec.topics[i]!.line);
-  return cuts ? columnLayout(spec, theme, width, height) : wide;
+  return cuts ? narrowList((sl) => columnLayout(spec, theme, width, height, sl), spec, strict) : wide;
 }
 
 function wideLayout(spec: StorySpec, theme: Theme, width: number, height: number): Omit<ListLayout, "barWs"> {
@@ -595,12 +633,13 @@ const CLOSING_CAM_MAX = 1.1, CLOSING_EDGE_SLACK = 32;
  * Ancho máximo de la píldora del panel `i`: la distancia al panel vecino de su fila (menos 24 px de aire) y lo que entra entre su
  * centro y el borde del cuadro contando el zoom inicial de la cámara (1,1) y 32 px de holgura por la inclinación; con tope en 900 px.
  */
-export function pillBudget(panels: PanelPlace[], i: number, width: number): number {
+export function pillBudget(panels: PanelPlace[], i: number, width: number, slack = 1): number {
   const c = panels[i]!;
   const d = Math.abs(c.x - width / 2);
   let b = Math.min(900, 2 * ((width / 2 - CLOSING_EDGE_SLACK) / (CLOSING_CAM_MAX * 1.03) - d));
   for (const o of panels) if (o !== c && Math.abs(o.y - c.y) < 1) b = Math.min(b, Math.abs(o.x - c.x) - 24);
-  return Math.max(120, Math.floor(b));
+  // `slack` (formatos angostos, `NARROW_SLACK`): la píldora también tiene que entrar con una tipografía más ancha y la letra 25 % más grande; sin él (1) es la de siempre
+  return Math.max(120, Math.floor(b / slack));
 }
 
 /** Rectángulo de pantalla (en reposo) del panel `c` y de su píldora. */
@@ -636,11 +675,11 @@ export function panelEntryLift(c: PanelPlace, theme: Theme, name: string, maxW: 
  * por la estimación del ancho del texto) o el panel mismo se saldrían del cuadro (40 px de holgura por la inclinación). En vertical la
  * píldora de arriba queda cerca del borde superior y con 1,1 asomaba unos px afuera.
  */
-export function closingCamStart(panels: PanelPlace[], theme: Theme, names: string[], width: number, height: number): number {
+export function closingCamStart(panels: PanelPlace[], theme: Theme, names: string[], width: number, height: number, fitSlack = 1): number {
   const cx = width / 2, cy = height / 2, slack = 40;
   let s = CLOSING_CAM_MAX;
   panels.forEach((c, i) => {
-    const { panel, pill } = panelRects(c, theme, names[i] ?? "", pillBudget(panels, i, width));
+    const { panel, pill } = panelRects(c, theme, names[i] ?? "", pillBudget(panels, i, width, fitSlack));
     const reachY = Math.max(cy - pill.y, panel.y + panel.h - cy);
     const reachX = Math.abs(c.x - cx) + Math.max(pill.w * 1.12, panel.w) / 2;
     s = Math.min(s, (cy - slack) / reachY, (cx - slack) / reachX);
@@ -652,9 +691,11 @@ export function closingCamStart(panels: PanelPlace[], theme: Theme, names: strin
  * Disposición de los paneles flotantes del cierre según la cantidad de temas (`k` = escala del lienzo 560x340).
  * Invariante: entre una fila y la siguiente queda un hueco de `ROW_GAP_Y` (>= lo que ocupa la píldora de la fila de abajo),
  * y sobre la primera fila queda `PILL_BAND`; así ninguna píldora cae sobre el panel de otro tema.
+ * `narrow`: si el formato es angosto (por defecto, por la proporción de `width` y `height`). Con una franja reservada abajo (subtítulos) `height` es la del cuadro menos la franja,
+ * y un cuadrado con franja se vería "ancho": quien conoce el formato completo lo dice acá.
  */
-export function panelLayout(n: number, width = 1920, height = 1080): PanelPlace[] {
-  if (width / height < 1.3) return panelGrid(n, width, height);
+export function panelLayout(n: number, width = 1920, height = 1080, narrow: boolean = width / height < 1.3): PanelPlace[] {
+  if (narrow) return panelGrid(n, width, height);
   const kBase = n === 2 ? 1.4 : n <= 4 ? 1.2 : 0.95;
   const rows = n === 2 ? [2] : [Math.ceil(n / 2), n - Math.ceil(n / 2)];
   // alto disponible: sin la banda de la píldora arriba (+24) ni 40 px abajo; la escala baja si no entran las filas con su hueco
@@ -682,12 +723,14 @@ export function panelLayout(n: number, width = 1920, height = 1080): PanelPlace[
  * entra en el ancho seguro y en el alto. Entre filas queda `ROW_GAP_Y` (la píldora del panel de abajo) y arriba `PILL_BAND`.
  */
 function panelGrid(n: number, width: number, height: number): PanelPlace[] {
-  const cols = width >= height || n > 3 ? 2 : 1;
-  const rows = Math.ceil(n / cols);
   const gapX = 36;
-  const availW = width - 2 * 80;
-  const top = PILL_BAND + 40, availH = height - top - 80;
-  const k = Math.min(1.4, (availW - (cols - 1) * gapX) / (cols * PANEL_W), (availH - (rows - 1) * ROW_GAP_Y) / (rows * PANEL_H));
+  const availW = width - 2 * 64;
+  const top = PILL_BAND + 28, availH = height - top - 56;
+  // una o dos columnas: se elige la que da los paneles más grandes (en vertical, con pocos temas, una columna; con cuatro o más y en cuadrado, dos)
+  const fitK = (cols: number) => Math.min(1.75, (availW - (cols - 1) * gapX) / (cols * PANEL_W), (availH - (Math.ceil(n / cols) - 1) * ROW_GAP_Y) / (Math.ceil(n / cols) * PANEL_H));
+  const cols = fitK(2) > fitK(1) + 1e-9 ? 2 : 1;
+  const rows = Math.ceil(n / cols);
+  const k = fitK(cols);
   const zs = [30, -90, -60, 50, 0, -40];
   const cw = PANEL_W * k, ch = PANEL_H * k;
   const block = rows * ch + (rows - 1) * ROW_GAP_Y;
@@ -740,4 +783,102 @@ export function rigProject(x: number, y: number, z: number, rig: Rig, persp: num
   if (persp - z3 < 60) return null;
   const fac = persp / (persp - z3);
   return { x: x1 * fac, y: y2 * fac, s: fac, z: z3 };
+}
+
+// ---------------------------------------------------------------- título de la apertura (formatos angostos)
+
+/** Piso legible del título (relativo a `type.hero`) y piso de emergencia con el que, como último recurso, el título entra sin cortarse con "…". */
+export const TITLE_FLOOR = 0.45;
+export const TITLE_HARD_FLOOR = 0.3;
+/** Renglones del título en formatos angostos antes de bajar la letra. */
+export const TITLE_ROWS = 3;
+
+export type TitleFit = { text: string; size: number; rows: string[]; /** `true` si entra en `TITLE_ROWS` renglones sin bajar de `TITLE_FLOOR × hero`. */ ok: boolean };
+
+/** Ancho máximo del cartel del título (px) en un cuadro de ancho `width`. */
+export const titleCardMax = (theme: Theme, width: number) => Math.min(1700, width - theme.safe.x);
+
+/**
+ * Acomoda el título de la apertura en un formato angosto midiéndolo con la tipografía del tema: primero hasta `TITLE_ROWS` renglones a `type.hero`, después una letra más
+ * chica (hasta `TITLE_FLOOR × hero`); si ni así entra, sigue bajando hasta `TITLE_HARD_FLOOR` (con un renglón más) y `ok` queda en `false`. **Nunca corta con "…"**.
+ * El cartel tiene un relleno de `0,55 × letra` por lado (ver `Opening`), que se descuenta del ancho.
+ */
+export function fitTitleNarrow(theme: Theme, text: string, width: number): TitleFit {
+  const meter = nameMeter(theme);
+  const wide = nameMeter(theme, NARROW_SLACK);
+  const maxW = titleCardMax(theme, width);
+  const room = (s: number) => maxW - 2 * Math.round(s * 0.55) - 8;
+  const rowsAt = (s: number) => wrapMeasured(text, room(s), s, meter);
+  // el título se parte solo en el navegador (texto que fluye en el cartel): con una letra más ancha o más grande pasa a más renglones, pero una palabra sola no se parte:
+  // cada palabra tiene que entrar en el cartel con la holgura de los formatos angostos
+  const words = text.split(/\s+/).filter(Boolean);
+  const wordsFit = (s: number) => words.every((w) => wide(w, s) <= room(s));
+  const fits = (r: string[], s: number, max: number) => r.length <= max && r.every((x) => meter(x, s) <= room(s)) && wordsFit(s);
+  const hero = theme.type.hero;
+  const floor = Math.round(hero * TITLE_FLOOR), hard = Math.round(hero * TITLE_HARD_FLOOR);
+  for (let s = Math.round(hero); s >= floor; s--) { const r = rowsAt(s); if (fits(r, s, TITLE_ROWS)) return { text, size: s, rows: r, ok: true }; }
+  for (let s = floor - 1; s >= hard; s--) { const r = rowsAt(s); if (fits(r, s, TITLE_ROWS + 1)) return { text, size: s, rows: r, ok: false }; }
+  return { text, size: hard, rows: rowsAt(hard), ok: false };
+}
+
+// ---------------------------------------------------------------- miniatura de la revelación (formatos angostos)
+
+export type RevealThumb = {
+  /** `"free"`: hay un lugar libre al costado del texto (a la derecha, sin pisarlo). `"spotlight"`: no lo hay; la lista se aparta un momento y la miniatura se muestra en el centro. */
+  mode: "free" | "spotlight";
+  /** Centro (px del cuadro) y tamaño de la miniatura en reposo. */
+  x: number; y: number; w: number; h: number;
+};
+
+/** Ancho mínimo y máximo de la miniatura de la revelación, como parte del ancho del cuadro. */
+export const REVEAL_THUMB = { min: 0.3, max: 0.42, spotlight: 0.42 };
+
+type TextRect = { x: number; y: number; w: number; h: number };
+
+/** Cajas de todo el texto de la lista (número, nombre, bajada y, en la fila `lateI`, el subrayado), medidas con la tipografía del tema. */
+export function listTextRects(L: ListLayout, theme: Theme, lateI = -1, lift = 0): TextRect[] {
+  const nm = nameMeter(theme, L.slack ?? FIT_SAFETY), lm = lineMeter(theme, L.slack ?? FIT_SAFETY);
+  const out: TextRect[] = [];
+  const n = L.names.length;
+  for (let i = 0; i < n; i++) {
+    const rowTop = L.top + i * L.rowH - (i === lateI ? 0 : lift); // `lift`: lo que las filas ya vistas suben en la revelación escenificada
+    const nameRows = L.nameRows?.[i] ?? [L.names[i]!];
+    const lineRows = L.lineRows[i] ?? [L.lines[i]!];
+    const x0 = L.stacked ? L.left : L.left + L.numW;
+    const nameTop = rowTop + L.blockTop + (L.stacked ? L.numH + L.numGap : 0);
+    if (L.stacked) out.push({ x: L.left - 6, y: rowTop + L.blockTop, w: Math.round(L.numSize * 1.7), h: L.numH });
+    else out.push({ x: L.left, y: nameTop, w: L.numW, h: L.nameH });
+    nameRows.forEach((r, k) => out.push({ x: x0, y: nameTop + k * L.nameH, w: nm(r, L.nameSize), h: L.nameH }));
+    const lineTop = nameTop + nameRows.length * L.nameH + ROW_GAP.a;
+    lineRows.forEach((r, k) => out.push({ x: x0, y: lineTop + k * L.lineH, w: lm(r, L.lineSize), h: L.lineH }));
+    if (i === lateI) out.push({ x: L.left + L.barLeft, y: rowTop + L.barTop, w: L.barWs[i] ?? L.barW, h: ROW_GAP.bar });
+  }
+  return out;
+}
+
+/**
+ * Dónde va la miniatura de la tarjeta que se revela (`design.reveal: "stage"`) en un formato angosto. Se busca, contra las cajas medidas de todo el texto de la lista,
+ * el lugar más grande (de `REVEAL_THUMB.max` a `REVEAL_THUMB.min` del ancho del cuadro) pegado al borde derecho de la lista, dentro del cuadro y sin tocar ningún
+ * texto (14 px de aire), lo más cerca posible del renglón de la fila nueva. Si no hay ninguno (cuadrado con la lista llena), vuelve `"spotlight"`: la miniatura en el centro.
+ */
+export function revealThumbRect(L: ListLayout, theme: Theme, lateI: number, width: number, height: number): RevealThumb {
+  const rects = listTextRects(L, theme, lateI, L.rowH * 0.14); // las filas ya vistas se corren 0,14 filas hacia arriba (Interlude: `room`)
+  const air = 14;
+  const hit = (a: TextRect, b: TextRect) => a.x < b.x + b.w + air && a.x + a.w + air > b.x && a.y < b.y + b.h + air && a.y + a.h + air > b.y;
+  const right = Math.min(L.left + L.rowW, width - Math.round(width * 0.06));
+  const yMin = Math.round(height * 0.06), yMax = height - Math.round(height * 0.06);
+  const prefer = L.top + lateI * L.rowH + L.blockTop + (L.stacked ? L.numH + L.numGap + L.nameH / 2 : L.nameH / 2);
+  for (let w = Math.round(width * REVEAL_THUMB.max); w >= Math.round(width * REVEAL_THUMB.min); w -= 4) {
+    const h = Math.round((w * 340) / 560);
+    let best: { y: number; d: number } | null = null;
+    for (let top = yMin; top + h <= yMax; top += 4) {
+      const box = { x: right - w, y: top, w, h };
+      if (rects.some((r) => hit(box, r))) continue;
+      const d = Math.abs(top + h / 2 - prefer);
+      if (!best || d < best.d) best = { y: top, d };
+    }
+    if (best) return { mode: "free", x: right - w / 2, y: best.y + h / 2, w, h };
+  }
+  const w = Math.round(width * REVEAL_THUMB.spotlight);
+  return { mode: "spotlight", x: width / 2, y: height / 2, w, h: Math.round((w * 340) / 560) };
 }

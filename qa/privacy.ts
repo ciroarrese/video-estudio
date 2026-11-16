@@ -114,7 +114,7 @@ export async function runPrivacy(o: PrivacyOptions): Promise<PrivacyResult> {
   for (const dir of o.scanSource ?? []) {
     for (const file of walkSource(dir, skip)) {
       scannedFiles++;
-      const lines = readFileSync(file, 'utf8').split('\n');
+      const lines = readFileSync(file, 'utf8').split(/\r?\n/);
       lines.forEach((line, i) => {
         for (const h of scanText(line, denySource, allow, { phones: false, domains: /https?:\/\//i.test(line) })) {
           // In source, only domains that appear as URLs are considered (keeps `foo.bar` code paths quiet).

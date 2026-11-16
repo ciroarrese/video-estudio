@@ -1,5 +1,5 @@
 import { measureWidth } from "../fx/text/measure";
-import { textStyle } from "../themes";
+import { textStyle, titleFamily } from "../themes";
 import type { Theme } from "../themes";
 
 type WeightName = keyof Theme["font"]["weights"];
@@ -31,5 +31,5 @@ export function textWidth(theme: Theme, text: string, opts: TextWidthOptions = {
   const weight = typeof w === "number" ? w : theme.font.weights[w];
   const ls = typeof st.letterSpacing === "string" ? parseFloat(st.letterSpacing) : 0;
   const shown = st.textTransform === "uppercase" ? text.toUpperCase() : st.textTransform === "lowercase" ? text.toLowerCase() : text;
-  return measureWidth(shown, size, { family: theme.font.family, weight, letterSpacing: Number.isFinite(ls) ? ls : 0 });
+  return measureWidth(shown, size, { family: opts.role === "title" ? titleFamily(theme) : theme.font.family, weight, letterSpacing: Number.isFinite(ls) ? ls : 0 });
 }

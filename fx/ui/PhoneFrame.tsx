@@ -1,10 +1,32 @@
 import type React from "react";
 import { Easing } from "../../engine";
 import { fade, fxBox, progress, styleKey, useFx, xform } from "../core";
-import type { FxProps } from "../core";
+import type { ColorRole, FxProps } from "../core";
+import { mix } from "../core";
 import { contrastRatio, relativeLuminance } from "../../themes";
+import type { Theme } from "../../themes";
 
-export type PhoneFrameProps = FxProps & { children?: React.ReactNode; bezel?: number };
+/**
+ * Color del cuerpo del aparato (marco y muesca), siempre del tema:
+ * - `auto` (por defecto): el más oscuro entre texto y fondo (como siempre);
+ * - `dark` / `light`: el más oscuro / el más claro entre texto y fondo (en un tema claro, `light` es el fondo y el marco se recorta con un filete `border`);
+ * - `soft`: un marco discreto, mezcla del borde del tema con el fondo (para sistemas serenos donde el negro pesa);
+ * - un rol del tema (`accent`, `surfaceAlt`, `border`, `textMuted`...).
+ */
+export type PhoneBezelColor = "auto" | "dark" | "light" | "soft" | ColorRole;
+
+export type PhoneFrameProps = FxProps & { children?: React.ReactNode; bezel?: number; bezelColor?: PhoneBezelColor };
+
+/** Color del cuerpo del teléfono para un tema (puro; lo usa `PhoneFrame` y sirve para armar la pantalla a juego). */
+export function phoneBodyColor(theme: Theme, tone: PhoneBezelColor = "auto"): string {
+  const { text, bg, border } = theme.color;
+  const darker = relativeLuminance(text) <= relativeLuminance(bg) ? text : bg;
+  const lighter = darker === text ? bg : text;
+  if (tone === "auto" || tone === "dark") return darker;
+  if (tone === "light") return lighter;
+  if (tone === "soft") return mix(border, bg, 0.35);
+  return theme.color[tone];
+}
 
 /** Tamaño por defecto del marco (px). */
 export const PHONE_SIZE = { width: 380, height: 760 } as const;
@@ -31,8 +53,8 @@ export function PhoneFrame(p: PhoneFrameProps) {
   const bez = p.bezel ?? PHONE_BEZEL;
   const scr = phoneScreen(w, h, bez);
   const R = phoneScreenRadius(theme);
-  // El marco del aparato es siempre el más oscuro de texto/fondo (con tema oscuro, el texto es claro y daría un marco blanco).
-  const body = relativeLuminance(theme.color.text) <= relativeLuminance(theme.color.bg) ? theme.color.text : theme.color.bg;
+  // Por defecto el marco es el más oscuro de texto/fondo (con tema oscuro, el texto es claro y daría un marco blanco); `bezelColor` lo cambia.
+  const body = phoneBodyColor(theme, p.bezelColor);
   const ring = contrastRatio(body, theme.color.bg) < 1.5; // marco igual al fondo: se lo recorta con un borde del tema
   const k = Easing.out(progress(local, 0, p.duration ? Math.min(20, p.duration * 0.3) : 20));
   // Traslado y opacidad solo mientras el marco entra (en reposo no queda `translateY(0.00px)` ni `opacity: 0.99`).

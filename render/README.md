@@ -44,6 +44,7 @@ Tambien `npx ve-render <id> ...`. **La herramienta se ejecuta desde un clon de e
 | `--frame-format png\|jpeg` | Captura sin perdida (por defecto) o JPEG (algo mas rapido, con perdida) |
 | `--jpeg-quality N` | Calidad JPEG (por defecto 95) |
 | `--assets <dir>` | Directorio extra de estaticos/audio (repetible, se busca primero; también `VE_ASSETS`, rutas separadas por `:`). Lo aceptan `render`, `qa`, `sheet`, `privacy` y el servidor de desarrollo (por `VE_ASSETS`). Además se sirven solas, sin pasar nada, `videos/<slug>/assets`, `videos/<slug>/audio` y `<VE_VIDEOS_DIR>/assets` (ver "Archivos del video") |
+| `--strict-fonts` | Una familia del sistema que el tema nombra sin archivo (`"Inter", sans-serif`) y no está instalada hace fallar; sin la bandera solo avisa (también `VE_STRICT_FONTS=1`). Ver "Fuentes del sistema que faltan" |
 | `--allow-missing-fonts` | Borrador: una fuente que no carga avisa en vez de fallar el render (también `VE_ALLOW_MISSING_FONTS=1`; en `qa`, `sheet` y `privacy` también). Ver "Fuentes que no cargan" |
 | `--check` | No codifica: verifica determinismo (sale con codigo 1 si falla). Tolerante por defecto |
 | `--check-count N` | Con `--check`: cuadros repartidos parejos en el rango (por defecto 12) |
@@ -117,11 +118,11 @@ Las pruebas que necesitan videos propios usan `withTempVideos` (`render/testing.
 
 ## Videos fuera del repo (`VE_VIDEOS_DIR`)
 
-`VE_VIDEOS_DIR=/ruta/absoluta/mis-videos npm run render -- --list` (también render, `--check`, `qa`, `sheet`, `privacy` y `npm run dev`) carga los videos de esa carpeta (`<slug>/index.ts(x)` y `<slug>/<carpeta>/index.ts(x)`; se ignoran las carpetas que empiezan con punto) **además de los ejemplos**, y los muestra como `videos/<slug>`. Sirve para dejar los videos fuera del repo y para pruebas con videos temporales. Si la ruta no existe o no es una carpeta, el CLI falla con un mensaje en español (no lista vacío). Una carpeta sin videos es válida y no da error.
+`VE_VIDEOS_DIR=/ruta/absoluta/mis-videos npm run render -- --list` (también render, `--check`, `qa`, `sheet`, `privacy` y `npm run dev`) carga los videos de esa carpeta (`<slug>/index.ts(x)` y `<slug>/<carpeta>/index.ts(x)`; se ignoran las carpetas que empiezan con punto) **además de los ejemplos**, y los muestra como `videos/<slug>`. **Las rutas `videos/<slug>/...` de los comandos se leen contra esa carpeta**: `privacy --deny videos/<slug>/prohibidos.txt --scan-source videos/<slug>` y `--assets videos/<slug>/audio` prueban primero la ruta tal cual y, si no existe, `<VE_VIDEOS_DIR>/<slug>/...` (`render/rutas.ts`); si no está en ningún lado el error nombra las rutas probadas. Los comandos de `npm run audio` (`--out`, `--cues`, `--tempo`, `--voz`...) hacen la misma traducción (`audio/rutas.ts`): una entrada se prueba tal cual y después contra esa carpeta; una salida cae en la carpeta del video si existe afuera. Sirve para dejar los videos fuera del repo y para pruebas con videos temporales. Si la ruta no existe o no es una carpeta, el CLI falla con un mensaje en español (no lista vacío). Una carpeta sin videos es válida y no da error.
 
 Causa del listado vacío que había: `import.meta.glob` de vite con una ruta relativa que sale del proyecto (`../../../../tmp/...`) devuelve un mapa vacío, y se llevaba también los ejemplos. Ahora `vite.config.ts` saca los patrones de `videos/` y agrega imports dinámicos con ruta absoluta de lo que encuentra en la carpeta (se escanea al compilar; al agregar una carpeta nueva el hash del bundle cambia solo).
 
-**Armar la carpeta.** `VE_VIDEOS_DIR=/ruta/mis-videos bash templates/nuevo.sh escena <slug> <nombre>` escribe ahí (en vez de en `videos/`) con los imports por alias (`video-estudio/engine`, ...) y crea `tsconfig.json` y `env.d.ts` si faltan (`... nuevo.sh externo` solo prepara esos dos). Los modelos están en `templates/externo/` (`tsconfig.json` con `paths` a este clon, sin `baseUrl` porque TypeScript 7 lo rechaza; `types: []` porque `vite/client` no se resuelve desde afuera; `env.d.ts` declara `*?url`, `*?raw`, imágenes, fuentes y audio; `react` y `react-dom` se resuelven a los tipos del clon). `npm run typecheck` revisa también esa carpeta cuando `VE_VIDEOS_DIR` está definida; `npm run typecheck:videos` la exige. `templates/tema-informe.ts` lee el tema de `<VE_VIDEOS_DIR>/<slug>/theme.ts` (o de una ruta a un `.ts`) con el mismo vite del proyecto, así que resuelve el alias y tolera los imports `?url`.
+**Armar la carpeta.** `VE_VIDEOS_DIR=/ruta/mis-videos npm run nuevo -- escena <slug> <nombre>` escribe ahí (en vez de en `videos/`) con los imports por alias (`video-estudio/engine`, ...) y crea `tsconfig.json` y `env.d.ts` si faltan (`... npm run nuevo -- externo` solo prepara esos dos). Los modelos están en `templates/externo/` (`tsconfig.json` con `paths` a este clon, sin `baseUrl` porque TypeScript 7 lo rechaza; `types: []` porque `vite/client` no se resuelve desde afuera; `env.d.ts` declara `*?url`, `*?raw`, imágenes, fuentes y audio; `react` y `react-dom` se resuelven a los tipos del clon). `npm run typecheck` revisa también esa carpeta cuando `VE_VIDEOS_DIR` está definida; `npm run typecheck:videos` la exige. `templates/tema-informe.ts` lee el tema de `<VE_VIDEOS_DIR>/<slug>/theme.ts` (o de una ruta a un `.ts`) con el mismo vite del proyecto, así que resuelve el alias y tolera los imports `?url`.
 
 Cómo importar el motor desde un video de afuera: con el alias `video-estudio/<carpeta>`, que apunta a la carpeta del repo.
 
@@ -179,7 +180,11 @@ No cargó una fuente; el video saldría con otra tipografía:
   - "Marca" (peso 700) desde http://127.0.0.1:41233/fonts/Marca-Bold.otf: no se pudo descargar o leer el archivo (...; ¿404 o archivo dañado?)
 ```
 
-Lo mismo en `qa`, `sheet` y `privacy` (todos dibujan con el mismo runtime). Para un borrador: `--allow-missing-fonts` (o `VE_ALLOW_MISSING_FONTS=1`), que solo avisa por consola. La prueba usa un video temporal con una URL que da 404 (`render/fuentes.test.ts`, con `withTempVideos`/`writeVideoFiles` de `render/testing.ts`).
+### Fuentes del sistema que faltan
+
+Lo de arriba vigila las fuentes **con archivo** (`theme.font.files`). Una familia que el tema nombra **sin archivo** (una fuente instalada en la máquina, como `"Inter", sans-serif`) no se carga desde ningún lado: si no está instalada, el navegador usa la siguiente de la pila y el video sale con otra letra, distinta según la máquina. `render` lo detecta (`render/fuentesSistema.ts`): en el primer cuadro, el del medio y el último mira la primera familia de cada elemento con texto y, si no es genérica (`sans-serif`, `system-ui`...) ni viene de un `@font-face`, comprueba que esté instalada midiendo texto contra tres familias base. Si falta, imprime `aviso: La fuente "X" no está instalada en esta máquina...`; con `--strict-fonts` (o `VE_STRICT_FONTS=1`) lanza un error con ese mensaje. No cambia ni un píxel del render. `qa`, `sheet` y `privacy` todavía no hacen esta comprobación (solo `render`; `qa/session.ts` puede llamar a `comprobarFuentesDelSistema`). La solución de fondo es declarar la fuente con archivo (`theme.font.files` y `asset()` o `?url`), para que el resultado no dependa de la máquina. Prueba: `render/fuentesSistema.test.ts`.
+
+Lo mismo (fuentes con archivo) en `qa`, `sheet` y `privacy` (todos dibujan con el mismo runtime). Para un borrador: `--allow-missing-fonts` (o `VE_ALLOW_MISSING_FONTS=1`), que solo avisa por consola. La prueba usa un video temporal con una URL que da 404 (`render/fuentes.test.ts`, con `withTempVideos`/`writeVideoFiles` de `render/testing.ts`).
 
 ## Velocidad de render: dónde se va el tiempo
 
@@ -189,17 +194,32 @@ El costo es de CPU en Chromium, no de codificación ni de disco. `render` imprim
 |---|---|---|
 | `hello` (escena sencilla) | ~0.07 s | |
 | `story-demo`, apertura / temas | 0.18 a 0.24 s | 3D, desenfoques, mucho DOM |
-| `story-demo --scale 0.5` | ~0.09 s | la rasterización crece con los píxeles |
+| `story-demo --scale 0.5` | ~0.09 s | la rasterización crece con los píxeles (en una máquina con la CPU libre; ver la medición con carga más abajo: no es una ganancia confiable) |
 | `--frame-format jpeg` | casi igual | cambia la codificación, no la rasterización |
 | `--disable-gpu`, `--disable-gpu-compositing`, `--num-raster-threads`, GPU raster | sin mejora (mismo CPU) | además cambiarían la clave de cache |
 
 Render completo de `story-demo` (1590 cuadros, 53 s, 1920x1080, con 3D y desenfoques, `--no-cache`) medido mientras la máquina estaba ocupada por otras tareas (promedio de carga 8 sobre 4 núcleos): **7.6 min de reloj, 4 min de CPU** (5.4 fps al principio, 4 fps al final), con 4 páginas: dibujar los cuadros 233 s, captura 1390 s, escritura 24 s (sumas entre las 4 páginas). Con la máquina libre, esos 4 min de CPU son ~1 a 1.5 min de reloj.
 
+**Medición con la máquina cargada (4 núcleos, carga de 10 a 17 por otros procesos; `kit-demo`, 1920x1080, 300 cuadros, 2 partes, `--no-audio`):** render completo a tamaño entero 82 s (unos 3,7 cuadros por segundo, con la compilación del bundle); a `--scale 0.5 --crf 23`, 95 s con la carga más alta; 90 cuadros sin caché a tamaño entero 28 a 29 s (3,1 cuadros por segundo) y a mitad de tamaño 32 a 35 s: **con la máquina ocupada el borrador a mitad de tamaño no es más rápido que el final**. En un render de un video real (medido por otra persona con carga 20) 4 cuadros por segundo a tamaño entero: 49 s son unos 6,7 min en horizontal. Contá 3 a 4 cuadros por segundo en una máquina compartida de 4 núcleos; con la CPU libre es bastante más (no se pudo medir en esta tanda).
+
+**Caché y borradores.** La clave de cada parte (150 cuadros) incluye el video, el código, las props, el rango, la escala (`--scale`), el `--crf`, las carpetas de estáticos y el entorno (versiones de ffmpeg y Chromium, formato y tamaño): **no incluye el audio** (se mezcla al final sobre las partes ya hechas). Entonces: (a) un render mudo a tamaño entero (`--no-audio`) y el final con sonido **comparten todas las partes** (medido: la segunda corrida da `2 en cache, 0 por renderizar` y tarda 3 s); (b) un borrador a mitad de tamaño o con otro `--crf` es otro píxel y no comparte nada con el final: es trabajo duplicado, no un adelanto. Por eso para aprobar el video mudo conviene mostrar la hoja y los tramos que importan (`--seconds`, `--scene`), o renderizar una vez a tamaño entero, y no hacer un borrador completo a otra escala.
+
 **Regla práctica:** tiempo de un render completo ≈ `cuadros × (0.07 a 0.25 s de CPU) / núcleos libres` más ~15 s fijos (compilar el bundle la primera vez, abrir las páginas, concatenar). `--concurrency` solo ayuda hasta la cantidad de núcleos libres: con más páginas que núcleos todo se enlentece. Un video de 60 s (1800 cuadros) con 3D y desenfoques son ~4 a 6 min de CPU: ~1.5 a 2 min con 4 núcleos libres, 5 a 8 min si la máquina está ocupada o tiene 1 o 2 núcleos (ahí se ven 4 a 6 cuadros por segundo, que es lo que se reportó con 5.5 min). El `--scale 0.5` para borradores es el atajo que más rinde (~2x). No se encontró un ajuste seguro que acelere más sin cambiar píxeles.
 
 ## Cache y salidas con videos privados
 
-Con `VE_VIDEOS_DIR` (videos en una carpeta fuera del clon) la cache de compilación (bundle con fuentes, logos y código de las escenas, segmentos, cuadros) y las salidas por defecto (mp4, hojas) **no se escriben en el clon público**: van a `<VE_VIDEOS_DIR>/.ve-cache/` y `<VE_VIDEOS_DIR>/out/`. Sin la variable siguen en `.ve-cache/` y `out/` del clon (ignoradas por git). Se pueden forzar con `VE_CACHE_DIR` y `VE_OUT_DIR` (rutas absolutas o relativas al directorio actual); `--out` sigue mandando sobre todo. La carpeta `out/` de la carpeta externa no cuenta como código del video ni entra en el hash.
+Con `VE_VIDEOS_DIR` (videos en una carpeta fuera del clon) la cache de compilación (bundle con fuentes, logos y código de las escenas, segmentos, cuadros) y las salidas por defecto (mp4, hojas) **no se escriben en el clon público**: van a `<VE_VIDEOS_DIR>/.ve-cache/` y `<VE_VIDEOS_DIR>/out/`. Sin la variable siguen en `.ve-cache/` y `out/` del clon (ignoradas por git). Se pueden forzar con `VE_CACHE_DIR` y `VE_OUT_DIR` (rutas absolutas o relativas al directorio actual); `--out` sigue mandando sobre todo (ver la regla de abajo). La carpeta `out/` de la carpeta externa no cuenta como código del video ni entra en el hash.
+
+**Regla de `--out` (y `--json` de `qa`/`privacy`, `--out` de `sheet`, y `--out`/`--junto-a` de `audio` cuando empiezan con `out/`)**, función `resolverSalida` de `render/dirs.ts`:
+
+1. Una ruta absoluta no cambia.
+2. Sin `VE_VIDEOS_DIR` ni `VE_OUT_DIR`, una relativa cuenta desde el directorio actual (`out/x.mp4` queda en `out/` de donde corras el comando).
+3. Con alguna de las dos, una relativa que empieza con `out/` (o `./out/`) usa la carpeta de salidas como si fuera ese `out`: `VE_OUT_DIR` si está definida, si no `<VE_VIDEOS_DIR>/out` (`--out out/x.mp4` da `<VE_VIDEOS_DIR>/out/x.mp4`; `--out out/a/x.mp4`, `<VE_VIDEOS_DIR>/out/a/x.mp4`).
+4. Con alguna de las dos, cualquier otra relativa cuelga de `VE_VIDEOS_DIR` (o, si solo hay `VE_OUT_DIR`, de esa carpeta): `--out x.mp4` da `<VE_VIDEOS_DIR>/x.mp4`.
+
+Así una ruta relativa nunca cae dentro del clon cuando hay carpeta externa. Los comandos imprimen la ruta final absoluta (`listo: ...`, `hoja: ...`, `informe: ...`).
+
+`npm run render -- --list` con `VE_VIDEOS_DIR` agrega arriba una línea que dice que las carpetas `videos/<slug>` de la lista están en `<VE_VIDEOS_DIR>/<slug>` (la lista las sigue mostrando con el prefijo `videos/`).
 
 `npm run clean` borra `.ve-cache/` y `out/` del clon y, si está definida, de la carpeta externa (o las de `VE_CACHE_DIR`/`VE_OUT_DIR`); no toca los videos.
 

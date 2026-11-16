@@ -2,8 +2,12 @@ export type Rect = { x: number; y: number; w: number; h: number };
 
 /** `info`: probably intentional (element in motion, faded out); hidden by default, shown with --verbose. */
 export type Severity = 'error' | 'warn' | 'info';
-export type RuleId = 'clip' | 'offscreen' | 'safe-area' | 'overlap' | 'min-size' | 'contrast' | 'covered' | 'unjudged' | 'signal';
-export const ALL_RULES: RuleId[] = ['clip', 'offscreen', 'safe-area', 'overlap', 'min-size', 'contrast', 'covered', 'unjudged', 'signal'];
+export type RuleId = 'clip' | 'offscreen' | 'safe-area' | 'overlap' | 'min-size' | 'texto-chico' | 'contrast' | 'covered' | 'unjudged' | 'signal' | 'vacio' | 'story-fit' | 'svg-escala';
+/** Las reglas que juzgan el texto de cada cuadro. `story-fit` no mira cuadros (mide los largos del guion de una historia): va aparte, ver `QA_RULES`. */
+export const ALL_RULES: RuleId[] = ['clip', 'offscreen', 'safe-area', 'overlap', 'min-size', 'texto-chico', 'contrast', 'covered', 'unjudged', 'signal', 'svg-escala'];
+/** Todas las reglas que corre `qa` por defecto: las de cada cuadro y `story-fit` (largos de títulos, nombres y bajadas de una historia por formato; solo para videos hechos con `defineStory`). */
+/** `vacio` no juzga texto sino la composición del cuadro (franjas sin nada): va aparte de `ALL_RULES`. */
+export const QA_RULES: RuleId[] = [...ALL_RULES, 'vacio', 'story-fit'];
 
 /** Short, serialisable description of an element (tag, test id, text excerpt, on-screen box). */
 export type ElementInfo = { tag: string; testid: string | null; text: string; rect: Rect; /** DOM child-index path from the stage ("0.2.1"), a fallback id when there is no test id. */ path?: string };
@@ -50,6 +54,9 @@ export type TextRun = {
   decorMain?: boolean;
   /** El texto está bajo `data-qa-fixed-scale` (reproducción a escala fija): queda fuera del estrés de tipografía, no de las reglas. */
   fixedScale?: boolean;
+  /** El texto es de un SVG (`<text>`, `<tspan>`, `<textPath>`) y si su `text-rendering` computado es `geometricPrecision` (regla `svg-escala`). */
+  svgText?: boolean;
+  svgPrecise?: boolean;
   /** El texto está bajo un `FocusGroup` que lo atenúa a propósito (`data-qa-focus`, kit/FocusGroup.tsx): su contraste bajo es el efecto buscado (`contrast` lo baja a info). */
   focusDim?: boolean;
   clips: ClipBox[];
@@ -84,7 +91,13 @@ export type TextRun = {
 /** Pieza que señala algo (`data-ve-signal`, kit/signal.ts): qué es, la señal que resuelve el tema (`mark`) y si la escena la forzó. */
 export type SignalMark = { kind: 'callout' | 'doodle' | 'marker' | string; piece: string; mark: string; forced: boolean; tag: string; rect: Rect; /** Reglas que una marca `data-qa-ignore` (propia o de un ancestro) calla para esta pieza. */ ignore?: string[] };
 
-export type PageData = { frame: number; width: number; height: number; runs: TextRun[]; elems: Record<string, Rect>; /** Cajas de los elementos `data-qa-fixed-scale` del cuadro. */ fixedRoots?: Rect[]; /** Coverage alpha of the elements in `elems` (same keys). */ opac?: Record<string, number>; /** Piezas que señalan algo en el cuadro (regla `signal`). */ signals?: SignalMark[] };
+/**
+ * Lo que ocupa el cuadro, para la regla `vacio` (solo formatos angostos): los tramos verticales [y0, y1] (px, unidos) donde algún elemento visible pinta algo
+ * (texto, fondo, borde, imagen, svg; sin los fondos de cuadro completo), y la opacidad más alta de un velo de transición (`data-qa-veil`).
+ */
+export type Occupancy = { bands: number[][]; veil: number };
+
+export type PageData = { frame: number; width: number; height: number; runs: TextRun[]; /** Ocupación del cuadro (solo si la regla `vacio` está activa y el formato es angosto). */ occupancy?: Occupancy; elems: Record<string, Rect>; /** Cajas de los elementos `data-qa-fixed-scale` del cuadro. */ fixedRoots?: Rect[]; /** Coverage alpha of the elements in `elems` (same keys). */ opac?: Record<string, number>; /** Piezas que señalan algo en el cuadro (regla `signal`). */ signals?: SignalMark[] };
 
 /**
  * Resumen de lo que `min-size` reclasificó como "detalle que se lee al acercar" (info): textos por debajo del mínimo en el cuadro
@@ -143,6 +156,8 @@ export type Thresholds = {
   offscreen: { tolerancePx: number; minOpacity: number; maxFrames: number; slipPct: number; /** Rebaba (px) que, con la cámara en movimiento, se informa como info. */ sliverPx: number; /** Desplazamiento mínimo (px) entre cuadros para decir que la cámara se mueve. */ cameraPx: number };
   'safe-area': { margin: number; minOpacity: number };
   overlap: { ratio: number; minOpacity: number; inkHeight: number; maxFrames: number };
+  'texto-chico': { minPx1080: number; minOpacity: number; tolerancePx: number };
+  vacio: { minFraction: number; /** Un hueco en el borde de arriba o de abajo no avisa si el del borde opuesto mide al menos esta parte de él (contenido centrado). */ balance: number };
   'min-size': { minPx1080: number; minOpacity: number; tolerancePx: number; /** Cuadros que se miran dentro de la escena para saber si un texto chico se lee al acercar la cámara (0 = no mirar: todo texto chico es error). Es el mínimo: en escenas largas se mira uno cada `probeEvery` cuadros si eso da más. */ probeFrames: number; /** Un cuadro de prueba cada tantos cuadros de la escena (con tope de 600 por escena); 0 = solo `probeFrames`, sin escalar con la duración. */ probeEvery: number };
   contrast: { error: number; warn: number; largePx1080: number; minOpacity: number };
   covered: { minOpacity: number; maxCoverFraction: number; hiddenFully: number };
@@ -152,6 +167,6 @@ export type Thresholds = {
   motion: { px: number; crossPx: number };
 };
 
-export type RuleContext = { frame: number; width: number; height: number; runs: TextRun[]; thresholds: Thresholds; signals?: SignalMark[] };
+export type RuleContext = { frame: number; width: number; height: number; runs: TextRun[]; thresholds: Thresholds; signals?: SignalMark[]; /** Ocupación de este cuadro y la de los vecinos (regla `vacio`). */ occupancy?: Occupancy; neighbourOccupancy?: Occupancy[] };
 
 export type Rule = { id: RuleId; description: string; check(ctx: RuleContext): Finding[] };

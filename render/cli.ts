@@ -1,6 +1,7 @@
 import { parseCliArgs, USAGE } from './args';
 import { installSignalHandlers, isInterrupted } from './cleanup';
 import { checkVideo, discoverVideos, listScenes, renderVideo } from './render';
+import { notaCarpetaExterna, videosDirExterna } from './dirs';
 import { budgetFromScenes, formatStoryBudget } from '../stories/budget';
 import { formatLoadErrors, formatSceneList, formatVideoList } from './meta';
 
@@ -21,11 +22,13 @@ async function main(): Promise<number> {
   const log = (m: string) => console.log(m);
   const base = {
     videoId: o.videoId, out: o.out, props: o.props, frames: o.frames, concurrency: o.concurrency, scale: o.scale,
-    crf: o.crf, segment: o.segment, audio: o.audio, cache: o.cache, keepFrames: o.keepFrames, frameFormat: o.frameFormat, jpegQuality: o.jpegQuality, assets: o.assets, allowMissingFonts: o.allowMissingFonts || undefined, checkCount: o.checkCount, checkPerScene: o.checkPerScene, checkAll: o.checkAll, checkMaxDelta: o.checkMaxDelta, checkMaxRatio: o.checkMaxRatio, checkStrict: o.checkStrict, format: o.format, scene: o.scene, seconds: o.seconds, audioBitrate: o.audioBitrate, audioPeakMax: o.audioPeakMax, audioPeakStrict: o.audioPeakStrict, audioPeakCheck: o.audioPeakCheck, log,
+    crf: o.crf, segment: o.segment, audio: o.audio, cache: o.cache, keepFrames: o.keepFrames, frameFormat: o.frameFormat, jpegQuality: o.jpegQuality, assets: o.assets, allowMissingFonts: o.allowMissingFonts || undefined, strictFonts: o.strictFonts || undefined, checkCount: o.checkCount, checkPerScene: o.checkPerScene, checkAll: o.checkAll, checkMaxDelta: o.checkMaxDelta, checkMaxRatio: o.checkMaxRatio, checkStrict: o.checkStrict, format: o.format, scene: o.scene, seconds: o.seconds, audioBitrate: o.audioBitrate, audioPeakMax: o.audioPeakMax, audioPeakStrict: o.audioPeakStrict, audioPeakCheck: o.audioPeakCheck, log,
   };
   try {
     if (o.list) {
       const { videos, errors } = await discoverVideos({ log });
+      const nota = notaCarpetaExterna(videosDirExterna());
+      if (nota) console.log(nota);
       console.log(formatVideoList(videos));
       if (errors.length) console.log(`\n${formatLoadErrors(errors)}`);
       return 0;

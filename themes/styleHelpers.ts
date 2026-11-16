@@ -181,6 +181,19 @@ export function surfaceStyle(theme: Theme, role: SurfaceRole, o: SurfaceOptions 
 
 const STRONGER = { regular: "medium", medium: "semibold", semibold: "stat", stat: "stat" } as const;
 
+/** Familia de los títulos: `font.display` si el tema la declara y, si no, `font.family`. */
+export function titleFamily(theme: Theme): string {
+  return theme.font.display ?? theme.font.family;
+}
+
+/**
+ * Estilo de tipografía para un título (titular, cifra grande, cartel): `{ fontFamily }` con `font.display`, o `{}` si el tema no la declara
+ * (el título hereda la familia del texto, sin cambiar nada). `textStyle(theme, "title")` ya lo incluye; usalo solo en un título que no pasa por ahí.
+ */
+export function titleFont(theme: Theme): React.CSSProperties {
+  return theme.font.display ? { fontFamily: theme.font.display } : {};
+}
+
 /**
  * Peso e interletrado de un rol de texto. `title`: `titleWeight` y `titleTracking`; `label`: `labelWeight`; `eyebrow`: caja alta y
  * `eyebrowTracking` (el peso lo deja a la pieza); `caption`: subtítulos y líneas de apoyo de las historias, con su propia caja
@@ -198,7 +211,10 @@ export function textStyle(theme: Theme, role: "title" | "label" | "eyebrow" | "c
   const captionTracking = st.captionTracking ?? (follow ? st.eyebrowTracking : 0);
   const extra = role === "title" ? st.titleTracking : role === "eyebrow" ? st.eyebrowTracking : role === "caption" ? captionTracking : 0;
   const ls = +((o.tracking ?? 0) + extra).toFixed(3);
-  if (role === "title") out.fontWeight = theme.font.weights[st.titleWeight];
+  if (role === "title") {
+    out.fontWeight = theme.font.weights[st.titleWeight];
+    if (theme.font.display) out.fontFamily = theme.font.display;
+  }
   if (role === "label") out.fontWeight = theme.font.weights[o.strong ? STRONGER[st.labelWeight] : st.labelWeight];
   if (role === "eyebrow" && st.eyebrowCase === "upper") out.textTransform = "uppercase";
   if (role === "caption") {

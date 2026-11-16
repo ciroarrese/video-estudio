@@ -1,5 +1,5 @@
 import type React from "react";
-import { Easing, lerp, mix, styleKey, sub, xform } from "../core";
+import { hiddenBefore, Easing, lerp, mix, styleKey, sub, xform } from "../core";
 import { useThreeFx } from "./common";
 import type { ThreeProps } from "./common";
 
@@ -19,7 +19,7 @@ export type ExtrudeTypeProps = ThreeProps & {
  * desvanece en el fondo), `outline-stack` (copias de solo contorno que tapan a las de atrás) o `none` (texto plano).
  */
 export function ExtrudeType(p: ExtrudeTypeProps) {
-  const { t, width, height, theme, pal, pen, k } = useThreeFx(p, { width: 1500, height: 560, duration: 75 });
+  const { rawLocal, t, width, height, theme, pal, pen, k } = useThreeFx(p, { width: 1500, height: 560, duration: 75 });
   const text = p.text ?? "Volumen";
   const fontSize = p.fontSize ?? theme.type.hero * 2.1;
   const mode = pen.extrude;
@@ -86,7 +86,7 @@ export function ExtrudeType(p: ExtrudeTypeProps) {
     }
   }
   return (
-    <div style={{ position: "relative", width, height, display: "flex", alignItems: "center", justifyContent: "center", overflow: "hidden", ...p.style }}>
+    <div style={{ position: "relative", width, height, display: "flex", alignItems: "center", justifyContent: "center", overflow: "hidden", ...p.style, ...hiddenBefore(rawLocal) }}>
       {echoes.length ? (
         <div key={styleKey(textStyle)} style={{ ...textStyle, position: "relative" }}>
           {echoes}

@@ -181,8 +181,8 @@ export function Pill({ index, name, scale = 1, glow = 0, maxW }: { index: number
     >
       <span style={{ fontSize: t.numSize, fontWeight: theme.font.weights.stat, ...numeral }}>{String(index + 1).padStart(2, "0")}</span>
       {t.rows.length > 1
-        ? <div style={{ fontSize: t.size, lineHeight: 1.25, fontWeight: title.fontWeight, ...(title.letterSpacing ? { letterSpacing: title.letterSpacing } : {}), color: theme.color.text }}>{t.rows.map((r, k) => <div key={k}>{r}</div>)}</div>
-        : <span style={{ fontSize: t.size, fontWeight: title.fontWeight, ...(title.letterSpacing ? { letterSpacing: title.letterSpacing } : {}), color: theme.color.text }}>{t.text}</span>}
+        ? <div style={{ fontSize: t.size, lineHeight: 1.25, fontFamily: title.fontFamily, fontWeight: title.fontWeight, ...(title.letterSpacing ? { letterSpacing: title.letterSpacing } : {}), color: theme.color.text }}>{t.rows.map((r, k) => <div key={k}>{r}</div>)}</div>
+        : <span style={{ fontSize: t.size, fontFamily: title.fontFamily, fontWeight: title.fontWeight, ...(title.letterSpacing ? { letterSpacing: title.letterSpacing } : {}), color: theme.color.text }}>{t.text}</span>}
     </div>
   );
 }
@@ -275,7 +275,7 @@ export function HeadlineRow({
     background: mark.style.background, boxShadow: mark.kind === "bar" && underline > 0.02 ? `0 0 18px ${withAlpha(theme.color.accent, 0.5)}` : undefined, opacity: mark.kind === "dot" ? mark.style.opacity : fade(underlineOpacity),
   };
   const num = number ?? <StoryNumeral loop={gradientLoop}>{String(i + 1).padStart(2, "0")}</StoryNumeral>;
-  const nameStyle = { fontWeight: title.fontWeight, color: theme.color.text, letterSpacing: title.letterSpacing };
+  const nameStyle = { fontFamily: title.fontFamily, fontWeight: title.fontWeight, color: theme.color.text, letterSpacing: title.letterSpacing };
   // la línea de apoyo lleva la caja, el interletrado y el peso del rol `caption` solo si el design system los fijó (`follow: false`: no hereda los del eyebrow)
   const cap = textStyle(theme, "caption", { follow: false });
   // el nombre en uno o más renglones (formatos angostos); sin `nameRows` es `names[i]` en un solo renglón
@@ -317,20 +317,38 @@ export function HeadlineRow({
       </div>
     );
   }
+  const nameSpan = <span style={{ fontSize: L.nameSize, lineHeight: `${L.nameH}px`, ...nameStyle }}>{L.names[i]}</span>;
+  const numSpan = <span style={{ width: L.numW, flexShrink: 0, fontSize: L.numSize, fontWeight: theme.font.weights.stat, position: "relative" }}>{num}</span>;
+  if (L.inline) {
+    // En un renglón `01 Nombre · línea`. El texto se acomodó con medidas estimadas: si con otra tipografía (más ancha, o letra más grande) el renglón no entra, la línea
+    // baja entera a un segundo renglón bajo el nombre (`flex-wrap`) y, si ni así entra, se parte por palabras; nunca se sale del cuadro ni se corta. Con la
+    // medida estimada entra en un renglón y el marcado de adentro es el de siempre.
+    return (
+      <div key={styleKey(root)} style={root}>
+        <div key={`block-${styleKey(block)}`} style={block}>
+          <div style={{ display: "flex", alignItems: "baseline", height: L.nameH, whiteSpace: "nowrap" }}>
+            {numSpan}
+            <div style={{ display: "flex", flexWrap: "wrap", alignItems: "baseline", flex: "1 1 0", minWidth: 0 }}>
+              {nameSpan}
+              <span style={{ display: "flex", minWidth: 0, maxWidth: "100%" }}>
+                <span style={{ fontSize: L.lineSize, lineHeight: `${L.nameH}px`, color: theme.color.textMuted, whiteSpace: "pre" }}>{` ${INLINE_SEP} `}</span>
+                <span style={{ fontSize: L.lineSize, lineHeight: `${L.nameH}px`, color: theme.color.textMuted, whiteSpace: "normal", ...cap }}>{L.lines[i]}</span>
+              </span>
+            </div>
+          </div>
+        </div>
+        {bar && <div key={`bar-${styleKey(bar)}`} style={bar} />}
+      </div>
+    );
+  }
   return (
     <div key={styleKey(root)} style={root}>
       <div key={`block-${styleKey(block)}`} style={block}>
         <div style={{ display: "flex", alignItems: "baseline", height: L.nameH, whiteSpace: "nowrap" }}>
-          <span style={{ width: L.numW, flexShrink: 0, fontSize: L.numSize, fontWeight: theme.font.weights.stat, position: "relative" }}>{num}</span>
-          <span style={{ fontSize: L.nameSize, lineHeight: `${L.nameH}px`, ...nameStyle }}>{L.names[i]}</span>
-          {L.inline && (
-            <>
-              <span style={{ fontSize: L.lineSize, lineHeight: `${L.nameH}px`, color: theme.color.textMuted, whiteSpace: "pre" }}>{` ${INLINE_SEP} `}</span>
-              <span style={{ fontSize: L.lineSize, lineHeight: `${L.nameH}px`, color: theme.color.textMuted, ...cap }}>{L.lines[i]}</span>
-            </>
-          )}
+          {numSpan}
+          {nameSpan}
         </div>
-        {!L.inline && <div style={{ marginLeft: L.numW, marginTop: ROW_GAP.a, height: L.lineH, fontSize: L.lineSize, lineHeight: `${L.lineH}px`, color: theme.color.textMuted, whiteSpace: "nowrap", ...cap }}>{L.lines[i]}</div>}
+        <div style={{ marginLeft: L.numW, marginTop: ROW_GAP.a, height: L.lineH, fontSize: L.lineSize, lineHeight: `${L.lineH}px`, color: theme.color.textMuted, whiteSpace: "nowrap", ...cap }}>{L.lines[i]}</div>
       </div>
       {bar && <div key={`bar-${styleKey(bar)}`} style={bar} />}
     </div>

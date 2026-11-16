@@ -48,7 +48,7 @@ export function Bars3D(p: Bars3DProps) {
   const g = progress(local, 0, dur * 0.2, Easing.out);
   const fs = theme.type.eyebrow;
   return (
-    <svg width={w} height={h} viewBox={`0 0 ${w} ${h}`} style={{ display: "block", fontFamily: theme.font.family, ...p.style }}>
+    <svg width={w} height={h} viewBox={`0 0 ${w} ${h}`} style={{ display: "block", fontFamily: theme.font.family, textRendering: "geometricPrecision", ...p.style }}>
       <path d={poly(slab)} fill={theme.color.surfaceAlt} stroke={theme.color.border} strokeWidth={2} opacity={g} />
       {data.map((v, i) => {
         const t = Easing.lands(staggerT(progress(local, 0, dur), i, n, 0.6));

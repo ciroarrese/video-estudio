@@ -1,0 +1,17 @@
+# Los archivos de texto se descargan con saltos de línea LF en todos los sistemas (también en Windows),
+# para que los scripts, las pruebas y las plantillas no cambien de comportamiento con CRLF.
+* text=auto eol=lf
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.webp binary
+*.mp4 binary
+*.mp3 binary
+*.wav binary
+*.ogg binary
+*.woff binary
+*.woff2 binary
+*.ttf binary
+*.otf binary
+*.pdf binary

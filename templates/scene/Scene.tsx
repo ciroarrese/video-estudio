@@ -1,4 +1,4 @@
-// Escena inicial. Se copia con: bash templates/nuevo.sh escena <slug> <nombre-de-escena>
+// Escena inicial. Se copia con: npm run nuevo -- escena <slug> <nombre-de-escena>
 // (queda en videos/<slug>/<nombre-de-escena>/; ver docs/guia-escenas.md).
 //
 // Reglas que esta plantilla ya cumple (ver docs/reglas.md):
@@ -192,7 +192,8 @@ export function SceneBody({ title, subtitle }: SceneProps) {
 
       {/* Fuera del mundo: no se mueve con la cámara. El subtítulo entra completo con la píldora: un texto que se
           escribe (`typed`) mientras su contenedor está en fundido (entrada o `hide`) da un falso error de contraste. */}
-      {/* El titular se aparta cuando la escala pasa de 1. */}
+      {/* El titular se aparta cuando la escala pasa de 1. `index` es el número que muestra la píldora (`index={1}` dice "01"): cambialo al
+          número del tema de esta escena (el segundo tema lleva `index={2}`, "02"); no lo dejes en 1 por inercia. */}
       <DockedHeadline index={1} title={title} subtitle={subtitle} start={4} hide={hideFromScale(cam.scale)} />
       <Wash range={T.wash} />
     </>

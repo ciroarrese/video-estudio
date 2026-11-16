@@ -1,10 +1,11 @@
+import { useStoryReserve } from "./subtitles";
 import { Easing, useFrame, useVideoConfig } from "../engine";
 import { kf } from "../kit";
 import { accentMark, cornerRadius, resolveStyle, textStyle, useTheme } from "../themes";
 import { fade, styleKey } from "../fx/core/math";
 import type React from "react";
 import { INTERLUDE_COMPACT_FRAMES } from "./durations";
-import { fitRowsUniform, fitText, nameMeter } from "./layout";
+import { NARROW_SLACK, fitRowsUniform, fitText, nameMeter } from "./layout";
 import { nextTopic } from "./Interlude";
 import { CheckMark, StoryStage, moveIn, scaler, useEase, useStorySpec } from "./shared";
 import { lateStart, withoutLate } from "./types";
@@ -25,7 +26,9 @@ export function InterludeCompact({ spec: specIn, done, skip = [], next: nextProp
   const spec = useStorySpec(done > lateStart(specIn) ? specIn : withoutLate(specIn)); // el diseño del video sobre el del design system
   const ease = useEase();
   const f = useFrame();
-  const { width } = useVideoConfig();
+  const { width, height } = useVideoConfig();
+  const narrow = width / height < 1.3;
+  const reserve = useStoryReserve(); // franja de los subtítulos (0 sin ellos)
   const dur = interludeCompactFrames(spec);
   const u = scaler(dur, INTERLUDE_COMPACT_FRAMES);
   const n = spec.topics.length;
@@ -51,8 +54,9 @@ export function InterludeCompact({ spec: specIn, done, skip = [], next: nextProp
   const nextFit = next ? fitText(next.name, maxW, theme.type.h2 * 0.62, { min: theme.type.body * 0.8, avg: 0.55 }) : null;
   // un nombre que no entra en un renglón con la estimación de siempre se mide y se parte en dos renglones (nunca "…"); si entra, queda como siempre
   const rowsOf = (name: string, fit: { text: string; size: number }, width: number, size: number, min: number): { size: number; rows: string[] } => {
-    if (fit.text === name) return { size: fit.size, rows: [name] };
-    const r = fitRowsUniform([name], { width, size, min, hardMin: Math.round(theme.type.caption), maxRows: 2, meter: nameMeter(theme) });
+    // en los formatos angostos el nombre se mide siempre y con la holgura de `NARROW_SLACK` (una fuente más ancha o la letra más grande no lo saca del cuadro)
+    if (fit.text === name && !narrow) return { size: fit.size, rows: [name] };
+    const r = fitRowsUniform([name], { width, size, min, hardMin: Math.round(theme.type.caption), maxRows: 2, meter: nameMeter(theme, narrow ? NARROW_SLACK : undefined) });
     return { size: r.size, rows: r.rows[0]! };
   };
   const nameRows = rowsOf(last.name, nameFit, maxW - theme.type.h2 * 1.4, theme.type.h2, theme.type.body);
@@ -66,7 +70,7 @@ export function InterludeCompact({ spec: specIn, done, skip = [], next: nextProp
   const eyebrow = textStyle(theme, "eyebrow", { tracking: 0.08 });
 
   // propiedades que se emiten solo mientras se animan (React agrega al final las que reaparecen): la clave remonta el elemento al cambiar el conjunto
-  const col: React.CSSProperties = { position: "absolute", inset: 0, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: Math.round(theme.type.h2 * 0.55), opacity: fade(out) };
+  const col: React.CSSProperties = { position: "absolute", inset: 0, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: Math.round(theme.type.h2 * 0.55), opacity: fade(out), ...(reserve ? { paddingBottom: reserve } : {}) };
   const strip: React.CSSProperties = { display: "flex", gap, width: barW, opacity: fade(appear) };
   const nameRow: React.CSSProperties = { display: "flex", alignItems: "center", gap: Math.round(cs * 0.4), maxWidth: maxW, opacity: fade(appear), ...moveIn(theme, appear, 0, { native: "rise", distance: 18 }) };
   const nextBox: React.CSSProperties = { textAlign: "center", opacity: fade(nextIn), ...moveIn(theme, nextIn, 1, { native: "rise", distance: 14 }), color: theme.color.textMuted, fontSize: theme.type.body };
@@ -86,7 +90,7 @@ export function InterludeCompact({ spec: specIn, done, skip = [], next: nextProp
         </div>
         <div key={`name-${styleKey(nameRow)}`} style={nameRow}>
           <div style={{ flexShrink: 0, width: cs, height: cs }}>{check > 0 && <CheckMark p={check} size={cs} id={`c${done}`} />}</div>
-          <div style={{ fontSize: nameRows.size, fontWeight: title.fontWeight, color: theme.color.text, letterSpacing: title.letterSpacing, whiteSpace: "nowrap" }}>{nameRows.rows.length === 1 ? nameRows.rows[0] : nameRows.rows.map((r, k) => <div key={k}>{r}</div>)}</div>
+          <div style={{ fontSize: nameRows.size, fontFamily: title.fontFamily, fontWeight: title.fontWeight, color: theme.color.text, letterSpacing: title.letterSpacing, whiteSpace: "nowrap" }}>{nameRows.rows.length === 1 ? nameRows.rows[0] : nameRows.rows.map((r, k) => <div key={k}>{r}</div>)}</div>
         </div>
         <div key={`next-${styleKey(nextBox)}`} style={nextBox}>
           {nextFit ? (

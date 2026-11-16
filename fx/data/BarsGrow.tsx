@@ -35,7 +35,7 @@ export function BarsGrow(p: BarsGrowProps) {
   const fs = theme.type.eyebrow * 0.85;
   const fills = data.map((_, i) => chartFill(theme, p.singleColor ? theme.color.accent : chartColor(theme, i), `bars-${p.seed ?? "b"}-${i}-${p.singleColor ? "s" : "c"}-${theme.color.accent}`));
   return (
-    <svg width={w} height={h} viewBox={`0 0 ${w} ${h}`} style={{ display: "block", fontFamily: theme.font.family, ...p.style }}>
+    <svg width={w} height={h} viewBox={`0 0 ${w} ${h}`} style={{ display: "block", fontFamily: theme.font.family, textRendering: "geometricPrecision", ...p.style }}>
       {fills.some((f) => f.kind !== "solid") && <defs>{fills.map((f) => <FillDef key={f.kind === "solid" ? "s" : f.id} fill={f} />)}</defs>}
       {cs.grid === "on" && ticks.slice(1).map((tk, i) => <line key={`g${i}`} x1={left} x2={w - left} y1={h - bot - (tk / max) * area} y2={h - bot - (tk / max) * area} stroke={theme.color.border} strokeWidth={1.5} opacity={g * 0.7} />)}
       {cs.grid !== "off" && <line x1={left} x2={w - left} y1={h - bot} y2={h - bot} stroke={theme.color.border} strokeWidth={3} opacity={g} />}

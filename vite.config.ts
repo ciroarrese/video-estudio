@@ -42,7 +42,7 @@ function veVideosDir(): Plugin {
     transform(code, id) {
       if (!extVideos || !id.split('?')[0]!.endsWith('engine/runtime/videos.ts')) return null;
       const sinVideos = code.replace(/\s*'\.\.\/\.\.\/videos\/[^']*',?/g, '');
-      const entradas = indicesDeVideos(extVideos).map((rel) => `  ${JSON.stringify('../../videos/' + rel)}: () => import(${JSON.stringify(join(extVideos, rel))}),`);
+      const entradas = indicesDeVideos(extVideos).map((rel) => `  ${JSON.stringify('../../videos/' + rel)}: () => import(${JSON.stringify(join(extVideos, rel).split(sep).join('/'))}),`);
       const extra = `\nObject.assign(modules, {\n${entradas.join('\n')}\n});\n`;
       return { code: sinVideos.replace(/(export const videosReady)/, extra + '$1'), map: null };
     },
@@ -60,7 +60,8 @@ function veVideosDir(): Plugin {
  */
 function veDeps(): Plugin {
   const rel = (id: string) => {
-    const f = id.split('?')[0]!;
+    // vite usa `/` en los id también en Windows: resolve los pasa a rutas del sistema para compararlos con extVideos
+    const f = resolve(id.split('?')[0]!);
     // los archivos de VE_VIDEOS_DIR se informan como `videos/...` (el render los busca ahí con el mismo mapeo)
     if (extVideos && (f === extVideos || f.startsWith(extVideos + sep))) return ['videos', ...relative(extVideos, f).split(sep)].filter(Boolean).join('/');
     return relative(__dirname, f).split('\\').join('/');

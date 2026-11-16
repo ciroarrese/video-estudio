@@ -78,3 +78,25 @@ export function pistaDeBateria(o: { bpm: number; seconds: number; sr: number; of
   }
   return x;
 }
+
+/**
+ * Voz sintética (no es voz humana ni se parece lo suficiente para un oído: sirve para probar detección y ducking): tono armónico de 120 Hz
+ * con una envolvente silábica de 4 Hz dentro de cada frase `[desde, hasta]` (segundos) y silencio fuera. Mono, determinista.
+ */
+export function pistaDeVoz(o: { seconds: number; sr: number; frases: ReadonlyArray<readonly [number, number]>; amplitud?: number }): Float32Array {
+  const { seconds, sr, frases, amplitud = 0.35 } = o;
+  const x = new Float32Array(Math.round(seconds * sr));
+  for (const [d, h] of frases) {
+    const i0 = Math.round(d * sr);
+    const i1 = Math.min(x.length, Math.round(h * sr));
+    for (let i = i0; i < i1; i++) {
+      const t = i / sr;
+      const sil = 0.55 + 0.45 * Math.abs(Math.sin(Math.PI * 4 * (t - d))); // sílabas: nunca llega al silencio dentro de la frase
+      const borde = Math.min(1, (i - i0) / (0.01 * sr), (i1 - 1 - i) / (0.01 * sr));
+      let v = 0;
+      for (let k = 1; k <= 6; k++) v += Math.sin(2 * Math.PI * 120 * k * t) / k;
+      x[i] = amplitud * 0.55 * v * sil * borde;
+    }
+  }
+  return x;
+}

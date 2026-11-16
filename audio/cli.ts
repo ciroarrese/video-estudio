@@ -1,11 +1,14 @@
 // CLI de audio: `tsx audio/cli.ts <comando> ...`. Delgada: la lógica vive en los módulos puros.
-import { readFileSync, writeFileSync } from 'node:fs';
-import { resolve } from 'node:path';
-import { leerCortes, leerFase, leerGainPorEfecto, leerFinal, leerInicio, leerNum, parsear, type RestriccionNum } from './args';
+import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { basename, dirname, extname, join } from 'node:path';
+import { entrada as ent, salida as sal } from './rutas';
+import { leerCortes, leerFase, leerGainPorEfecto, leerFinal, leerInicio, leerInstantes, leerListaPositiva, leerNum, parsear, type RestriccionNum } from './args';
 import { empalmar } from './empalme';
 import { BARRIDOS, BARRIDO_POR_DEFECTO, CLICS, CLIC_POR_DEFECTO, EFECTOS, generarEfectos, nombreDeBarrido, nombreDeClic, picosDeEfectos } from './efectos';
 import { avisoMp3SinEtiqueta, decodificar, hayFfmpeg } from './ffmpeg';
 import { mezclar, type Cue } from './mezcla';
+import { ventanasDeVoz, verificarVozEscenas, type TramoDeVoz } from './voz';
+import { aJson, aSrt, aVtt, cortesDeEscenas, leerSubtitulosJson, parsearSubtitulos, subtitulosDeGuion, type Subtitulo } from '../kit/subtitulos';
 import { avisoDeFase, chequearConfianza, pulsoMasCercano, tempoReport, TEMPO_SR, type TempoReport } from './tempo';
 
 const USO = `Uso: tsx audio/cli.ts <comando>
@@ -36,9 +39,31 @@ const USO = `Uso: tsx audio/cli.ts <comando>
          [--fade-in seg] [--fade-out 1] [--duck-db 5] [--duck-ataque 10] [--duck-release 250]
          [--duck-escala-gain] [--lufs <objetivo>] [--techo -1] [--sr 48000]
          [--gain barrido=0.4,tilde=0.8]
+         [--voz locucion.wav] [--voz-gain 1] [--voz-desde seg] [--voz-en seg] [--voz-duck-db 8]
+         [--voz-ataque 60] [--voz-release 450] [--voz-umbral dBFS] [--voz-une 350]
       --gain multiplica el gain de todos los cues de cada efecto nombrado (por el nombre del sfx tal cual).
       Mezcla efectos (cues: [{"frame":45,"sfx":"clic","gain":1,"ancla":"inicio|pico"}]) y música en un solo archivo.
+      --voz agrega una pista de locución que aporta la persona (wav o mp3 local, nunca al repo) como capa de la mezcla: entra
+      en --voz-en (segundo del video), salta --voz-desde segundos del archivo y baja la música --voz-duck-db dB mientras habla
+      (0 lo apaga). --cues es opcional si hay --voz o --musica. --lufs y --techo rigen sobre toda la mezcla, voz incluida.
+
+  subtitulos <entrada.json|.srt|.vtt> | --guion guion.json  [--fps 30] [--out salida.srt|.vtt|.json] [--junto-a out/video.mp4]
+             [--palabras] [--max-car 42] [--max-subtitulo 84]
+      Convierte y exporta subtítulos. La entrada es un JSON { desde, hasta, texto } (segundos, o cuadros con "unidad":"cuadros"),
+      un SRT o un VTT. --guion arma los subtítulos desde el guion ([{ "texto": "...", "frames": 150 }, ...] o
+      { "fps": 30, "escenas": [...] }), repartiendo el tiempo de cada escena por cantidad de palabras.
+      --out escribe un solo archivo (el formato lo da la extensión); --junto-a out/video.mp4 escribe video.srt y video.vtt al lado
+      del mp4. --palabras agrega tiempos por palabra (VTT con etiquetas de karaoke; JSON). --max-car es el largo de cada renglón de los
+      archivos (42) y --max-subtitulo el de cada subtítulo que arma --guion (84). Sin salida, imprime el SRT.
+
+  locucion --subtitulos subs.json|.srt|.vtt (--cortes 5,f300 | --escenas 150,120,30 | --escenas-seg 5,4,1)
+           [--fps 30] [--frames N | --segundos S] [--tolerancia 0.25] [--max-cps 17] [--estricto]
+           [--voz locucion.wav [--voz-en seg --voz-desde seg --voz-umbral dBFS --voz-une 350]]
+      Avisa si una frase cruza o roza un corte de escena, si dos se pisan, si pasan del final o si se leen demasiado rápido.
+      --escenas / --escenas-seg dan la duración de cada escena (los cortes salen de sumarlas). Con --voz también revisa los
+      tramos donde HAY voz en la pista. Con --estricto sale con código 2 si hay algún aviso.
 `;
+
 
 function main(): Promise<void> {
   const [cmd, ...resto] = process.argv.slice(2);
@@ -66,21 +91,21 @@ function main(): Promise<void> {
       return (async () => {
         if (!pos[0]) throw new Error('Falta el archivo');
         const fase = leerFase(op);
-        const x = await decodificar(resolve(pos[0]), { sr: TEMPO_SR, canales: 1 });
+        const x = await decodificar(ent(pos[0]), { sr: TEMPO_SR, canales: 1 });
         const avMp3 = avisoMp3SinEtiqueta(pos[0]);
         if (avMp3) console.error('Aviso: ' + avMp3);
         const r: TempoReport = { archivo: pos[0], ...tempoReport(x, num('fps', 30, POS)!, { bpm: num('bpm', undefined, POS), offsetSec: num('offset'), fase, minBpm: num('min-bpm', undefined, POS), maxBpm: num('max-bpm', undefined, POS) }) };
         const avFase = avisoDeFase(r);
         if (avFase) console.error('Aviso: ' + avFase);
         const txt = JSON.stringify(r, null, 2);
-        if (op.get('out')) writeFileSync(resolve(op.get('out')!), txt + '\n');
+        if (op.get('out')) writeFileSync(sal(op.get('out')!), txt + '\n');
         else console.log(txt);
       })();
     case 'empalme':
       return (async () => {
         if (!pos[0]) throw new Error('Falta el archivo');
-        const entrada = resolve(pos[0]);
-        const salida = resolve(requerida('out'));
+        const entrada = ent(pos[0]);
+        const salida = sal(requerida('out'));
         const { fps, frames } = framesYFps();
         // Se validan todas las opciones antes de decodificar nada.
         const inicio = leerInicio(op);
@@ -101,7 +126,7 @@ function main(): Promise<void> {
         if (avMp3) console.error('Aviso: ' + avMp3);
         let t: TempoReport;
         if (op.get('tempo')) {
-          t = JSON.parse(readFileSync(resolve(op.get('tempo')!), 'utf8')) as TempoReport;
+          t = JSON.parse(readFileSync(ent(op.get('tempo')!), 'utf8')) as TempoReport;
           if (fase) console.error('Aviso: --fase se ignora con --tempo (el JSON ya trae la fase); usalo en el comando tempo.');
         } else {
           const x = await decodificar(entrada, { sr: TEMPO_SR, canales: 1 });
@@ -134,7 +159,7 @@ function main(): Promise<void> {
           final: r.plan.final, silencioFinalSec: r.plan.silencioFinalSec, cuerpo: r.cuerpo, headroomDb: r.headroomDb,
           spliceFrames: r.spliceFrames, cortes: r.cortes, beatFrames: r.beatFrames, avisos: r.plan.avisos, plan: r.plan,
         };
-        if (op.get('json')) writeFileSync(resolve(op.get('json')!), JSON.stringify(res, null, 2) + '\n');
+        if (op.get('json')) writeFileSync(sal(op.get('json')!), JSON.stringify(res, null, 2) + '\n');
         console.log(JSON.stringify({ ...res, plan: undefined }, null, 2));
       })();
     case 'efectos': {
@@ -150,17 +175,90 @@ function main(): Promise<void> {
       if (op.has('clic') && !clic) throw new Error(`Falta el valor de --clic; las opciones son: ${Object.keys(CLICS).join(', ')}`);
       const barrido = op.get('barrido');
       if (op.has('barrido') && !barrido) throw new Error(`Falta el valor de --barrido; las opciones son: ${Object.keys(BARRIDOS).join(', ')}`);
-      const rutas = generarEfectos(resolve(dir), undefined, { clic: clic ?? CLIC_POR_DEFECTO, barrido: barrido ?? BARRIDO_POR_DEFECTO });
+      const rutas = generarEfectos(sal(dir), undefined, { clic: clic ?? CLIC_POR_DEFECTO, barrido: barrido ?? BARRIDO_POR_DEFECTO });
       console.log(`Efectos generados en ${dir}${clic ? ` (clic = ${clic})` : ''}${barrido ? ` (barrido = ${barrido})` : ''}:\n${rutas.map((r) => '  ' + r).join('\n')}\nNo se versionan: generalos a pedido.`);
       return Promise.resolve();
     }
+    case 'subtitulos':
+      return (async () => {
+        const fps = num('fps', 30, POS)!;
+        let cues: Subtitulo[];
+        if (op.has('guion')) {
+          const g = JSON.parse(readFileSync(ent(requerida('guion')), 'utf8')) as unknown;
+          const escenas = Array.isArray(g) ? g : (g as { escenas?: unknown }).escenas;
+          if (!Array.isArray(escenas)) throw new Error('El guion tiene que ser una lista de escenas o { "escenas": [...] } (cada una con "texto" y "frames" o "segundos")');
+          const fpsGuion = (g as { fps?: number }).fps ?? fps;
+          cues = subtitulosDeGuion(escenas, { fps: fpsGuion, conPalabras: op.has('palabras'), maxCaracteres: num('max-subtitulo', undefined, { min: 10, entero: true }) });
+        } else {
+          if (!pos[0]) throw new Error('Falta la entrada (.json, .srt o .vtt) o --guion guion.json');
+          const archivo = ent(pos[0]);
+          const txt = readFileSync(archivo, 'utf8');
+          cues = extname(archivo).toLowerCase() === '.json' ? leerSubtitulosJson(JSON.parse(txt) as unknown, fps) : parsearSubtitulos(txt);
+        }
+        if (cues.length === 0) throw new Error('No hay subtítulos en la entrada');
+        const maxCaracteres = num('max-car', undefined, { min: 10, entero: true });
+        const conPalabras = op.has('palabras');
+        const escribir = (ruta: string, contenido: string) => {
+          mkdirSync(dirname(ruta), { recursive: true });
+          writeFileSync(ruta, contenido);
+          console.log(`Escrito: ${ruta}`);
+        };
+        const como = (ext: string): string => {
+          if (ext === '.srt') return aSrt(cues, { maxCaracteres });
+          if (ext === '.vtt') return aVtt(cues, { maxCaracteres, conPalabras });
+          if (ext === '.json') return aJson(cues);
+          throw new Error(`--out: la extensión "${ext}" no es .srt, .vtt ni .json`);
+        };
+        const juntoA = op.get('junto-a');
+        const out = op.get('out');
+        if (op.has('junto-a') && !juntoA) throw new Error('--junto-a necesita la ruta del mp4 (por ejemplo --junto-a out/mi-video.mp4)');
+        if (out) escribir(sal(out), como(extname(out).toLowerCase()));
+        if (juntoA) {
+          const base = join(dirname(sal(juntoA)), basename(juntoA, extname(juntoA)));
+          escribir(`${base}.srt`, como('.srt'));
+          escribir(`${base}.vtt`, como('.vtt'));
+        }
+        if (!out && !juntoA) process.stdout.write(aSrt(cues, { maxCaracteres }));
+        else console.log(`${cues.length} subtítulos, de ${cues[0]!.desde.toFixed(2)} s a ${cues[cues.length - 1]!.hasta.toFixed(2)} s`);
+      })();
+    case 'locucion':
+      return (async () => {
+        const fps = num('fps', 30, POS)!;
+        const archivo = ent(requerida('subtitulos'));
+        const txt = readFileSync(archivo, 'utf8');
+        const cues = extname(archivo).toLowerCase() === '.json' ? leerSubtitulosJson(JSON.parse(txt) as unknown, fps) : parsearSubtitulos(txt);
+        let cortes = leerInstantes(op, 'cortes', fps) ?? [];
+        const escF = leerListaPositiva(op, 'escenas');
+        const escS = leerListaPositiva(op, 'escenas-seg');
+        if (escF && escS) throw new Error('Pasá --escenas (cuadros) o --escenas-seg (segundos), no las dos');
+        if (escF) cortes = cortes.concat(cortesDeEscenas(escF.map((n) => n / fps)));
+        if (escS) cortes = cortes.concat(cortesDeEscenas(escS));
+        if (cortes.length === 0) console.error('Aviso: no hay cortes de escena (--cortes, --escenas o --escenas-seg): solo se revisan solapes, final y lectura.');
+        const seg = num('segundos', undefined, POS);
+        const fr = num('frames', undefined, { min: 1, entero: true });
+        const duracionSec = seg ?? (fr !== undefined ? fr / fps : escF ? escF.reduce((a, b) => a + b, 0) / fps : escS ? escS.reduce((a, b) => a + b, 0) : undefined);
+        const opts = { toleranciaSec: num('tolerancia', undefined, NOneg), duracionSec, maxCps: num('max-cps', undefined, NOneg) };
+        const avisos = verificarVozEscenas(cues.map((c): TramoDeVoz => ({ desde: c.desde, hasta: c.hasta, texto: c.texto })), cortes, opts);
+        if (op.get('voz')) {
+          const sr = 16000;
+          const x = await decodificar(ent(op.get('voz')!), { sr, canales: 1 });
+          const enSec = num('voz-en', 0, NOneg)!;
+          const desdeSec = num('voz-desde', 0, NOneg)!;
+          const tramos = ventanasDeVoz(x.subarray(Math.round(desdeSec * sr)), sr, { umbralDb: num('voz-umbral'), uneMs: num('voz-une', undefined, NOneg) }).map((t): TramoDeVoz => ({ desde: enSec + t.iniSample / sr, hasta: enSec + t.finSample / sr }));
+          console.log(`Voz detectada: ${tramos.length} tramos (${tramos.map((t) => `${t.desde.toFixed(2)}-${t.hasta.toFixed(2)}`).join(', ')})`);
+          avisos.push(...verificarVozEscenas(tramos, cortes, { toleranciaSec: opts.toleranciaSec, duracionSec, maxCps: 0 }).map((a) => ({ ...a, mensaje: `Voz: ${a.mensaje}` })));
+        }
+        for (const a of avisos) console.log(`Aviso [${a.tipo}]: ${a.mensaje}`);
+        console.log(avisos.length === 0 ? `Sin avisos: ${cues.length} subtítulos, ${cortes.length} cortes.` : `${avisos.length} aviso${avisos.length === 1 ? '' : 's'}.`);
+        if (avisos.length > 0 && op.has('estricto')) process.exitCode = 2;
+      })();
     case 'mezcla':
       return (async () => {
-        const cues = JSON.parse(readFileSync(resolve(requerida('cues')), 'utf8')) as Cue[];
+        const cues = (op.has('cues') ? JSON.parse(readFileSync(ent(requerida('cues')), 'utf8')) : []) as Cue[];
         if (!Array.isArray(cues)) throw new Error('El archivo de cues tiene que ser una lista');
         const { fps, frames } = framesYFps();
         const musica = op.get('musica');
-        const salida = resolve(requerida('out'));
+        const salida = sal(requerida('out'));
         const sr = num('sr', undefined, { min: 8000, entero: true });
         const musicaOpts = {
           gain: num('musica-gain', undefined, NOneg), desdeSec: num('musica-desde', undefined, NOneg),
@@ -179,14 +277,24 @@ function main(): Promise<void> {
         const techoDbtp = num('techo');
         if (techoDbtp !== undefined && techoDbtp > 0) throw new Error('--techo es un pico en dBTP y no puede ser positivo (por ejemplo -1)');
         const gainPorEfecto = leerGainPorEfecto(op);
+        const voz = op.get('voz');
+        if (op.has('voz') && !voz) throw new Error('--voz necesita la ruta de la pista de locución (wav o mp3)');
+        const vozOpts = voz
+          ? {
+              archivo: ent(voz), gain: num('voz-gain', undefined, NOneg), desdeSec: num('voz-desde', undefined, NOneg), enSec: num('voz-en', undefined, NOneg),
+              duckDb: num('voz-duck-db', undefined, NOneg), duckAtaqueMs: num('voz-ataque', undefined, POS), duckReleaseMs: num('voz-release', undefined, POS),
+              umbralDb: num('voz-umbral'), uneMs: num('voz-une', undefined, NOneg),
+            }
+          : undefined;
         const plan = await mezclar({
-          gainPorEfecto, fps, durationFrames: frames, cues, sfxDir: op.get('sfx') ? resolve(op.get('sfx')!) : undefined, sr, salida,
-          musica: musica ? { archivo: resolve(musica), ...musicaOpts } : undefined,
+          gainPorEfecto, voz: vozOpts, fps, durationFrames: frames, cues, sfxDir: op.get('sfx') ? ent(op.get('sfx')!) : undefined, sr, salida,
+          musica: musica ? { archivo: ent(musica), ...musicaOpts } : undefined,
           duck, lufs, techoDbtp,
         });
         for (const a of plan.advertencias) console.error('Aviso: ' + a);
         const omitidos = plan.advertencias.filter((a) => a.includes('cae fuera del video')).length;
         console.log(`Mezcla lista: ${salida} (${frames} cuadros a ${fps} fps, ${cues.length - omitidos} cues)`);
+        if (vozOpts) console.log(`Voz: ${plan.info.tramosVozSec.length} tramos detectados${plan.info.tramosVozSec.length ? ` (${plan.info.tramosVozSec.map((t) => `${t.desde.toFixed(2)}-${t.hasta.toFixed(2)} s`).join(', ')})` : ''}; la música baja ${vozOpts.duckDb ?? 8} dB mientras habla.`);
         console.log(JSON.stringify({ sonoridadAntesLufs: plan.info.lufsAntes, gananciaLufsDb: plan.info.gananciaLufsDb, reduccionLimitadorDb: plan.info.reduccionLimitadorDb, sonoridadFinalLufs: plan.info.lufsFinal, picoVerdaderoDbtp: plan.info.picoVerdaderoDbtp }));
       })();
     default:

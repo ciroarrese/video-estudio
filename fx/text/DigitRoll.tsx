@@ -1,6 +1,6 @@
 import React from "react";
 import { Easing } from "../../engine";
-import { clamp, fxDensity, lerp, progress, roleColor, styleKey, useFx, xform } from "../core";
+import { hiddenBefore, clamp, fxDensity, lerp, progress, roleColor, styleKey, useFx, xform } from "../core";
 import type { ColorRole, FxProps } from "../core";
 import { textLook } from "../../themes";
 import { baseText } from "./shared";
@@ -120,7 +120,7 @@ export function DigitRoll(props: DigitRollProps) {
   };
   const deco = textLook(theme).decoration !== "none";
   return (
-    <div style={{ ...baseText(theme, { fontSize: fs, color: props.color, weight: props.weight ?? theme.font.weights.stat }), display: "flex", alignItems: "center", lineHeight: 1, ...(deco ? { width: "fit-content", ...decorationHost(theme) } : {}), ...style }}>
+    <div style={{ ...baseText(theme, { fontSize: fs, color: props.color, weight: props.weight ?? theme.font.weights.stat }), display: "flex", alignItems: "center", lineHeight: 1, ...(deco ? { width: "fit-content", ...decorationHost(theme) } : {}), ...style, ...hiddenBefore(local) }}>
       {slots}
       {suffix && (
         <span key={styleKey(sufStyle)} style={sufStyle}>

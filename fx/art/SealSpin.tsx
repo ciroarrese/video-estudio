@@ -35,7 +35,7 @@ export function SealSpin(p: SealSpinProps) {
   // Escala y opacidad solo mientras el sello aparece (en reposo no queda `scale(1)`).
   const gp = { transform: svgScale(cx, cy, 0.6 + 0.4 * Math.min(1.08, pop)), opacity: fade(Math.min(1, pop * 2)) };
   return (
-    <svg width={w} height={h} viewBox={`0 0 ${w} ${h}`} style={{ display: "block", fontFamily: theme.font.family, ...p.style }}>
+    <svg width={w} height={h} viewBox={`0 0 ${w} ${h}`} style={{ display: "block", fontFamily: theme.font.family, textRendering: "geometricPrecision", ...p.style }}>
       <defs><path id={`sp-${uid}`} d={`M${cx - rt} ${cy} a${rt} ${rt} 0 1 1 ${2 * rt} 0 a${rt} ${rt} 0 1 1 ${-2 * rt} 0`} /></defs>
       <g key={`${gp.transform ? "t" : ""}${gp.opacity === undefined ? "" : "o"}`} {...gp}>
         <circle cx={cx} cy={cy} r={R} fill={theme.color.surface} stroke={theme.color.accent} strokeWidth={6} />

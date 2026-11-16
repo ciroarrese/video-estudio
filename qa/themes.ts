@@ -5,6 +5,7 @@ import type { ElementInfo, Finding } from './types';
 import type { QaResult } from './run';
 import { runQa, type QaOptions } from './run';
 import { formatElement } from './geometry';
+import { datoFaltante } from './datoFaltante';
 
 /** Los design systems con nombre que el repo trae (themes/index.ts); `--themes all` los corre todos. */
 export const THEME_NAMES = ['neutral', 'dark', 'editorial', 'neon', 'papel'] as const;
@@ -79,9 +80,31 @@ export function formatDifferences(m: Matrix, max = 40): string {
   return out.join('\n');
 }
 
-/** Corre el mismo control bajo cada sistema, uno por vez (un navegador a la vez: la maquina se comparte). */
-export async function runQaThemes(o: QaOptions, themes: string[]): Promise<Record<string, QaResult>> {
+export { datoFaltante } from './datoFaltante';
+export type ThemeSkip = { theme: string; reason: string };
+
+/**
+ * Corre el mismo control bajo cada sistema, uno por vez (un navegador a la vez: la maquina se comparte). Un sistema que no declara un color de
+ * datos que el video pide (`theme.data.libre`) no puede dibujarlo: se saltea con un aviso (`skipped`, y `log`) y el resto de la matriz corre.
+ * Si ningún sistema puede, lanza un error que lo dice.
+ */
+export async function runQaThemes(o: QaOptions, themes: string[], skipped: ThemeSkip[] = []): Promise<Record<string, QaResult>> {
   const out: Record<string, QaResult> = {};
-  for (const t of themes) out[t] = await runQa({ ...o, props: { ...(o.props ?? {}), theme: t } });
+  let first = false;
+  for (const t of themes) {
+    try {
+      out[t] = await runQa({ ...o, props: { ...(o.props ?? {}), theme: t } });
+    } catch (e) {
+      const d = datoFaltante(e);
+      if (!d) throw e;
+      first = true;
+      const reason = `el video lee el color de datos "${d.name}" (theme.data.${d.name}) y el sistema "${t}" no lo declara`;
+      skipped.push({ theme: t, reason });
+      (o.log ?? (() => {}))(`aviso: se saltea el sistema "${t}": ${reason}. Declaralo en ese tema o corré --themes solo con los sistemas que lo tienen.`);
+    }
+  }
+  if (!Object.keys(out).length && first) {
+    throw new Error(`ningún sistema de --themes puede dibujar este video (${skipped.map((x) => `${x.theme}: ${x.reason}`).join('; ')}). El video usa colores de datos propios: --themes no aplica; corré el control sin --themes (con el tema del video).`);
+  }
   return out;
 }

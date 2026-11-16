@@ -1,5 +1,5 @@
 import React from "react";
-import { resolveStyle, textStyle } from "../../themes";
+import { resolveStyle, textStyle, titleFamily } from "../../themes";
 import type { Theme } from "../../themes";
 import { roleColor } from "../core";
 import type { ColorRole, FxProps } from "../core";
@@ -34,7 +34,7 @@ export function baseText(
 ): React.CSSProperties {
   const tt = title ? titleTreatment(theme, p.weight) : null;
   return {
-    fontFamily: theme.font.family,
+    fontFamily: title ? titleFamily(theme) : theme.font.family,
     fontSize: p.fontSize ?? theme.type.h1,
     fontWeight: tt ? tt.weight : p.weight ?? theme.font.weights.semibold,
     ...(tt && tt.tracking !== 0 ? { letterSpacing: `${+tt.tracking.toFixed(3)}em` } : {}),

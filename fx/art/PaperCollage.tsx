@@ -52,7 +52,7 @@ export function PaperCollage(p: PaperCollageProps) {
   const last = strips[n - 1]!;
   const fs = theme.type.h2 * 0.8;
   return (
-    <svg width={w} height={h} viewBox={`0 0 ${w} ${h}`} style={{ display: "block", fontFamily: theme.font.family, ...p.style }}>
+    <svg width={w} height={h} viewBox={`0 0 ${w} ${h}`} style={{ display: "block", fontFamily: theme.font.family, textRendering: "geometricPrecision", ...p.style }}>
       {strips.map((s, i) => {
         const e = Easing.lands(staggerT(t, i, n, Math.min(0.95, 0.6 * staggerScale(theme))));
         if (e <= 0) return null;
