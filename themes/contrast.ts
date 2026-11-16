@@ -161,6 +161,18 @@ function usageText(role: string, onlyText: boolean): string[] {
   return out;
 }
 
+/** Valida la tipografía: `font.display` tiene que ser una familia no vacía y `displayFiles` solo tiene sentido con `display`. */
+function fontWarnings(theme: Theme): ContrastWarning[] {
+  const out: ContrastWarning[] = [];
+  const f = theme.font;
+  const err = (pair: string, message: string) => out.push({ pair, ratio: 0, required: 0, severity: "error", message: `${pair}: ${message}` });
+  if (f.display !== undefined && (typeof f.display !== "string" || f.display.trim() === "" || /^\d/.test(f.display.trim()))) {
+    err("font.display", "tiene que ser una familia tipográfica (texto no vacío que no empiece con un número); si no la usás, quitala");
+  }
+  if (f.displayFiles?.length && !f.display) err("font.displayFiles", "hay archivos para la familia de los títulos pero el tema no declara font.display");
+  return out;
+}
+
 /**
  * Texto normal exige 4.5 (aviso); por debajo de 3 es error.
  * Cubre texto/fondo, atenuado, onAccent/accent, acentos y colores de estado como texto
@@ -242,6 +254,7 @@ export function checkTheme(theme: Theme): ContrastWarning[] {
       check(`data.${name}/${on}`, data[name]!, bg, spec?.min ?? 3, undefined, spec?.scope);
     }
   }
+  out.push(...fontWarnings(theme));
   out.push(...styleWarnings(theme, contrastRatio));
   for (const [pair, msg] of vencidos) {
     const colors = pairColors(theme, pair);

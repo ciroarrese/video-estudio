@@ -1,6 +1,6 @@
 import React from "react";
 import { random } from "../../engine";
-import { progress, roleColor, stagger, styleKey, useFx, xform } from "../core";
+import { hiddenBefore, progress, roleColor, stagger, styleKey, useFx, xform } from "../core";
 import type { ColorRole } from "../core";
 import { contrastRatio, readableOn, staggerFrames, textLook } from "../../themes";
 import { mix } from "../core";
@@ -93,7 +93,7 @@ export function SplitFlap(props: SplitFlapProps) {
   const hinge = roleColor(theme, "bg");
   const glyphSet = glyphs ?? look.glyphs;
   return (
-    <div style={{ ...baseText(theme, { ...props, fontSize: fs }), display: "flex", gap: Math.round(fs * 0.12), ...style }}>
+    <div style={{ ...baseText(theme, { ...props, fontSize: fs }), display: "flex", gap: Math.round(fs * 0.12), ...style, ...hiddenBefore(local) }}>
       {chars.map((ch, i) => {
         const plan = flapPlan(ch, i, n, seed, duration, glyphSet, each);
         const flips = plan.seq.length - 1;

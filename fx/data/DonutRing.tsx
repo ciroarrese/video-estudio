@@ -1,6 +1,6 @@
 import { withAlpha } from "../../themes";
 import { Easing } from "../../engine";
-import { fxBox, progress, roleColor, useFx } from "../core";
+import { hiddenBefore, fxBox, progress, roleColor, useFx } from "../core";
 import type { ColorRole, FxProps } from "../core";
 import { arcPoints, fmtInt, toPath } from "./geom";
 
@@ -50,7 +50,7 @@ export function DonutRing(p: DonutRingProps) {
   const tickIn = R + sw / 2 + 12, tickOut = R + sw / 2 + 28;
   const shown = (value * k);
   return (
-    <svg width={w} height={h} viewBox={`0 0 ${w} ${h}`} style={{ display: "block", fontFamily: theme.font.family, ...p.style }}>
+    <svg width={w} height={h} viewBox={`0 0 ${w} ${h}`} style={{ display: "block", fontFamily: theme.font.family, ...p.style, ...hiddenBefore(local) }}>
       {Array.from({ length: n }, (_, i) => {
         const a = -Math.PI / 2 + (i / n) * Math.PI * 2;
         const on = i / n < frac - 1e-9;

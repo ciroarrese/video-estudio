@@ -1,6 +1,6 @@
 import { chartFill, chartStyle, withAlpha } from "../../themes";
 import { Easing } from "../../engine";
-import { fxBox, fxDensity, progress, roleColor, useFx } from "../core";
+import { fxBox, fxDensity, hiddenBefore, progress, roleColor, useFx } from "../core";
 import type { ColorRole, FxProps } from "../core";
 import { catmullRom, fmtInt, niceTicks, pointAt, polyLength, toPath, trimPolyline } from "./geom";
 import type { Pt } from "./geom";
@@ -57,7 +57,7 @@ export function LineDraw(p: LineDrawProps) {
   const fs = theme.type.eyebrow * 0.8 * k;
   const area = trimmed.length > 1 ? `${toPath(trimmed)} L${trimmed[trimmed.length - 1]!.x.toFixed(2)} ${L.y0} L${L.x0} ${L.y0} Z` : "";
   return (
-    <svg width={w} height={h} viewBox={`0 0 ${w} ${h}`} style={{ display: "block", fontFamily: theme.font.family, ...p.style }}>
+    <svg width={w} height={h} viewBox={`0 0 ${w} ${h}`} style={{ display: "block", fontFamily: theme.font.family, ...p.style, ...hiddenBefore(local) }}>
       <defs>
         {areaFill.kind !== "solid" && <FillDef fill={areaFill} />}
         <linearGradient id={`ld-${uid}`} x1="0" y1="0" x2="0" y2="1">

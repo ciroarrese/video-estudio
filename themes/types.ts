@@ -27,9 +27,17 @@ export interface ThemeFontFile {
 
 export interface ThemeFont {
   family: string;
+  /**
+   * Familia opcional para los títulos (titulares, cifras grandes, cartel de una historia). Si falta, los títulos usan `family`: un tema
+   * que no la declara se ve igual que siempre. Los textos de las interfaces recreadas siguen en `family`. Se lee con `titleFamily(theme)`
+   * y `titleFont(theme)`; con tokens, `--font-family-display`. Sus archivos locales van en `displayFiles`.
+   */
+  display?: string;
   weights: { regular: number; medium: number; semibold: number; stat: number };
   /** Archivos locales opcionales (para @font-face). */
   files?: ThemeFontFile[];
+  /** Archivos locales de la familia `display` (para @font-face). */
+  displayFiles?: ThemeFontFile[];
 }
 
 export interface Theme {

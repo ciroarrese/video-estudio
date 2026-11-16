@@ -1,6 +1,6 @@
 import React from "react";
 import { Easing } from "../../engine";
-import { fxBox, progress, roleColor, useFx } from "../core";
+import { hiddenBefore, fxBox, progress, roleColor, useFx } from "../core";
 import type { ColorRole, FxProps } from "../core";
 import { measureWidth } from "./measure";
 import { textLook } from "../../themes";
@@ -56,7 +56,7 @@ export function MarqueeBands(props: MarqueeBandsProps) {
     return { background: roleColor(theme, "bg"), color: ink, boxSizing: "border-box", border: `${Math.max(2, Math.round(fs * 0.04 * look.weightK))}px solid ${ink}`, ...(look.glow > 0 ? { boxShadow: `0 0 ${(fs * 0.4 * look.glow).toFixed(1)}px ${mix(ink, roleColor(theme, "bg"), 0.5)}` } : {}) };
   };
   return (
-    <div style={{ position: "relative", width: box.width, height: box.height, overflow: "hidden", ...style }}>
+    <div style={{ position: "relative", width: box.width, height: box.height, overflow: "hidden", ...style, ...hiddenBefore(local) }}>
       <div style={{ position: "absolute", left: 0, top: 0, width: box.width, height: box.height, transform: `rotate(${angle}deg)`, transformOrigin: "50% 50%" }}>
         {lines.map((line, j) => {
           const dir: 1 | -1 = j % 2 === 0 ? -1 : 1;

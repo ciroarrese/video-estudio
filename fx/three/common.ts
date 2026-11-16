@@ -64,6 +64,8 @@ export interface ThreeFx {
   frame: number;
   /** Cuadro local acotado a [0, duration]: la animacion queda quieta al terminar (still compuesto). */
   local: number;
+  /** Cuadro local sin acotar (negativo antes de `start`): para ocultar el efecto antes de que empiece (`hiddenBefore`). */
+  rawLocal: number;
   /** Progreso lineal 0..1 de toda la animacion. */
   t: number;
   width: number;
@@ -92,6 +94,7 @@ export function useThreeFx(p: ThreeProps, def: { width: number; height: number; 
   return {
     frame,
     local: clamp(local, 0, duration),
+    rawLocal: local,
     t: progress(local, 0, duration),
     width,
     height,

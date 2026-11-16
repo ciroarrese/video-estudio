@@ -169,6 +169,7 @@ const COLOR_ALIASES: Record<string, string[]> = {
   danger: ["danger", "error", "destructive", "negative", "critical", "red"],
 };
 
+const FONT_DISPLAY = ["font-family-display", "font-display", "font-family-heading", "font-heading", "font-family-title", "font-title", "typography-font-family-display"];
 const FONT_FAMILY = ["font-family", "font-family-base", "font-family-sans", "font-sans", "font-body", "font-base", "font-primary", "typography-font-family", "typography-family", "font-family-body", "font"];
 const WEIGHT_ALIASES: Record<string, string[]> = {
   regular: ["regular", "normal", "400"],
@@ -394,6 +395,8 @@ export function themeFromTokensWithReport(
   // Tipografía
   const fam = noUnresolved("font.family", FONT_FAMILY, "Familia tipográfica", (x) => !/^\d/.test(x.trim()));
   if (fam) theme.font.family = fam;
+  const disp = noUnresolved("font.display", FONT_DISPLAY, "Familia tipográfica de los títulos", (x) => !/^\d/.test(x.trim()) && !/^(swap|block|fallback|optional|auto)$/i.test(x.trim()));
+  if (disp) theme.font.display = disp;
   for (const w of Object.keys(WEIGHT_ALIASES) as (keyof Theme["font"]["weights"])[]) {
     const names = WEIGHT_ALIASES[w].flatMap((a) => [`font-weight-${a}`, `weight-${a}`, `fw-${a}`, `font-${a}`]);
     const v = pick(`font.weights.${w}`, names, (x) => {

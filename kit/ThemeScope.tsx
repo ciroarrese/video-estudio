@@ -2,7 +2,7 @@ import React, { useLayoutEffect, useState } from "react";
 import { holdRender, releaseRender, reportFontFailure } from "../engine";
 import { ThemeProvider } from "../themes";
 import type { Theme } from "../themes";
-import { firstFamily, fontFaceCss } from "./fonts";
+import { fontFaceCss, fontFaces } from "./fonts";
 
 type FontsApi = { load(font: string, text?: string): Promise<unknown>; check(font: string, text?: string): boolean };
 const fontsApi = (): FontsApi | null => (typeof document === "undefined" ? null : ((document as unknown as { fonts?: FontsApi }).fonts ?? null));
@@ -18,12 +18,11 @@ const requested = new Set<string>();
  */
 export function useThemeFonts(theme: Theme): number {
   const [loaded, setLoaded] = useState(0);
-  const files = theme.font.files;
-  const face = firstFamily(theme.font.family);
+  const files = fontFaces(theme);
   useLayoutEffect(() => {
     const api = fontsApi();
-    if (!api || !files?.length) return;
-    for (const f of files) {
+    if (!api || !files.length) return;
+    for (const { face, file: f } of files) {
       const key = `${f.weight}|${face}|${f.src}`;
       if (requested.has(key)) continue;
       requested.add(key);
@@ -70,6 +69,11 @@ export type ThemeScopeProps = {
   paint?: boolean;
   /** Estilo de la superficie (solo con `paint`): posición y tamaño, radio, sombra. */
   style?: React.CSSProperties;
+  /**
+   * Sin `paint`, aplica la tipografía del tema al subárbol (`font.family` y su peso regular) sin pintar fondo ni cambiar la maquetación
+   * (un contenedor `display: contents`). Sirve para una interfaz recreada con otra familia dentro de un video con otra. Con `paint` ya se aplica.
+   */
+  font?: boolean;
   children?: React.ReactNode;
 };
 
@@ -80,7 +84,7 @@ export type ThemeScopeProps = {
  *
  * Es el mismo `ThemeProvider` de `themes/` más lo que hace falta para el cambio de tema por escena.
  */
-export function ThemeScope({ theme, paint = false, style, children }: ThemeScopeProps) {
+export function ThemeScope({ theme, paint = false, style, font = false, children }: ThemeScopeProps) {
   useThemeFonts(theme);
   const fontCss = fontFaceCss(theme);
   return (
@@ -99,6 +103,8 @@ export function ThemeScope({ theme, paint = false, style, children }: ThemeScope
         >
           {children}
         </div>
+      ) : font ? (
+        <div style={{ display: "contents", fontFamily: theme.font.family, fontWeight: theme.font.weights.regular }}>{children}</div>
       ) : (
         children
       )}

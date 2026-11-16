@@ -1,6 +1,6 @@
 import { cornerRadius, withAlpha, textStyle } from "../../themes";
 import { Easing } from "../../engine";
-import { fxBox, fxDensity, progress, svgScale, useFx } from "../core";
+import { hiddenBefore, fxBox, fxDensity, progress, svgScale, useFx } from "../core";
 import type { FxProps } from "../core";
 import { SvgShadow, svgSurface } from "../data/styleKit";
 
@@ -36,7 +36,7 @@ export function TileDone(p: TileDoneProps) {
   const rx = cornerRadius(theme, "card");
   const colBorder = done ? theme.color.success : surf.border > 0 ? surf.edge : "none";
   return (
-    <svg width={w} height={h} viewBox={`0 0 ${w} ${h}`} style={{ display: "block", fontFamily: theme.font.family, ...p.style }}>
+    <svg width={w} height={h} viewBox={`0 0 ${w} ${h}`} style={{ display: "block", fontFamily: theme.font.family, ...p.style, ...hiddenBefore(local) }}>
       <g key={svgScale(w / 2, h / 2, press) ? "p" : "r"} transform={svgScale(w / 2, h / 2, press)}>
         <SvgShadow shadow={surf.shadow} x={inset} y={inset} width={w - 2 * inset} height={h - 2 * inset} rx={rx} />
         <rect x={inset} y={inset} width={w - 2 * inset} height={h - 2 * inset} rx={rx} fill={surf.fill} stroke={colBorder} strokeWidth={(done ? 3 : 2) * (done ? 1 : surf.border) * Math.max(k, 0.6)} />

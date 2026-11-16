@@ -3,7 +3,7 @@ import { Easing } from "../../engine";
 import { fxBox, progress, roleColor, stagger, styleKey, useFx, xform } from "../core";
 import type { ColorRole } from "../core";
 import { measureWidth } from "./measure";
-import { staggerScale } from "../../themes";
+import { staggerScale, titleFamily } from "../../themes";
 import { arrivalInner, decoration, decorationHost } from "./look";
 import { baseText, titleTreatment } from "./shared";
 import type { TextFxProps } from "./shared";
@@ -47,7 +47,7 @@ export function MaskedRise(props: MaskedRiseProps) {
   const words = text.split(/\s+/).filter(Boolean);
   const fs = props.fontSize ?? theme.type.h1;
   const tt = titleTreatment(theme, props.weight);
-  const font = { family: theme.font.family, weight: tt.weight, letterSpacing: tt.tracking };
+  const font = { family: titleFamily(theme), weight: tt.weight, letterSpacing: tt.tracking };
   let idx = 0;
   const lastWord = words.length - 1;
   const dotP = progress(local, plan.total - 16, 16, Easing.lands);
