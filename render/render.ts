@@ -14,6 +14,7 @@ import { trackChild, trackCloser, trackPath, untrackPath } from './cleanup';
 import { digestFiles, ENCODER_SETTINGS, frameFile, planCheckFrames, framePattern, planSegments, planShards, segmentKey } from './plan';
 import { serveStatic } from './server';
 import { assetDirsFor, esArchivoDeAudio, explicitAssetDirs } from './assets';
+import { comprobarFuentesDelSistema, strictFonts } from './fuentesSistema';
 import { cacheDirPorDefecto, salidaPorDefecto } from './dirs';
 import { cleanPageError, metaForFormat, NOSTAGE_QUERY, pageQuery, resolveScene, sceneRange, type VideoMeta } from './meta';
 import type { FormatName, SceneInfo } from '../engine';
@@ -47,6 +48,8 @@ export type RenderOptions = {
   assets?: string[];
   /** Borrador: una fuente que no carga solo avisa en vez de fallar (también VE_ALLOW_MISSING_FONTS=1). */
   allowMissingFonts?: boolean;
+  /** Una familia del sistema que el tema nombra sin archivo y no está instalada hace fallar (por defecto solo avisa). `--strict-fonts` / `VE_STRICT_FONTS=1`. */
+  strictFonts?: boolean;
   /** Formato de pantalla (`horizontal`, `vertical`, `cuadrado`); sin esto, el formato base del video. */
   format?: FormatName;
   /** Renderiza solo esta escena (id/nombre o índice desde 0; ver `listScenes`). No se combina con `frames`. */
@@ -414,6 +417,8 @@ async function setup(o: RenderOptions, needAudio: boolean) {
       if (shared.error) throw shared.error;
       if (!found) throw new Error(`Video desconocido "${o.videoId}". Disponibles: ${metas.map((m) => m.id).join(', ')}`);
       const meta = metaForFormat(found, o.format);
+      // Una familia del sistema que el tema nombra sin archivo y no está instalada hace que el video salga con otra tipografía: avisa (o falla con --strict-fonts).
+      await comprobarFuentesDelSistema(page, meta.durationInFrames, { strict: strictFonts(o), log });
       const scenes = async (): Promise<SceneInfo[]> => (await page.evaluate(() => (window as any).__ve.scenes())) as SceneInfo[];
       let tracks: Track[] = [];
       if (needAudio) tracks = (await page.evaluate(() => (window as any).__ve.scanAudio())) as Track[];

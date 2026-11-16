@@ -3,7 +3,7 @@
 //   npm run typecheck               corre `tsc` del repo y, si VE_VIDEOS_DIR está definida, esta revisión (`--opcional`)
 // El tsconfig.json de la carpeta lo crea `VE_VIDEOS_DIR=... bash templates/nuevo.sh externo` (ver templates/externo/).
 import { spawnSync } from 'node:child_process';
-import { existsSync, statSync } from 'node:fs';
+import { existsSync, readFileSync, statSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -26,5 +26,10 @@ if (!existsSync(tsconfig)) {
   process.exit(1);
 }
 console.log(`typecheck:videos: ${tsconfig}`);
+// Un tsconfig creado antes de que la plantilla excluyera `out/` y `.ve-cache/` puede meter en la revisión los .ts que dejen las salidas y la caché.
+const texto = readFileSync(tsconfig, 'utf8');
+if (!/"exclude"\s*:\s*\[[^\]]*"out"/.test(texto) || !/"exclude"\s*:\s*\[[^\]]*"\.ve-cache"/.test(texto)) {
+  console.warn(`aviso: ${tsconfig} no excluye "out" ni ".ve-cache" (la plantilla actual sí: "exclude": ["node_modules", "assets", "out", ".ve-cache"]); agregalos para que la revisión no mire salidas ni caché.`);
+}
 const r = spawnSync(join(repo, 'node_modules', '.bin', 'tsc'), ['--noEmit', '-p', tsconfig], { stdio: 'inherit', cwd: dir });
 process.exit(r.status ?? 1);

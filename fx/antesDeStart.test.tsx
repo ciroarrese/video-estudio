@@ -40,7 +40,6 @@ function textoVisible(markup: string): string[] {
 }
 
 // Efectos con texto a la vista: props mínimas para que dibujen contenido. Los que dibujan solo formas se prueban con el mismo método (sin texto no hay nada que listar).
-const C = (el: (f: number) => React.ReactNode) => el;
 const casos: [string, (f: number) => React.ReactNode][] = [
   ["LineDraw", (f) => <fx.LineDraw frame={f} start={START} />],
   ["DonutRing", (f) => <fx.DonutRing frame={f} start={START} />],
@@ -86,13 +85,28 @@ const casos: [string, (f: number) => React.ReactNode][] = [
   ["PhoneOrbit", (f) => <fx.PhoneOrbit frame={f} start={START} />],
   ["IsoCity", (f) => <fx.IsoCity frame={f} start={START} />],
 ];
-void C;
+
+/**
+ * Efectos que esconden el texto con una máscara (`overflow: hidden` y la letra desplazada fuera de la caja): antes de `start` cada letra está
+ * debajo de su máscara, que no se ve. Se comprueba esa estructura en lugar de la opacidad.
+ */
+const enmascarados = new Set(["MaskedRise", "KineticWords"]);
+
+function letrasEnmascaradas(markup: string): boolean {
+  const doc = new DOMParser().parseFromString(`<body>${markup}</body>`, "text/html");
+  const tw = Array.from(doc.body.querySelectorAll("span")).filter((e) => e.children.length === 0 && (e.textContent ?? "").trim() !== "");
+  return tw.length > 0 && tw.every((e) => /transform:translateY\(\d/.test((e.getAttribute("style") ?? "").replace(/\s+/g, "")) && /overflow:hidden/.test((e.parentElement?.getAttribute("style") ?? "").replace(/\s+/g, "")));
+}
 
 describe("catálogo fx: antes de `start` no hay texto a la vista", () => {
   for (const [name, mk] of casos) {
     for (const [tn, theme] of [["neutral", neutral], ["dark", dark]] as const) {
       it(`${name} (${tn})`, () => {
         for (const f of [0, 20, START - 1]) {
+          if (enmascarados.has(name)) {
+            expect(letrasEnmascaradas(html(mk(f), theme, f)), `${name}: las letras tienen que estar bajo su máscara antes de start (cuadro ${f})`).toBe(true);
+            continue;
+          }
           const visible = textoVisible(html(mk(f), theme, f));
           expect(visible, `${name} muestra texto antes de start (cuadro ${f})`).toEqual([]);
         }

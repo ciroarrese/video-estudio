@@ -113,7 +113,7 @@ Interfaces recreadas con el tema (no capturas). Se pueden poner dentro de `World
 | `ChatThread` | Burbujas con indicador de "escribiendo" antes de cada respuesta. | Una conversación, un asistente. | `messages` (`{from: "me" \| "them", text}`) |
 | `CommandPalette` | Se abre, se escribe una consulta, filtra y "presiona" el primer resultado. | Búsqueda rápida, atajos. | `query`, `items` (`{label, hint?}`) |
 | `CardFan` | Tarjetas que salen de una pila y se abren en abanico. | Presentar varias opciones. | `items` o `children`, `spread` |
-| `PhoneFrame` | Marco de teléfono que recorta sus hijos a la pantalla. | Mostrar tu propia interfaz en un teléfono. | `children`, `bezel` |
+| `PhoneFrame` | Marco de teléfono que recorta sus hijos a la pantalla. | Mostrar tu propia interfaz en un teléfono. | `children`, `bezel`, `bezelColor` |
 | `PhoneScroll` | Teléfono con contenido que se desplaza y barra de desplazamiento. | Una pantalla larga, un feed. | `children`, `contentHeight` |
 | `BeforeAfter` | Manija que revela el "después" sobre el "antes" (por defecto, alambre a diseño). | Comparación antes/después. | `before`, `after`, `rest`, `beforeLabel`, `afterLabel` |
 | `TileGrid` | Baldosas que se dan vuelta y se encienden con escalonado sembrado. | Progreso de muchas cosas a la vez. | `cols`, `rows`, `lit`, `seed` |
@@ -242,7 +242,7 @@ Lo implementan `LineDraw`, `TileDone`, `NotificationStack` (la caja de diseño t
 3. **Corte seco entre palabras** (`KineticWords`): el movimiento ocurre dentro de cada palabra, no entre ellas.
 4. **El último cuadro es un still.** Todo efecto termina compuesto y legible; se puede congelar para una miniatura o como primera imagen de la escena siguiente.
 5. **Oclusión pintando de lejos a cerca** y **profundidad con opacidad y grosor**: lo lejano se desvanece y se afina; lo cercano es más grande y más opaco. En `fx/three` la perspectiva se proyecta a mano.
-6. **Efectos montados: pueden estar desde el cuadro 0.** Antes de `start` y una vez terminados, los efectos no emiten `transform`, `filter` ni `opacity` (en reposo no queda `scale(1)` ni `opacity: 1`), así que montarlos de más no ensucia el render; `examples/fx-in-scene` es el ejemplo de regresión. Si `--check` falla con un efecto, seguí `docs/reglas.md`, sección "Qué hacer cuando --check falla".
+6. **Efectos montados: pueden estar desde el cuadro 0.** **Antes de `start` no se ve nada de un efecto** (ni rótulos, ni valores, ni formas): los que tienen texto quedan ocultos con `opacity: 0` mientras no empezaron (`hiddenBefore(local)` de `fx/core`; lo prueba `fx/antesDeStart.test.tsx` para todo el catálogo, con los que esconden el texto bajo una máscara, `MaskedRise` y `KineticWords`, comprobados por su estructura) y desde `start` no emiten esa opacidad. Una vez terminados no emiten `transform`, `filter` ni `opacity` (en reposo no queda `scale(1)` ni `opacity: 1`), así que montarlos de más no ensucia el render; **un efecto propio que tenga texto tiene que cumplir lo mismo** (`...hiddenBefore(local)` al final del `style` de la raíz); `examples/fx-in-scene` es el ejemplo de regresión. Si `--check` falla con un efecto, seguí `docs/reglas.md`, sección "Qué hacer cuando --check falla".
 7. **Raster estable.** Para que el render sea idéntico según el historial de cuadros, ver la lista única en `docs/reglas.md` (traslados enteros, `scale()` sobre texto solo si la pieza pasa `--check` completo, CSS 3D solo como `perspective()` propio de cada elemento, sin sombras bajo `rotate()`).
 
 ## Base común

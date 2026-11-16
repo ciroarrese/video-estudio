@@ -106,39 +106,43 @@ Probalo: `npm run dev` y abrí `/?video=kit-demo`, o `npm run sheet -- kit-demo 
 
 ## 6. Recrear una interfaz con primitivas del tema
 
-Las herramientas se arman con `div` posicionados y con los valores del tema. Estas piezas son punto de partida; copialas a la carpeta de la escena (`videos/<slug>/<escena>/`, de ahí los `../../../` hasta la raíz) y ajustalas. Siempre tamaño de letra de `theme.type`, colores de `theme.color`, radios y sombras del tema.
+Las herramientas se arman con `div` posicionados y con los valores del tema. **Primero las piezas de interfaz del kit** (`Chip`, `Button`, `Avatar`, `Check`, `ListRow`, `Icon`: `kit/README.md`, "Piezas de interfaz"), que ya toman esquinas, bordes, sombra, letra y trazos del design system; después las de abajo, que son punto de partida: copialas a la carpeta de la escena (`videos/<slug>/<escena>/`, de ahí los `../../../` hasta la raíz) y ajustalas. Siempre tamaño de letra de `theme.type`, colores de `theme.color` y **forma por las ayudas de estilo** (`surfaceStyle`, `cornerRadius`, `borderWidth`, `textStyle`, `entrance`, `chartStyle`; sección 14): la escena no escribe radios, bordes ni sombras sueltos, así el mismo video se rehace con otro design system.
 
 ```tsx
 import React from "react";
-import { useTheme } from "../../../themes";
+import { borderWidth, chartStyle, entrance, surfaceStyle, textStyle, useTheme } from "../../../themes";
+import { Eyebrow } from "../../../kit";
 
-/** Ventana con barra de título (tres puntos + nombre de la herramienta). */
+/** Ventana con barra de título (tres puntos + nombre de la herramienta). Superficie, esquinas y borde del design system. */
 export function Window({ x, y, w, h, title, children }: { x: number; y: number; w: number; h: number; title: string; children?: React.ReactNode }) {
   const t = useTheme();
+  const bar = Math.round(t.type.eyebrow * 2.2); // alto explícito de la barra (sección 15, punto 3)
+  const dot = Math.round(t.type.eyebrow * 0.55);
   return (
-    <div style={{ position: "absolute", left: x, top: y, width: w, height: h, overflow: "hidden", background: t.color.surface, border: `1px solid ${t.color.border}`, borderRadius: t.radius.lg, boxShadow: t.shadow.lg }}>
-      <div style={{ height: 56, display: "flex", alignItems: "center", gap: 10, padding: "0 22px", background: t.color.surfaceAlt, borderBottom: `1px solid ${t.color.border}` }}>
+    <div style={{ position: "absolute", left: x, top: y, width: w, height: h, overflow: "hidden", ...surfaceStyle(t, "window") }}>
+      <div style={{ height: bar, boxSizing: "border-box", display: "flex", alignItems: "center", gap: "0.4em", padding: "0 0.9em", fontSize: dot, background: t.color.surfaceAlt, borderBottom: `${borderWidth(t, "window")}px solid ${t.color.border}` }}>
         {[t.color.danger, t.color.warning, t.color.success].map((c, i) => (
-          <span key={i} style={{ width: 14, height: 14, borderRadius: t.radius.pill, background: c }} />
+          <span key={i} style={{ width: dot, height: dot, borderRadius: t.radius.pill, background: c }} />
         ))}
-        <span style={{ marginLeft: 16, fontSize: t.type.eyebrow, fontWeight: t.font.weights.semibold, color: t.color.textMuted }}>{title}</span>
+        <Eyebrow style={{ marginLeft: "0.9em" }}>{title}</Eyebrow>
       </div>
-      <div style={{ position: "relative", height: h - 56 }}>{children}</div>
+      <div style={{ position: "relative", height: h - bar }}>{children}</div>
     </div>
   );
 }
 
-/** Tabla: encabezado y filas con las columnas reales de la herramienta. `appear` (0..1 por fila) la hace entrar escalonada. */
+/** Tabla: encabezado y filas con las columnas reales de la herramienta. `appear` (0..1 por fila) la hace entrar escalonada con la entrada del tema. */
 export function Table({ columns, rows, appear }: { columns: string[]; rows: string[][]; appear: (row: number) => number }) {
   const t = useTheme();
   const grid = `repeat(${columns.length}, 1fr)`;
+  const rowH = Math.round(t.type.eyebrow * 2.2); // alto de fila explícito
   return (
-    <div style={{ padding: "18px 30px" }}>
-      <div style={{ display: "grid", gridTemplateColumns: grid, padding: "0 20px 12px", fontSize: t.type.eyebrow, color: t.color.textMuted, fontWeight: t.font.weights.medium }}>
+    <div style={{ padding: "0.7em 1.2em", fontSize: t.type.eyebrow }}>
+      <div style={{ display: "grid", gridTemplateColumns: grid, height: rowH, alignItems: "center", padding: "0 0.8em", color: t.color.textMuted }}>
         {columns.map((c) => <span key={c}>{c}</span>)}
       </div>
       {rows.map((r, i) => (
-        <div key={i} style={{ display: "grid", gridTemplateColumns: grid, alignItems: "center", height: 56, marginBottom: 8, padding: "0 20px", boxSizing: "border-box", background: t.color.bg, border: `1px solid ${t.color.border}`, borderRadius: t.radius.md, fontSize: t.type.eyebrow, color: t.color.text, opacity: appear(i) }}>
+        <div key={i} style={{ display: "grid", gridTemplateColumns: grid, alignItems: "center", height: rowH, marginBottom: "0.3em", padding: "0 0.8em", boxSizing: "border-box", color: t.color.text, ...surfaceStyle(t, "card", { corner: "control", level: "sm" }), ...entrance(t, appear(i), i) }}>
           {r.map((c, j) => <span key={j}>{c}</span>)}
         </div>
       ))}
@@ -146,20 +150,21 @@ export function Table({ columns, rows, appear }: { columns: string[]; rows: stri
   );
 }
 
-/** Tarjeta de indicador. `selected` agrega el borde de acento. */
+/** Tarjeta de indicador. `selected` la enciende (borde de acento y sombra más alta). */
 export function StatCard({ label, value, selected }: { label: string; value: string; selected?: boolean }) {
   const t = useTheme();
   return (
-    <div style={{ width: 360, height: 200, boxSizing: "border-box", padding: 28, background: t.color.surfaceAlt, borderRadius: t.radius.panel, border: `2px solid ${selected ? t.color.accent : t.color.border}`, boxShadow: selected ? t.shadow.lg : t.shadow.sm }}>
-      <div style={{ fontSize: t.type.eyebrow, color: t.color.textMuted }}>{label}</div>
-      <div style={{ fontSize: t.type.stat * 0.6, fontWeight: t.font.weights.stat, color: t.color.text }}>{value}</div>
+    <div style={{ width: 360, height: 200, boxSizing: "border-box", padding: 28, ...surfaceStyle(t, "panel", { on: selected, level: selected ? "lg" : "sm" }) }}>
+      <Eyebrow>{label}</Eyebrow>
+      <div style={{ fontSize: t.type.stat * 0.6, lineHeight: 1.1, fontWeight: t.font.weights.stat, color: t.color.text, ...textStyle(t, "title") }}>{value}</div>
     </div>
   );
 }
 
-/** Gráfico de barras que crece con el cuadro. `progress` va de 0 a 1 (usá `kf`). */
+/** Gráfico de barras que crece con el cuadro. `progress` va de 0 a 1 (usá `kf`). El radio de la barra lo decide `style.chart`. */
 export function BarChart({ values, progress, w, h }: { values: number[]; progress: number; w: number; h: number }) {
   const t = useTheme();
+  const r = chartStyle(t).barRadius;
   const max = Math.max(...values);
   const gap = 18;
   const bw = (w - gap * (values.length - 1)) / values.length;
@@ -167,7 +172,7 @@ export function BarChart({ values, progress, w, h }: { values: number[]; progres
     <div style={{ position: "relative", width: w, height: h }}>
       {values.map((v, i) => {
         const bh = (v / max) * h * progress;
-        return <div key={i} style={{ position: "absolute", left: i * (bw + gap), bottom: 0, width: bw, height: bh, borderRadius: `${t.radius.sm}px ${t.radius.sm}px 0 0`, background: t.color.chart[i % t.color.chart.length] }} />;
+        return <div key={i} style={{ position: "absolute", left: i * (bw + gap), bottom: 0, width: bw, height: bh, borderRadius: `${r}px ${r}px 0 0`, background: t.color.chart[i % t.color.chart.length] }} />;
       })}
     </div>
   );
@@ -175,6 +180,16 @@ export function BarChart({ values, progress, w, h }: { values: number[]; progres
 ```
 
 Cómo usarlas dentro de `<World>`: `<Window x={260} y={200} w={1400} h={700} title="Panel de ejemplo"><Table columns={["Nombre", "Estado"]} rows={[["Elemento alfa", "Activo"]]} appear={(i) => kf(f, [30 + i * 5, 48 + i * 5], [0, 1])} /></Window>`.
+
+**Formularios, listas y avisos con las piezas del kit** (nada de armar el chip, el botón o el tilde a mano en cada escena; el estado que cambia con el cuadro se pasa como número 0 a 1):
+
+```tsx
+import { Avatar, Button, Check, Chip, Icon, ListRow, kf } from "../../../kit";
+
+<ListRow leading={<Avatar name="Luna" index={0} />} title="Luna" detail="Mañana 10:30" trailing={<Chip tone="success">Confirmado</Chip>} divider />
+<Button pressed={kf(f, [40, 46], [0, 1])} icon={<Icon name="calendar" size={32} color="onAccent" />}>Pedir turno</Button>
+<Check progress={kf(f, [60, 75], [0, 1])} />   {/* el tilde se dibuja con el cuadro */}
+```
 
 ### Colores con nombre y letra chica de la interfaz
 

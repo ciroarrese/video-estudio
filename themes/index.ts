@@ -18,3 +18,4 @@ export { neon } from "./neon";
 export { papel } from "./papel";
 export { dimOpacity, dimmedColor } from "./dim";
 export type { DimOptions } from "./dim";
+export { formatTokenReport } from "./informe";

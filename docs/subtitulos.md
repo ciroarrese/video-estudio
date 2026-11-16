@@ -2,7 +2,7 @@
 
 Un video que va a redes se ve, casi siempre, sin sonido: los subtítulos dejan de ser un adorno y pasan a ser parte del contenido. Esta guía cubre el formato de los datos, el componente `Subtitles` del kit, los archivos `.srt`/`.vtt` aparte y la verificación contra los cortes de escena. El sonido de la locución (mezcla, ducking, sonoridad) está en `docs/audio.md`, sección "Locución".
 
-> Regla de `docs/reglas.md`: sin subtítulos por defecto, porque compiten con la imagen. Se activan cuando la persona dice que el video va a redes, a una pantalla sin sonido, o los pide (cuestionario de la skill, pregunta 6 y 7). Con subtítulos, la imagen sigue explicándose sola: el subtítulo repite lo que se dice, no lo que ya se ve.
+> Regla de `docs/reglas.md`: sin subtítulos por defecto, porque con sonido compiten con la imagen; **con subtítulos por defecto cuando el video va a redes o se ve sin sonido**, o cuando la persona los pide. Salen de las preguntas del cuestionario de la skill: la 6 (texto en pantalla: titulares, rótulos, subtítulos), la 7 (¿va a redes o se ve sin sonido?) y la 8 (¿habrá locución?). Con subtítulos, la imagen sigue explicándose sola: el subtítulo repite lo que se dice, no lo que ya se ve.
 
 ## Piezas
 
@@ -148,7 +148,7 @@ Con `--voz`, los tramos donde la pista de voz **suena de verdad** (no los de los
 
 ## Flujo en la producción
 
-1. **Cuestionario**: ¿va a redes o se ve sin sonido? Sí: subtítulos por defecto. ¿Habrá locución? Sí: la graba o la aporta la persona (ver "Licencias" en `docs/audio.md`).
+1. **Cuestionario** (preguntas 6 a 8 de la skill): ¿va a redes o se ve sin sonido (pregunta 7)? Sí: subtítulos por defecto. ¿Habrá locución (pregunta 8)? Sí: la graba o la aporta la persona (ver "Licencias" en `docs/audio.md`).
 2. **Guion**: una columna "texto en pantalla / locución" por escena. Se anota el estilo (`bloque` o `karaoke`) junto con el resto de las decisiones del design system.
 3. **Escenas**: la zona de contenido deja libre `subtitleBand(...)` en cada formato; `Subtitles` va en la escena raíz sobre los velos.
 4. **Tiempos**: sin locución, `subtitulosDeGuion`. Con locución, a mano o desde un SRT, y `locucion` para verificar.

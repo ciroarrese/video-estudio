@@ -38,8 +38,9 @@ Sin cambios (no tienen forma ni superficie): `Cursor`, `FlyingCard` (dibuja lo q
 - **Salida de la cámara**: `exitThrough(theme, frame, rango, cam, objetivo, native?)` para el `map` de `cameraAt`: el atravesado de siempre (`dive`) o el empuje suave de `motion.exit: settle`.
 - **Atenuar lo demás**: `<FocusGroup range variant?>` envuelve lo que no es el objetivo de una señal `focus` (ver `Callout`).
 - **Una escena dentro de otra**: `<NestedScene scene start? frame? format? scale | width | height>` (vista previa viva o miniatura).
-- **Tema por ámbito**: `<ThemeScope theme paint? style?>` cambia el tema de un subárbol (se anida); con `paint` pinta fondo, texto y tipografía del tema; declara el `@font-face` de sus fuentes y espera su carga. Ver `themes/README.md`.
+- **Tema por ámbito**: `<ThemeScope theme paint? font? style?>` cambia el tema de un subárbol (se anida); con `paint` pinta fondo, texto y tipografía del tema; con `font` (sin `paint`) aplica solo la tipografía, sin pintar ni cambiar la maquetación; declara el `@font-face` de sus fuentes y espera su carga. Ver `themes/README.md`.
 - **Escena**: `<Stage>` fondo, tipografía y nubes opcionales del tema.
+- **Piezas de interfaz** (para recrear formularios, listas y avisos; `kit/ui.tsx`): `<Chip>`, `<Button>`, `<Avatar>`, `<Check>`, `<ListRow>` e `<Icon>`. Ver la tabla "Piezas de interfaz" abajo.
 - **Subtítulos**: `<Subtitles cues estilo?>` (bloque o karaoke), hasta dos renglones medidos con `textWidth`, en el área segura de cada formato; `subtitleBand` es la franja que hay que dejar libre; lectores y escritores de JSON, SRT y VTT y `subtitulosDeGuion` en `kit/subtitulos.ts`. Guía completa: `docs/subtitulos.md`.
 - **Maquetar sin píxeles fijos** (ver "Disposición y medidas" abajo): `textWidth(theme, texto, opts)` ancho medido; `<Callout>`, `placeBeside`, `calloutState` y `coveredOpacity` para una pastilla que se pone en lugar libre; `headlineStrip` y `cameraKeepClear` para dejar libre la franja del titular; `cameraView` para saber qué ve la cámara. Atenuar texto: `dimOpacity` / `dimmedColor` (en `themes/`).
 
@@ -58,7 +59,7 @@ Props exactas de las piezas que más se usan (todas aceptan `frame?` para fijar 
 | `DoodleUnderline` | `id`, `start`, `end`, `x`, `y`, `length`, `boil = 3`, `width = 5` | Raya horizontal desde `(x, y)` hacia la derecha. |
 | `Wash` | `range: [ini, fin]`, `color?` | Velo de cuadro completo (color del fondo del tema por defecto). Va fuera de `World`, al final del contenido. Lleva `data-qa-veil` para que `qa` lo trate como transición. |
 | `Subtitles` | `cues: Subtitulo[]` (segundos), `estilo = "bloque"` (o `"karaoke"`), `offsetSec = 0`, `size?`, `bottom?` | Subtítulo activo de hasta dos renglones, abajo y al centro; en vertical por encima de la zona de las redes. Sale todo del tema (`surfaceStyle`, `entrance`, `cornerRadius`); no corta con "…": si no entra en dos renglones, pagina. Va en la escena raíz, sobre los velos. `subtitleBand(theme, { width, height })` da la franja (`Rect`) para dejarla libre. |
-| `ThemeScope` | `theme: Theme`, `paint = false`, `style?`, `children` | Cambia el tema de un subárbol. Con `paint`, pinta una superficie (el `style` le da posición, tamaño, radio y sombra). Ver `docs/guia-escenas.md`, sección 10. |
+| `ThemeScope` | `theme: Theme`, `paint = false`, `font = false`, `style?`, `children` | Cambia el tema de un subárbol. Con `paint`, pinta una superficie (el `style` le da posición, tamaño, radio y sombra). Con `font` y sin `paint`, aplica la tipografía del tema del ámbito (`font.family`, un contenedor `display: contents`: no cambia la maquetación); sirve para una interfaz recreada con otra letra que el video. Ver `docs/guia-escenas.md`, sección 10. |
 | `World` | `camera`, `width`, `height`, `perspective = 2400`, `children` | `width`/`height` del formato (`useFormat()`), no 1920x1080 escritos a mano. |
 | `Stage` | `clouds = true`, `cloudOpacity?`, `cloud?: CloudOptions`, `children` | Fondo, tipografía y nubes del tema. `cloud` (`colors`, `count`, `seed`, `blobs`, `opacity`, `blur`) pisa lo que declara `theme.cloud` solo en esa escena. |
 | `CloudBackground` | `colors?`, `count?`, `seed?`, `blobs?`, `opacity?`, `blur?` (por defecto `theme.cloud.blur`, y si no, 110), `width?`, `height?` | Cada propiedad pisa a `theme.cloud`. `colors` y `blobs[].color` aceptan roles (`"accent2"`, `"data.estado"`, `"chart[2]"`) o colores del tema. `blobs: { x, y, size? }[]` (x, y en fracciones del cuadro) reemplaza el reparto sembrado. |
@@ -66,6 +67,21 @@ Props exactas de las piezas que más se usan (todas aceptan `frame?` para fijar 
 | `flyInZ` | `(progress, { from = 900, perspective = 1400, x, y, rotateX, rotateY, fade = true })` | Devuelve un `style` (no un componente). Ver "Entrada en profundidad". |
 | `CountUp` | `from = 0`, `to`, `start`, `duration`, `format?`, `style?` | Número que cuenta. |
 | `GradientText` | `children`, `pan = 0`, `loop?` (por defecto `decor.gradientLoop`), `style?` | Texto con el degradado del tema. `loop` = cuadros de un vaivén completo (vuelve exacto al terminar el ciclo); `pan` = velocidad sin ciclo exacto. Ambos salen del cuadro. |
+
+## Piezas de interfaz
+
+Las piezas que toda interfaz recreada necesita y que antes cada video escribía por su cuenta. Todo sale del tema (colores por rol, esquinas por `cornerRadius`, borde y sombra por `surfaceStyle`/`borderWidth`, letra por `textStyle`, trazos por `style.line`): con otro design system cambian de forma sin tocar la escena. Son puras: el estado que cambia con el cuadro (apretado, tildado, dibujado) se pasa como un número de 0 a 1 que calcula la escena (`kf`). No llevan posición: se ubican con el contenedor. (`Chip` y `Pill` de `stories/` son las piezas propias de la historia —muro, píldora del titular—; no son estas.)
+
+| Pieza | Props | Qué hace |
+|---|---|---|
+| `Chip` | `children`, `tone = "neutral"` (`neutral`, `accent`, `success`, `warning`, `danger`), `on?`, `size?`, `style?` | Píldora o etiqueta. `neutral` es la superficie `chip` del design system (`on` la enciende con borde de acento); `accent` va rellena; los estados llevan un punto del color antes del texto, así el contraste del texto no depende del color del estado. `size` = letra en px (por defecto `type.caption`); los espacios son proporcionales. |
+| `Button` | `children`, `variant = "primary"` (o `secondary`), `pressed = 0`, `size?`, `icon?`, `style?` | Botón de acción con las esquinas del rol `control`. `pressed` (0 a 1) mezcla el relleno hacia `accent2` (o `surfaceAlt`): el apretado cambia el color, no el tamaño. |
+| `Avatar` | `name`, `index = 0`, `size = 56`, `ring?`, `style?` | Círculo con la inicial; color de `color.chart[index]` y letra del color más legible sobre él. `ring` agrega un anillo del color de la superficie para apilar avatares. |
+| `Check` | `progress = 1`, `size = 48`, `tone = "accent"` (o `success`), `filled = true`, `style?` | Tilde dentro de un círculo que se dibuja con `progress`; grosor y puntas del trazo siguen `style.line` (`weight`, `cap`). Con `progress = 1` no emite propiedades de dibujo. |
+| `ListRow` | `title`, `detail?`, `leading?`, `trailing?`, `on?`, `divider?`, `size?`, `style?` | Fila de lista: pieza a la izquierda (`Avatar`, `Icon`), texto en el medio (`minWidth: 0`: un nombre largo no empuja lo de la derecha), pieza a la derecha (`Chip`, `Check`, una hora). `on` la resalta con `surfaceAlt`; `divider` agrega la raya fina del tema. |
+| `Icon` | `name`, `size = 40`, `color = "text"`, `progress = 1`, `style?` | Ícono de trazo propio, dibujado para este repo en una caja de 24 x 24: `calendar`, `bell`, `clock`, `user`, `check`, `home`, `search`, `heart`, `document`, `message` (`ICON_NAMES`). `color` es un rol del tema (`accent`, `onAccent`...) o `data.<nombre>`; el grosor y las puntas salen de `style.line`; `progress` dibuja el trazo con el cuadro. Es un conjunto chico para recrear interfaces, no una fuente de íconos: si falta uno, se pide. |
+
+La letra de los títulos (`font.display`, `themes/README.md`) no se aplica a estas piezas: son interfaz y siguen con `font.family`.
 
 ## Disposición y medidas
 

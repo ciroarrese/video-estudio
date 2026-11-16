@@ -7,6 +7,7 @@
 //   3. `<VE_VIDEOS_DIR>/assets` cuando los videos están afuera del repo.
 //   4. Después, el bundle y `public/`.
 // Gana el primero que tenga el archivo. Solo se incluyen las carpetas que existen.
+import { resolverRutaBlanda } from './rutas';
 import { readdirSync, statSync } from 'node:fs';
 import { delimiter, extname, join, resolve } from 'node:path';
 
@@ -21,10 +22,11 @@ const isDir = (p: string) => {
 /** Carpeta que hace de `videos/` (VE_VIDEOS_DIR) o `null` si se usa la del repo. */
 export const externalVideosDir = (): string | null => (process.env.VE_VIDEOS_DIR ? resolve(process.env.VE_VIDEOS_DIR) : null);
 
-/** `--assets` más `VE_ASSETS`, como rutas absolutas (existan o no: el digest de la cache las trata como vacías si faltan). */
+/** `--assets` más `VE_ASSETS`, como rutas absolutas (la ruta `videos/...` se busca también en VE_VIDEOS_DIR; existan o no: el digest de la cache las trata como vacías si faltan). */
 export function explicitAssetDirs(assets: string[] = []): string[] {
   const fromEnv = (process.env.VE_ASSETS ?? '').split(delimiter).filter(Boolean);
-  return [...new Set([...assets, ...fromEnv].map((a) => resolve(a)))];
+  // `videos/<slug>/audio` con VE_VIDEOS_DIR: se resuelve contra esa carpeta si la ruta tal cual no existe (render/rutas.ts)
+  return [...new Set([...assets, ...fromEnv].map((a) => resolverRutaBlanda(a)))];
 }
 
 /**

@@ -8,7 +8,7 @@ Efectos de interfaz recreada: notificaciones, chat, paleta de comandos, teléfon
 | `ChatThread` | Burbujas con indicador de "escribiendo" antes de cada respuesta | `messages` (`{from: "me" \| "them", text}`) |
 | `CommandPalette` | Se abre, se escribe una consulta, filtra y "presiona" el primer resultado | `query`, `items` (`{label, hint?}`) |
 | `CardFan` | N tarjetas que salen de una pila y se abren en abanico | `items` o `children`, `spread` |
-| `PhoneFrame` | Marco de teléfono que recorta sus hijos a la pantalla | `children`, `bezel` |
+| `PhoneFrame` | Marco de teléfono que recorta sus hijos a la pantalla | `children`, `bezel`, `bezelColor` |
 | `PhoneScroll` | Teléfono con contenido que se desplaza y barra de desplazamiento | `children`, `contentHeight` |
 | `BeforeAfter` | Manija que revela el "después" sobre el "antes" (por defecto, alambre → diseño) | `before`, `after`, `rest`, `beforeLabel`, `afterLabel` |
 | `TileGrid` | Baldosas que se dan vuelta y se encienden con escalonado sembrado | `cols`, `rows`, `lit`, `seed` |

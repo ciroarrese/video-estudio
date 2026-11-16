@@ -4,12 +4,15 @@ import { cornerRadius, textStyle } from "../../themes";
 import { chartColor, fade, fxBox, styleKey, useFx, xform } from "../core";
 import type { FxProps } from "../core";
 import { PhoneFrame, phoneScreen } from "./PhoneFrame";
+import type { PhoneBezelColor } from "./PhoneFrame";
 
 export type PhoneScrollProps = FxProps & {
   /** Contenido alto; por defecto una lista de ejemplo. */
   children?: React.ReactNode;
   /** Alto del contenido en px (hace falta si pasas `children`). */
   contentHeight?: number;
+  /** Color del marco del teléfono (ver `PhoneFrame`). */
+  bezelColor?: PhoneBezelColor;
 };
 
 /** Desplazamiento (px) y geometria de la barra: sube con pausas y llega al final. */

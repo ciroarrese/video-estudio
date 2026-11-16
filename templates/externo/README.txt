@@ -7,7 +7,7 @@ Se prepara sola con:
 
 (o al crear la primera escena con `bash templates/nuevo.sh escena <slug> <nombre>` con la variable definida). Deja en la carpeta:
 
-  tsconfig.json   paths a este repo (video-estudio/*) y a los tipos de react; sin baseUrl (TypeScript 7 lo rechaza) y con
+  tsconfig.json   paths a este repo (video-estudio/*) y a los tipos de react; excluye node_modules, assets, out y .ve-cache; sin baseUrl (TypeScript 7 lo rechaza) y con
                   `types: []` (vite/client no se resuelve desde afuera; env.d.ts declara los imports `?url`).
   env.d.ts        declaraciones de `*?url`, `*?raw`, imágenes, fuentes y audio.
 

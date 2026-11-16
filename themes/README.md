@@ -37,7 +37,23 @@ console.log(checkTheme(theme)); // [] si el contraste es suficiente
 
 Los tokens en JSON se pasan igual: `themeFromTokens({ color: { accent: { $value: "#e11d48" } } })`.
 
-Las fuentes locales se declaran en `font.files` (`{ weight, src }`). No se incluyen fuentes ni valores de marca en este repo.
+Las fuentes locales se declaran en `font.files` (`{ weight, src }`). No se incluyen fuentes ni valores de marca en este repo. Una familia que el tema nombra **sin archivo** (una fuente instalada en la máquina) tiene que estar instalada donde se renderiza: `render` avisa si no lo está (`aviso: La fuente "X" no está instalada...`) y con `--strict-fonts` (o `VE_STRICT_FONTS=1`) falla; si no, el video saldría con la tipografía de reserva de la pila, que cambia de una máquina a otra. Para que no dependa de la máquina, declarala con archivo en `font.files`.
+
+## Tipografía de los títulos: `font.display`
+
+Un design system suele pedir dos familias: una para titulares y cifras grandes (por ejemplo con serifa) y otra para el texto de las interfaces. `theme.font.display` (opcional) es la familia de los títulos; **si falta, los títulos usan `font.family`** y el tema se ve exactamente igual que antes. Con tokens: `--font-family-display` (también `--font-display`, `--font-heading`, `--font-family-heading`, `--font-title`; un `--font-display: swap` se ignora porque es una propiedad de `@font-face`, no una familia). Sus archivos locales van en `font.displayFiles` (`{ weight, src }`, como `font.files`); `ThemeScope` y `Stage` declaran su `@font-face` y esperan la carga.
+
+```ts
+const { theme } = themeFromTokensWithReport(`:root { --font-family: "Texto", sans-serif; --font-family-display: "Titulos", serif; }`);
+// theme.font.family  = '"Texto", sans-serif'    texto de las interfaces
+// theme.font.display = '"Titulos", serif'       titulares
+```
+
+- **Qué la usa**: `textStyle(theme, "title")` (el titular de `DockedHeadline`, el título del cartel, de la lista y del cierre de las historias, `NotificationStack`, `LayerExplode`, `CarouselRing`), los efectos de titular de `fx/text` (`MaskedRise`, `ScrambleDecode`, `Typewriter`: `baseText(..., title = true)`) y `textWidth(theme, texto, { role: "title" })` (mide con la familia de los títulos).
+- **Para una pieza propia con un título**: esparcí `...textStyle(theme, "title")` (trae peso, interletrado y familia) o, si no pasa por ahí, `...titleFont(theme)` (`{ fontFamily }` o `{}`). Para medir o dibujar en canvas/SVG por separado, `titleFamily(theme)` (la cadena: `font.display ?? font.family`). **No** escribas `fontFamily: theme.font.family` en un título.
+- **Qué no la usa**: rótulos, `eyebrow`, `caption`, texto de las interfaces recreadas y las piezas de `kit/ui` (`Chip`, `Button`, `ListRow`...): siguen con `font.family`.
+- `checkTheme` valida que `display` sea una familia (texto no vacío que no empiece con un número) y que `displayFiles` no exista sin `display`.
+- Una interfaz recreada con otra letra que el video (la herramienta de la persona tiene su propia tipografía) se envuelve en `<ThemeScope theme={otro} font>` (sin `paint`: solo cambia la letra, sin pintar fondo ni mover nada).
 
 ## Colores de datos: `theme.data`
 
@@ -117,7 +133,7 @@ import { dark } from "./themes";
 <ThemeScope theme={dark} paint style={{ width: 860, height: 660 }}>{/* herramienta oscura */}</ThemeScope>
 ```
 
-- `paint` pinta una superficie con fondo, texto y tipografía del tema (sin `paint` solo cambia el tema).
+- `paint` pinta una superficie con fondo, texto y tipografía del tema (sin `paint` solo cambia el tema). `font` (sin `paint`) aplica además la tipografía del tema del ámbito con un contenedor `display: contents`, sin pintar ni cambiar la maquetación.
 - Si el tema declara `font.files`, declara su `@font-face` y frena la captura (`holdRender`) hasta que carguen; esto vale también para `Stage`.
 - `checkTheme` se corre por tema: cada ámbito tiene su propio informe.
 - `themes/` no importa nada de `engine/`, por eso `ThemeScope` vive en `kit/`.
@@ -173,7 +189,7 @@ Además de los colores, `checkTheme` revisa el estilo: valores inválidos (error
 ## Cómo traer tu design system
 
 1. **Tokens.** Pasá los tokens (CSS con variables o JSON) a `themeFromTokensWithReport(tokens, neutral)`. Colores, fuentes, radios y sombras usan los alias de arriba; el estilo, `--style-*`. Un design system con otros nombres: renombrá los tokens o pasá `{ style: {...} }` y `{ data: {...} }`.
-2. **Adaptador e informe.** Leé `report.mapped` (qué token fue a qué rol), `report.fallback` y `report.style.fallback` (qué quedó con el valor de la base: ahí se nota qué le falta al design system), `report.style.invalid` y `report.warnings`. Un `fallback` en un color de marca es casi siempre un token mal nombrado.
+2. **Adaptador e informe.** `npx tsx templates/tema-informe.ts <slug>` los imprime juntos (`formatTokenReport(theme, report)` de `themes/` da las mismas líneas). Leé `report.mapped` (qué token fue a qué rol), `report.fallback` y `report.style.fallback` (qué quedó con el valor de la base: ahí se nota qué le falta al design system), `report.style.invalid` y `report.warnings`. Un `fallback` en un color de marca es casi siempre un token mal nombrado.
 3. **Decisiones de estilo.** Para cada grupo de `style`, elegí el carácter: ¿esquinas rectas o píldoras? ¿tarjetas sólidas, de contorno, de vidrio o teñidas? ¿sombra, filo o halo? ¿el número en degradado o sólido? ¿resalte con subrayado o marcador? ¿qué fondo, qué movimiento, con o sin garabatos? Empezá por `editorial`, `neon` o `papel` como referencia (`themes/editorial.ts`, `neon.ts`, `papel.ts`: un tema entero, de 60 líneas).
 4. **Revisión.** `checkTheme(theme)` tiene que dar `[]` sin reconocimientos; si trae avisos, `suggestion` dice el tono más cercano que pasa y los de `style.*` dicen qué valor subir o bajar. Si una marca aprobada incumple un par, reconocelo con `acknowledge`.
 5. **Un video en cada formato.** Probá el design system con un video real (o `examples/design-systems`, cuando exista) en los tres formatos que el video admita: `npm run render -- <id> --check` con `--format horizontal`, `--format vertical` y `--format cuadrado`, `npm run qa -- <id> --count 40` y la hoja de cuadros (`npm run sheet -- <id> --count 12`) mirada de verdad: un estilo se ve mal antes de medirse mal.

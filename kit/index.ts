@@ -41,3 +41,5 @@ export {
   palabrasDe, subtituloActivo, paginarSubtitulo, parsearTiempo, formatearTiempo, partirPorCaracteres, normalizarTexto, ordenar as ordenarSubtitulos,
 } from "./subtitulos";
 export type { Subtitulo, PalabraSubtitulo, PistaSubtitulos, EscenaDeGuion, OpcionesGuion, PaginaSubtitulo, Renglon, Medir, OpcionesLayout } from "./subtitulos";
+export { Chip, Button, Avatar, Check, ListRow, Icon, ICON_NAMES } from "./ui";
+export type { ChipProps, ButtonProps, AvatarProps, CheckProps, ListRowProps, IconProps, IconName } from "./ui";

@@ -160,3 +160,18 @@ describe("revisión", () => {
     expect(neutral.font.weights.regular).toBe(400);
   });
 });
+
+describe("formatTokenReport: informe de estilo", () => {
+  it("imprime los campos de estilo tomados, los de valor base y los inválidos", async () => {
+    const { formatTokenReport } = await import("./informe");
+    const r = themeFromTokensWithReport(`:root { --color-primary: #0a5; --style-shape-corners: sharp; --style-surface-kind: inexistente; --style-motion-exit: settle; }`);
+    const txt = formatTokenReport(r.theme, r.report).join("\n");
+    expect(txt).toContain("Estilo (theme.style): 2 campos declarados");
+    expect(txt).toMatch(/shape\.corners = sharp <- style-shape-corners/);
+    expect(txt).toMatch(/motion\.exit = settle/);
+    expect(txt).toContain("Campos de estilo con el valor de la base");
+    expect(txt).toMatch(/Campos de estilo inválidos, ignorados \(1\)/);
+    expect(txt).toContain("surface.kind");
+    expect(txt).toContain("acepta:");
+  });
+});

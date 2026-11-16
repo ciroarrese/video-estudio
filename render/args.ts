@@ -22,6 +22,7 @@ export type CliOptions = {
   checkStrict: boolean;
   assets: string[];
   allowMissingFonts: boolean;
+  strictFonts: boolean;
   checkCount?: number;
   checkPerScene?: number;
   checkAll: boolean;
@@ -74,6 +75,7 @@ export const USAGE = `Uso: ve-render <videoId> [opciones]
   --check-all            Con --check: todos los cuadros del rango (lento)
                          (con --frames a-b se verifica dentro del rango; con --scene, dentro de la escena)
   --allow-missing-fonts  Borrador: una fuente que no carga avisa en vez de fallar (también VE_ALLOW_MISSING_FONTS=1)
+  --strict-fonts         Una familia del sistema que el tema nombra sin archivo y no está instalada hace fallar (por defecto avisa; también VE_STRICT_FONTS=1)
   -h, --help             Esta ayuda
 `;
 
@@ -125,6 +127,7 @@ export function parseCliArgs(argvIn: string[]): CliOptions {
         'check-per-scene': { type: 'string' },
         'check-all': { type: 'boolean' },
         'allow-missing-fonts': { type: 'boolean' },
+        'strict-fonts': { type: 'boolean' },
         assets: { type: 'string', multiple: true },
         format: { type: 'string' },
         scene: { type: 'string' },
@@ -138,11 +141,11 @@ export function parseCliArgs(argvIn: string[]): CliOptions {
   }
   const { values: v, positionals } = parsed;
   if (v.help) {
-    return { videoId: '', props: {}, scale: 1, crf: 18, segment: 150, audio: true, cache: true, keepFrames: false, frameFormat: 'png', jpegQuality: 95, check: false, checkMaxDelta: 2, checkMaxRatio: 0.001, checkStrict: false, assets: [], allowMissingFonts: false, checkAll: false, audioBitrate: '192k', audioPeakMax: -1, audioPeakStrict: false, audioPeakCheck: true, list: false, listScenes: false, help: true };
+    return { videoId: '', props: {}, scale: 1, crf: 18, segment: 150, audio: true, cache: true, keepFrames: false, frameFormat: 'png', jpegQuality: 95, check: false, checkMaxDelta: 2, checkMaxRatio: 0.001, checkStrict: false, assets: [], allowMissingFonts: false, strictFonts: false, checkAll: false, audioBitrate: '192k', audioPeakMax: -1, audioPeakStrict: false, audioPeakCheck: true, list: false, listScenes: false, help: true };
   }
   if (v.list) {
     if (positionals.length) throw new Error('--list no lleva <videoId>');
-    return { videoId: '', props: {}, scale: 1, crf: 18, segment: 150, audio: true, cache: true, keepFrames: false, frameFormat: 'png', jpegQuality: 95, check: false, checkMaxDelta: 2, checkMaxRatio: 0.001, checkStrict: false, assets: [], allowMissingFonts: false, checkAll: false, audioBitrate: '192k', audioPeakMax: -1, audioPeakStrict: false, audioPeakCheck: true, list: true, listScenes: false, help: false };
+    return { videoId: '', props: {}, scale: 1, crf: 18, segment: 150, audio: true, cache: true, keepFrames: false, frameFormat: 'png', jpegQuality: 95, check: false, checkMaxDelta: 2, checkMaxRatio: 0.001, checkStrict: false, assets: [], allowMissingFonts: false, strictFonts: false, checkAll: false, audioBitrate: '192k', audioPeakMax: -1, audioPeakStrict: false, audioPeakCheck: true, list: true, listScenes: false, help: false };
   }
   if (positionals.length !== 1) throw new Error('Falta <videoId> (o sobran argumentos posicionales)');
   if ((v['check-count'] !== undefined || v['check-per-scene'] !== undefined || v['check-all']) && !v.check && !v['check-strict']) throw new Error('--check-count, --check-per-scene y --check-all van con --check');
@@ -232,6 +235,7 @@ export function parseCliArgs(argvIn: string[]): CliOptions {
     checkPerScene: v['check-per-scene'] === undefined ? undefined : int('--check-per-scene', v['check-per-scene'], 1),
     checkAll: !!v['check-all'],
     allowMissingFonts: !!v['allow-missing-fonts'],
+    strictFonts: !!v['strict-fonts'],
     assets: v.assets ?? [],
     format,
     scene: v.scene,

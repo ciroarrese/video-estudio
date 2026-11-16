@@ -88,8 +88,8 @@ Ver también el catálogo (`docs/animaciones.md`): los efectos de `fx/` ya cumpl
   *Por qué:* el zoom dice dónde mirar; sin desenfoque, un viaje largo parece un salto.
 - [ ] **Entre un tema y otro se vuelve al listado, se tilda el que se acaba de mostrar y se entra al siguiente.** `composeStory` lo hace con las vueltas al listado; con `interludes: false` se pierde.
   *Por qué:* da orientación (dónde estamos, cuánto falta) sin subtítulos.
-- [ ] **Subtítulos solo si la persona los pide.** El valor por defecto es sin subtítulos: la imagen tiene que explicarse sola.
-  *Por qué:* se probaron y se sacaron; compiten con la imagen y la tapan.
+- [ ] **Subtítulos según el cuestionario (etapa 0 de la skill, preguntas 6 y 7).** Sin subtítulos por defecto: la imagen tiene que explicarse sola. **Sí por defecto cuando el video va a redes o se ve sin sonido** (celular, feed, pantalla de un evento), o cuando la persona los pide: `Subtitles` quemado en el video más `.srt`/`.vtt` aparte (`docs/subtitulos.md`). Con subtítulos, cada escena deja libre la franja `subtitleBand` en cada formato.
+  *Por qué:* sin sonido no hay otra forma de seguir una explicación; con sonido y sin subtítulos pedidos compiten con la imagen y la tapan (se probaron y se sacaron).
 - [ ] **Los flujos tienen dirección:** lo que sale hacia un lado vuelve por el mismo eje (lo que viaja a la derecha, vuelve desde la derecha; un arco de ida y uno de vuelta no se cruzan).
   *Por qué:* un flujo sin dirección se lee como desorden.
 - [ ] **Cada escena termina atravesando un elemento** (`zoomThrough` con un punto de destino) **y cierra con un velo** (`Wash`) hacia la siguiente.

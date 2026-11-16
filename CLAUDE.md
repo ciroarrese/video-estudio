@@ -1,6 +1,6 @@
 # Video Studio (`video-estudio`): convenciones para agentes
 
-Video Studio es el nombre visible; repo, paquete, alias `video-estudio/*` y comandos no cambian. Herramienta para producir videos animados con un motor propio (TypeScript + React 18). Para hacer un video seguí la skill `.claude/skills/video-estudio/SKILL.md`; las reglas están en `docs/reglas.md`, la guía de escenas en `docs/guia-escenas.md`, el sonido en `docs/audio.md` y el catálogo de efectos listos (`fx/`) en `docs/animaciones.md`: usalo antes de escribir una animación desde cero.
+Video Studio es el nombre visible; repo, paquete, alias `video-estudio/*` y comandos no cambian. Herramienta para producir videos animados con un motor propio (TypeScript + React 18). Para hacer un video seguí la skill `.claude/skills/video-estudio/SKILL.md`; las reglas están en `docs/reglas.md`, la guía de escenas en `docs/guia-escenas.md`, el sonido en `docs/audio.md`, los subtítulos en `docs/subtitulos.md` y el catálogo de efectos listos (`fx/`) en `docs/animaciones.md`: usalo antes de escribir una animación desde cero.
 
 ## Idioma
 
@@ -30,6 +30,8 @@ npm run qa -- <id> --count 40 --font-fallback wide --font-scale 1.25   # estrés
 npm run privacy -- <id> --deny videos/<slug>/prohibidos.txt --scan-source videos/<slug>
 npm run sheet -- <id> --count 12        # y mirar la hoja
 ```
+
+Con `VE_VIDEOS_DIR` (videos fuera del repo) las rutas `videos/<slug>/...` de `--deny`, `--allow`, `--scan-source` y `--assets` se buscan también en esa carpeta; `npm run audio` pide rutas absolutas.
 
 Cómo leer `qa`: la línea **`juzgados: N de M textos x cuadros (P%)`** dice cuánto texto se juzgó de verdad y por qué no se juzgó el resto (fuera del cuadro, casi transparente, tapado por una capa opaca, excluido con `data-qa-ignore="all"`); con menos de la mitad juzgado, un "0 errores" no dice nada. Mirá también cuántos hallazgos callaron las marcas (`callados`). `--repeat 2` corre el control dos veces y sale con código 3 si los informes difieren. Una marca `data-qa-ignore` lleva un comentario que dice por qué y nunca va en un contenedor más ancho que el elemento del que habla (`docs/reglas.md`). Reglas de maquetación para otro design system: `docs/guia-escenas.md`, sección 15.
 

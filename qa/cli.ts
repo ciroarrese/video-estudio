@@ -7,6 +7,7 @@ import { openSession } from './session';
 import { budgetFromScenes, formatStoryBudget } from '../stories/budget';
 import { formatSceneList, parseFormat, suffixOf } from '../render/index';
 import { salidaPorDefecto } from '../render/dirs';
+import { resolverRutaVideos } from '../render/rutas';
 import { runPrivacy } from './privacy';
 import { failsAt, runQa } from './run';
 import { RULES } from './rules';
@@ -246,6 +247,17 @@ async function main(cmd: string, argv: string[]): Promise<number> {
   }
 
   // privacy
+  // Con VE_VIDEOS_DIR, `videos/<slug>/...` se busca primero tal cual y después en esa carpeta (render/rutas.ts); si no está en ningún lado, el error nombra lo probado.
+  for (const f of ['deny', 'allow', 'scan-source']) {
+    if (!p.flags.has(f)) continue;
+    p.flags.set(f, p.flags.get(f)!.map((r) => {
+      try {
+        return resolverRutaVideos(r);
+      } catch (e) {
+        throw new Error(`--${f} ${r}: ${(e as Error).message}`);
+      }
+    }));
+  }
   const deny = leerListas(p, 'deny', (f) => readFileSync(f, 'utf8'));
   if (!deny.rutas.length) throw new Error('Falta --deny <archivo> (se puede repetir)');
   const dirs = p.flags.get('scan-source') ?? [];

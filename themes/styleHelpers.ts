@@ -181,16 +181,6 @@ export function surfaceStyle(theme: Theme, role: SurfaceRole, o: SurfaceOptions 
 
 const STRONGER = { regular: "medium", medium: "semibold", semibold: "stat", stat: "stat" } as const;
 
-/**
- * Peso e interletrado de un rol de texto. `title`: `titleWeight` y `titleTracking`; `label`: `labelWeight`; `eyebrow`: caja alta y
- * `eyebrowTracking` (el peso lo deja a la pieza); `caption`: subtítulos y líneas de apoyo de las historias, con su propia caja
- * (`captionCase`), interletrado (`captionTracking`) y peso (`captionWeight`). `tracking` es lo que la pieza ya lleva (por ejemplo -0,02 em en los nombres de la lista):
- * el del estilo se suma. Omite `letterSpacing` y `textTransform` cuando no cambian nada.
- * `strong` (solo en `label`): el rótulo que va un escalón más fuerte que el común (los nombres de una tarjeta, la etiqueta de una ficha):
- * `labelWeight` subido un escalón (`regular` a `medium`, `medium` a `semibold`, `semibold` a `stat`). Con el estilo por defecto, `semibold`.
- * `caption`: con `captionCase: "eyebrow"` y `captionTracking: null` (por defecto) sigue al eyebrow, así que un design system que no los toca no
- * cambia; `follow: false` hace que "seguir al eyebrow" signifique "no tocar" (la línea de la lista, que nunca llevó caja ni interletrado del estilo).
- */
 /** Familia de los títulos: `font.display` si el tema la declara y, si no, `font.family`. */
 export function titleFamily(theme: Theme): string {
   return theme.font.display ?? theme.font.family;
@@ -204,6 +194,16 @@ export function titleFont(theme: Theme): React.CSSProperties {
   return theme.font.display ? { fontFamily: theme.font.display } : {};
 }
 
+/**
+ * Peso e interletrado de un rol de texto. `title`: `titleWeight` y `titleTracking`; `label`: `labelWeight`; `eyebrow`: caja alta y
+ * `eyebrowTracking` (el peso lo deja a la pieza); `caption`: subtítulos y líneas de apoyo de las historias, con su propia caja
+ * (`captionCase`), interletrado (`captionTracking`) y peso (`captionWeight`). `tracking` es lo que la pieza ya lleva (por ejemplo -0,02 em en los nombres de la lista):
+ * el del estilo se suma. Omite `letterSpacing` y `textTransform` cuando no cambian nada.
+ * `strong` (solo en `label`): el rótulo que va un escalón más fuerte que el común (los nombres de una tarjeta, la etiqueta de una ficha):
+ * `labelWeight` subido un escalón (`regular` a `medium`, `medium` a `semibold`, `semibold` a `stat`). Con el estilo por defecto, `semibold`.
+ * `caption`: con `captionCase: "eyebrow"` y `captionTracking: null` (por defecto) sigue al eyebrow, así que un design system que no los toca no
+ * cambia; `follow: false` hace que "seguir al eyebrow" signifique "no tocar" (la línea de la lista, que nunca llevó caja ni interletrado del estilo).
+ */
 export function textStyle(theme: Theme, role: "title" | "label" | "eyebrow" | "caption", o: { tracking?: number; strong?: boolean; follow?: boolean } = {}): React.CSSProperties {
   const st = resolveStyle(theme).type;
   const out: React.CSSProperties = {};
