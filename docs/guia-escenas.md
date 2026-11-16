@@ -1,6 +1,6 @@
 # Guía de escenas
 
-Cómo se escribe una escena de este toolkit. Antes leé `docs/reglas.md` (las reglas y sus motivos), `kit/README.md` (las piezas) y `engine/README.md` (la regla de determinismo). Antes de escribir una animación a medida, mirá el catálogo de efectos listos en `docs/animaciones.md`. Para arrancar copiá la plantilla: `bash templates/nuevo.sh escena <slug> <nombre>`. Las firmas exactas de las piezas están en la tabla de `kit/README.md`; dónde poner cada cosa en el cuadro y cuánto acercar la cámara, en la sección 13.
+Cómo se escribe una escena de este toolkit. Antes leé `docs/reglas.md` (las reglas y sus motivos), `kit/README.md` (las piezas) y `engine/README.md` (la regla de determinismo). Antes de escribir una animación a medida, mirá el catálogo de efectos listos en `docs/animaciones.md`. Para arrancar copiá la plantilla: `npm run nuevo -- escena <slug> <nombre>`. Las firmas exactas de las piezas están en la tabla de `kit/README.md`; dónde poner cada cosa en el cuadro y cuánto acercar la cámara, en la sección 13.
 
 ## 1. Lo básico
 
@@ -455,7 +455,7 @@ La escena de `examples/kit-demo` es un recorrido de piezas; esta es una escena d
 | 96 a 122 | la cámara vuelve a la vista general |
 | 122 a 149 | atravesado hacia el indicador y velo |
 
-Guardalo como `videos/<slug>/datos/Scene.tsx` después de `bash templates/nuevo.sh escena <slug> datos` (que ya deja el `index.ts` y el tema; el ejemplo exporta los mismos nombres que la plantilla: `DURACION`, `SceneBody` y `SceneVideo`). Es horizontal; para vertical agregale una entrada vertical a las constantes de caja como en `templates/scene/Scene.tsx`. Pasa `typecheck`, `--check` y `qa` sin errores:
+Guardalo como `videos/<slug>/datos/Scene.tsx` después de `npm run nuevo -- escena <slug> datos` (que ya deja el `index.ts` y el tema; el ejemplo exporta los mismos nombres que la plantilla: `DURACION`, `SceneBody` y `SceneVideo`). Es horizontal; para vertical agregale una entrada vertical a las constantes de caja como en `templates/scene/Scene.tsx`. Pasa `typecheck`, `--check` y `qa` sin errores:
 
 ```tsx
 import React from "react";

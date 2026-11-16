@@ -177,7 +177,7 @@ function comprobarVideosDir() {
     accessSync(dir, constants.R_OK | constants.W_OK);
     return ok('Carpeta de videos (VE_VIDEOS_DIR)', dir);
   } catch (e) {
-    return falta('Carpeta de videos (VE_VIDEOS_DIR)', `${dir}: ${e?.code === 'ENOENT' ? 'no existe' : e?.message}`, 'Creala ("mkdir -p") o corregí la variable.');
+    return falta('Carpeta de videos (VE_VIDEOS_DIR)', `${dir}: ${e?.code === 'ENOENT' ? 'no existe' : e?.message}`, 'Creá la carpeta (en Windows, con el Explorador o "mkdir") o corregí la variable.');
   }
 }
 

@@ -106,6 +106,9 @@ jobs:
       - name: npm run render -- demo-intro --seconds 0-1
         run: npm run render -- demo-intro --seconds 0-1
 
+      - name: La escena nueva se renderizó
+        run: node .github/scripts/verificar-video.mjs out/demo-intro-f0-29.mp4 --ancho 1920 --alto 1080
+
       - name: npm run typecheck
         run: npm run typecheck
 

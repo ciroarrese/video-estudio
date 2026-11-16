@@ -1,5 +1,7 @@
 # Video Studio
 
+[![instalacion](https://github.com/ciroarrese/video-studio/actions/workflows/instalacion.yml/badge.svg)](https://github.com/ciroarrese/video-studio/actions/workflows/instalacion.yml)
+
 Video Studio produce **videos animados** (presentaciones, demos, explicadores, recorridos de herramientas) a partir de una conversación: le decís a un agente de código (Claude Code, Codex CLI u otro) "haceme un video de presentación de estos tres proyectos" y la skill [`video-estudio`](.claude/skills/video-estudio/SKILL.md) te lleva por etapas (cuestionario, fichas, tema, guion, escenas, sonido), esperando tu aprobación en cada una. El motor es propio, en TypeScript y React 18: cada video es una función del número de cuadro, Chromium captura cada cuadro y ffmpeg arma el MP4. El design system (colores, tipografía, esquinas, movimiento) es un tema intercambiable: el mismo video se rehace con otro estilo cambiando solo el tema.
 
 El nombre que ves es "Video Studio"; el repo, el paquete npm, el alias de import (`video-estudio/*`), la skill y los comandos se siguen llamando `video-estudio`.
@@ -11,7 +13,7 @@ El nombre que ves es "Video Studio"; el repo, el paquete npm, el alias de import
 - **Chromium vía Playwright**: lo instala el paso 2 de abajo. Si ya tenés un Chrome o Chromium, alcanza con `VE_CHROMIUM=/ruta/al/chrome` (en ese caso igual hace falta el paquete `playwright`).
 - Para producir un video con ayuda: un agente de código abierto en la carpeta del repo. Está desarrollado y probado con [Claude Code](https://claude.com/claude-code); con otros agentes (Codex CLI, Cursor, Gemini CLI...) el flujo es el mismo pero no está probado de punta a punta (ver [AGENTS.md](AGENTS.md)).
 
-En Windows conviene usar WSL 2 (los scripts de las plantillas son de bash). Instrucciones por sistema operativo, problemas frecuentes y cómo usar la skill: **[docs/instalacion.md](docs/instalacion.md)**.
+En Windows se puede usar PowerShell nativo (sin bash) o WSL 2. <!-- CI-CONDICIONAL-3 -->La instalación se prueba en cada cambio con integración continua en Linux, macOS y Windows (ver `.github/workflows/instalacion.yml`). <!-- /CI-CONDICIONAL-3 -->Instrucciones por sistema operativo, problemas frecuentes y cómo usar la skill: **[docs/instalacion.md](docs/instalacion.md)**.
 
 ## Inicio rápido (unos 5 minutos; la guía completa está en [docs/instalacion.md](docs/instalacion.md))
 
@@ -22,7 +24,8 @@ cd video-studio
 
 # 2. Instalar (una vez)
 npm install
-npm i -D playwright && npx playwright install chromium
+npm i -D playwright
+npx playwright install chromium       # en Linux: npx playwright install --with-deps chromium
 
 # 3. Diagnóstico: Node, Chromium, ffmpeg, carpetas de salida (dice qué falta y cómo arreglarlo)
 npm run doctor
@@ -38,8 +41,8 @@ npm run qa -- kit-demo --count 12         # textos cortados, contraste, áreas s
 ### Tu primer video propio
 
 1. **Con la skill (lo recomendado).** Abrí tu agente de código (Claude Code, Codex CLI...) en esta carpeta y pedí lo que necesitás: "haceme un video de presentación de mi herramienta". Contestá el cuestionario (podés decir "todo por defecto") y aprobá cada etapa. Los archivos del video se crean en `videos/<slug>/` (que no se sube: está en `.gitignore`).
-2. **Si tu material es privado**, definí antes una carpeta fuera del repo: `export VE_VIDEOS_DIR=$HOME/mis-videos`. La skill, las plantillas y los comandos la usan igual, y la cache, los MP4 y las hojas quedan ahí (`$VE_VIDEOS_DIR/out`).
-3. **A mano, sin la skill**: `bash templates/nuevo.sh escena mi-video intro` crea `mi-video/intro/` con una escena de arranque ya descubierta por el motor; después `npm run render -- mi-video-intro` (el id es `<slug>-<escena>`), `npm run sheet -- mi-video-intro --count 6` y `npm run qa -- mi-video-intro`. `npm run render -- --list` muestra todos los videos que el motor ve.
+2. **Si tu material es privado**, definí antes una carpeta fuera del repo: `export VE_VIDEOS_DIR=$HOME/mis-videos` (en PowerShell: `$env:VE_VIDEOS_DIR = "C:\Users\vos\mis-videos"`). La skill, las plantillas y los comandos la usan igual, y la cache, los MP4 y las hojas quedan ahí (`$VE_VIDEOS_DIR/out`).
+3. **A mano, sin la skill**: `npm run nuevo -- escena mi-video intro` crea `mi-video/intro/` con una escena de arranque ya descubierta por el motor; después `npm run render -- mi-video-intro` (el id es `<slug>-<escena>`), `npm run sheet -- mi-video-intro --count 6` y `npm run qa -- mi-video-intro`. `npm run render -- --list` muestra todos los videos que el motor ve.
 
 El render termina en `out/<id>.mp4`. Antes de dar un video por terminado, la lista de control está en [CLAUDE.md](CLAUDE.md) (tipos, determinismo con `--check`, calidad, privacidad y hoja de cuadros).
 
@@ -78,11 +81,11 @@ Catálogo de efectos listos (texto, 3D, datos, interfaz y arte): [docs/animacion
 | `render/` | `ve-render`: captura con Chromium y MP4 con ffmpeg, en paralelo y por partes |
 | `qa/` | `ve-qa`, `ve-sheet`, `ve-privacy`: control de calidad, hoja de cuadros y privacidad |
 | `examples/` | Videos cortos genéricos con datos ficticios, las galerías del catálogo (`fx-text`, `fx-3d`, `fx-data-ui-art`), el muestrario `fx-muro`, `annotation-demo` y `fx-in-scene` |
-| `templates/` | Escena e historia de arranque (con `nuevo.sh` para copiarlas) |
+| `templates/` | Escena e historia de arranque (con `nuevo.mjs`, `npm run nuevo`, para copiarlas) |
 | `docs/` | Guía de instalación y uso (`instalacion.md`), reglas de producción (con la lista de determinismo), guía de escenas, catálogo de animaciones, sonido, origen del motor |
 | `.claude/` | Skill `video-estudio` (Video Studio: cuestionario y etapas con aprobación) |
 | `AGENTS.md`, `CLAUDE.md` | Instrucciones para agentes de código: punto de entrada (`AGENTS.md`, que lee Codex CLI y otros) y convenciones del repo (`CLAUDE.md`, que lee Claude Code) |
-| `videos/` | Los videos que se producen (`videos/<slug>/`). No existe en un clon nuevo: lo crea la skill (o `templates/nuevo.sh`) y se descubre solo |
+| `videos/` | Los videos que se producen (`videos/<slug>/`). No existe en un clon nuevo: lo crea la skill (o `npm run nuevo`) y se descubre solo |
 | `public/` | Fuentes, imágenes y música con licencia, referenciadas con `asset()` |
 
 ## Hacer un video nuevo
@@ -104,7 +107,7 @@ El estilo del design system (qué decide y quién lo cumple): [docs/estilo.md](d
 
 Este repo es público: no puede llevar nombres de empresas, clientes o personas reales, credenciales, capturas ni marcas que no sean de quien las sube. Un video con material privado se produce así:
 
-- **En una carpeta fuera del repo**: `VE_VIDEOS_DIR=/ruta/absoluta/mis-videos bash templates/nuevo.sh escena <slug> <nombre>` crea ahí el video (con `tsconfig.json` y `env.d.ts` para el editor, a partir de `templates/externo/`) y los comandos `render`, `qa`, `sheet`, `privacy` y `npm run dev` lo descubren si la variable está definida (junto con los ejemplos). Sus fuentes, logos y audio van en `<carpeta>/assets` o `<carpeta>/<slug>/assets` (se sirven solos) y se referencian con `asset()` o con `import ... ?url`. Los tipos se revisan con `npm run typecheck:videos` (o con `npm run typecheck`, que también los mira si la variable está definida).
+- **En una carpeta fuera del repo**: `VE_VIDEOS_DIR=/ruta/absoluta/mis-videos npm run nuevo -- escena <slug> <nombre>` (en PowerShell: primero `$env:VE_VIDEOS_DIR = "C:\ruta\mis-videos"` y después `npm run nuevo -- escena <slug> <nombre>`) crea ahí el video (con `tsconfig.json` y `env.d.ts` para el editor, a partir de `templates/externo/`) y los comandos `render`, `qa`, `sheet`, `privacy` y `npm run dev` lo descubren si la variable está definida (junto con los ejemplos). Sus fuentes, logos y audio van en `<carpeta>/assets` o `<carpeta>/<slug>/assets` (se sirven solos) y se referencian con `asset()` o con `import ... ?url`. Los tipos se revisan con `npm run typecheck:videos` (o con `npm run typecheck`, que también los mira si la variable está definida).
 - **O en `videos/`**, que está en `.gitignore` y no se sube nunca.
 - **La cache y las salidas también quedan afuera**: con `VE_VIDEOS_DIR` definida, el bundle compilado (con fuentes, logos y código de las escenas), los segmentos, los cuadros, los mp4 y las hojas se escriben en `<VE_VIDEOS_DIR>/.ve-cache/` y `<VE_VIDEOS_DIR>/out/`, nunca dentro del clon (se pueden mover con `VE_CACHE_DIR` y `VE_OUT_DIR`). `npm run clean` borra esas carpetas y las del clon. Así el clon público se puede comprimir o compartir sin arrastrar nada privado.
 - Nada privado va en `examples/`, `public/`, `docs/` ni en ningún otro archivo versionado. Lo que no puede aparecer en pantalla va en `prohibidos.txt` y se verifica con `ve-privacy`.

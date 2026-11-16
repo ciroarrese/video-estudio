@@ -46,19 +46,13 @@ El Node de los repositorios de Debian y Ubuntu suele ser viejo. Instalá la vers
 
 Otras distribuciones: instalá `nodejs` (22 o superior), `npm`, `ffmpeg` y `git` con tu gestor de paquetes (`dnf`, `pacman`, `zypper`...), o Node con nvm.
 
-Chromium en Linux necesita bibliotecas del sistema (fuentes, `libnss3`, etc.). Si al lanzarlo falta alguna, Playwright las instala con `npx playwright install-deps chromium` (pide `sudo`).
+Chromium en Linux necesita bibliotecas del sistema (fuentes, `libnss3`, etc.). El paso del navegador de abajo, `npx playwright install --with-deps chromium`, las instala junto con Chromium (pide `sudo`); si ya tenías Chromium y solo falta una biblioteca, `npx playwright install-deps chromium`.
 
 ### Windows
 
-**Recomendado: WSL 2 (Ubuntu).** Es lo que conviene porque la skill y las plantillas usan comandos de bash (por ejemplo `bash templates/nuevo.sh escena ...`). En una PowerShell de administrador:
+Hay dos caminos: **Windows nativo con PowerShell** (sin bash ni WSL) o **WSL 2**. Los comandos de la herramienta son `npm run ...` en los dos (incluido `npm run nuevo` para crear escenas).
 
-```powershell
-wsl --install -d Ubuntu
-```
-
-Reiniciá si lo pide, abrí "Ubuntu" y seguí **todo lo de Linux** de arriba dentro de esa terminal. Clonà el repo dentro del sistema de archivos de WSL (`~/video-studio`), no en `/mnt/c/...`: ahí todo es mucho más lento. Tu agente tiene que correr dentro de WSL (en la terminal de Ubuntu, o con la extensión de WSL de tu editor). Los MP4 de `out/` se ven desde Windows en `\\wsl$\Ubuntu\home\<tu-usuario>\video-studio\out`.
-
-**Windows nativo (no probado).** El código de los comandos usa `node:path` y `tsx`, que son multiplataforma, y no hay a la vista nada propio de Linux en el render; pero esta guía no pudo probarlo en Windows, y hay dos obstáculos conocidos: `templates/nuevo.sh` es un script de bash (hace falta Git Bash o WSL) y los ejemplos de comandos de la skill están escritos para bash. Si querés intentarlo igual:
+**Windows nativo (PowerShell).** <!-- CI-CONDICIONAL-1 -->Se prueba en cada cambio con integración continua en Linux, macOS y Windows (ver `.github/workflows/instalacion.yml`): esos pasos corren en un Windows real con la PowerShell de siempre, sin bash. <!-- /CI-CONDICIONAL-1 -->Abrí PowerShell (no hace falta que sea de administrador) y:
 
 ```powershell
 winget install OpenJS.NodeJS.LTS
@@ -66,7 +60,29 @@ winget install Git.Git
 winget install Gyan.FFmpeg        # o: choco install ffmpeg / scoop install ffmpeg
 ```
 
-Abrí una terminal nueva (para que tome el PATH) y corré `npm run doctor`. Si algo no anda, pasá a WSL: es el camino con el que se desarrolló y probó.
+Cerrá la PowerShell y abrí una nueva (para que tome el PATH) y comprobá:
+
+```powershell
+node -v                # 22 o superior
+ffmpeg -version
+ffprobe -version
+```
+
+Después seguí **"Descargar el repo"** e **"Instalar, paso a paso"** más abajo: los comandos son los mismos (`git clone`, `npm install`, `npm i -D playwright`, `npx playwright install chromium`, `npm run doctor`, `npm run render -- hello`). La integración continua instala ffmpeg con Chocolatey (`choco install ffmpeg`); `winget` y `scoop` son equivalentes pero no se ejercitan en esa prueba. Notas para Windows:
+
+- Para una variable de entorno se escribe `$env:VE_VIDEOS_DIR = "C:\Users\vos\mis-videos"` (dura hasta cerrar esa ventana; para dejarla fija, "Variables de entorno" del sistema). La forma `VE_X=valor comando` es de bash y no existe en PowerShell: primero se define la variable y después se corre el comando en otra línea.
+- Crear una escena: `npm run nuevo -- escena <slug> <nombre>` (no `bash templates/nuevo.sh`).
+- Si PowerShell dice que la ejecución de scripts está deshabilitada al correr `npm`, es la política de ejecución: `Set-ExecutionPolicy -Scope CurrentUser RemoteSigned` y abrí una ventana nueva; o usá `cmd`.
+- Antivirus y OneDrive: cloná el repo en una carpeta que no sincronice OneDrive (por ejemplo `C:\dev\video-studio`); las carpetas sincronizadas ralentizan `node_modules` y la caché.
+- Las rutas con espacios van entre comillas (`"C:\Mis videos"`).
+
+**WSL 2 (Ubuntu).** Alternativa si ya trabajás en WSL o preferís bash. En una PowerShell de administrador:
+
+```powershell
+wsl --install -d Ubuntu
+```
+
+Reiniciá si lo pide, abrí "Ubuntu" y seguí **todo lo de Linux** de arriba dentro de esa terminal. Clonà el repo dentro del sistema de archivos de WSL (`~/video-studio`), no en `/mnt/c/...`: ahí todo es mucho más lento. Tu agente tiene que correr dentro de WSL (en la terminal de Ubuntu, o con la extensión de WSL de tu editor). Los MP4 de `out/` se ven desde Windows en `\\wsl$\Ubuntu\home\<tu-usuario>\video-studio\out`.
 
 ## Descargar el repo
 
@@ -94,7 +110,9 @@ npm i -D playwright
 npx playwright install chromium
 ```
 
-Esperado: la primera línea termina en segundos; la segunda baja Chromium (cientos de MB; unos minutos según tu conexión) y no hace nada si ya lo tenés. `npm i -D playwright` agrega `playwright` a tu `package.json` y a `package-lock.json` (es una dependencia opcional del proyecto, por eso no viene incluida): ver "Actualizar" para no pelearte con `git pull`. El paso del navegador (`npx playwright install chromium`) **no pudo probarse tal cual** al escribir esta guía, porque el entorno de pruebas ya traía un Chromium; el resto sí.
+En Linux, la segunda línea es `npx playwright install --with-deps chromium`: además de bajar el navegador instala las bibliotecas del sistema que Chromium necesita (pide `sudo`); en macOS y Windows no hace falta. Es lo mismo en bash y en PowerShell.
+
+Esperado: la primera línea termina en segundos; la segunda baja Chromium (cientos de MB; unos minutos según tu conexión; medido en Linux: unos 20 s con buena conexión) y no hace nada si ya lo tenés. `npm i -D playwright` agrega `playwright` a tu `package.json` y a `package-lock.json` (es una dependencia opcional del proyecto, por eso no viene incluida): ver "Actualizar" para no pelearte con `git pull`. <!-- CI-CONDICIONAL-2 -->La descarga real de Chromium con `npx playwright install chromium` se prueba en cada cambio con integración continua en Linux, macOS y Windows (ver `.github/workflows/instalacion.yml`). <!-- /CI-CONDICIONAL-2 -->
 
 Si ya tenés Chrome o Chromium y no querés bajar otro, saltá la segunda línea y definí `VE_CHROMIUM` con la ruta del ejecutable (macOS: `/Applications/Google Chrome.app/Contents/MacOS/Google Chrome`; Linux: lo que devuelva `which chromium` o `which google-chrome`); el paquete `playwright` se instala igual. Un Chrome muy distinto del que espera Playwright puede dar capturas distintas: si el resultado te sorprende, usá el que baja Playwright.
 
@@ -176,7 +194,7 @@ No se asume que Codex cargue skills desde `.claude/skills/`: por eso la frase le
 
 Qué no se probó: ningún agente que no sea Claude Code. El repo no incluye archivos de reglas propios de Cursor ni de Gemini CLI a propósito, para no afirmar convenciones que no se verificaron: si tu agente soporta un archivo de reglas, creá uno que diga "seguí `AGENTS.md`".
 
-Lo que sí pide la skill a cualquier agente: poder ejecutar `npm run ...` y `bash`, leer imágenes (para mirar las hojas de cuadros; si el agente no las ve, mirá vos las hojas y decile qué corregir) y escribir en `videos/<slug>/`.
+Lo que sí pide la skill a cualquier agente: poder ejecutar `npm run ...` (y, en Linux, macOS o WSL, comandos de bash), leer imágenes (para mirar las hojas de cuadros; si el agente no las ve, mirá vos las hojas y decile qué corregir) y escribir en `videos/<slug>/`.
 
 ## Cómo se usa la skill
 
@@ -242,13 +260,20 @@ Agente:  Entendí: el Tema 2, Recordatorios. ¿Es ese? ...
 
 La skill y todos sus comandos son relativos a la raíz del repo (`npm run ...`, `docs/`, `templates/`), así que **el agente tiene que correr en el repo**. Hay dos formas.
 
-**A. Abrir el agente en el repo y que el video viva afuera (la que está probada).** Es lo de "Material privado": `export VE_VIDEOS_DIR=/ruta/a/tu/proyecto/videos` y abrí el agente en `video-studio`. Los videos, la caché y las salidas quedan en tu carpeta; el repo no se toca. Con `bash templates/nuevo.sh escena <slug> <nombre>` la carpeta recibe un `tsconfig.json` y un `env.d.ts` para que tu editor entienda los imports. Probado acá: crear una escena en una carpeta externa, listarla con `render -- --list` y renderizar un tramo (`out/` queda en esa carpeta).
+**A. Abrir el agente en el repo y que el video viva afuera (la que está probada).** Es lo de "Material privado": `export VE_VIDEOS_DIR=/ruta/a/tu/proyecto/videos` y abrí el agente en `video-studio`. Los videos, la caché y las salidas quedan en tu carpeta; el repo no se toca. Con `npm run nuevo -- escena <slug> <nombre>` la carpeta recibe un `tsconfig.json` y un `env.d.ts` para que tu editor entienda los imports. Probado acá: crear una escena en una carpeta externa, listarla con `render -- --list` y renderizar un tramo (`out/` queda en esa carpeta).
 
 **B. Abrir el agente en otra carpeta y tener la skill disponible (solo Claude Code).** Claude Code carga las skills personales de `~/.claude/skills/<nombre>/SKILL.md`. Podés enlazar o copiar la de este repo:
 
 ```bash
 mkdir -p ~/.claude/skills
 ln -s "$HOME/video-studio/.claude/skills/video-estudio" ~/.claude/skills/video-estudio    # o: cp -r (queda desactualizada con cada git pull)
+```
+
+En Windows (PowerShell) el enlace es una unión de carpetas:
+
+```powershell
+New-Item -ItemType Directory -Force "$HOME\.claude\skills" | Out-Null
+New-Item -ItemType Junction -Path "$HOME\.claude\skills\video-estudio" -Target "$HOME\video-studio\.claude\skills\video-estudio"
 ```
 
 La skill sigue necesitando el repo clonado, con sus dependencias instaladas, y cuál es su ruta: `SKILL.md` le indica al agente que, si el directorio actual no es la raíz del repo, use la ruta que le des o la variable `VIDEO_STUDIO_DIR` (una convención de esta guía: el motor no la lee) y corra cada comando con `cd <raíz> && ...`. Entonces abrí el agente donde quieras y decile, en la primera frase: "Usá la skill video-estudio. El repo está en `/ruta/a/video-studio`; los videos van en `/ruta/a/mis-videos` (`VE_VIDEOS_DIR`)". No probado: el enlace desde `~/.claude/skills` y la búsqueda de la raíz desde otra carpeta (se probó el flujo A). En Windows nativo, `ln -s` pide permisos de administrador: copiá la carpeta.
@@ -292,7 +317,7 @@ Después de actualizar, un render tarda más la primera vez porque la caché se 
 
 ## Desinstalar
 
-1. Borrá la carpeta del repo (`rm -rf video-studio`). Tus videos privados en `VE_VIDEOS_DIR` **no** se borran: están afuera; copialos antes si querés conservarlos (los de `videos/` sí desaparecen con la carpeta).
-2. Si enlazaste la skill: `rm ~/.claude/skills/video-estudio`.
+1. Borrá la carpeta del repo (`rm -rf video-studio`; en PowerShell, `Remove-Item -Recurse -Force video-studio`). Tus videos privados en `VE_VIDEOS_DIR` **no** se borran: están afuera; copialos antes si querés conservarlos (los de `videos/` sí desaparecen con la carpeta).
+2. Si enlazaste la skill: `rm ~/.claude/skills/video-estudio` (en PowerShell, `Remove-Item "$HOME\.claude\skills\video-estudio"`).
 3. Chromium de Playwright vive aparte y ocupa unos 400 MB: Linux `~/.cache/ms-playwright`, macOS `~/Library/Caches/ms-playwright`, Windows `%USERPROFILE%\AppData\Local\ms-playwright`.
 4. Sacá las variables `VE_*` de tu perfil de shell si las agregaste.
