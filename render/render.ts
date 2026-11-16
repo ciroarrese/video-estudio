@@ -181,7 +181,8 @@ export async function ensureBundle(root: string, cacheDir: string, runId: string
         name: 've-stub-broken',
         enforce: 'pre' as const,
         load: (id: string) => {
-          const msg = stubbed.get(id.split('?')[0]!);
+          // vite usa `/` en los id también en Windows; las claves de `stubbed` son rutas del sistema (resolve las normaliza)
+          const msg = stubbed.get(resolve(id.split('?')[0]!));
           return msg === undefined ? null : `throw new Error(${JSON.stringify(msg)});`;
         },
       };

@@ -23,7 +23,7 @@ describe('planMezcla', () => {
     expect(p.cueSamples).toEqual([72000, 144000]);
     expect(p.efectoSamples).toEqual([72000, 144000]);
     expect(p.totalSamples).toBe(480000);
-    expect(p.inputs).toEqual(['public/sfx/clic.wav', 'public/sfx/tilde.wav']);
+    expect(p.inputs).toEqual([join('public', 'sfx', 'clic.wav'), join('public', 'sfx', 'tilde.wav')]);
     expect(p.filterComplex).toContain('adelay=72000S:all=1');
     expect(p.filterComplex).toContain('volume=0.5');
     expect(p.filterComplex).toContain('amix=inputs=2:normalize=0');
@@ -51,14 +51,14 @@ describe('planMezcla', () => {
   });
 
   it('resuelve nombres y rutas', () => {
-    expect(rutaDeEfecto('tilde', 'x')).toBe('x/tilde.wav');
+    expect(rutaDeEfecto('tilde', 'x')).toBe(join('x', 'tilde.wav'));
     expect(rutaDeEfecto('otra/cosa.wav', 'x')).toBe('otra/cosa.wav');
   });
 
   it('ancla "pico" adelanta el efecto lo que tarda en llegar a su pico; un efecto mono se duplica sin perder 3 dB', () => {
     const p = planMezcla(
       { fps: 30, durationFrames: 120, cues: [{ frame: 60, sfx: 'barrido', ancla: 'pico' }, { frame: 1, sfx: 'tilde', ancla: 'pico' }] },
-      { 'public/sfx/barrido.wav': { canales: 1, picoSamples: 18480 }, 'public/sfx/tilde.wav': { canales: 2, picoSamples: 4560 } },
+      { [join('public', 'sfx', 'barrido.wav')]: { canales: 1, picoSamples: 18480 }, [join('public', 'sfx', 'tilde.wav')]: { canales: 2, picoSamples: 4560 } },
     );
     expect(p.cueSamples).toEqual([96000, 1600]);
     expect(p.efectoSamples).toEqual([96000 - 18480, 0]);

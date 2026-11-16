@@ -5,7 +5,7 @@
 // Código de salida: 0 si no falta nada imprescindible, 1 si falta algo, 2 si se pide una opción que no existe.
 import { spawnSync } from 'node:child_process';
 import { createRequire } from 'node:module';
-import { accessSync, constants, existsSync, mkdirSync, readFileSync, rmSync, statSync, statfsSync, writeFileSync } from 'node:fs';
+import { accessSync, constants, existsSync, mkdirSync, readFileSync, realpathSync, rmSync, statSync, statfsSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
@@ -237,6 +237,17 @@ async function main() {
   return codigo;
 }
 
-if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1])).href) {
+// ¿Corre este archivo como programa? `import.meta.url` ya viene con los enlaces simbólicos resueltos (macOS: /var -> /private/var),
+// así que `argv[1]` se compara por su ruta real; si no, el comando no hace nada cuando la ruta pasa por un enlace.
+const esPrincipal = () => {
+  if (!process.argv[1]) return false;
+  try {
+    return import.meta.url === pathToFileURL(realpathSync(resolve(process.argv[1]))).href;
+  } catch {
+    return false;
+  }
+};
+
+if (esPrincipal()) {
   process.exit(await main());
 }

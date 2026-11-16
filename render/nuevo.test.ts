@@ -2,7 +2,7 @@
 // `templates/nuevo.mjs` (`npm run nuevo`): funciones puras, el programa completo en carpetas temporales y que
 // `templates/nuevo.sh` (envoltorio) delegue en él. Vive en render/ porque vitest.config.ts no incluye templates/**.
 import { execFileSync, spawnSync } from 'node:child_process';
-import { cpSync, mkdtempSync, readFileSync, readdirSync, rmSync } from 'node:fs';
+import { cpSync, mkdtempSync, readFileSync, readdirSync, rmSync, symlinkSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -110,6 +110,24 @@ describe('templates/nuevo.mjs: el programa', () => {
     expect(r.status).toBe(0);
     expect(r.stdout).toContain('creado videos/demo/cli (id de video: demo-cli)');
     expect(spawnSync(process.execPath, [join(p, 'templates', 'nuevo.mjs')], { encoding: 'utf8' }).status).toBe(2);
+  });
+
+  // macOS pone la carpeta temporal detrás de un enlace (/var -> /private/var): Node resuelve el enlace en `import.meta.url` pero no
+  // en `process.argv[1]`, y el script no hacía nada. Se reproduce en cualquier sistema ejecutándolo a través de un enlace a la carpeta.
+  // 'junction' no pide permisos especiales en Windows (en los demás sistemas el tipo se ignora).
+  it('anda cuando la ruta del script pasa por un enlace simbólico (nuevo.mjs y doctor.mjs)', () => {
+    const p = proyecto();
+    const base = carpeta('ve-enlace-');
+    const enlace = join(base, 'enlace');
+    symlinkSync(p, enlace, 'junction');
+    const r = spawnSync(process.execPath, [join(enlace, 'templates', 'nuevo.mjs'), 'escena', 'demo', 'cli'], { encoding: 'utf8' });
+    expect(r.status).toBe(0);
+    expect(r.stdout).toContain('creado videos/demo/cli (id de video: demo-cli)');
+    const enlaceRepo = join(base, 'repo');
+    symlinkSync(repo, enlaceRepo, 'junction');
+    const d = spawnSync(process.execPath, [join(enlaceRepo, 'render', 'doctor.mjs'), '--help'], { encoding: 'utf8' });
+    expect(d.status).toBe(0);
+    expect(d.stdout).toContain('Uso: npm run doctor');
   });
 });
 

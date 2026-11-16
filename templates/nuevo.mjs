@@ -10,7 +10,7 @@
 // No hay que registrar nada: el runtime descubre solo toda carpeta videos/<slug>/**/index.ts (ver SKILL.md).
 // Código de salida: 0 bien, 1 el destino ya existe o falta algo previo, 2 uso incorrecto.
 // Sin dependencias: corre con Node solo.
-import { cpSync, existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
+import { cpSync, existsSync, mkdirSync, readFileSync, readdirSync, realpathSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
@@ -157,6 +157,17 @@ export function nuevo(args, log = console.log, err = console.error, opciones = {
   }
 }
 
-if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1])).href) {
+// ¿Corre este archivo como programa? `import.meta.url` ya viene con los enlaces simbólicos resueltos (macOS: /var -> /private/var),
+// así que `argv[1]` se compara por su ruta real; si no, el comando no hace nada cuando la ruta pasa por un enlace.
+const esPrincipal = () => {
+  if (!process.argv[1]) return false;
+  try {
+    return import.meta.url === pathToFileURL(realpathSync(resolve(process.argv[1]))).href;
+  } catch {
+    return false;
+  }
+};
+
+if (esPrincipal()) {
   process.exit(nuevo(process.argv.slice(2)));
 }

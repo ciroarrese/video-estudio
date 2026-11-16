@@ -1,7 +1,7 @@
 // @vitest-environment node
 // `npm run doctor`: funciones puras del diagnóstico y un arranque real con --help.
 import { spawnSync } from 'node:child_process';
-import { resolve } from 'node:path';
+import { join, resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { carpetasDeSalida, codigoDeSalida, cumpleNode, formatearBytes, lineaDeInforme, nodeMinimoDe, tieneCodificador, versionDeFfmpeg } from './doctor.mjs';
 
@@ -34,11 +34,13 @@ describe('render/doctor.mjs', () => {
   });
 
   it('resuelve las carpetas de salida como render/dirs.ts', () => {
-    expect(carpetasDeSalida({}, '/repo', '/cwd')).toEqual({ videosExterna: null, cache: '/repo/.ve-cache', salida: '/cwd/out' });
-    expect(carpetasDeSalida({ VE_VIDEOS_DIR: '/priv' }, '/repo', '/cwd')).toEqual({ videosExterna: '/priv', cache: '/priv/.ve-cache', salida: '/priv/out' });
+    // Las rutas esperadas se arman con node:path: en Windows `resolve('/cwd')` lleva la letra de unidad y `join` usa `\\`.
+    expect(carpetasDeSalida({}, '/repo', '/cwd')).toEqual({ videosExterna: null, cache: join('/repo', '.ve-cache'), salida: resolve('/cwd', 'out') });
+    const priv = resolve('/priv');
+    expect(carpetasDeSalida({ VE_VIDEOS_DIR: '/priv' }, '/repo', '/cwd')).toEqual({ videosExterna: priv, cache: join(priv, '.ve-cache'), salida: join(priv, 'out') });
     const c = carpetasDeSalida({ VE_VIDEOS_DIR: '/priv', VE_CACHE_DIR: '/c', VE_OUT_DIR: '/o' }, '/repo', '/cwd');
-    expect(c.cache).toBe('/c');
-    expect(c.salida).toBe('/o');
+    expect(c.cache).toBe(resolve('/c'));
+    expect(c.salida).toBe(resolve('/o'));
   });
 
   it('da el código de salida y las líneas del informe', () => {
