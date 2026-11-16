@@ -1,6 +1,6 @@
 # Video Studio (`video-estudio`): convenciones para agentes
 
-Video Studio es el nombre visible; repo, paquete, alias `video-estudio/*` y comandos no cambian. Herramienta para producir videos animados con un motor propio (TypeScript + React 18). Para hacer un video seguí la skill `.claude/skills/video-estudio/SKILL.md`; las reglas están en `docs/reglas.md`, la guía de escenas en `docs/guia-escenas.md`, el sonido en `docs/audio.md`, los subtítulos en `docs/subtitulos.md` y el catálogo de efectos listos (`fx/`) en `docs/animaciones.md`: usalo antes de escribir una animación desde cero.
+Video Studio es el nombre visible; repo, paquete, alias `video-estudio/*` y comandos no cambian. Herramienta para producir videos animados con un motor propio (TypeScript + React 18). Para hacer un video seguí la skill `.claude/skills/video-estudio/SKILL.md`; las reglas están en `docs/reglas.md`, la guía de escenas en `docs/guia-escenas.md`, el sonido en `docs/audio.md`, los subtítulos en `docs/subtitulos.md` y el catálogo de efectos listos (`fx/`) en `docs/animaciones.md`: usalo antes de escribir una animación desde cero. Si algo no arranca (Node, ffmpeg, Chromium, carpetas de salida), corré `npm run doctor`; la guía de instalación y uso es `docs/instalacion.md`. `AGENTS.md` es el punto de entrada equivalente para agentes que no leen este archivo.
 
 ## Idioma
 

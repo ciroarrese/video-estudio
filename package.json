@@ -20,7 +20,8 @@
     "privacy": "tsx qa/cli.ts privacy",
     "clean": "tsx render/clean.ts",
     "audio": "tsx audio/cli.ts",
-    "exec": "node render/exec.mjs"
+    "exec": "node render/exec.mjs",
+    "doctor": "node render/doctor.mjs"
   },
   "dependencies": {
     "react": "^18.3.1",

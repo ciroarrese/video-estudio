@@ -9,6 +9,8 @@ description: "Produce videos animados (presentación, demo, explicador, recorrid
 
 Todo lo que escribas para la persona va en español rioplatense (voseo, sin emojis). El repo es público: nada de nombres de empresas, clientes o personas reales en lo que quede versionado. Los garabatos del kit (`DoodleCircle`, `DoodleArrow`, `DoodleUnderline`) y `MarkerDraw` son para design systems de trazo a mano: para señalar se usa `Callout`. Las props exactas de las piezas del kit están en la tabla de `kit/README.md` y `Loop`/`density` de los efectos en `docs/animaciones.md`: no hace falta leer el código fuente.
 
+**Dónde corre todo.** Las rutas de esta skill (`CLAUDE.md`, `docs/`, `themes/`, `templates/`) y todos los comandos son relativos a la raíz del clon de Video Studio (la carpeta con `package.json` con `"name": "video-estudio"` y `render/cli.ts`). Antes de empezar comprobá que el directorio actual es esa raíz. Si no lo es (la skill está instalada como skill global y abriste el agente en otra carpeta), la raíz es la ruta que te dé la persona o la de la variable de entorno `VIDEO_STUDIO_DIR` si está definida (es una convención de la guía `docs/instalacion.md`: el motor no la lee); si no tenés ninguna, pedísela y no sigas sin ella. Después corré cada comando con `cd <raíz> && ...` y, si el material vive fuera del clon, con `VE_VIDEOS_DIR` definida (ver más abajo).
+
 ## Qué leer y cuándo (no leas todo de entrada)
 
 Son unas 3300 líneas de docs; **no se leen de entrada**. Leé solo lo de la fila de la etapa en que estás, justo antes de empezarla, y consultá el resto cuando haga falta (los números son secciones de `docs/guia-escenas.md`).
