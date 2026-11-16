@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { datoFaltante } from './themes';
+import { datoFaltante } from './datoFaltante';
 
 describe('qa --themes: un sistema que no declara el color de datos que el video pide', () => {
   it('reconoce el error de themes/data.ts (también envuelto por la página)', () => {

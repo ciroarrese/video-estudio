@@ -271,6 +271,14 @@ describe.skipIf(!chromium)('qa on the qa-defects video (e2e)', () => {
     expect(w(wide, F.overlap)).toBeGreaterThan(w(base, F.overlap)!);
   }, 300_000);
 
+  it('story-fit sola no muestrea cuadros (solo el largo del guion) y con --scene también corre si la escena es de la historia', async () => {
+    for (const scene of [undefined, 'opening', 'closing']) {
+      const r = await runQa({ videoId: 'story-demo', rules: ['story-fit'], scene });
+      expect(r.summary.frames, String(scene)).toEqual([]);
+      expect(r.summary.errors, String(scene)).toBe(0);
+    }
+  }, 300_000);
+
   // Reproducibilidad: el control es una función determinista del video y las opciones. Antes el muestreo de fondos corría en el canvas de
   // la página y devolvía colores distintos para el mismo PNG: el contraste saltaba entre corridas (fx-in-scene con neon, cuadros 184/192/222).
   it('reproducible: dos corridas del mismo control dan informes idénticos (hallazgos y medidas), con paralelismo y con vecinos', async () => {

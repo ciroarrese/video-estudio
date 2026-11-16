@@ -633,12 +633,13 @@ const CLOSING_CAM_MAX = 1.1, CLOSING_EDGE_SLACK = 32;
  * Ancho máximo de la píldora del panel `i`: la distancia al panel vecino de su fila (menos 24 px de aire) y lo que entra entre su
  * centro y el borde del cuadro contando el zoom inicial de la cámara (1,1) y 32 px de holgura por la inclinación; con tope en 900 px.
  */
-export function pillBudget(panels: PanelPlace[], i: number, width: number): number {
+export function pillBudget(panels: PanelPlace[], i: number, width: number, slack = 1): number {
   const c = panels[i]!;
   const d = Math.abs(c.x - width / 2);
   let b = Math.min(900, 2 * ((width / 2 - CLOSING_EDGE_SLACK) / (CLOSING_CAM_MAX * 1.03) - d));
   for (const o of panels) if (o !== c && Math.abs(o.y - c.y) < 1) b = Math.min(b, Math.abs(o.x - c.x) - 24);
-  return Math.max(120, Math.floor(b));
+  // `slack` (formatos angostos, `NARROW_SLACK`): la píldora también tiene que entrar con una tipografía más ancha y la letra 25 % más grande; sin él (1) es la de siempre
+  return Math.max(120, Math.floor(b / slack));
 }
 
 /** Rectángulo de pantalla (en reposo) del panel `c` y de su píldora. */
@@ -674,11 +675,11 @@ export function panelEntryLift(c: PanelPlace, theme: Theme, name: string, maxW: 
  * por la estimación del ancho del texto) o el panel mismo se saldrían del cuadro (40 px de holgura por la inclinación). En vertical la
  * píldora de arriba queda cerca del borde superior y con 1,1 asomaba unos px afuera.
  */
-export function closingCamStart(panels: PanelPlace[], theme: Theme, names: string[], width: number, height: number): number {
+export function closingCamStart(panels: PanelPlace[], theme: Theme, names: string[], width: number, height: number, fitSlack = 1): number {
   const cx = width / 2, cy = height / 2, slack = 40;
   let s = CLOSING_CAM_MAX;
   panels.forEach((c, i) => {
-    const { panel, pill } = panelRects(c, theme, names[i] ?? "", pillBudget(panels, i, width));
+    const { panel, pill } = panelRects(c, theme, names[i] ?? "", pillBudget(panels, i, width, fitSlack));
     const reachY = Math.max(cy - pill.y, panel.y + panel.h - cy);
     const reachX = Math.abs(c.x - cx) + Math.max(pill.w * 1.12, panel.w) / 2;
     s = Math.min(s, (cy - slack) / reachY, (cx - slack) / reachX);
@@ -690,9 +691,11 @@ export function closingCamStart(panels: PanelPlace[], theme: Theme, names: strin
  * Disposición de los paneles flotantes del cierre según la cantidad de temas (`k` = escala del lienzo 560x340).
  * Invariante: entre una fila y la siguiente queda un hueco de `ROW_GAP_Y` (>= lo que ocupa la píldora de la fila de abajo),
  * y sobre la primera fila queda `PILL_BAND`; así ninguna píldora cae sobre el panel de otro tema.
+ * `narrow`: si el formato es angosto (por defecto, por la proporción de `width` y `height`). Con una franja reservada abajo (subtítulos) `height` es la del cuadro menos la franja,
+ * y un cuadrado con franja se vería "ancho": quien conoce el formato completo lo dice acá.
  */
-export function panelLayout(n: number, width = 1920, height = 1080): PanelPlace[] {
-  if (width / height < 1.3) return panelGrid(n, width, height);
+export function panelLayout(n: number, width = 1920, height = 1080, narrow: boolean = width / height < 1.3): PanelPlace[] {
+  if (narrow) return panelGrid(n, width, height);
   const kBase = n === 2 ? 1.4 : n <= 4 ? 1.2 : 0.95;
   const rows = n === 2 ? [2] : [Math.ceil(n / 2), n - Math.ceil(n / 2)];
   // alto disponible: sin la banda de la píldora arriba (+24) ni 40 px abajo; la escala baja si no entran las filas con su hueco

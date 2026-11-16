@@ -103,6 +103,12 @@ export function Interlude({ spec: specIn, done, skip = [], next: nextProp, ticks
   const S = stage ? { room: sc(REVEAL_STAGE_T.room), sweep: sc(REVEAL_STAGE_T.sweep), thumbIn: sc(REVEAL_STAGE_T.thumbIn), thumbFly: sc(REVEAL_STAGE_T.thumbFly) } : null;
   const motion = resolveStyle(theme).motion;
   const room = S ? kf(f, S.room, [0, 1], ease.inOut) : 0; // las filas ya vistas se corren apenas hacia arriba para hacer lugar a la nueva
+  // cuánto suben (px): el 14 % del alto de la fila; en los formatos angostos, donde la lista llena el alto, no más de lo que deja libre arriba de la primera fila menos un
+  // cuarto de la letra del nombre (con una tipografía más alta de lo medido, la caja del primer renglón se saldría del cuadro al subir)
+  const roomShift = (() => {
+    const base = L.rowH * 0.14;
+    return width / height < 1.3 ? Math.max(0, Math.min(base, L.top + L.blockTop - Math.ceil(L.nameSize * 0.25))) : base;
+  })();
   const lateI = n - 1;
   const rowTop = L.top + lateI * L.rowH;
   const rowMidY = rowTop + L.blockTop + L.nameH / 2; // centro del renglón del nombre de la fila nueva
@@ -205,7 +211,7 @@ export function Interlude({ spec: specIn, done, skip = [], next: nextProp, ticks
               if (sp < 1) rowStyle = { transform: `translateY(${((1 - q) * L.rowH * 0.6).toFixed(2)}px) scale(${(0.94 + 0.06 * q).toFixed(4)})`, transformOrigin: "0 50%" };
               else rowStyle = {};
             } else if (stage && room > 0) {
-              rowStyle = { ...rowStyle, transform: [rowStyle.transform, `translateY(${(-room * L.rowH * 0.14).toFixed(2)}px)`].filter(Boolean).join(" ") };
+              rowStyle = { ...rowStyle, transform: [rowStyle.transform, `translateY(${(-room * roomShift).toFixed(2)}px)`].filter(Boolean).join(" ") };
             }
             const rowOpacity = rowIn * (flyNext ? 1 : others) * (flyNext ? 1 - kf(f, [T.fly[1] - u(16), T.fly[1] - u(10)], [0, 1]) : 1) * (1 - listAside);
             const ringP = stage && lateRow ? kf(f, [win[1] - u(2), win[1] + u(22)], [0, 1], ease.out) : 0;

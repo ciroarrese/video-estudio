@@ -5,7 +5,7 @@ import { GradientText, Highlight, kf } from "../kit";
 import { accentMark, chartStyle, cornerRadius, numeralStyle, resolveColor, resolveStyle, staggerFrames, surfaceStyle, textStyle, transitionVeil, useTheme, withAlpha } from "../themes";
 import type { Theme } from "../themes";
 import { fade, styleKey, xform } from "../fx/core/math";
-import { PILL_OFF, closingWall, fitText, nameMeter, panelEntryLift, panelLayout, closingCamStart, pillBudget, pillFit, rigProject, rigTransform } from "./layout";
+import { NARROW_SLACK, PILL_OFF, closingWall, fitText, nameMeter, panelEntryLift, panelLayout, closingCamStart, pillBudget, pillFit, rigProject, rigTransform } from "./layout";
 import { Chip, Logo, Pill, RichText, StoryStage, pillNumberColor, scaler, useEase, useStorySpec } from "./shared";
 import { plainRich, wallOptions } from "./types";
 import type { StorySpec, TopicScene } from "./types";
@@ -161,11 +161,12 @@ export function Closing({ spec: specIn, scenes = [] }: { spec: StorySpec; scenes
   const n = spec.topics.length;
   const cx = width / 2, cy = height / 2;
   const { inner, outer, slots } = closingWall(spec, width, height);
-  const panels = panelLayout(n, width, height - reserve);
+  const panels = panelLayout(n, width, height - reserve, width / height < 1.3); // el formato es el del cuadro entero (con la franja de subtítulos un cuadrado se vería ancho)
   const stagger = Math.min(6, 30 / n);
   // cuánto se acerca cada panel a la cámara al entrar (menos en los formatos donde los paneles llenan el cuadro)
-  const camStart = closingCamStart(panels, theme, spec.topics.map((t) => t.name), width, height - reserve);
-  const lifts = panels.map((c, i) => panelEntryLift(c, theme, spec.topics[i]!.name, pillBudget(panels, i, width), width, height - reserve, camStart));
+  const fitSlack = width / height < 1.3 ? NARROW_SLACK : 1; // vertical y cuadrado: las píldoras entran también con fuente ancha y letra 25 % más grande
+  const camStart = closingCamStart(panels, theme, spec.topics.map((t) => t.name), width, height - reserve, fitSlack);
+  const lifts = panels.map((c, i) => panelEntryLift(c, theme, spec.topics[i]!.name, pillBudget(panels, i, width, fitSlack), width, height - reserve, camStart));
   const T = { wall: u(130), fold: [u(170), u(200)] as [number, number], fly: [u(200), u(254)] as [number, number], light: u(262), pull: u(372), wash: [u(368), u(398)] as [number, number], logo: closingLogoAt(dur), sign: u(418) };
 
   const cam = {
@@ -271,14 +272,14 @@ export function Closing({ spec: specIn, scenes = [] }: { spec: StorySpec; scenes
           return (
             <div key={`${i}-${styleKey(card)}`} style={card}>
               <div style={{ width: PANEL.w, height: PANEL.h, transform: xform({ scaleX: c.k, scaleY: Math.max(0.001, c.k * (1 - fold)) }), transformOrigin: "0 0" }}>
-                {/* miniatura de la escena a escala de panel: su texto es detalle que se lee al acercar, no se le pide el tamaño mínimo (`min-size`); el resto de las reglas sí */}
-                <div data-qa-ignore="min-size" style={{ width: PANEL.w, height: PANEL.h, ...panelSurface }}>
+                {/* miniatura de la escena a escala de panel: su texto es detalle que se lee al acercar, no se le pide el tamaño mínimo (`min-size`); tampoco el recorte de sus rótulos de `<svg>` (`clip`): la miniatura la dibuja el video y con una fuente de reemplazo más ancha el centro de un gráfico de anillo se pasa de su `<svg>` sin que sea un defecto del cierre; el resto de las reglas sí */}
+                <div data-qa-ignore="min-size clip" style={{ width: PANEL.w, height: PANEL.h, ...panelSurface }}>
                   {Thumb ? <Thumb /> : <DefaultThumbnail index={i} name={spec.topics[i]!.name} />}
                 </div>
               </div>
               {!titleGone && (
                 <div style={{ position: "absolute", left: Math.round(W / 2), top: PILL_OFF, transform: "translate(-50%, -50%)" }}>
-                  <Pill index={i} name={spec.topics[i]!.name} maxW={pillBudget(panels, i, width)} />
+                  <Pill index={i} name={spec.topics[i]!.name} maxW={pillBudget(panels, i, width, fitSlack)} />
                 </div>
               )}
             </div>
@@ -293,7 +294,7 @@ export function Closing({ spec: specIn, scenes = [] }: { spec: StorySpec; scenes
         const pc = rigProject((c.x - cx) * cam.s, (c.y - cy + bobOf(i) - H / 2 + PILL_OFF) * cam.s, c.z * cam.s, { dz: 0, rx: cam.rx, ry: cam.ry }, CARD_P)!;
         // la píldora en vuelo es la del muro (tamaño completo); arranca achicada al ancho de la del panel para que no haya salto
         const name = spec.topics[i]!.name;
-        const pp = pillFit(theme, name, pillBudget(panels, i, width)), pw = pillFit(theme, name, wallPillMaxW(theme, name, width));
+        const pp = pillFit(theme, name, pillBudget(panels, i, width, fitSlack)), pw = pillFit(theme, name, wallPillMaxW(theme, name, width));
         // por ancho (sin salto de tamaño) pero nunca con letra menor a la del panel: con nombres largos el texto del muro es más largo y la letra salía de ~14 px
         const ratio = Math.max(pp.w / pw.w, pp.size / pw.size);
         const from = { x: cx + pc.x, y: cy + pc.y, s: pc.s * cam.s * ratio, rx: cam.rx, ry: cam.ry };

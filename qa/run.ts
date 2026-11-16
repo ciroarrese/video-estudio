@@ -90,7 +90,7 @@ async function runQaPass(o: QaOptions, honorFixedScale: boolean): Promise<{ resu
     const perScene = o.perScene ?? DEFAULT_PER_SCENE;
     if (!Number.isInteger(perScene) || perScene < 0) throw new Error('--per-scene debe ser un entero >= 0');
     // Cuadros anclados a cada escena (ver `anchoredFrames`): solo con el muestreo por defecto, sin rango ni cuadros pedidos.
-    const porDefecto = !range && o.frames === undefined && o.every === undefined && perScene > 0;
+    const porDefecto = !soloFit && !range && o.frames === undefined && o.every === undefined && perScene > 0;
     const scenesAll = porDefecto ? await session.scenes().catch(() => []) : [];
     const anchored = porDefecto ? anchoredFrames(scenesAll, meta.durationInFrames, perScene) : [];
     const frames = soloFit ? [] : sampleFrames(o, meta.durationInFrames, 24, range, anchored);
