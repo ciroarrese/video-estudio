@@ -293,6 +293,35 @@ New-Item -ItemType Junction -Path "$HOME\.claude\skills\video-estudio" -Target "
 
 La skill sigue necesitando el repo clonado, con sus dependencias instaladas, y cuál es su ruta: `SKILL.md` le indica al agente que, si el directorio actual no es la raíz del repo, use la ruta que le des o la variable `VIDEO_STUDIO_DIR` (una convención de esta guía: el motor no la lee) y corra cada comando con `cd <raíz> && ...`. Entonces abrí el agente donde quieras y decile, en la primera frase: "Usá la skill video-estudio. El repo está en `<ruta-del-clon>`; los videos van en `/ruta/a/mis-videos` (`VE_VIDEOS_DIR`)". Probado de punta a punta con un agente simulado (no con Claude Code cargando la skill): con una copia del `SKILL.md` en una carpeta personal falsa y el agente parado en una carpeta ajena, la comprobación de la raíz con `VIDEO_STUDIO_DIR`, `npm run nuevo`, `typecheck`, `--check`, `qa`, `privacy`, `sheet` y el render funcionaron con `cd <raíz> &&` y `VE_VIDEOS_DIR` en cada comando. No verificado: que Claude Code cargue la skill solo desde `~/.claude/skills` (el enlace resuelve, pero la carga automática no se probó). Se probó también el flujo A. En Windows nativo, `ln -s` pide permisos de administrador: copiá la carpeta.
 
+## Compartir un design system
+
+Un design system se comparte copiando una carpeta a la carpeta de videos de cada persona (la de `VE_VIDEOS_DIR` o `.video-studio.local.json`, o `videos/` del clon). Estructura (los nombres son ficticios):
+
+```
+<carpeta de videos>/
+  marca-demo/                 el sistema: la carpeta que se instala
+    theme.ts                  exporta `theme` y, si sale de tokens, `report`
+    README.md                 qué piezas trae (intro, cierre, recursos) y las reglas de marca
+    Intro.tsx, Cierre.tsx     piezas propias (opcional)
+  assets/marca-demo/          fuentes e imágenes del sistema (opcional; se sirven solas)
+  marca-demo-base/            un video de ejemplo (opcional); su theme.ts hace
+                              export { theme, report } from "../marca-demo/theme";
+```
+
+**Qué cuenta como "design system instalado".** Una carpeta directa de la carpeta de videos que tiene `theme.ts` y `README.md` en su raíz y **no contiene ningún `index.ts(x)` de video**, ni en su raíz ni en subcarpetas (con uno, el motor la descubriría como video). `assets/`, `out/` y las carpetas que empiezan con punto no cuentan. Las piezas, los assets y el video de ejemplo no son requisito.
+
+**Detectarlo.** `npm run sistemas` lista los instalados (nombre, ruta, piezas, si tiene `assets/<sistema>` y video de ejemplo, y qué videos ya lo reexportan); `npm run sistemas -- --json` da lo mismo para un script. Solo lee. La skill lo corre sola en la etapa 2: con un sistema instalado lo usa y te lo avisa en una línea; con varios, te pregunta cuál; con ninguno, arma el tema como siempre.
+
+**Usarlo en un video.** `npm run nuevo -- escena <slug> <nombre> --sistema marca-demo` crea el video con este `<slug>/theme.ts` (`report` solo si el sistema lo exporta):
+
+```ts
+export { theme, report } from "../marca-demo/theme";
+```
+
+Las piezas del sistema se importan con rutas relativas, por ejemplo `import { Intro } from "../../marca-demo/Intro"` desde `<slug>/<escena>/`. El `README.md` del sistema manda sobre cómo usarlas. Con un tema ya instalado se sigue decidiendo cómo se señala y se mueve cada escena (`docs/guia-escenas.md`, sección 16), leyendo ese tema. No edites la carpeta del sistema para hacer un video: se actualiza copiando la versión nueva encima.
+
+**Privacidad.** Si el repo es público, la carpeta del sistema no se sube: vive en tu carpeta de videos (que no se versiona o está afuera del clon).
+
 ## Problemas frecuentes
 
 Primero corré `npm run doctor`: cubre casi todo lo de esta lista. Los mensajes están copiados del código.

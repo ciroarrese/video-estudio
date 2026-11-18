@@ -20,7 +20,7 @@ Son unas 3300 líneas de docs; **no se leen de entrada**. Leé solo lo de la fil
 | Siempre | `CLAUDE.md` y esta skill | `docs/reglas.md`: "Lista única de determinismo" y "De contenido y privacidad" |
 | 0 cuestionario | nada más | `docs/subtitulos.md` (si va a redes o sin sonido), `docs/audio.md` (si lleva sonido) |
 | 1 fichas | nada más | |
-| 2 tema | `themes/README.md`: "Crear un tema desde los tokens", "Colores de datos", "Tipografía de los títulos", "Estilo", "Cómo traer tu design system"; sección 16 | `docs/estilo.md`, `templates/theme.ts` |
+| 2 tema | `npm run sistemas` y, si hay uno instalado, su `README.md`; `themes/README.md`: "Crear un tema desde los tokens", "Colores de datos", "Tipografía de los títulos", "Estilo", "Cómo traer tu design system"; sección 16 | `docs/estilo.md`, `templates/theme.ts` |
 | 3 guion | sección 16 (modelo de la sección de recursos), `docs/animaciones.md` ("Cómo elegir" y "Afinidad con el design system"), `docs/audio.md` "Sin música: plan de cues" (si hay sonido) | `stories/README.md` "Límites", sección 11 |
 | 4 escenas | secciones 1 a 3, 6 (interfaz), 11 y 13 (formatos y composición), 14 y 15 (estilo y otro design system), "Para que no parezca un borrador" (dentro de la 7); `kit/README.md` ("Referencia de firmas", "Piezas de interfaz"); `docs/reglas.md` "Técnicas" | 7 (errores comunes y recetas de `qa`), 9 (kit con `fx/`), 10 (`ThemeScope`), 17 (`Loop`, `NestedScene`), la fila del efecto en `docs/animaciones.md`; si es un **tutorial de interfaz**: sección 18 y `kit/README.md` ("Tutorial de interfaz") |
 | 5a armado | `stories/README.md` (opciones de la historia) | sección 8 |
@@ -96,6 +96,7 @@ Todos corren desde la raíz del repo. Los `<id>` son ids de video registrados.
 | Copia liviana | `npm run render -- <id> --out out/<slug>.mp4 --liviano [MB]` (deja `out/<slug>-liviano.mp4` de como mucho 25 MB; el audio se copia) |
 | Salidas viejas | `npm run limpiar -- <slug> --seco` (lista las de `out/` más viejas que el código del video; sin `--seco` pregunta antes de borrar) |
 | Informe del tema | `npx tsx templates/tema-informe.ts <slug>` |
+| Design systems instalados | `npm run sistemas` (solo lectura; `-- --json` para leerlo desde un script; respeta `VE_VIDEOS_DIR` y `.video-studio.local.json`). Para un video nuevo que lo use: `npm run nuevo -- escena <slug> <nombre> --sistema <carpeta>` |
 | MP4 de una escena sola para mostrar | `npm run render -- <id> --scene <escena>` (tamaño entero, `out/<id>-<escena>.mp4`; el final reutiliza las partes de 150 cuadros que caen enteras dentro de la escena, no las de los bordes; ver "Comandos largos"). Solo para ver rápido un tramo sin que se reutilice: `--scale 0.5 --crf 23` |
 | MP4 final | `npm run render -- <id> --out out/<slug>.mp4` (con `--no-audio` primero para el video mudo: las partes se reutilizan con el sonido) |
 | Videos y escenas | `npm run render -- --list` (videos descubiertos y, al final, las carpetas que no cargaron), `npm run qa -- <id> --list-scenes` (escenas y, en una historia, el presupuesto de cuadros por bloque; también `sheet`; `render -- <id> --list-scenes` lista las escenas pero no el presupuesto) |
@@ -159,7 +160,13 @@ Si la información de un tema no alcanza para una ficha, preguntá en vez de inv
 
 ## Etapa 2: tema (el design system va primero)
 
-Antes de empezar: fichas aprobadas. **El design system se decide antes de escribir una sola escena**: una escena no decide forma, superficie, tipografía ni movimiento; lo decide el tema y la escena lo lee con las ayudas. El orden es: tokens, informe del adaptador, estilo, prueba con la plantilla y hoja, y recién después fuentes.
+Antes de empezar: fichas aprobadas. **Antes que cualquier otra cosa, corré `npm run sistemas`** (con carpeta externa o `.video-studio.local.json` mira esa carpeta, si no `videos/`): lista los design systems ya instalados (carpeta con `theme.ts` y `README.md` en su raíz y sin ningún video adentro; ver "Compartir un design system" en `docs/instalacion.md`). La persona no tiene que avisarlo en cada pedido.
+
+- **Exactamente uno**: usalo en vez de armar un tema nuevo, y decíselo en una línea ("Encontré el design system `<nombre>` instalado y lo uso"). Leé su `README.md` completo (piezas, intro, cierre, recursos y reglas de marca: se respetan) y mirá su `theme.ts`. El `theme.ts` del video es `export { theme, report } from "../<nombre>/theme";` (`report` solo si el sistema lo exporta; `npm run nuevo -- escena <slug> <nombre> --sistema <nombre>` lo deja escrito), las piezas se importan con `../../<nombre>/...` (desde `<slug>/<escena>/`) y las fuentes e imágenes ya están en `assets/<nombre>/` (se sirven solas). Si trae intro y cierre, la apertura y el cierre del guion los usan; el video de ejemplo `<nombre>-base` muestra cómo se combinan. Los puntos 1 y 6 de abajo (tokens, fuentes) no se rehacen; sí se hacen el 2 (informe: `npx tsx templates/tema-informe.ts <slug>` lee el tema reexportado), el 4 (hoja de prueba) y el 5, **leyendo el tema instalado**: el análisis de señales, efectos y transiciones de `docs/guia-escenas.md`, sección 16, se sigue haciendo (qué señal declara `style.annotation.mark`, qué transición, qué efectos encajan, qué reglas de marca del README aplican). Lo que el sistema no cubra se anota y se pide; no se edita su carpeta sin que la persona lo pida.
+- **Más de uno**: preguntale cuál usar (listá los nombres) y esperá la respuesta.
+- **Ninguno**: seguí como hasta ahora (tokens de la persona, `neutral` o `dark`).
+
+**El design system se decide antes de escribir una sola escena**: una escena no decide forma, superficie, tipografía ni movimiento; lo decide el tema y la escena lo lee con las ayudas. El orden es: tokens, informe del adaptador, estilo, prueba con la plantilla y hoja, y recién después fuentes.
 
 1. **Tokens.** Con los tokens de la persona (archivo CSS con variables o JSON), escribí `videos/<slug>/theme.ts` con `themeFromTokensWithReport` (ver `themes/README.md`). Debe exportar `theme` y, cuando sale de tokens, `report`:
 

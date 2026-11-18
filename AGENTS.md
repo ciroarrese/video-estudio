@@ -19,5 +19,6 @@ Todos los comandos corren desde la raíz de este repo. Si algo falla al arrancar
 - No leer ni copiar código fuente de otros frameworks de video (`docs/ORIGEN.md`).
 - Las interfaces se recrean con su estructura y sus rótulos; no se usan capturas.
 - Para señalar se usa `Callout` (la señal la pone el tema); nada de flechas ni garabatos por costumbre.
+- Design system instalado: antes de armar un tema corré `npm run sistemas`. Si lista uno, se usa (leer su `README.md`, `export { theme, report } from "../<sistema>/theme"`, sus piezas por `../../<sistema>/...`); con más de uno, se pregunta cuál; `npm run nuevo -- escena <slug> <nombre> --sistema <carpeta>` deja el `theme.ts` escrito. Convención: `docs/instalacion.md`, "Compartir un design system".
 - Para un tutorial de interfaz: `npm run nuevo -- paso <slug> <nombre>` y `StepFrame` (`kit/README.md`, "Tutorial de interfaz"; `docs/guia-escenas.md`, sección 18).
 - Antes de dar algo por terminado, la lista de control de `CLAUDE.md` ("Antes de dar algo por terminado"), con `npm run audio -- informe` si el video lleva sonido.
