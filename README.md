@@ -59,6 +59,8 @@ npm run sheet -- hello --format vertical --count 8   # out/hello-vertical-sheet.
 npm run render -- story-demo --list-scenes # escenas con nombre; --scene <id|índice> renderiza solo una
 npm run render -- kit-demo --seconds 1:30-2:05 # un extracto con su sonido (también --frames a-b); --audio-peak-strict falla si el AAC se pasa de -1 dBTP
 npm run exec -- /ruta/al/script.ts           # corre un script de afuera que importa video-estudio/* (sin tsconfig propio)
+npm run sistemas                          # lista los design systems instalados en la carpeta de videos (ver "Compartir un design system" en docs/instalacion.md)
+npm run nuevo -- escena mi-video intro --sistema marca-demo   # un video cuyo theme.ts reexporta un design system instalado
 npm run nuevo -- paso mi-tutorial crear    # un paso de tutorial de interfaz (StepFrame, cámara guiada); ejemplo: tutorial-demo
 npm run render -- hello --liviano          # además deja out/hello-liviano.mp4 de 25 MB como máximo
 npm run limpiar -- hello --seco            # lista las salidas viejas de ese video (sin --seco, las borra si confirmás)

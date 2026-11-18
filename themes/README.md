@@ -186,6 +186,10 @@ Las piezas no leen cadenas de `theme.style`: llaman a estas ayudas (puras, deter
 
 Además de los colores, `checkTheme` revisa el estilo: valores inválidos (error) y las combinaciones que dañan la lectura, como un vidrio tenue sobre un fondo cargado con texto atenuado, una superficie teñida, un marcador o un patrón de fondo que bajan el contraste del texto, números atenuados, o tarjetas sin borde ni sombra que se pierden contra el fondo. Revisa también `line`, `solid` y `text`: trazos finos (`hairline`) con `border` de poco contraste, aristas de sólidos `outline` o `translucent` que no se separan del fondo, el cursor de bloque (`onAccent` sobre `accent`), losetas y adornos de texto. Los pares se pueden reconocer en `acknowledge` con nombres como `style.surface.glass/textMuted`.
 
+## Compartir un design system
+
+Un design system instalado es una carpeta de la carpeta de videos (`VE_VIDEOS_DIR`, `.video-studio.local.json` o `videos/`) con `theme.ts` (exporta `theme` y, normalmente, `report`) y `README.md` (piezas y reglas de marca) en su raíz y ningún `index.ts(x)` de video adentro; opcionalmente piezas `*.tsx`, `assets/<sistema>/` al lado y un video de ejemplo `<sistema>-base/`. `npm run sistemas` los lista. Un video lo usa con `export { theme, report } from "../<sistema>/theme";` en su `theme.ts` (`npm run nuevo -- escena <slug> <nombre> --sistema <sistema>` lo escribe). Estructura completa y reglas: `docs/instalacion.md`, "Compartir un design system".
+
 ## Cómo traer tu design system
 
 1. **Tokens.** Pasá los tokens (CSS con variables o JSON) a `themeFromTokensWithReport(tokens, neutral)`. Colores, fuentes, radios y sombras usan los alias de arriba; el estilo, `--style-*`. Un design system con otros nombres: renombrá los tokens o pasá `{ style: {...} }` y `{ data: {...} }`.

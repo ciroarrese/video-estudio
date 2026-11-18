@@ -7,7 +7,7 @@ import { tmpdir } from 'node:os';
 import { dirname, join, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { afterAll, describe, expect, it } from 'vitest';
-import { conBarras, indiceDeEscena, indiceDeHistoria, nombreValido, nuevo, reescribirImports, reescribirTema, reescribirTsconfig } from '../templates/nuevo.mjs';
+import { conBarras, sistemaValido, temaDeSistema, indiceDeEscena, indiceDeHistoria, nombreValido, nuevo, reescribirImports, reescribirTema, reescribirTsconfig } from '../templates/nuevo.mjs';
 
 const repo = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const temporales: string[] = [];
@@ -194,6 +194,57 @@ const hayBash = (() => {
     return false;
   }
 })();
+
+describe('templates/nuevo.mjs: --sistema', () => {
+  const sistema = (p: string, base: string, texto = 'export const theme = {};\nexport const report = {};\n') => {
+    mkdirSync(join(p, base, 'marca-demo'), { recursive: true });
+    writeFileSync(join(p, base, 'marca-demo', 'theme.ts'), texto);
+  };
+
+  it('funciones puras', () => {
+    expect(sistemaValido('marca-demo')).toBe(true);
+    for (const malo of ['', '../x', 'a/b', 'a\\b', '.oculta', undefined]) expect(sistemaValido(malo)).toBe(false);
+    expect(temaDeSistema('marca-demo', true)).toContain('export { theme, report } from "../marca-demo/theme";');
+    expect(temaDeSistema('marca-demo', false)).toContain('export { theme } from "../marca-demo/theme";');
+  });
+
+  it('el theme.ts del video nuevo reexporta el sistema instalado (con report si lo exporta)', () => {
+    const p = proyecto();
+    sistema(p, 'videos');
+    const r = correr(['escena', 'demo', 'intro', '--sistema', 'marca-demo'], p);
+    expect(r.codigo).toBe(0);
+    expect(r.out.join('\n')).toContain('reexporta el design system "marca-demo"');
+    expect(readFileSync(join(p, 'videos', 'demo', 'theme.ts'), 'utf8')).toContain('export { theme, report } from "../marca-demo/theme";');
+    expect(existsSync(join(p, 'videos', 'demo', 'intro', 'Scene.tsx'))).toBe(true);
+    const q = proyecto();
+    sistema(q, 'videos', 'export const theme = {};\n');
+    correr(['paso', 'demo', 'uno', '--sistema=marca-demo'], q);
+    expect(readFileSync(join(q, 'videos', 'demo', 'theme.ts'), 'utf8')).toContain('export { theme } from "../marca-demo/theme";');
+  });
+
+  it('con VE_VIDEOS_DIR busca el sistema en esa carpeta; un theme.ts que ya existe no se pisa', () => {
+    const p = proyecto();
+    const ext = carpeta('ve-ext-');
+    sistema(ext, '.');
+    writeFileSync(join(ext, 'demo-previo.txt'), '');
+    expect(correr(['escena', 'demo', 'intro', '--sistema', 'marca-demo'], p, { VE_VIDEOS_DIR: ext }).codigo).toBe(0);
+    expect(readFileSync(join(ext, 'demo', 'theme.ts'), 'utf8')).toContain('../marca-demo/theme');
+    writeFileSync(join(ext, 'demo', 'theme.ts'), 'export const theme = 1;\n');
+    const r = correr(['escena', 'demo', 'otra', '--sistema', 'marca-demo'], p, { VE_VIDEOS_DIR: ext });
+    expect(r.out.join('\n')).toContain('no reexporta "marca-demo"');
+    expect(readFileSync(join(ext, 'demo', 'theme.ts'), 'utf8')).toBe('export const theme = 1;\n');
+  });
+
+  it('falla con 1 si el sistema no está instalado (sin crear nada) y con 2 si el nombre es inválido', () => {
+    const p = proyecto();
+    const r = correr(['escena', 'demo', 'intro', '--sistema', 'no-esta'], p);
+    expect(r.codigo).toBe(1);
+    expect(r.err.join('\n')).toContain('npm run sistemas');
+    expect(existsSync(join(p, 'videos', 'demo'))).toBe(false);
+    expect(correr(['escena', 'demo', 'intro', '--sistema', '../x'], p).codigo).toBe(2);
+    expect(correr(['escena', 'demo', 'intro', '--sistema'], p).codigo).toBe(2);
+  });
+});
 
 describe('templates/nuevo.sh delega en templates/nuevo.mjs', () => {
   it('es un envoltorio fino que llama a node con nuevo.mjs', () => {

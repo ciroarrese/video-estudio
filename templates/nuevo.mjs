@@ -5,6 +5,7 @@
 //   npm run nuevo -- paso <slug> <nombre-del-paso>        -> videos/<slug>/<nombre-del-paso>/ (un paso de tutorial de interfaz: StepFrame, cámara guiada, tabla de tiempos)
 //   npm run nuevo -- historia <slug> <escena-de-ejemplo>  -> videos/<slug>/historia/
 //   npm run nuevo -- externo                              -> solo prepara tsconfig.json y env.d.ts de VE_VIDEOS_DIR
+//   ... --sistema <carpeta>   (con escena, paso o historia) el theme.ts nuevo reexporta el design system instalado en <carpeta> (npm run sistemas)
 // También crea videos/<slug>/theme.ts (tema neutro) si todavía no existe.
 // Con VE_VIDEOS_DIR definida (videos fuera del repo) escribe ahí en vez de en videos/, con los imports por alias
 // (`video-estudio/engine`, ...) y crea tsconfig.json y env.d.ts de esa carpeta si faltan.
@@ -44,11 +45,19 @@ export const indiceDeEscena = (texto, slug, nombre) => texto.replace(/"plantilla
 export const indiceDeHistoria = (texto, slug, nombre) =>
   texto.replace('"../scene/Scene"', () => `"../${nombre}/Scene"`).replace('"plantilla-historia"', () => `"${slug}"`);
 
+/** Nombre de carpeta de un design system instalado: una sola carpeta, sin rutas. */
+export const sistemaValido = (s) => /^[A-Za-z0-9][A-Za-z0-9._-]*$/.test(String(s ?? ''));
+
+/** theme.ts de un video que usa un design system instalado en la carpeta hermana `<sistema>/` (`report` solo si el sistema lo exporta). */
+export const temaDeSistema = (sistema, conReport) =>
+  `// Tema del design system instalado "${sistema}" (carpeta hermana de este video). Para cambiarlo, editá ../${sistema}/theme.ts.\nexport { theme${conReport ? ', report' : ''} } from "../${sistema}/theme";\n`;
+
 export const USO = [
   'Uso: npm run nuevo -- escena <slug> <nombre-de-escena>',
   '     npm run nuevo -- paso <slug> <nombre-del-paso>       (un paso de tutorial de interfaz)',
   '     npm run nuevo -- historia <slug> <nombre-de-una-escena>',
   '     npm run nuevo -- externo        (con VE_VIDEOS_DIR: prepara tsconfig.json y env.d.ts)',
+  '     agregá --sistema <carpeta> a escena, paso o historia para usar un design system instalado (npm run sistemas)',
 ];
 
 // ---------- el programa ----------
@@ -80,7 +89,18 @@ export function nuevo(args, log = console.log, err = console.error, opciones = {
   if (!opciones.env) aplicarConfigLocal(env, repo);
   const plantillas = join(repo, 'templates');
   try {
-    const [modo = '', slug = '', nombre = ''] = args;
+    // `--sistema <carpeta>` (o `--sistema=<carpeta>`) se saca de los argumentos antes de leer los posicionales.
+    let sistema = null;
+    const posicionales = [];
+    for (let i = 0; i < args.length; i++) {
+      if (args[i] === '--sistema') {
+        sistema = args[++i] ?? '';
+        if (!sistema) throw new Salida(2, 'Falta el nombre de la carpeta después de --sistema (mirá npm run sistemas).');
+      } else if (String(args[i]).startsWith('--sistema=')) sistema = String(args[i]).slice('--sistema='.length);
+      else posicionales.push(args[i]);
+    }
+    if (sistema !== null && !sistemaValido(sistema)) throw new Salida(2, `--sistema lleva el nombre de una carpeta (sin rutas ni barras): recibido "${sistema}".`);
+    const [modo = '', slug = '', nombre = ''] = posicionales;
 
     // Carpeta externa: tsconfig.json con paths a este repo y env.d.ts (solo si faltan).
     const prepararExterno = (dir) => {
@@ -126,8 +146,15 @@ export function nuevo(args, log = console.log, err = console.error, opciones = {
       prefTema = '../../';
       prefNivel = '../../../';
     }
+    if (sistema !== null && !existsSync(join(dirname(base), sistema, 'theme.ts'))) {
+      throw new Salida(1, `No hay un design system instalado en ${conBarras(join(dirname(base), sistema))} (falta theme.ts). Los instalados se listan con: npm run sistemas`);
+    }
     mkdirSync(base, { recursive: true });
-    if (!existsSync(join(base, 'theme.ts'))) {
+    if (sistema !== null && !existsSync(join(base, 'theme.ts'))) {
+      const conReport = /\breport\b/.test(readFileSync(join(dirname(base), sistema, 'theme.ts'), 'utf8'));
+      writeFileSync(join(base, 'theme.ts'), temaDeSistema(sistema, conReport));
+      log(`creado ${basePublica}/theme.ts (reexporta el design system "${sistema}")`);
+    } else if (!existsSync(join(base, 'theme.ts'))) {
       writeFileSync(join(base, 'theme.ts'), reescribirTema(readFileSync(join(plantillas, 'theme.ts'), 'utf8'), prefTema));
       log(`creado ${basePublica}/theme.ts`);
     }
@@ -141,6 +168,9 @@ export function nuevo(args, log = console.log, err = console.error, opciones = {
       writeFileSync(indice, indiceDeEscena(readFileSync(indice, 'utf8'), slug, nombre));
       log(`creado ${basePublica}/${nombre} (id de video: ${slug}-${nombre})`);
       if (modo === 'paso') log('falta: reemplazar la interfaz de ejemplo y la tabla de tiempos (T y SENALES) por las del paso real');
+      if (sistema !== null && existsSync(join(base, 'theme.ts')) && !readFileSync(join(base, 'theme.ts'), 'utf8').includes(`../${sistema}/theme`)) {
+        log(`aviso: ${basePublica}/theme.ts ya existía y no reexporta "${sistema}"; no se tocó`);
+      }
       log(`ya se descubre solo (${env.VE_VIDEOS_DIR ? `VE_VIDEOS_DIR=${env.VE_VIDEOS_DIR} ` : ''}npm run render -- --list); no hay que registrarla`);
     } else {
       const dest = join(base, 'historia');
