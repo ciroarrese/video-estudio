@@ -1,4 +1,5 @@
 // Interfaz recreada bajo una cámara: lo que el contrato `data-qa-world` / `data-qa-overlay` / `data-qa-target` cambia en las reglas.
+// Todo esto vale solo si la corrida es de un tutorial (bandera `tutorial` de qa/run.ts: algún cuadro muestreado tiene `data-qa-target` o `data-qa-settled`); sin ella la recolección no lee estas marcas.
 //
 //  - `data-qa-world`: el contenedor que la cámara transforma. Con el mundo ACERCADO (escala > `ZOOM_MIN`) el borde del cuadro corta texto de la interfaz a
 //    propósito: ese texto cortado baja a `info` en offscreen, covered, overlap y contrast. Lo que queda entero dentro del encuadre se juzga normal.

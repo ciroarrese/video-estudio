@@ -6,7 +6,7 @@ import type { Finding } from './types';
 
 const el = (text: string) => ({ tag: 'span', testid: null, text, rect: { x: 0, y: 0, w: 1, h: 1 } });
 const f = (frame: number, text: string, ratio: number): Finding => ({ rule: 'contrast', severity: 'error', frame, message: `contraste ${ratio}:1`, element: el(text), data: { ratio } });
-const res = (findings: Finding[], seconds = 1): QaResult => ({ findings, summary: { videoId: 'v', frames: [0], total: findings.length, errors: findings.length, warnings: 0, infos: 0, byRule: { contrast: findings.length }, judged: emptyJudged(), seconds } });
+const res = (findings: Finding[], seconds = 1): QaResult => ({ findings, summary: { videoId: 'v', frames: [0], total: findings.length, errors: findings.length, warnings: 0, infos: 0, tutorial: false, byRule: { contrast: findings.length }, judged: emptyJudged(), seconds } });
 
 describe('diffReports', () => {
   it('ignora el tiempo', () => {

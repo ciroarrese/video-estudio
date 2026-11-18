@@ -28,7 +28,7 @@ const USAGE = {
 Reglas: ${QA_RULES.join(', ')}  (silenciar: data-qa-ignore="regla" en el elemento o un ancestro; adorno de interfaz: data-qa-decor)
 Interfaz recreada bajo una cámara: data-qa-world (el mundo que la cámara transforma: con zoom, lo que el borde corta baja a info y texto-chico solo juzga el objetivo),
   data-qa-overlay (capa fija con anotaciones: lo que tapa del mundo no cuenta), data-qa-target (objetivo de la señal activa: nunca se exceptúa) y data-qa-settled (en el
-  mundo: cámara asentada). Activan las reglas salto (saltos entre cuadros vecinos) y foco-centro (el objetivo asentado cae en el 60 % central).
+  mundo: cámara asentada). Solo cuentan si la corrida es de un tutorial (algún cuadro muestreado tiene data-qa-target o data-qa-settled; un data-qa-world solo no alcanza). Activan las reglas salto (saltos entre cuadros vecinos) y foco-centro (el objetivo asentado cae en el 60 % central).
 --pares N: cuadros extra (40 por defecto; 0 = ninguno) con sus vecinos alrededor de los cambios de data-qa-settled y de data-qa-target, para la regla salto
 Umbrales: --set salto.px=24 --set salto.ratio=0.25 --set foco-centro.zone=0.6 --set foco-centro.error=0.85`,
   privacy: `Uso: ve-privacy [<videoId>] --deny lista.txt [--deny otra.txt]... [--allow lista.txt]...  [--frames … | --every N | --count 24] [--props json] [--format …] [--scene id|índice] [--scan-source dir]... [--assets dir]... [--allow-missing-fonts] [--json salida.json | --out salida.json]
@@ -178,6 +178,7 @@ async function main(cmd: string, argv: string[]): Promise<number> {
         console.log(`\ncallados (no cuentan arriba): ${parts.join('; ')}`);
       }
       console.log('');
+      if (s.frames.length) console.log(s.tutorial ? 'corrida de tutorial (hay data-qa-target o data-qa-settled): cuentan data-qa-world, data-qa-overlay y data-qa-target, y corren salto y foco-centro' : 'corrida normal (sin data-qa-target ni data-qa-settled): no se tratan como tutorial; salto y foco-centro no corren y data-qa-world no cambia nada');
       if (s.sampling) console.log(`muestreo: ${s.sampling.even} cuadros repartidos + ${s.sampling.anchored} anclados al cuadro local de ${s.sampling.scenes} ${s.sampling.scenes === 1 ? 'escena' : 'escenas'} (hasta ${s.sampling.perScene} por escena: no se mueven si cambia la duración del resto del video; --per-scene 0 los apaga)`);
       if (s.frames.length) for (const l of formatJudged(s.judged)) console.log(l);
       if (s.pares) console.log(`pares consecutivos (regla salto): ${s.pares.juzgados} juzgados de ${s.pares.comparados} comparados${s.pares.cortes ? `; ${s.pares.cortes} salteados por ser cortes de escena o un cambio de pantalla` : ''}; ${s.pares.porTransicion} ${s.pares.porTransicion === 1 ? 'cuadro sumado' : 'cuadros sumados'} alrededor de ${s.pares.cambios} ${s.pares.cambios === 1 ? 'cambio' : 'cambios'} de data-qa-settled/data-qa-target (--pares N)`);

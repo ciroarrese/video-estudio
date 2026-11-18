@@ -8,6 +8,7 @@ import { DEFAULT_PARES, findTransitions } from './pares';
 import { anchoredFrames, DEFAULT_PER_SCENE, sampleFrames, type SampleSpec } from './sampling';
 import { openSession, sceneFrames, type Stress } from './session';
 import type { FormatName } from '../engine';
+import type { PageData } from './types';
 import type { Around } from './types';
 import { mergeThresholds, type ThresholdOverrides } from './thresholds';
 import { candidatesOf, probeReadable, reclassifyDetail } from './zoom';
@@ -66,6 +67,8 @@ export type QaSummary = {
   judged: JudgedSummary;
   /** Estres de tipografia con el que se corrio (si hubo). */
   stress?: Stress;
+  /** La corrida se trató como tutorial de interfaz (algún cuadro muestreado tiene `data-qa-target` o `data-qa-settled`): recién entonces cuentan `data-qa-world`, `data-qa-overlay` y `data-qa-target`, y corren `salto` y `foco-centro`. */
+  tutorial: boolean;
   /**
    * Regla `salto` (solo si el video usa `data-qa-world`, `data-qa-overlay` o `data-qa-target`): pares de cuadros consecutivos `comparados`, `juzgados` (con elementos de los dos
    * cuadros), `cortes` (el paso cruza el inicio de una escena o cambia más de la mitad del mundo: no se juzga) y cuántos cuadros se sumaron al muestreo `porTransicion`
@@ -120,6 +123,9 @@ async function runQaPass(o: QaOptions, honorFixedScale: boolean): Promise<{ resu
       const chk = await session.openPage();
       await comprobarFuentesDelSistema(chk.page, meta.durationInFrames, { strict: !!o.strictFonts || /^(1|true|si|sí|yes)$/i.test(process.env.VE_STRICT_FONTS ?? ''), log: o.log ?? (() => {}) });
     }
+    // Las páginas se abren una vez y se reusan en el muestreo y en las sondas de pares.
+    const pool: Awaited<ReturnType<typeof session.openPage>>[] = [];
+    const pages = async (n: number) => { while (pool.length < n) pool.push(await session.openPage()); return pool.slice(0, n); };
     const findings: Finding[] = [];
     const silenced: SilencedSummary = {};
     const judged = emptyJudged();
@@ -129,30 +135,42 @@ async function runQaPass(o: QaOptions, honorFixedScale: boolean): Promise<{ resu
     const fixedTexts = new Set<string>();
     const fixedFrames = new Set<number>();
     let otherText = false, fullCover = false;
-    // Regla `salto`: los inicios de escena (un paso que los cruza es un corte, no un salto) y los pares ya comparados (el paso a -> a+1, una sola vez aunque lo vean dos cuadros).
-    const wantSalto = rules.includes('salto') && !soloFit;
-    const sceneStarts = wantSalto ? new Set((await session.scenes().catch(() => [])).map((x) => x.from)) : new Set<number>();
-    const pairs = new Map<number, PairStatus>();
-    let usesMarks = false;
-    const processFrame = async (vp: Awaited<ReturnType<typeof session.openPage>>, f: number) => {
+    // Bandera de corrida `tutorial` (se decide después de recolectar los cuadros muestreados, sin renderizar nada de más): algún cuadro tiene `data-qa-target` o `data-qa-settled`.
+    // Los cuadros se recolectan leyendo las marcas (`data-qa-world`, `-overlay`, `-target`) y se juzgan al final; sin la bandera esas marcas se descartan y el control es el de antes de que existieran.
+    let tutorial = false;
+    type Item = { f: number; data: PageData; neighbours: PageData[]; around: Around };
+    const items: Item[] = [];
+    const collectFrame = async (vp: Awaited<ReturnType<typeof session.openPage>>, f: number, marks: boolean): Promise<Item> => {
       await vp.setFrame(f);
-      const data = await collectRuns(vp, meta.width, meta.height, [], undefined, wantOccupancy);
-      if (data.worlds?.length || data.overlays?.length || data.targets?.length) usesMarks = true;
+      const data = await collectRuns(vp, meta.width, meta.height, [], undefined, wantOccupancy, marks);
       // Capturas (normal y con el texto oculto): el fondo para `contrast` y la evidencia de que el texto se ve para `visibleRuns` y `unjudged`.
       if (rules.includes('contrast') || rules.includes('unjudged')) await sampleBackgrounds(vp, data.runs, { bg: rules.includes('contrast'), ink: true });
       // Motion: compare with the neighbouring frames (f-1, f+1) to tell transitions from static defects.
       const keys = coverKeys(data);
-      const neighbours = [];
+      const neighbours: PageData[] = [];
       const around: Around = {};
       for (const n of [f - 1, f + 1]) {
         if (n < 0 || n >= meta.durationInFrames) continue;
         await vp.setFrame(n);
-        const nd = await collectRuns(vp, meta.width, meta.height, keys, undefined, wantOccupancy);
+        const nd = await collectRuns(vp, meta.width, meta.height, keys, undefined, wantOccupancy, marks);
         neighbours.push(nd);
         if (n < f) around.prev = nd; else around.next = nd;
       }
-      if (wantSalto) { around.cutPrev = sceneStarts.has(f); around.cutNext = sceneStarts.has(f + 1); }
       applyMotion(data, neighbours);
+      return { f, data, neighbours, around };
+    };
+    /** Sin la bandera: ningún texto es del mundo, de una capa ni el objetivo, y no hay mundos, capas ni objetivos (como antes de que existieran las marcas). */
+    const withoutMarks = (d: PageData) => {
+      for (const r of d.runs) { r.world = null; r.overlay = false; r.target = false; }
+      delete d.worlds; delete d.overlays; delete d.targets;
+    };
+    const isTutorialFrame = (d: PageData) => !!d.targets?.length || !!d.worlds?.some((w) => w.settled);
+    // Regla `salto`: los inicios de escena (un paso que los cruza es un corte, no un salto) y los pares ya comparados (el paso a -> a+1, una sola vez aunque lo vean dos cuadros).
+    let wantSalto = false;
+    let sceneStarts = new Set<number>();
+    const pairs = new Map<number, PairStatus>();
+    const evaluate = ({ f, data, neighbours, around }: Item) => {
+      if (wantSalto) { around.cutPrev = sceneStarts.has(f); around.cutNext = sceneStarts.has(f + 1); }
       const ctx = { frame: f, width: meta.width, height: meta.height, runs: data.runs, thresholds, signals: data.signals, worlds: data.worlds, overlays: data.overlays, targets: data.targets, ...(wantSalto ? { around } : {}), occupancy: data.occupancy, neighbourOccupancy: neighbours.flatMap((n) => (n.occupancy ? [n.occupancy] : [])) };
       const r = runRulesCounted(ctx, rules);
       findings.push(...r.findings);
@@ -178,18 +196,31 @@ async function runQaPass(o: QaOptions, honorFixedScale: boolean): Promise<{ resu
     const runFrames = async (list: number[]) => {
       const queue = [...list];
       const w = Math.max(1, Math.min(workers, list.length));
-      await Promise.all(Array.from({ length: list.length ? w : 0 }, async () => {
-        const vp = await session.openPage();
-        for (let f = queue.shift(); f !== undefined; f = queue.shift()) await processFrame(vp, f);
+      const vps = list.length ? await pages(w) : [];
+      await Promise.all(vps.map(async (vp) => {
+        for (let f = queue.shift(); f !== undefined; f = queue.shift()) items.push(await collectFrame(vp, f, true));
       }));
     };
     await runFrames(frames);
-    // Pares alrededor de los cambios de `data-qa-settled` / aparición del `data-qa-target` (qa/pares.ts): solo si el video usa las marcas y la regla `salto` está activa.
+    tutorial = !soloFit && items.some((i) => isTutorialFrame(i.data));
+    if (!tutorial) {
+      // Sin la bandera, el único efecto de las marcas en la recolección es que una capa `data-qa-overlay` no cuenta como tapa del texto de un mundo: esos cuadros se recolectan de nuevo sin marcas.
+      const again = items.filter((i) => i.data.runs.some((r) => r.skippedOverlay));
+      const vps = again.length ? await pages(Math.min(workers, again.length)) : [];
+      const queue = [...again];
+      await Promise.all(vps.map(async (vp) => {
+        for (let it = queue.shift(); it; it = queue.shift()) Object.assign(it, await collectFrame(vp, it.f, false));
+      }));
+      for (const i of items) { withoutMarks(i.data); i.neighbours.forEach(withoutMarks); }
+    }
+    wantSalto = rules.includes('salto') && !soloFit && tutorial;
+    if (wantSalto) sceneStarts = new Set((await session.scenes().catch(() => [])).map((x) => x.from));
+    // Pares alrededor de los cambios de `data-qa-settled` / aparición del `data-qa-target` (qa/pares.ts): solo en corridas de tutorial y con la regla `salto` activa.
     let porTransicion = 0, cambios = 0;
     const paresMax = o.pares ?? DEFAULT_PARES;
-    if (wantSalto && usesMarks && paresMax > 0) {
+    if (wantSalto && paresMax > 0) {
       const [a, b] = range ?? [0, meta.durationInFrames - 1];
-      const probes = await Promise.all(Array.from({ length: Math.max(1, workers) }, () => session.openPage()));
+      const probes = await pages(Math.max(1, workers));
       const t = await findTransitions(probes.map((vp) => async (f: number) => { await vp.setFrame(f); return stateSignature(vp); }), a, b, paresMax);
       cambios = t.found;
       const extra = t.frames.filter((f) => !frames.includes(f));
@@ -197,6 +228,8 @@ async function runQaPass(o: QaOptions, honorFixedScale: boolean): Promise<{ resu
       frames.push(...extra);
       await runFrames(extra);
     }
+    items.sort((x, y) => x.f - y.f);
+    for (const it of items) evaluate(it);
     // Detalle que se lee al acercar: un texto chico en el plano general que dentro de la misma escena se ve por encima del mínimo
     // en otro cuadro deja de ser error (ver qa/zoom.ts). Solo si hubo errores de tamaño y no se apagó con probeFrames=0.
     let detail: DetailSummary | null = null;
@@ -246,7 +279,7 @@ async function runQaPass(o: QaOptions, honorFixedScale: boolean): Promise<{ resu
         byRule, ...(detail ? { detailSmallText: detail } : {}),
         // Las claves de `silenced` se insertan en el orden en que terminan los cuadros (según el paralelismo): se ordenan para que el informe sea idéntico entre corridas.
         ...(Object.keys(silenced).length ? { silenced: Object.fromEntries(Object.entries(silenced).sort(([a], [b]) => a.localeCompare(b))) } : {}),
-        ...(decorTexts.size ? { decor: { texts: decorTexts.size, frames: decorFrames.size } } : {}), judged, ...(o.stress ? { stress: o.stress } : {}), ...(sampling ? { sampling } : {}),
+        ...(decorTexts.size ? { decor: { texts: decorTexts.size, frames: decorFrames.size } } : {}), judged, tutorial, ...(o.stress ? { stress: o.stress } : {}), ...(sampling ? { sampling } : {}),
         ...(wantSalto && pairs.size ? { pares: { comparados: pairs.size, juzgados: [...pairs.values()].filter((x) => x === 'juzgado').length, cortes: [...pairs.values()].filter((x) => x === 'corte').length, porTransicion, cambios } } : {}),
         ...(fixed && !fixed.refuse ? { fixedScale: { texts: fixed.texts, frames: fixed.frames } } : {}), seconds: Math.round((Date.now() - t0) / 100) / 10,
       },

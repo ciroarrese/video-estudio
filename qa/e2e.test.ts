@@ -327,6 +327,23 @@ describe.skipIf(!chromium)('qa on the qa-defects video (e2e)', () => {
     expect(summary.judged.partial.worldCut).toBeGreaterThan(0);
     expect(summary.judged.overlayCoverSkipped).toBeGreaterThan(0);
     expect(summary.pares?.juzgados).toBeGreaterThan(0);
+    expect(summary.tutorial).toBe(true);
+    // sinObjetivo corrido junto con los demás casos: la corrida es de tutorial, el texto del mundo que no es el objetivo no se juzga en texto-chico y el salto sí
+    expect(at(M.sinObjetivo, 'texto-chico')).toEqual([]);
+    expect(at(M.sinObjetivo, 'salto')).toEqual(['salto:warn']);
+  }, 300_000);
+
+  it('qa-mundo: un mundo sin objetivo ni asentado no es un tutorial: salto no juzga y texto-chico avisa como siempre', async () => {
+    const solo = await runQa({ videoId: 'qa-mundo', frames: [M.sinObjetivo], perScene: 0 });
+    expect(solo.summary.tutorial).toBe(false);
+    expect(solo.summary.pares).toBeUndefined();
+    expect(solo.findings.filter((f) => f.rule === 'salto' || f.rule === 'foco-centro')).toEqual([]);
+    expect(solo.findings.filter((f) => f.rule === 'texto-chico').map((f) => f.severity)).toEqual(['warn']);
+    expect(solo.summary.judged.partial.worldText).toBeUndefined();
+    // con un objetivo (el caso del salto lleva uno vacío) la misma corrida de un solo caso sí es de tutorial
+    const salto = await runQa({ videoId: 'qa-mundo', frames: [M.saltoJump], perScene: 0, pares: 0 });
+    expect(salto.summary.tutorial).toBe(true);
+    expect(salto.findings.filter((f) => f.rule === 'salto').map((f) => f.severity)).toEqual(['warn']);
   }, 300_000);
 
   it('qa-mundo: los pares alrededor de los cambios de data-qa-settled/data-qa-target se suman solos (acotados por --pares) y el informe es reproducible', async () => {
@@ -345,6 +362,7 @@ describe.skipIf(!chromium)('qa on the qa-defects video (e2e)', () => {
   it('un video sin marcas no usa salto ni foco-centro: ni pares en el resumen ni hallazgos de esas reglas', async () => {
     const r = await runQa({ videoId: 'qa-defects', frames: '0-24' });
     expect(r.summary.pares).toBeUndefined();
+    expect(r.summary.tutorial).toBe(false);
     expect(r.findings.filter((f) => f.rule === 'salto' || f.rule === 'foco-centro')).toEqual([]);
     expect(r.summary.judged.partial).toEqual({ decor: expect.any(Number), veil: expect.any(Number), ignoredSome: expect.any(Number), gradientText: expect.any(Number) });
   }, 180_000);

@@ -11,7 +11,7 @@ Estado de cada punto de este documento al cerrar la etapa 8 (el texto de abajo s
 | 1.3 Etiqueta con lado fijo | Hecho | `calloutDecision` y `Callout fixed`; `placeBeside` acepta `align`. |
 | 1.4 Barra, tarjeta y marco de paso | Hecho | `ProgressBar`, `DataCard` y `StepFrame`. Límite: horizontal-primero, y con la señal `focus` no atenúa lo demás solo. |
 | 1.5 Plantilla de paso | Hecho | `npm run nuevo -- paso <slug> <nombre>`; ejemplo `examples/tutorial-demo`. |
-| 2.1 `qa` y el zoom | Hecho | `data-qa-world` (lo emite `World` siempre) y objetivo nunca exceptuado (`data-qa-target`). |
+| 2.1 `qa` y el zoom | Hecho | `data-qa-world` (lo emite `World` siempre) y objetivo nunca exceptuado (`data-qa-target`). Solo en corridas de tutorial (bandera `tutorial`: hay `data-qa-target` o `data-qa-settled`); en las demás `qa` se comporta como antes. |
 | 2.2 Capas fijas | Hecho | `data-qa-overlay`. |
 | 2.3 Ruido de `texto-chico` | Hecho distinto | Una línea por elemento con la cuenta de cuadros, y solo en planos sostenidos; con `data-qa-world` juzga el objetivo asentado con su tamaño efectivo (letra por zoom). |
 | 2.4 Detector de saltos | Hecho distinto | Regla `salto` (aviso, no error) sobre pares de cuadros consecutivos; `--pares N` suma pares alrededor de cada cambio de foco. Un asentado más corto que el paso de la grilla de sondeo no se ve. |

@@ -10,9 +10,9 @@ const evalStr = <R>(vp: VideoPage, expr: string) => (vp.page.evaluate as unknown
 
 const HIDE_TEXT = `*,*::before,*::after{color:transparent !important;-webkit-text-fill-color:transparent !important;text-shadow:none !important;text-decoration-color:transparent !important;caret-color:transparent !important}svg text{fill:transparent !important;stroke:transparent !important}`;
 
-/** `onlyKeys`: modo liviano, solo mide los textos con esas claves (tamaño en pantalla y opacidad; sin tapados ni recortes). */
-export async function collectRuns(vp: VideoPage, width: number, height: number, elemKeys: string[] = [], onlyKeys?: string[], occupancy = false): Promise<PageData> {
-  const d = await evalStr<Omit<PageData, 'frame'>>(vp, `${collectSrc}(${JSON.stringify({ width, height, elemKeys, onlyKeys, occupancy })})`);
+/** `marks`: se leen `data-qa-world`, `data-qa-overlay` y `data-qa-target` (`qa/run.ts` las descarta si la corrida no es de un tutorial). `onlyKeys`: modo liviano, solo mide los textos con esas claves (tamaño en pantalla y opacidad; sin tapados ni recortes). */
+export async function collectRuns(vp: VideoPage, width: number, height: number, elemKeys: string[] = [], onlyKeys?: string[], occupancy = false, marks = false): Promise<PageData> {
+  const d = await evalStr<Omit<PageData, 'frame'>>(vp, `${collectSrc}(${JSON.stringify({ width, height, elemKeys, onlyKeys, occupancy, marks })})`);
   return { ...d, frame: -1 };
 }
 

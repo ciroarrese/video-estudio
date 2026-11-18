@@ -29,11 +29,14 @@ import { Fill, useFrame } from '../../engine';
  * 20 overlayJump      la capa fija se corre 60 px respecto del objetivo en un cuadro, sin cambiar de lado: aviso `salto`.
  * 21 focoCenter       objetivo asentado en el centro: nada.   22 foco70  centro a 70 % del eje: aviso `foco-centro`.   23 foco95  a 95 %: error.
  * 24 focoTraveling    el mismo objetivo del foco70 pero sin `data-qa-settled`: nada.   25 focoOutside  objetivo fuera del cuadro: error.
+ * 26 sinObjetivo     un mundo sin objetivo ni asentado (como el `World` de un video que no es tutorial) con un salto y un texto chico: corrido SOLO (la corrida no es de tutorial)
+ *                    `salto` no juzga y `texto-chico` avisa como siempre; corrido junto con los demás casos (la corrida sí es de tutorial) el texto del mundo no se juzga.
+ * Los casos 14 a 17 llevan un objetivo vacío fuera del texto (`Ancla`): la corrida de uno solo de ellos cuenta como tutorial.
  */
 export const QA_MUNDO = {
   zoomCut: 1, zoomOne: 4, targetCut: 7, coveredCut: 10, coveredWhole: 13, targetCovered: 16, overlayOverWorld: 19, overlayOverTarget: 22, overlayClip: 25, overlayContrast: 28, contrastNoMark: 31,
   chicoOther: 34, chicoTarget: 37, chicoUnsettled: 40, saltoJump: 43, saltoContinuous: 46, saltoCamera: 49, saltoEntry: 52, sideFlip: 55, overlayGlued: 58, overlayJump: 61,
-  focoCenter: 64, foco70: 67, foco95: 70, focoTraveling: 73, focoOutside: 76,
+  focoCenter: 64, foco70: 67, foco95: 70, focoTraveling: 73, focoOutside: 76, sinObjetivo: 79,
 } as const;
 
 const font: CSSProperties = { fontFamily: 'Arial, Helvetica, sans-serif', color: '#1b1f2a' };
@@ -69,6 +72,9 @@ const Overlay = ({ left, top, text = 'Revisá este dato', w = 260, extra }: { le
 const Target = ({ children, x, y, w, h }: { children?: ReactNode; x: number; y: number; w: number; h: number }) => (
   <div data-testid="objetivo" data-qa-target="" style={{ position: 'absolute', left: x, top: y, width: w, height: h }}>{children}</div>
 );
+
+/** Objetivo vacío y fuera de todo texto: hace que la corrida cuente como tutorial (hay un `data-qa-target`) sin cambiar lo que mide el caso. */
+const Ancla = () => <Target x={1200} y={680} w={40} h={20} />;
 
 export function QaMundo() {
   const f = useFrame();
@@ -124,16 +130,16 @@ export function QaMundo() {
       body = (<World cam={flat}><Target x={200} y={300} w={220} h={20}><Label id="chico" x={0} y={0} text="Nota al pie de la tabla" size={12} /></Target></World>);
       break;
     case 14: // salto: 0, +100, +100
-      body = (<World cam={flat}><Label id="etiqueta-mundo" x={[100, 200, 200][ph]!} y={300} text="Total del período" /></World>);
+      body = (<World cam={flat}><Label id="etiqueta-mundo" x={[100, 200, 200][ph]!} y={300} text="Total del período" /><Ancla /></World>);
       break;
     case 15: // continuo: +50 por cuadro
-      body = (<World cam={flat}><Label id="etiqueta-mundo" x={100 + ph * 50} y={300} text="Total del período" /></World>);
+      body = (<World cam={flat}><Label id="etiqueta-mundo" x={100 + ph * 50} y={300} text="Total del período" /><Ancla /></World>);
       break;
     case 16: // la cámara viaja con todo el mundo
-      body = (<World cam={{ s: 1, tx: -60 * ph, ty: 0 }}><Label id="etiqueta-mundo" x={400} y={300} text="Total del período" /></World>);
+      body = (<World cam={{ s: 1, tx: -60 * ph, ty: 0 }}><Label id="etiqueta-mundo" x={400} y={300} text="Total del período" /><Ancla /></World>);
       break;
     case 17: // entrada con fundido
-      body = (<World cam={flat}><Label id="etiqueta-mundo" x={[100, 200, 200][ph]!} y={300} text="Total del período" style={{ opacity: [0.2, 0.6, 1][ph] }} /></World>);
+      body = (<World cam={flat}><Label id="etiqueta-mundo" x={[100, 200, 200][ph]!} y={300} text="Total del período" style={{ opacity: [0.2, 0.6, 1][ph] }} /><Ancla /></World>);
       break;
     case 18: // capa fija: de la derecha a la izquierda del objetivo
       body = (<><World cam={flat}><Target x={500} y={300} w={200} h={40}><Label id="meta" x={0} y={0} text="Importe" /></Target></World><Overlay left={ph === 0 ? 730 : 240} top={292} w={220} text="Revisá este dato" /></>);
@@ -156,8 +162,11 @@ export function QaMundo() {
     case 24: // esquina, sin asentar
       body = (<World cam={flat}><Target x={1058} y={340} w={60} h={40}><Label id="meta" x={0} y={0} text="Ok" /></Target></World>);
       break;
-    default: // fuera del cuadro
+    case 25: // fuera del cuadro
       body = (<World cam={flat} settled><Target x={1400} y={340} w={60} h={40}><Label id="meta" x={0} y={0} text="Ok" /></Target></World>);
+      break;
+    default: // mundo SIN objetivo ni asentado (como el `World` de un video que no es tutorial): sin la bandera de tutorial
+      body = (<World cam={flat}><Label id="etiqueta-mundo" x={[100, 200, 200][ph]!} y={300} text="Total del período" /><Label id="chico" x={200} y={500} text="Nota al pie de la tabla" size={12.5} /></World>);
   }
   return <Fill style={{ background: '#ffffff' }}>{body}</Fill>;
 }

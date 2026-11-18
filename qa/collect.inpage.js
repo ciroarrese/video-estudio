@@ -6,6 +6,8 @@
   // Opacidad efectiva desde la que un velo de cuadro completo tapa del todo el texto de abajo (ver mas abajo `hiddenBy` y `veil`).
   var VEIL_HIDES = 0.98;
   var onlyKeys = opts.onlyKeys ? new Set(opts.onlyKeys) : null;
+  // `marks`: se leen las marcas de mundo, capa y objetivo (qa/run.ts las descarta después si la corrida no es de un tutorial).
+  var TUT = !!opts.marks;
   var ids = new Map();
   function idOf(el) { if (!ids.has(el)) ids.set(el, ids.size); return ids.get(el); }
   function rectOf(r) { return { x: r.left, y: r.top, w: r.width, h: r.height }; }
@@ -273,9 +275,9 @@
     var transformed = Math.abs(Math.hypot(m.a, m.b) - 1) > 0.01 || Math.abs(Math.hypot(m.c, m.d) - 1) > 0.01 || Math.abs(m.b) > 0.01 || Math.abs(m.c) > 0.01;
     var scale = Math.hypot(m.c, m.d);
     if (!(scale > 0)) scale = 0;
-    var worldEl = el.closest ? el.closest('[data-qa-world]') : null;
-    var elOverlay = !!(el.closest && el.closest('[data-qa-overlay]'));
-    var elTarget = !!(el.closest && el.closest('[data-qa-target]'));
+    var worldEl = TUT && el.closest ? el.closest('[data-qa-world]') : null;
+    var elOverlay = TUT && !!(el.closest && el.closest('[data-qa-overlay]'));
+    var elTarget = TUT && !!(el.closest && el.closest('[data-qa-target]'));
     var fontPx = parseFloat(cs.fontSize);
     var fill = textFill(el, cs);
     var weight = parseInt(cs.fontWeight, 10) || 400;
@@ -453,9 +455,9 @@
     return a;
   }
   var worlds = [], overlays = [], targets = [];
-  Array.prototype.forEach.call(stage.querySelectorAll('[data-qa-world]'), function (e) { if (!visibleEl(e)) return; var w = worldOf(e); worlds.push({ key: w.key, rect: rectOf(e.getBoundingClientRect()), zoom: w.zoom, settled: w.settled }); });
-  Array.prototype.forEach.call(stage.querySelectorAll('[data-qa-overlay]'), function (e) { if (!visibleEl(e) || (e.parentElement && e.parentElement.closest('[data-qa-overlay]'))) return; overlays.push(anchorOf(e, true)); });
-  Array.prototype.forEach.call(stage.querySelectorAll('[data-qa-target]'), function (e) { if (!visibleEl(e) || (e.parentElement && e.parentElement.closest('[data-qa-target]'))) return; targets.push(anchorOf(e, false)); });
+  if (TUT) Array.prototype.forEach.call(stage.querySelectorAll('[data-qa-world]'), function (e) { if (!visibleEl(e)) return; var w = worldOf(e); worlds.push({ key: w.key, rect: rectOf(e.getBoundingClientRect()), zoom: w.zoom, settled: w.settled }); });
+  if (TUT) Array.prototype.forEach.call(stage.querySelectorAll('[data-qa-overlay]'), function (e) { if (!visibleEl(e) || (e.parentElement && e.parentElement.closest('[data-qa-overlay]'))) return; overlays.push(anchorOf(e, true)); });
+  if (TUT) Array.prototype.forEach.call(stage.querySelectorAll('[data-qa-target]'), function (e) { if (!visibleEl(e) || (e.parentElement && e.parentElement.closest('[data-qa-target]'))) return; targets.push(anchorOf(e, false)); });
   var out = { width: W, height: H, runs: runs, elems: elems, opac: opac, fixedRoots: fixedRoots, signals: signals, occupancy: occupancy };
   if (worlds.length) out.worlds = worlds;
   if (overlays.length) out.overlays = overlays;
