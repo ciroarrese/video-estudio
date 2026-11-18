@@ -10,10 +10,11 @@
 // (`video-estudio/engine`, ...) y crea tsconfig.json y env.d.ts de esa carpeta si faltan.
 // No hay que registrar nada: el runtime descubre solo toda carpeta videos/<slug>/**/index.ts (ver SKILL.md).
 // Código de salida: 0 bien, 1 el destino ya existe o falta algo previo, 2 uso incorrecto.
-// Sin dependencias: corre con Node solo.
+// Sin dependencias de paquetes: corre con Node solo. Lo único que importa del repo es render/config-local.mjs (JavaScript plano, para leer .video-studio.local.json).
 import { cpSync, existsSync, mkdirSync, readFileSync, readdirSync, realpathSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
+import { aplicarConfigLocal } from '../render/config-local.mjs';
 
 const raiz = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 
@@ -75,6 +76,8 @@ const reescribirArchivos = (dir, extensiones, f) => {
 export function nuevo(args, log = console.log, err = console.error, opciones = {}) {
   const repo = opciones.repo ?? raiz;
   const env = opciones.env ?? process.env;
+  // Configuración local (`.video-studio.local.json`): completa VE_VIDEOS_DIR si la persona no la definió. Con `env` propio (pruebas) no se toca.
+  if (!opciones.env) aplicarConfigLocal(env, repo);
   const plantillas = join(repo, 'templates');
   try {
     const [modo = '', slug = '', nombre = ''] = args;

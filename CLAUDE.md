@@ -28,9 +28,12 @@ npm run qa -- <id> --themes all --count 40   # si el video debe funcionar con m�
 npm run qa -- <id> --count 40 --font-fallback wide --font-scale 1.25   # estrés de tipografía: 0 errores (maquetación que no supone las medidas de una fuente)
 npm run privacy -- <id> --deny videos/<slug>/prohibidos.txt --scan-source videos/<slug>
 npm run sheet -- <id> --count 12        # y mirar la hoja
+npm run audio -- informe --video <id> --sfx videos/<slug>/audio/sfx   # si lleva sonido: el agente no oye, el informe de mezcla es la verificación (mismas opciones que `mezcla`; `docs/audio.md`)
 ```
 
 Con `VE_VIDEOS_DIR` (videos fuera del repo) las rutas `videos/<slug>/...` de `--deny`, `--allow`, `--scan-source` y `--assets` se buscan también en esa carpeta; `npm run audio` las resuelve igual (las entradas tal cual y, si no existen, contra esa carpeta; las salidas caen en la carpeta del video).
+
+Tutorial de interfaz (recorrido de una aplicación recreada): se arma con `npm run nuevo -- paso <slug> <nombre>` y `StepFrame` (`kit/README.md`, "Tutorial de interfaz"; criterios en `docs/guia-escenas.md`, sección 18; ejemplo `examples/tutorial-demo`). `qa` suma `salto` y `foco-centro` (`--pares N`) con las marcas `data-qa-*` que el marco pone solo. Para mandar el mp4 por un canal con tope de tamaño: `--liviano`; para ordenar `out/`: `npm run limpiar -- <slug>`. Con videos fuera del repo, `.video-studio.local.json` en la raíz (`{ "videosDir": "<carpeta>" }`) evita repetir `VE_VIDEOS_DIR`.
 
 Cómo leer `qa`: la línea **`juzgados: N de M textos x cuadros (P%)`** dice cuánto texto se juzgó de verdad y por qué no se juzgó el resto (fuera del cuadro, casi transparente, tapado por una capa opaca, excluido con `data-qa-ignore="all"`); con menos de la mitad juzgado, un "0 errores" no dice nada. Mirá también cuántos hallazgos callaron las marcas (`callados`). `--repeat 2` corre el control dos veces y sale con código 3 si los informes difieren. Una marca `data-qa-ignore` lleva un comentario que dice por qué y nunca va en un contenedor más ancho que el elemento del que habla (`docs/reglas.md`). Reglas de maquetación para otro design system: `docs/guia-escenas.md`, sección 15.
 

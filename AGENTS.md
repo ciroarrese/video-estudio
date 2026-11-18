@@ -19,4 +19,5 @@ Todos los comandos corren desde la raíz de este repo. Si algo falla al arrancar
 - No leer ni copiar código fuente de otros frameworks de video (`docs/ORIGEN.md`).
 - Las interfaces se recrean con su estructura y sus rótulos; no se usan capturas.
 - Para señalar se usa `Callout` (la señal la pone el tema); nada de flechas ni garabatos por costumbre.
-- Antes de dar algo por terminado, la lista de control de `CLAUDE.md` ("Antes de dar algo por terminado").
+- Para un tutorial de interfaz: `npm run nuevo -- paso <slug> <nombre>` y `StepFrame` (`kit/README.md`, "Tutorial de interfaz"; `docs/guia-escenas.md`, sección 18).
+- Antes de dar algo por terminado, la lista de control de `CLAUDE.md` ("Antes de dar algo por terminado"), con `npm run audio -- informe` si el video lleva sonido.

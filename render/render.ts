@@ -261,8 +261,9 @@ export async function videoCodeFiles(root: string, bundleDir: string, source: st
   const at = (f: string) => (videosDir && (f === 'videos' || f.startsWith('videos/')) ? join(videosDir, f.slice('videos/'.length)) : join(root, f));
   const files = new Set<string>();
   for (const f of [...deps.runtime, ...own, 'package-lock.json', 'tsconfig.json', 'vite.config.ts', 'engine/runtime/index.html']) files.add(at(f));
+  // `referencias/` (capturas y notas de la persona, ver la skill) no es código del video: agregar una captura no puede invalidar las partes. Si el código importa un archivo de ahí, entra por `own`.
   const carpeta = at(source);
-  if (existsSync(carpeta)) for (const f of statSync(carpeta).isDirectory() ? walk(carpeta, [], (nombre, depth) => depth === 0 && (nombre === 'assets' || nombre === 'audio')) : [carpeta]) files.add(f);
+  if (existsSync(carpeta)) for (const f of statSync(carpeta).isDirectory() ? walk(carpeta, [], (nombre, depth) => depth === 0 && (nombre === 'assets' || nombre === 'audio' || nombre === 'referencias')) : [carpeta]) files.add(f);
   // El audio no entra en la huella: se mezcla al final sobre las partes de video en cache y no cambia ningún cuadro.
   const present = [...files].filter((f) => existsSync(f) && statSync(f).isFile() && !esArchivoDeAudio(f));
   const h = createHash('sha256');

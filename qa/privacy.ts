@@ -38,7 +38,8 @@ export const isSourceFile = (name: string): boolean => {
   const n = name.toLowerCase();
   return SOURCE_EXT.has(extname(n)) || n === '.env' || n.startsWith('.env.') || basename(n).endsWith('.env');
 };
-const SKIP_DIR = new Set(['node_modules', 'dist', 'out', '.git', '.ve-cache']);
+/** `referencias/` es el material que manda la persona (capturas, notas con datos reales): nunca entra al video ni al código, así que no se escanea (ver la skill, etapa 1). */
+const SKIP_DIR = new Set(['node_modules', 'dist', 'out', '.git', '.ve-cache', 'referencias']);
 
 /** Los archivos de listas se llaman `prohibidos.txt` por convencion: nunca se escanean. */
 export const DENY_LIST_NAME = 'prohibidos.txt';

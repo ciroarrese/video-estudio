@@ -30,6 +30,17 @@ describe('privacy --scan-source', () => {
     expect(r.findings).toEqual([]);
   });
 
+  it('no escanea videos/<slug>/referencias/ (material de referencia con datos reales) pero sí el resto', async () => {
+    const dir = setup();
+    mkdirSync(join(dir, 'v', 'referencias'));
+    writeFileSync(join(dir, 'v', 'referencias', 'notas.md'), 'la captura muestra a ZZCorp\n');
+    const r = await runPrivacy({ deny: 'zzcorp\n', scanSource: [join(dir, 'v')], skipFiles: [join(dir, 'v', 'otra-lista.txt')] });
+    expect(r.findings).toEqual([]);
+    expect(r.scannedFiles).toBe(1);
+    writeFileSync(join(dir, 'v', 'malo.tsx'), 'const c = "ZZCorp";\n');
+    expect((await runPrivacy({ deny: 'zzcorp\n', scanSource: [join(dir, 'v')], skipFiles: [join(dir, 'v', 'otra-lista.txt')] })).findings.map((f) => f.where)).toEqual([expect.stringContaining('malo.tsx:1')]);
+  });
+
   it('sigue encontrando el termino en el resto del codigo', async () => {
     const dir = setup();
     writeFileSync(join(dir, 'v', 'malo.tsx'), 'const c = "ZZCorp";\n');

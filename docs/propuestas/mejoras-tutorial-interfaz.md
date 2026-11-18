@@ -1,5 +1,34 @@
 # Mejoras para Video Studio a partir de un tutorial de interfaz
 
+## Estado
+
+Estado de cada punto de este documento al cerrar la etapa 8 (el texto de abajo se conserva tal como se escribió). Dónde está cada cosa: `kit/README.md` ("Tutorial de interfaz"), `qa/README.md`, `render/README.md`, `docs/audio.md`, `docs/guia-escenas.md` (sección 18) y la skill.
+
+| Punto | Estado | Dónde / por qué |
+|---|---|---|
+| 1.1 Cámara guiada por focos | Hecho | `guidedCameraPlan` y `guidedCameraKeys` (`kit/`); paradas a mano con `stops` y `returnAt`. |
+| 1.2 Cámara sin inclinación | Hecho | Perfil `plana` de `cameraAt` y `projectRect` / `projectPoint` (con inclinación proyectan las esquinas y fallan con un mensaje claro si una queda detrás de la cámara). |
+| 1.3 Etiqueta con lado fijo | Hecho | `calloutDecision` y `Callout fixed`; `placeBeside` acepta `align`. |
+| 1.4 Barra, tarjeta y marco de paso | Hecho | `ProgressBar`, `DataCard` y `StepFrame`. Límite: horizontal-primero, y con la señal `focus` no atenúa lo demás solo. |
+| 1.5 Plantilla de paso | Hecho | `npm run nuevo -- paso <slug> <nombre>`; ejemplo `examples/tutorial-demo`. |
+| 2.1 `qa` y el zoom | Hecho | `data-qa-world` (lo emite `World` siempre) y objetivo nunca exceptuado (`data-qa-target`). |
+| 2.2 Capas fijas | Hecho | `data-qa-overlay`. |
+| 2.3 Ruido de `texto-chico` | Hecho distinto | Una línea por elemento con la cuenta de cuadros, y solo en planos sostenidos; con `data-qa-world` juzga el objetivo asentado con su tamaño efectivo (letra por zoom). |
+| 2.4 Detector de saltos | Hecho distinto | Regla `salto` (aviso, no error) sobre pares de cuadros consecutivos; `--pares N` suma pares alrededor de cada cambio de foco. Un asentado más corto que el paso de la grilla de sondeo no se ve. |
+| 2.5 Foco centrado | Hecho | Regla `foco-centro` (aviso hasta 85 % de desvío, error más allá). |
+| 3.1 Caché sin invalidaciones de más | Hecho en parte | Hecho: la clave solo cuenta los estáticos que el render pidió de verdad; `audio/fuentes/` no se sirve ni entra a la caché; `render` dice por qué no reutilizó. **No hecho: el "prop de solo sonido"** (que apagar el sonido de una escena no vuelva a renderizar el video): no hay forma segura de saber qué props afectan solo al audio sin que cada video lo declare, y declararlo es una API nueva que no se diseñó. Cambiar solo la mezcla ya tarda segundos. |
+| 3.2 Esperas largas | Hecho | `render` imprime el tiempo restante estimado; la skill avisa la duración y manda un mensaje a mitad de camino si pasa de 5 minutos. |
+| 3.3 Copia liviana | Hecho | `--liviano [MB]`. |
+| 3.4 Salidas viejas | Hecho | `npm run limpiar -- <slug>`. |
+| 4.1 Normalizar vs. música | Hecho | Aviso al combinar `--lufs` y `--musica-gain`, y `--musica-bajo-efectos <dB>`. |
+| 4.2 Informe de mezcla | Hecho (con una salvedad) | `npm run audio -- informe`. La detección de voz es una heurística: solo se probó con voz sintética, no con voces reales; un aviso dice "revisá este tramo". |
+| 4.3 Cues por escena | Hecho | `cues` relativos a la escena y `mezcla --video <id>`. |
+| 4.4 Audio propio de una escena | Hecho | `audioPropio` en la escena; `empalme` y `mezcla` terminan o bajan la música ahí. |
+| 4.5 Detalles menores | Hecho | mp3 a wav automático (en `audio/fuentes/`), `--gain nombre=0` nombrado en la skill y en `docs/audio.md`, pausas internas de la pista informadas por `empalme`. |
+| 5.1 a 5.5 Skill | Hecho | Cuestionario ampliado, modo corrido, `referencias/`, respaldo con `git init` local y `.video-studio.local.json` (ver `.claude/skills/video-estudio/SKILL.md`). |
+| 6 Privacidad | Hecho | La ficha `datos-emulados.txt` es lista de permitidos (valores o `/regex/`), el formato de comprobante se reconoce antes de clasificar un teléfono. |
+| 7 Criterios de tutoriales | Hecho | `docs/guia-escenas.md`, sección 18. |
+
 Documento de trabajo, escrito el 18/11/2026. Reúne lo que costó, lo que hubo que construir a mano y lo que la persona corrigió durante la producción de un video real, para llevarlo al proyecto original (motor, kit, QA, audio, skill y documentación).
 
 ## Alcance

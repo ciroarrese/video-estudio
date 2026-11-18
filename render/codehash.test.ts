@@ -38,6 +38,32 @@ describe('videoCodeHash (cache por video)', () => {
   });
 });
 
+describe('la huella de código ignora videos/<slug>/referencias/ (material de referencia de la persona)', () => {
+  it('agregar o cambiar una captura o una nota ahí no cambia la huella; un archivo de código del video sí', async () => {
+    const root = mkdtempSync(join(tmpdir(), 've-hash-ref-'));
+    try {
+      const w = (f: string, t: string) => {
+        mkdirSync(join(root, f, '..'), { recursive: true });
+        writeFileSync(join(root, f), t);
+      };
+      for (const f of ['package-lock.json', 'tsconfig.json', 'vite.config.ts', 'engine/runtime/index.html', 'videos/uno/index.ts', 'videos/uno/referencias/pantalla-1.png']) w(f, f + '1');
+      const bundle = join(root, 'bundle');
+      mkdirSync(bundle);
+      writeFileSync(join(bundle, 've-deps.json'), JSON.stringify({ runtime: [], videos: { 'videos/uno': ['videos/uno/index.ts'] } }));
+      const h = () => videoCodeHash(root, bundle, 'videos/uno', { videosDir: null });
+      const h0 = await h();
+      w('videos/uno/referencias/pantalla-1.png', 'otra captura');
+      w('videos/uno/referencias/pantalla-2.png', 'una captura nueva');
+      w('videos/uno/referencias/README.md', 'qué pantalla es cada una');
+      expect(await h()).toBe(h0);
+      w('videos/uno/datos.json', 'un archivo del video que sí cuenta');
+      expect(await h()).not.toBe(h0);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+});
+
 describe('la huella de código no incluye los estáticos (los sigue el manifiesto de cada parte)', () => {
   it('audio, public/ y las carpetas assets/ y audio/ del video no cambian la huella; el código y otros archivos del video sí', async () => {
     const root = mkdtempSync(join(tmpdir(), 've-hash-audio-'));
