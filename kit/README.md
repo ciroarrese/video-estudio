@@ -28,7 +28,7 @@ Sin cambios (no tienen forma ni superficie): `Cursor`, `FlyingCard` (dibuja lo q
 ## Piezas
 
 - **Ayudas**: `kf(frame, claves, valores, easing?)` cuadros clave; `track(frame, [[f, x, y], ...])` trayectos 2D; `typed(texto, frame, inicio, cps)` texto que se escribe.
-- **Cámara**: `cameraAt(frame, claves, opts?)` devuelve `{x, y, scale, rx, ry, blur}` con inclinación y desenfoque según la velocidad (cámara quieta = sin inclinación ni desenfoque; topes configurables). `<World camera width height>` aplica la transformación y el desenfoque a sus hijos (coordenadas del mundo). `zoomThrough(frame, [ini, fin], cam, objetivo, power?)` convierte la cámara en un atravesado de un punto (se pasa por `opts.map`). `<Wash frame range color?>` velo de cierre de escena; `useCameraAt(frame, claves, opts?)` es `cameraAt` con los valores del estilo.
+- **Cámara**: `cameraAt(frame, claves, opts?)` devuelve `{x, y, scale, rx, ry, blur}` con inclinación y desenfoque según la velocidad (cámara quieta = sin inclinación ni desenfoque; topes configurables). `<World camera width height settled?>` aplica la transformación y el desenfoque a sus hijos (coordenadas del mundo) y marca su contenedor con `data-qa-world`. `zoomThrough(frame, [ini, fin], cam, objetivo, power?)` convierte la cámara en un atravesado de un punto (se pasa por `opts.map`). `<Wash frame range color?>` velo de cierre de escena; `useCameraAt(frame, claves, opts?)` es `cameraAt` con los valores del estilo.
 - **Cursor y viñeta**: `<Cursor frame keys clicks show>` con onda de clic en el acento; `<Vignette amount color? strength?>` (color del design system, el acento por defecto; `color` es un rol del tema o `data.<nombre>`).
 - **Profundidad**: `flyInZ(progress, { from, perspective, x, y, rotateX, rotateY, fade })` devuelve el `style` de una entrada en profundidad para un elemento (ver abajo).
 - **Garabatos** (solo para sistemas de trazo a mano; para señalar, `Callout`) (trazo a mano que "hierve": el temblor se vuelve a sortear cada `boil` cuadros, 3 por defecto): `<DoodleCircle>`, `<DoodleArrow>`, `<DoodleUnderline>`; se dibujan y se desvanecen por cuadro; el trazo usa acento → acento 2 del tema. Cada uno necesita un `id` único.
@@ -43,6 +43,46 @@ Sin cambios (no tienen forma ni superficie): `Cursor`, `FlyingCard` (dibuja lo q
 - **Piezas de interfaz** (para recrear formularios, listas y avisos; `kit/ui.tsx`): `<Chip>`, `<Button>`, `<Avatar>`, `<Check>`, `<ListRow>` e `<Icon>`. Ver la tabla "Piezas de interfaz" abajo.
 - **Subtítulos**: `<Subtitles cues estilo?>` (bloque o karaoke), hasta dos renglones medidos con `textWidth`, en el área segura de cada formato; `subtitleBand` es la franja que hay que dejar libre; lectores y escritores de JSON, SRT y VTT y `subtitulosDeGuion` en `kit/subtitulos.ts`. Guía completa: `docs/subtitulos.md`.
 - **Maquetar sin píxeles fijos** (ver "Disposición y medidas" abajo): `textWidth(theme, texto, opts)` ancho medido; `<Callout>`, `placeBeside`, `calloutState` y `coveredOpacity` para una pastilla que se pone en lugar libre; `headlineStrip` y `cameraKeepClear` para dejar libre la franja del titular; `cameraView` para saber qué ve la cámara. Atenuar texto: `dimOpacity` / `dimmedColor` (en `themes/`).
+
+## Tutorial de interfaz
+
+Para un recorrido de una interfaz recreada: la cámara va de un foco al siguiente, cada foco queda **centrado** y lo que lo explica va **pegado** a él. Todo es función pura del cuadro y del tema. Receta corta: `npm run nuevo -- paso <slug> <nombre>` (la escena declara una interfaz y una tabla de tiempos) y el ejemplo `examples/tutorial-demo` (dos pasos, 10 s).
+
+| Pieza | Qué hace |
+|---|---|
+| `<StepFrame overview zoom signals step? profile? keepClear? overlay? stops? returnAt? arrive? travel? margin? safe? targetPad?>` | El marco de paso. Recibe la cámara (vista general `{ x, y, scale? }`, rango de zoom `{ in, out? }`) y la lista de señales (`StepSignal`: `id?`, `target` (rectángulo del mundo), `start`, `duration`, `label?`, `labelSide?`, `card?: { label, value, side }`, `scale?`, `arrive?`, `variant?`) y dibuja la cámara guiada, el foco, la etiqueta, la tarjeta de dato y la barra de progreso (`step: { index, count, duration }`). La interfaz (en coordenadas del mundo) va de hijo. Los cuadros son los del contexto: dentro de un `Sequence`, los de ese paso. El perfil de cámara es `plana` por defecto. Con la señal `focus` del tema dibuja el anillo; atenuar lo demás es cosa de la escena (`FocusGroup` sobre lo que no es el objetivo). |
+| `guidedCameraPlan(opts)` / `guidedCameraKeys(opts)` | Función pura que devuelve las claves de cámara (`CameraKey[]`) y las paradas (`GuidedStop`: `id`, `kind`, `arrive`, `depart`, `key`, `fits`). Arranca en la vista general; el acercamiento es el viaje al primer objetivo y cada objetivo queda centrado en el cuadro. Llega `arrive` cuadros después del inicio de la señal (14) y viaja en `travel` (22): sostiene la parada anterior y sale `travel` cuadros antes de llegar (si no hay tiempo, sale en cuanto llegó, con un viaje más corto). La escala es `zoom.in` y **solo** baja si el objetivo (con `targetPad`, 16) no entra en el área útil (el cuadro menos `margin`, 80, o `safe`): hasta `zoom.out` (por defecto la escala de la vista general); `fits: false` dice que ni así entra. `stops` suma encuadres a mano (llegan en su cuadro `f`) y `returnAt` vuelve a la vista general. Dos paradas que llegan en el mismo cuadro lanzan un error en español. `guidedSettledAt(plan, frame)` da la señal sobre la que está asentada la cámara. |
+| `cameraAt(frame, keys, { profile: "plana" })` / `useCameraAt` | El perfil `plana` (`CAMERA_PROFILES`) apaga inclinación y desenfoque de movimiento: es la cámara de un recorrido de interfaz, donde las capas fijas se anclan con una proyección exacta. Lo explícito en `opts` gana al perfil, y el perfil gana a lo que pide el tema (`cameraTilt`, `cameraBlur`). |
+| `projectRect(rect, cam, { width, height }, { perspective? })` y `projectPoint` | Dónde cae en pantalla un rectángulo (o un punto) del mundo con una cámara dada: la misma cuenta que `World`. Sin inclinación es la cuenta plana; con inclinación proyecta las cuatro esquinas con la perspectiva de `World` y devuelve la caja envolvente; si una esquina queda detrás de la cámara lanza un error que lo dice y sugiere el perfil `plana`. Es lo que ancla una capa de pantalla a algo del mundo sin quedar desfasada un cuadro. |
+| `calloutDecision(theme, opts)` y `<Callout fixed={{ side, align }}>` | Lado y alineación de la etiqueta decididos **una sola vez**. `calloutDecision` se llama con el objetivo ya asentado (proyectado con la cámara final de su señal) y devuelve `{ side, align }`; pasado a `fixed` en cada cuadro, la pastilla ocupa siempre ese lado y solo sigue al rectángulo, sin cambiar de lado mientras la cámara viaja. Sin `fixed`, `Callout` se comporta como siempre. `placeBeside` acepta `align` (0, 0,5 o 1) y `decideBeside` devuelve lado y alineación elegidos. |
+| `<DataCard target label value side? fixed? range avoid? within? gap? size?>` | Tarjeta de dato ampliado: rótulo chico y valor grande junto al foco, del lado indicado. Superficie `card` del tema, caja medida con `textWidth`, entrada `entrance`. `dataCardDecision` y `dataCardPlacement` dan la misma cuenta fuera de la pieza. |
+| `<ProgressBar step steps progress? thickness?>` | Una sola barra fina arriba, sin fondo ni rótulo, del color de acento: avanza con el paso y el avance dentro del paso (`stepProgress(step, steps, within)`). Ancho y alto enteros. |
+
+Límites del marco: es horizontal-primero (la disposición de la interfaz la decide quien la escribe: `useFormat().pick`); con la señal `focus` no atenúa lo demás solo (el objetivo está dentro del mundo, y `FocusGroup` atenúa todo lo que envuelve); la tarjeta con un lado sin lugar (por ejemplo `right` con el objetivo ya ancho) se corre y puede pisar el foco: elegí un lado con aire (`StepSignal.card.side`).
+
+### Marcas para `qa`
+
+El marco las pone; quien arme el mundo a mano con `World` puede ponerlas igual. Son atributos sin efecto visual.
+
+| Atributo | Dónde va | Qué dice |
+|---|---|---|
+| `data-qa-world` (`"true"`) | El contenedor que la cámara transforma (lo agrega `World` siempre). | Lo que hay adentro se mueve con la cámara y el encuadre puede cortarlo a propósito: no es un error que una parte quede fuera del cuadro. |
+| `data-qa-overlay` | Las capas fijas en espacio de pantalla que son anotaciones del video: la etiqueta y el trazo del foco (`Callout overlay`), la tarjeta de dato (`DataCard`) y la barra de progreso (valor `"progreso"`: no está anclada a un objetivo). | Lo que esas capas tapan no cuenta como defecto, salvo que sea el objetivo de la señal activa. |
+| `data-qa-target` (el `id` de la señal) | El elemento, o un `div` transparente con su geometría dentro del mundo, que es el objetivo de la señal **activa** en ese cuadro (desde `start` hasta `start + duration`). | Ese objetivo nunca se exceptúa: si está cortado o tapado, es un defecto. |
+| `data-qa-settled` (`"true"`) | El mismo contenedor `data-qa-world`, mientras la cámara está asentada sobre una señal (llegó y todavía no salió hacia la siguiente). No se emite viajando, en la vista general ni en una parada a mano. | Es cuando el objetivo tiene que estar centrado y legible. |
+
+```tsx
+// Una escena de un paso: la interfaz y una tabla de tiempos. El marco hace el resto.
+const SENALES: StepSignal[] = [
+  { id: "fecha", target: CAMPO_FECHA, start: 14, duration: 60, label: "Elegí la fecha", card: { label: "Cupos libres", value: "12 de 20", side: "below" } },
+  { id: "boton", target: BOTON, start: 80, duration: 50, label: "Confirmá con este botón" },
+];
+<StepFrame overview={{ x: width / 2, y: height / 2 }} zoom={{ in: 1.6 }} step={{ index: 0, count: 2, duration: 150 }} signals={SENALES}>
+  <Interfaz />
+</StepFrame>
+```
+
+Dos cosas que conviene saber: (1) un texto de la interfaz que se posiciona de forma absoluta dentro de `World` necesita `whiteSpace: "nowrap"` (el mundo mide 1 x 1 px y el texto se parte en cada palabra); (2) el texto de las capas fijas no escala con la cámara, así que se lee igual en el plano general y en el acercado.
 
 ## Referencia de firmas
 
@@ -60,7 +100,7 @@ Props exactas de las piezas que más se usan (todas aceptan `frame?` para fijar 
 | `Wash` | `range: [ini, fin]`, `color?` | Velo de cuadro completo (color del fondo del tema por defecto). Va fuera de `World`, al final del contenido. Lleva `data-qa-veil` para que `qa` lo trate como transición. |
 | `Subtitles` | `cues: Subtitulo[]` (segundos), `estilo = "bloque"` (o `"karaoke"`), `offsetSec = 0`, `size?`, `bottom?` | Subtítulo activo de hasta dos renglones, abajo y al centro; en vertical por encima de la zona de las redes. Sale todo del tema (`surfaceStyle`, `entrance`, `cornerRadius`); no corta con "…": si no entra en dos renglones, pagina. Va en la escena raíz, sobre los velos. `subtitleBand(theme, { width, height })` da la franja (`Rect`) para dejarla libre. |
 | `ThemeScope` | `theme: Theme`, `paint = false`, `font = false`, `style?`, `children` | Cambia el tema de un subárbol. Con `paint`, pinta una superficie (el `style` le da posición, tamaño, radio y sombra). Con `font` y sin `paint`, aplica la tipografía del tema del ámbito (`font.family`, un contenedor `display: contents`: no cambia la maquetación); sirve para una interfaz recreada con otra letra que el video. Ver `docs/guia-escenas.md`, sección 10. |
-| `World` | `camera`, `width`, `height`, `perspective = 2400`, `children` | `width`/`height` del formato (`useFormat()`), no 1920x1080 escritos a mano. |
+| `World` | `camera`, `width`, `height`, `perspective = 2400`, `settled?`, `children` | `width`/`height` del formato (`useFormat()`), no 1920x1080 escritos a mano. |
 | `Stage` | `clouds = true`, `cloudOpacity?`, `cloud?: CloudOptions`, `children` | Fondo, tipografía y nubes del tema. `cloud` (`colors`, `count`, `seed`, `blobs`, `opacity`, `blur`) pisa lo que declara `theme.cloud` solo en esa escena. |
 | `CloudBackground` | `colors?`, `count?`, `seed?`, `blobs?`, `opacity?`, `blur?` (por defecto `theme.cloud.blur`, y si no, 110), `width?`, `height?` | Cada propiedad pisa a `theme.cloud`. `colors` y `blobs[].color` aceptan roles (`"accent2"`, `"data.estado"`, `"chart[2]"`) o colores del tema. `blobs: { x, y, size? }[]` (x, y en fracciones del cuadro) reemplaza el reparto sembrado. |
 | `Vignette` | `amount: number` (0 a 1), `color?` (por defecto `decor.vignetteColor`: el acento), `strength = 1` | Oscurece los bordes; usala con el zoom. Es un degradado de cuadro completo: cae sobre el texto cercano a un borde (no es transparente a `qa`: lo que hay debajo se sigue juzgando) y `editorial` no la dibuja. `color`: rol del tema (`"bg"`, `"text"`, `"data.x"`) o color sacado del tema; en una interfaz oscura, `color="bg"` y un `strength` bajo evitan teñirla. Opacidad del borde: `0,22 * strength * amount`. |

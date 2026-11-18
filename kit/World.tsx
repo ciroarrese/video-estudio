@@ -11,18 +11,24 @@ const r3 = (n: number) => Math.round(n * 1000) / 1000;
  * (sin `perspective` ni `transform-style: preserve-3d` en un ancestro) y el elemento se ubica en
  * `left: 0; top: 0` enteros con todo el movimiento dentro del `transform`: así Chromium rasteriza
  * igual sin importar el historial de cuadros. El mundo se inclina como un plano.
+ *
+ * El contenedor que la cámara transforma lleva `data-qa-world` (marca para `qa`: el mundo se mueve con la cámara y el encuadre puede cortar lo que hay
+ * en él) y, si la escena pasa `settled`, `data-qa-settled="true"` mientras la cámara está asentada sobre una señal.
  */
 export function World({
   camera,
   width,
   height,
   perspective = 2400,
+  settled,
   children,
 }: {
   camera: Camera;
   width: number;
   height: number;
   perspective?: number;
+  /** La cámara está asentada sobre una señal (no viaja): agrega `data-qa-settled` al contenedor del mundo. Lo pone `StepFrame`; sin esta prop no se emite. */
+  settled?: boolean;
   children?: React.ReactNode;
 }) {
   const flat = Math.abs(camera.rx) < 1e-6 && Math.abs(camera.ry) < 1e-6;
@@ -43,7 +49,7 @@ export function World({
   };
   return (
     <div style={{ position: "absolute", left: 0, top: 0, width, height }}>
-      <div key={st.filter ? "blur" : "sharp"} style={st}>
+      <div key={st.filter ? "blur" : "sharp"} data-qa-world="true" data-qa-settled={settled ? "true" : undefined} style={st}>
         {children}
       </div>
     </div>

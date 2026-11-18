@@ -9,3 +9,4 @@ export function carpetasDeSalida(env: Record<string, string | undefined>, raizRe
 export function lineaDeInforme(r: Resultado): string;
 export function codigoDeSalida(resultados: Resultado[]): number;
 export function diagnosticar(opciones?: { rapido?: boolean }): Promise<Resultado[]>;
+export function comprobarVideosDir(config: Record<'VE_VIDEOS_DIR' | 'VE_OUT_DIR' | 'VE_CACHE_DIR', { valor: string | null; origen: string | null }>): Resultado;

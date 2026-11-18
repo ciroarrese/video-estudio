@@ -6,6 +6,19 @@
 // dentro del clon público, que alguien podría comprimir o compartir. Se pueden forzar con VE_CACHE_DIR y VE_OUT_DIR.
 import { existsSync, rmSync } from 'node:fs';
 import { isAbsolute, join, resolve } from 'node:path';
+import { aplicarConfigLocal } from './config-local.mjs';
+
+// Configuración local (`.video-studio.local.json`, ver render/config-local.mjs): todos los comandos (render, qa, sheet, privacy, audio,
+// vite) pasan por este módulo antes de leer VE_VIDEOS_DIR, VE_OUT_DIR y VE_CACHE_DIR, así que acá se completan las que no vengan del
+// entorno. La variable de entorno gana. Las pruebas (VITEST) no la leen: tienen que ser herméticas aunque el clon tenga el archivo.
+if (!process.env.VITEST && !process.env.VE_SIN_CONFIG_LOCAL) {
+  try {
+    aplicarConfigLocal();
+  } catch (e) {
+    console.error(`Error: ${(e as Error).message}`);
+    process.exit(2);
+  }
+}
 
 /** Carpeta que hace de `videos/` (VE_VIDEOS_DIR) o `null` si se usa la del repo. */
 export const videosDirExterna = (): string | null => (process.env.VE_VIDEOS_DIR ? resolve(process.env.VE_VIDEOS_DIR) : null);

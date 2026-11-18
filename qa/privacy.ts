@@ -1,5 +1,5 @@
 import { readdirSync, readFileSync, realpathSync, statSync } from 'node:fs';
-import { basename, extname, join, relative } from 'node:path';
+import { basename, extname, join, relative, resolve } from 'node:path';
 import { collectAllText } from './page';
 import { collectStrings, parseTermList, scanJoined, scanText, type Hit, type Term } from './privacyCore';
 import { sampleFrames, type SampleSpec } from './sampling';
@@ -38,10 +38,25 @@ export const isSourceFile = (name: string): boolean => {
   const n = name.toLowerCase();
   return SOURCE_EXT.has(extname(n)) || n === '.env' || n.startsWith('.env.') || basename(n).endsWith('.env');
 };
-const SKIP_DIR = new Set(['node_modules', 'dist', 'out', '.git', '.ve-cache']);
+/** `referencias/` es el material que manda la persona (capturas, notas con datos reales): nunca entra al video ni al código, así que no se escanea (ver la skill, etapa 1). */
+const SKIP_DIR = new Set(['node_modules', 'dist', 'out', '.git', '.ve-cache', 'referencias']);
 
 /** Los archivos de listas se llaman `prohibidos.txt` por convencion: nunca se escanean. */
 export const DENY_LIST_NAME = 'prohibidos.txt';
+/** La ficha de datos emulados del video (`videos/<slug>/datos-emulados.txt`): una lista de permitidos que se toma sola y tampoco se escanea (sus valores estan ahi a proposito). */
+export const EMULATED_LIST_NAME = 'datos-emulados.txt';
+
+/** Fichas `datos-emulados.txt` que existen en esas carpetas (sin repetir; rutas absolutas): la de `videos/<slug>/`, o `$VE_VIDEOS_DIR/<slug>/`, que se llega por la ruta de `--deny`. */
+export function fichasEmuladas(dirs: string[]): string[] {
+  const out: string[] = [];
+  for (const d of dirs) {
+    const f = join(resolve(d), EMULATED_LIST_NAME);
+    try {
+      if (statSync(f).isFile() && !out.includes(f)) out.push(f);
+    } catch { /* no hay ficha en esa carpeta */ }
+  }
+  return out;
+}
 const realOr = (p: string) => { try { return realpathSync(p); } catch { return p; } };
 
 function* walkSource(dir: string, skip: Set<string>): Generator<string> {
@@ -49,7 +64,7 @@ function* walkSource(dir: string, skip: Set<string>): Generator<string> {
     if (SKIP_DIR.has(e.name)) continue;
     const p = join(dir, e.name);
     if (e.isDirectory()) yield* walkSource(p, skip);
-    else if (e.isFile() && e.name !== DENY_LIST_NAME && isSourceFile(e.name) && !skip.has(realOr(p)) && statSync(p).size < 2_000_000) yield p;
+    else if (e.isFile() && e.name !== DENY_LIST_NAME && e.name !== EMULATED_LIST_NAME && isSourceFile(e.name) && !skip.has(realOr(p)) && statSync(p).size < 2_000_000) yield p;
   }
 }
 

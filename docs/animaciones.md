@@ -41,6 +41,8 @@ Esta tabla da el efecto por función; después filtrá por el carácter del desi
 | Mostrar una app | `PhoneFrame` / `PhoneScroll` con tu contenido | `PhoneOrbit` (gira hacia el espectador; acepta tu interfaz como `children` o `screen`) |
 | Cierre con logo | `LogoLand` | `SealSpin`, `MaskedRise` con `dot` |
 | Señalar o llamar la atención sobre algo | `Callout` (la señal la decide el tema; con `focus`, más `FocusGroup`) | `MarkerDraw` y los garabatos del kit, solo si el design system es de trazo a mano |
+| Tutorial de interfaz: señalar pasos, uno tras otro, con la cámara siguiendo cada foco | `StepFrame` del kit (cámara guiada por focos, etiqueta junto al foco, `DataCard` y `ProgressBar`); ejemplo `examples/tutorial-demo`, plantilla `npm run nuevo -- paso <slug> <nombre>` | `guidedCameraKeys` + `projectRect` + `Callout` con `fixed`, si el marco no alcanza (ver `kit/README.md`, "Tutorial de interfaz") |
+| Un importe o una cifra de la interfaz que a tamaño real no se lee | `DataCard` (rótulo y valor grande junto al foco) | `DigitRoll` si el número tiene que contar |
 | Que un efecto se repita mientras se muestra | `Loop` (envuelve cualquier efecto: pausa, desfase, fundido o ida y vuelta) | - |
 | Transición entre escenas | `Wash` (sigue a `motion.transition`) | `DotWipe` (lúdico), `Tunnel`, `HalftoneWave`, `MarqueeBands` (separador) |
 | Fondo animado | `WaveDots`, `TerrainMesh` | `HalftoneWave`, `LiquidBlob` |

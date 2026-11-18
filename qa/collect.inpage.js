@@ -6,6 +6,8 @@
   // Opacidad efectiva desde la que un velo de cuadro completo tapa del todo el texto de abajo (ver mas abajo `hiddenBy` y `veil`).
   var VEIL_HIDES = 0.98;
   var onlyKeys = opts.onlyKeys ? new Set(opts.onlyKeys) : null;
+  // `marks`: se leen las marcas de mundo, capa y objetivo (qa/run.ts las descarta después si la corrida no es de un tutorial).
+  var TUT = !!opts.marks;
   var ids = new Map();
   function idOf(el) { if (!ids.has(el)) ids.set(el, ids.size); return ids.get(el); }
   function rectOf(r) { return { x: r.left, y: r.top, w: r.width, h: r.height }; }
@@ -80,6 +82,20 @@
   }
   // data-qa-fixed-scale en el elemento o un ancestro: reproduccion a escala fija; solo la prueba de estres de tipografia la saltea.
   function fixedScaleOf(el) { return !!(el.closest && el.closest('[data-qa-fixed-scale]')); }
+  // Mundo (`data-qa-world`): escala en pantalla (ancho en pantalla / ancho de diseno, o el alto si no hay ancho) y si la camara esta asentada (`data-qa-settled`).
+  var worldCache = new Map();
+  function worldOf(w) {
+    var c = worldCache.get(w);
+    if (c) return c;
+    var br = w.getBoundingClientRect();
+    var zoom = w.offsetWidth > 0 ? br.width / w.offsetWidth : (w.offsetHeight > 0 ? br.height / w.offsetHeight : 1);
+    var st = w.getAttribute('data-qa-settled');
+    c = { key: identOf(w), zoom: zoom > 0 ? zoom : 1, settled: st !== null && st !== 'false' };
+    worldCache.set(w, c);
+    return c;
+  }
+  // Identidad de un contenedor marcado entre cuadros: ruta DOM + etiqueta + testid (sin el texto, que cambia).
+  function identOf(el) { var t = el.closest ? el.closest('[data-testid]') : null; return pathOf(el) + '|' + el.tagName.toLowerCase() + '|' + (t ? t.getAttribute('data-testid') : ''); }
   function pathOf(el) {
     var p = [];
     for (var e = el; e && e !== stage; e = e.parentElement) p.push(Array.prototype.indexOf.call(e.parentElement.children, e));
@@ -259,6 +275,9 @@
     var transformed = Math.abs(Math.hypot(m.a, m.b) - 1) > 0.01 || Math.abs(Math.hypot(m.c, m.d) - 1) > 0.01 || Math.abs(m.b) > 0.01 || Math.abs(m.c) > 0.01;
     var scale = Math.hypot(m.c, m.d);
     if (!(scale > 0)) scale = 0;
+    var worldEl = TUT && el.closest ? el.closest('[data-qa-world]') : null;
+    var elOverlay = TUT && !!(el.closest && el.closest('[data-qa-overlay]'));
+    var elTarget = TUT && !!(el.closest && el.closest('[data-qa-target]'));
     var fontPx = parseFloat(cs.fontSize);
     var fill = textFill(el, cs);
     var weight = parseInt(cs.fontWeight, 10) || 400;
@@ -271,7 +290,7 @@
       opacity: opacityUp(el), fontPx: fontPx, scale: scale, transformed: transformed, screenPx: fontPx * scale, bold: weight >= 700,
       color: 'rgba(' + fill.r + ',' + fill.g + ',' + fill.b + ',' + fill.a + ')', transparentFill: fill.a < 0.05,
       svgText: el.namespaceURI === 'http://www.w3.org/2000/svg', svgPrecise: String(cs.textRendering).toLowerCase() === 'geometricprecision',
-      fadingBg: fadingSurface(el), ignore: ignoreOf(el), decor: decorOf(el).decor, decorMain: decorOf(el).main, fixedScale: fixedScaleOf(el), focusDim: !!(el.closest && el.closest('[data-qa-focus]')), clips: clips,
+      fadingBg: fadingSurface(el), ignore: ignoreOf(el), decor: decorOf(el).decor, decorMain: decorOf(el).main, fixedScale: fixedScaleOf(el), world: worldEl ? worldOf(worldEl) : null, overlay: elOverlay, target: elTarget, focusDim: !!(el.closest && el.closest('[data-qa-focus]')), clips: clips,
       own: {
         sw: el.scrollWidth, cw: el.clientWidth, sh: el.scrollHeight, ch: el.clientHeight,
         ox: cs.overflowX, oy: cs.overflowY, ellipsis: cs.textOverflow === 'ellipsis',
@@ -296,6 +315,7 @@
       var hiddenN = 0;
       var hiddenBy = null;
       var skippedCover = false;
+      var skippedOverlay = false;
       var maxLines = Math.min(rects.length, 8);
       for (var li = 0; li < maxLines; li++) {
         var ln = rects[li];
@@ -322,6 +342,9 @@
             var solidMedia = (c.tagName === 'IMG' || c.tagName === 'VIDEO' || c.tagName === 'CANVAS') && op >= 0.9;
             var solid = solidColor || solidImage || solidMedia;
             if (!solid) continue;
+            // Una capa `data-qa-overlay` (etiqueta, tarjeta, barra de progreso: anotacion del video en espacio de pantalla) que tapa texto del MUNDO no es un defecto de ese texto,
+            // salvo que el texto sea el objetivo (`data-qa-target`). El texto de la propia capa (o de otra capa) se sigue juzgando.
+            if (worldEl && !elOverlay && !elTarget && c.closest && c.closest('[data-qa-overlay]')) { skippedOverlay = true; continue; }
             if (coverIgnorable(c)) {
               skippedCover = true;
               var cr = c.getBoundingClientRect();
@@ -353,6 +376,7 @@
       }
       if (total > 0 && hiddenN === total) run.hiddenBy = hiddenBy;
       if (skippedCover) run.skippedCovers = 1;
+      if (skippedOverlay) run.skippedOverlay = 1;
     }
     // veil: un velo de cuadro completo TRANSLUCIDO (no llega a ser `cover`, que pide >= 0.9) por encima del texto, p. ej. un `Wash` a medio fundido.
     // Se mide al medio de la primera linea; `qa/motion.ts` le agrega `fade` (cambio de su opacidad entre cuadros vecinos) para distinguir un
@@ -394,5 +418,49 @@
     if (getComputedStyle(e).visibility !== 'visible') return;
     signals.push({ kind: e.getAttribute('data-ve-signal'), piece: e.getAttribute('data-ve-piece') || '', mark: e.getAttribute('data-ve-mark') || '', forced: e.getAttribute('data-ve-forced') === 'true', tag: e.tagName.toLowerCase(), rect: rectOf(r), ignore: ignoreOf(e) });
   });
-  return { width: W, height: H, runs: runs, elems: elems, opac: opac, fixedRoots: fixedRoots, signals: signals, occupancy: occupancy };
+  // Mundos, capas fijas y objetivos marcados (`data-qa-world`, `data-qa-overlay`, `data-qa-target`): para las reglas `salto` y `foco-centro` y para exceptuar lo que corresponde.
+  function visibleEl(e) { return getComputedStyle(e).visibility === 'visible' && getComputedStyle(e).display !== 'none'; }
+  // Cajas de lo que una capa pinta de verdad (fondo, borde, imagen, texto propio): los envoltorios de cuadro completo no cuentan como tapa de nada.
+  function paintRects(root) {
+    var out = [];
+    var all = [root].concat(Array.prototype.slice.call(root.querySelectorAll('*')));
+    var rng2 = document.createRange();
+    for (var i = 0; i < all.length && out.length < 64; i++) {
+      var e = all[i];
+      var tg = e.tagName.toLowerCase();
+      if (tg === 'script' || tg === 'style') continue;
+      var ec = getComputedStyle(e);
+      if (ec.visibility !== 'visible' || ec.display === 'none' || opacityUp(e) < 0.05) continue;
+      var r = e.getBoundingClientRect();
+      if (r.width < 1 || r.height < 1 || r.width * r.height >= 0.85 * W * H) continue;
+      var paints = tg === 'img' || tg === 'video' || tg === 'canvas' || tg === 'svg' || (ec.backgroundColor !== 'rgba(0, 0, 0, 0)' && parseRgba(ec.backgroundColor).a >= 0.05) || (ec.backgroundImage && ec.backgroundImage !== 'none');
+      if (!paints && ec.boxShadow === 'none') {
+        var bw = parseFloat(ec.borderTopWidth) + parseFloat(ec.borderBottomWidth) + parseFloat(ec.borderLeftWidth) + parseFloat(ec.borderRightWidth);
+        paints = bw > 0 && ec.borderTopStyle !== 'none';
+      }
+      if (paints) { out.push(rectOf(r)); continue; }
+      for (var c = e.firstChild; c; c = c.nextSibling) {
+        if (c.nodeType !== 3 || !c.data.trim()) continue;
+        rng2.selectNodeContents(c);
+        var rl = rng2.getClientRects();
+        for (var k2 = 0; k2 < rl.length && out.length < 64; k2++) if (rl[k2].width >= 1 && rl[k2].height >= 1) out.push(rectOf(rl[k2]));
+      }
+    }
+    return out;
+  }
+  function anchorOf(e, withPaint) {
+    var a = { key: keyOf(e), tag: e.tagName.toLowerCase(), testid: testidOf(e), text: excerpt(e.textContent || ''), rect: rectOf(e.getBoundingClientRect()), opacity: opacityUp(e), ignore: ignoreOf(e) };
+    if (withPaint) a.kind = e.getAttribute('data-qa-overlay') || '';
+    if (withPaint) a.paint = paintRects(e);
+    return a;
+  }
+  var worlds = [], overlays = [], targets = [];
+  if (TUT) Array.prototype.forEach.call(stage.querySelectorAll('[data-qa-world]'), function (e) { if (!visibleEl(e)) return; var w = worldOf(e); worlds.push({ key: w.key, rect: rectOf(e.getBoundingClientRect()), zoom: w.zoom, settled: w.settled }); });
+  if (TUT) Array.prototype.forEach.call(stage.querySelectorAll('[data-qa-overlay]'), function (e) { if (!visibleEl(e) || (e.parentElement && e.parentElement.closest('[data-qa-overlay]'))) return; overlays.push(anchorOf(e, true)); });
+  if (TUT) Array.prototype.forEach.call(stage.querySelectorAll('[data-qa-target]'), function (e) { if (!visibleEl(e) || (e.parentElement && e.parentElement.closest('[data-qa-target]'))) return; targets.push(anchorOf(e, false)); });
+  var out = { width: W, height: H, runs: runs, elems: elems, opac: opac, fixedRoots: fixedRoots, signals: signals, occupancy: occupancy };
+  if (worlds.length) out.worlds = worlds;
+  if (overlays.length) out.overlays = overlays;
+  if (targets.length) out.targets = targets;
+  return out;
 })

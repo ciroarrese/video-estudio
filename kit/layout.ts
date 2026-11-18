@@ -16,6 +16,17 @@ export interface PlaceOptions {
   prefer?: Side[];
   /** Separación en px con el objetivo. Por defecto 16. */
   gap?: number;
+  /**
+   * Alineación fija a lo largo del borde del objetivo: 0 = al comienzo, 0,5 = centrada, 1 = al final. Sin ella prueba las tres (centrada, comienzo, final)
+   * y se queda con la primera libre. Junto con un solo lado en `prefer` fija la decisión entera (ver `decideBeside`).
+   */
+  align?: 0 | 0.5 | 1;
+}
+
+/** Lo que `decideBeside` devuelve para repetirlo igual en cada cuadro: el lado y la alineación elegidos. */
+export interface BesideDecision {
+  side: Side;
+  align: 0 | 0.5 | 1;
 }
 
 export interface Placement {
@@ -47,6 +58,22 @@ const TARGET_PENALTY = 1e6;
  * ```
  */
 export function placeBeside(target: Rect, size: { w: number; h: number }, o: PlaceOptions = {}): Placement {
+  const { align: _a, ...out } = placeBesideAligned(target, size, o);
+  return out;
+}
+
+/**
+ * Decide **una sola vez** de qué lado y con qué alineación va una pieza junto a un objetivo (el mismo cálculo de `placeBeside`, que devuelve además la
+ * alineación elegida). Se llama con el objetivo donde va a quedar asentado (por ejemplo, proyectado con la cámara final de su señal) y el resultado se
+ * pasa después a `placeBeside` como `{ prefer: [side], align }` en cada cuadro: la pieza solo sigue al rectángulo y nunca cambia de lado mientras la
+ * cámara viaja ni se corre de la alineación elegida.
+ */
+export function decideBeside(target: Rect, size: { w: number; h: number }, o: PlaceOptions = {}): BesideDecision & Placement {
+  const p = placeBesideAligned(target, size, o);
+  return p;
+}
+
+function placeBesideAligned(target: Rect, size: { w: number; h: number }, o: PlaceOptions = {}): Placement & { align: 0 | 0.5 | 1 } {
   const avoid = o.avoid ?? [];
   const gap = o.gap ?? 16;
   const sides = o.prefer?.length ? o.prefer : (["right", "below", "left", "above"] as Side[]);
@@ -55,9 +82,9 @@ export function placeBeside(target: Rect, size: { w: number; h: number }, o: Pla
     win
       ? { x: Math.round(clamp(x, win.x, Math.max(win.x, win.x + win.w - size.w))), y: Math.round(clamp(y, win.y, Math.max(win.y, win.y + win.h - size.h))) }
       : { x: Math.round(x), y: Math.round(y) };
-  let best: (Placement & { score: number }) | null = null;
+  let best: (Placement & { score: number; align: 0 | 0.5 | 1 }) | null = null;
   for (const side of sides) {
-    for (const t of [0.5, 0, 1]) {
+    for (const t of o.align !== undefined ? [o.align] : ([0.5, 0, 1] as const)) {
       // t reparte la pieza a lo largo del borde del objetivo: 0,5 centrada, 0 alineada al comienzo, 1 al final
       const dx = t * (target.w - size.w), dy = t * (target.h - size.h);
       const raw =
@@ -75,8 +102,8 @@ export function placeBeside(target: Rect, size: { w: number; h: number }, o: Pla
       });
       const onTarget = area(box, target);
       const score = overlap + (onTarget > 0 ? TARGET_PENALTY + onTarget : 0);
-      if (score === 0) return { x, y, side, overlap: 0, covers: [] };
-      if (!best || score < best.score) best = { x, y, side, overlap, covers, score };
+      if (score === 0) return { x, y, side, overlap: 0, covers: [], align: t };
+      if (!best || score < best.score) best = { x, y, side, overlap, covers, score, align: t };
     }
   }
   const { score: _s, ...out } = best!;

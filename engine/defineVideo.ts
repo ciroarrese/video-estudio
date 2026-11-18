@@ -60,6 +60,9 @@ export function defineVideo<P = Record<string, unknown>>(def: VideoDefinition<P>
     if (!s.id || !Number.isInteger(s.from) || s.from < 0 || !Number.isInteger(s.durationInFrames) || s.durationInFrames <= 0) {
       throw new Error(`defineVideo(${def.id}): cada escena necesita id, from (entero >= 0) y durationInFrames (entero > 0)`);
     }
+    for (const c of s.cues ?? []) {
+      if (!Number.isFinite(c.frame) || c.frame < 0 || !c.sfx) throw new Error(`defineVideo(${def.id}): un cue de la escena "${s.id}" necesita frame (>= 0, relativo a la escena) y sfx`);
+    }
   }
   const prev = registry.get(def.id);
   if (prev?.source && currentSource && prev.source !== currentSource) {

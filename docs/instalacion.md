@@ -233,11 +233,25 @@ export VE_VIDEOS_DIR=$HOME/mis-videos      # Windows (PowerShell): $env:VE_VIDEO
 claude                                     # o tu agente, abierto en la carpeta del repo
 ```
 
-Los videos viven en `$VE_VIDEOS_DIR/<slug>/`, y la caché, los MP4 y las hojas, en `$VE_VIDEOS_DIR/out` y `$VE_VIDEOS_DIR/.ve-cache`, nunca dentro del clon (`VE_OUT_DIR` y `VE_CACHE_DIR` los mueven). Detalle: [README, "Trabajar con material privado"](../README.md#trabajar-con-material-privado). Lo que no puede aparecer en pantalla va en `prohibidos.txt` y el comando `npm run privacy` lo verifica.
+Los videos viven en `$VE_VIDEOS_DIR/<slug>/`, y la caché, los MP4 y las hojas, en `$VE_VIDEOS_DIR/out` y `$VE_VIDEOS_DIR/.ve-cache`, nunca dentro del clon (`VE_OUT_DIR` y `VE_CACHE_DIR` los mueven). **Sin exportar la variable cada vez (archivo de configuración local).** Si preferís no exportar nada, ni escribir `cd <clon> && VE_VIDEOS_DIR=... npm run ...` en cada comando (por ejemplo, con un agente que abre una terminal nueva en cada llamada), dejá un archivo `.video-studio.local.json` en la raíz del clon. Git lo ignora:
+
+```json
+{ "videosDir": "/ruta/a/mis-videos" }
+```
+
+(`~` vale por tu carpeta personal; opcionales: `outDir` y `cacheDir`.) Lo leen todos los comandos (`render`, `qa`, `sheet`, `privacy`, `audio`, `typecheck`, `npm run dev`) cuando la variable de entorno no está definida; **si está definida, la variable gana**. `npm run doctor` muestra de dónde sale la carpeta de videos. Un archivo con JSON roto o una clave que no existe da un error que nombra el archivo. Detalle: [render/README.md](../render/README.md#videos-fuera-del-repo-ve_videos_dir).
+
+Detalle: [README, "Trabajar con material privado"](../README.md#trabajar-con-material-privado). Lo que no puede aparecer en pantalla va en `prohibidos.txt` y el comando `npm run privacy` lo verifica.
 
 **Subtítulos y locución.** Quemados en el video (bloque o karaoke) y como `.srt` o `.vtt`: [docs/subtitulos.md](subtitulos.md). La herramienta no genera voz: la locución la grabás o aportás vos, y se alinea con los subtítulos ([docs/audio.md](audio.md) y [docs/subtitulos.md](subtitulos.md)). **Sonido:** efectos propios sintetizados, o una pista tuya con licencia que se ajusta al compás; no trae música ([docs/audio.md](audio.md)).
 
-**Cuánto tarda un render.** Contá de 3 a 4 cuadros por segundo a 1920x1080 en una máquina compartida de 4 núcleos (un video de 60 s son unos 8 a 10 minutos por formato); con la máquina libre es bastante más rápido. El agente te avisa antes de lanzar cada render largo.
+**Cuánto tarda un render.** Contá de 3 a 4 cuadros por segundo a 1920x1080 en una máquina compartida de 4 núcleos (un video de 60 s son unos 8 a 10 minutos por formato); con la máquina libre es bastante más rápido. El agente te avisa antes de lanzar cada render largo. Mientras corre, `render` imprime cada 5 % cuánto falta (`faltan ~2 min 30 s`).
+
+**Volver a renderizar es barato si no cambió ninguna imagen.** Las partes ya renderizadas se reutilizan mientras no cambie el código del video ni algún archivo (fuente, imagen) que el render realmente haya usado; agregar un archivo suelto en una carpeta de estáticos no rehace nada. Si no se reutilizan, `render` dice por qué (`caché: ... cambió el estático /logo.png`). Para guardar pistas originales o intermedios de sonido sin que molesten, usá `videos/<slug>/audio/fuentes/`: esa subcarpeta ni se sirve ni cuenta para la caché. Cambiar solo la mezcla de sonido tarda segundos.
+
+**Un mp4 más chico para mandarlo.** `npm run render -- <id> --liviano` deja, además del mp4, `<id>-liviano.mp4` de 25 MB como máximo (`--liviano 40` para otro tope): el audio se copia y el video se recodifica a la tasa justa.
+
+**Ordenar `out/`.** `npm run limpiar -- <slug|id>` lista los mp4, hojas y carpetas de cuadros de ese video que quedaron más viejos que su código y los borra si confirmás (`--seco` solo lista; `--si` no pregunta). Solo toca la carpeta de salidas. `npm run clean` sigue borrando toda la caché y todas las salidas.
 
 ### Ejemplo de conversación
 

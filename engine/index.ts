@@ -6,7 +6,7 @@ export type { FormatInfo } from './useFormat';
 export { FORMAT_NAMES, formatOf, isFormatName, deriveFormatSizes, resolveFormats, configFor } from './format';
 export type { FormatName, FormatSize, FormatsOption, FormatPick } from './format';
 export { registerScene, collectScenes, clearScenes, resolveScenes } from './scenes';
-export type { SceneInfo } from './scenes';
+export type { SceneInfo, SceneCue, SceneOwnAudio } from './scenes';
 export { interpolate } from './interpolate';
 export type { InterpolateOptions } from './interpolate';
 export { Easing, bezier, back } from './Easing';

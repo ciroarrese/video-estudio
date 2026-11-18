@@ -9,6 +9,7 @@ import { existsSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { createServer } from "vite";
+import "../render/dirs"; // completa VE_VIDEOS_DIR desde `.video-studio.local.json` si la variable no está definida
 import { checkTheme, formatTokenReport } from "../themes";
 import type { TokenReport, Theme } from "../themes";
 

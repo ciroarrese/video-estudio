@@ -2,7 +2,7 @@
 // `templates/nuevo.mjs` (`npm run nuevo`): funciones puras, el programa completo en carpetas temporales y que
 // `templates/nuevo.sh` (envoltorio) delegue en él. Vive en render/ porque vitest.config.ts no incluye templates/**.
 import { execFileSync, spawnSync } from 'node:child_process';
-import { cpSync, mkdtempSync, readFileSync, readdirSync, rmSync, symlinkSync } from 'node:fs';
+import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync, readdirSync, rmSync, symlinkSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -18,10 +18,12 @@ const carpeta = (p: string) => {
 };
 afterAll(() => temporales.forEach((d) => rmSync(d, { recursive: true, force: true })));
 
-/** Un proyecto mínimo: copia de templates/ y el resto no hace falta para generar. */
+/** Un proyecto mínimo: copia de templates/ y de render/config-local.mjs (que nuevo.mjs importa); el resto no hace falta para generar. */
 const proyecto = () => {
   const d = carpeta('ve-nuevo-mjs-');
   cpSync(join(repo, 'templates'), join(d, 'templates'), { recursive: true });
+  mkdirSync(join(d, 'render'));
+  cpSync(join(repo, 'render', 'config-local.mjs'), join(d, 'render', 'config-local.mjs'));
   return d;
 };
 const correr = (args: string[], p: string, env: Record<string, string | undefined> = {}) => {
@@ -102,6 +104,56 @@ describe('templates/nuevo.mjs: el programa', () => {
     const e = correr(['externo'], p, { VE_VIDEOS_DIR: join(solo, 'nueva') });
     expect(e.out.at(-1)).toBe(`revision de tipos: VE_VIDEOS_DIR=${join(solo, 'nueva')} npm run typecheck`);
     expect(readdirSync(join(solo, 'nueva')).sort()).toEqual(['env.d.ts', 'tsconfig.json']);
+  });
+
+  it('paso: crea videos/<slug>/<nombre>/{Scene.tsx,index.ts} con el marco, la tabla de tiempos, imports e id corregidos', () => {
+    const p = proyecto();
+    const r = correr(['paso', 'tutorial', 'crear'], p);
+    expect(r.codigo).toBe(0);
+    expect(r.out.join('\n')).toContain('videos/tutorial/crear (id de video: tutorial-crear)');
+    expect(existsSync(join(p, 'videos', 'tutorial', 'theme.ts'))).toBe(true);
+    expect(readdirSync(join(p, 'videos', 'tutorial', 'crear')).sort()).toEqual(['Scene.tsx', 'index.ts']);
+    const escena = readFileSync(join(p, 'videos', 'tutorial', 'crear', 'Scene.tsx'), 'utf8');
+    expect(escena).toContain('StepFrame');
+    expect(escena).toContain('const T = {');
+    expect(escena).toContain('SENALES');
+    expect(escena).toContain('from "../../../kit"');
+    expect(escena).not.toContain('"../../kit"');
+    expect(readFileSync(join(p, 'videos', 'tutorial', 'crear', 'index.ts'), 'utf8')).toContain('id: "tutorial-crear"');
+    expect(indiceDeEscena('id: "plantilla-paso",', 'abc', 'uno')).toBe('id: "abc-uno",');
+  });
+
+  it('paso: falla con 1 si ya existe y con 2 si el nombre es inválido o falta', () => {
+    const p = proyecto();
+    expect(correr(['paso', 't', 'uno'], p).codigo).toBe(0);
+    expect(correr(['paso', 't', 'uno'], p)).toMatchObject({ codigo: 1, err: ['Ya existe videos/t/uno'] });
+    expect(correr(['paso', 't', 'Mal'], p).codigo).toBe(2);
+    expect(correr(['paso', 't'], p).err[0]).toMatch(/^Uso: npm run nuevo/);
+  });
+
+  it('paso con VE_VIDEOS_DIR escribe afuera, con imports por alias y tsconfig.json', () => {
+    const p = proyecto();
+    const ext = carpeta('ve-paso-ext-');
+    const r = correr(['paso', 'ext', 'crear'], p, { VE_VIDEOS_DIR: ext });
+    expect(r.codigo).toBe(0);
+    const escena = readFileSync(join(ext, 'ext', 'crear', 'Scene.tsx'), 'utf8');
+    expect(escena).toContain('from "video-estudio/kit"');
+    expect(escena).toContain('from "video-estudio/engine"');
+    expect(existsSync(join(ext, 'tsconfig.json'))).toBe(true);
+  });
+
+  it('sin env propio lee la configuración local (.video-studio.local.json) y la variable de entorno gana', () => {
+    const p = proyecto();
+    const ext = carpeta('ve-nuevo-cfg-');
+    writeFileSync(join(p, '.video-studio.local.json'), JSON.stringify({ videosDir: ext }));
+    const salida = (extra: Record<string, string> = {}) => spawnSync(process.execPath, [join(p, 'templates', 'nuevo.mjs'), 'paso', 'cfg', 'uno'], { encoding: 'utf8', env: { ...process.env, VE_VIDEOS_DIR: '', ...extra } });
+    const r = salida();
+    expect(r.status).toBe(0);
+    expect(existsSync(join(ext, 'cfg', 'uno', 'Scene.tsx'))).toBe(true);
+    expect(existsSync(join(p, 'videos'))).toBe(false);
+    const otra = carpeta('ve-nuevo-cfg2-');
+    expect(salida({ VE_VIDEOS_DIR: otra }).status).toBe(0);
+    expect(existsSync(join(otra, 'cfg', 'uno', 'Scene.tsx'))).toBe(true);
   });
 
   it('el comando por línea de comandos anda con `node templates/nuevo.mjs`', () => {

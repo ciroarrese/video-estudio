@@ -10,9 +10,9 @@ const evalStr = <R>(vp: VideoPage, expr: string) => (vp.page.evaluate as unknown
 
 const HIDE_TEXT = `*,*::before,*::after{color:transparent !important;-webkit-text-fill-color:transparent !important;text-shadow:none !important;text-decoration-color:transparent !important;caret-color:transparent !important}svg text{fill:transparent !important;stroke:transparent !important}`;
 
-/** `onlyKeys`: modo liviano, solo mide los textos con esas claves (tamaño en pantalla y opacidad; sin tapados ni recortes). */
-export async function collectRuns(vp: VideoPage, width: number, height: number, elemKeys: string[] = [], onlyKeys?: string[], occupancy = false): Promise<PageData> {
-  const d = await evalStr<Omit<PageData, 'frame'>>(vp, `${collectSrc}(${JSON.stringify({ width, height, elemKeys, onlyKeys, occupancy })})`);
+/** `marks`: se leen `data-qa-world`, `data-qa-overlay` y `data-qa-target` (`qa/run.ts` las descarta si la corrida no es de un tutorial). `onlyKeys`: modo liviano, solo mide los textos con esas claves (tamaño en pantalla y opacidad; sin tapados ni recortes). */
+export async function collectRuns(vp: VideoPage, width: number, height: number, elemKeys: string[] = [], onlyKeys?: string[], occupancy = false, marks = false): Promise<PageData> {
+  const d = await evalStr<Omit<PageData, 'frame'>>(vp, `${collectSrc}(${JSON.stringify({ width, height, elemKeys, onlyKeys, occupancy, marks })})`);
   return { ...d, frame: -1 };
 }
 
@@ -45,6 +45,22 @@ export async function sampleBackgrounds(vp: VideoPage, runs: TextRun[], want: { 
     const ink = inkFractions(shown, img, runs.map((r) => r.lines));
     runs.forEach((r, i) => (r.ink = ink[i] ?? null));
   }
+}
+
+/**
+ * Firma barata del cuadro para buscar cambios de `data-qa-settled` y de aparición del `data-qa-target` (qa/pares.ts): si algún mundo está asentado y qué objetivos hay
+ * (etiqueta, testid y comienzo del texto). `''` si el cuadro no usa ninguna de las dos marcas.
+ */
+export async function stateSignature(vp: VideoPage): Promise<string> {
+  return evalStr<string>(
+    vp,
+    `(()=>{const r=document.getElementById('stage')||document.body;
+      const ws=r.querySelectorAll('[data-qa-world]'),ts=r.querySelectorAll('[data-qa-target]');
+      if(!ws.length&&!ts.length)return '';
+      let st=false;ws.forEach(w=>{const v=w.getAttribute('data-qa-settled');if(v!==null&&v!=='false')st=true;});
+      const k=[];ts.forEach(t=>{const e=t.closest('[data-testid]');k.push(t.tagName+'|'+(e?e.getAttribute('data-testid'):'')+'|'+(t.textContent||'').replace(/\\s+/g,' ').trim().slice(0,40));});
+      return JSON.stringify([st,k]);})()`,
+  );
 }
 
 export type PageText = {

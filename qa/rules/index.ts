@@ -10,6 +10,8 @@ import { signalRule } from './signal';
 import { svgEscalaRule } from './svgEscala';
 import { textoChicoRule } from './textoChico';
 import { vacioRule } from './vacio';
+import { saltoRule } from './salto';
+import { focoCentroRule } from './focoCentro';
 import { judgement } from './judged';
 import { unjudgedRule } from './unjudged';
 import { visibleRuns } from './visible';
@@ -17,11 +19,11 @@ import { visibleRuns } from './visible';
 export { visibleRuns } from './visible';
 export { addJudged, emptyJudged, judgement } from './judged';
 
-export const RULES: Rule[] = [clipRule, offscreenRule, safeAreaRule, overlapRule, minSizeRule, textoChicoRule, contrastRule, coveredRule, unjudgedRule, signalRule, svgEscalaRule, vacioRule];
+export const RULES: Rule[] = [clipRule, offscreenRule, safeAreaRule, overlapRule, minSizeRule, textoChicoRule, contrastRule, coveredRule, unjudgedRule, signalRule, svgEscalaRule, vacioRule, saltoRule, focoCentroRule];
 
 export function runRules(ctx: RuleContext, enabled?: RuleId[]): Finding[] {
   const vis = { ...ctx, runs: visibleRuns(ctx) };
-  return RULES.filter((r) => !enabled || enabled.includes(r.id)).flatMap((r) => r.check(r.id === 'covered' || r.id === 'unjudged' || r.id === 'signal' || r.id === 'vacio' ? ctx : vis));
+  return RULES.filter((r) => !enabled || enabled.includes(r.id)).flatMap((r) => r.check(r.id === 'covered' || r.id === 'unjudged' || r.id === 'signal' || r.id === 'vacio' || r.id === 'salto' || r.id === 'foco-centro' ? ctx : vis));
 }
 
 /**

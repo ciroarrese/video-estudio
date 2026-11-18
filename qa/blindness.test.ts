@@ -115,7 +115,7 @@ describe('inkFractions: evidencia de pixeles', () => {
 
 describe('--themes: matriz y diferencias', () => {
   const fnd = (frame: number, rule: string, severity: string, testid: string): Finding => ({ rule: rule as never, severity: severity as never, frame, message: `${rule} ${testid}`, element: { tag: 'p', testid, text: testid, rect: { x: 0, y: 0, w: 1, h: 1 } } });
-  const res = (findings: Finding[]): QaResult => ({ findings, summary: { videoId: 'v', frames: [0], total: findings.length, errors: 0, warnings: 0, infos: 0, byRule: {}, judged: emptyJudged(), seconds: 1 } });
+  const res = (findings: Finding[]): QaResult => ({ findings, summary: { videoId: 'v', frames: [0], total: findings.length, errors: 0, warnings: 0, infos: 0, tutorial: false, byRule: {}, judged: emptyJudged(), seconds: 1 } });
   it('parseThemes: lista, all y errores', () => {
     expect(parseThemes('all')).toEqual(['neutral', 'dark', 'editorial', 'neon', 'papel']);
     expect(parseThemes('neon, dark,neon')).toEqual(['neon', 'dark']);

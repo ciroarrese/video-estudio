@@ -3,7 +3,7 @@ import { createHash, randomBytes } from 'node:crypto';
 import { cpus } from 'node:os';
 import { existsSync, mkdirSync, readFileSync, readdirSync, renameSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { writeFile } from 'node:fs/promises';
-import { dirname, join, relative, resolve, sep } from 'node:path';
+import { basename, dirname, join, relative, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { comparePngs, DEFAULT_TOLERANCE, formatDiff, withinTolerance, type CheckTolerance } from './compare';
 import { buildAudioGraph, resolveSrc, windowTracks, type Track } from './audio';
@@ -11,9 +11,13 @@ import { picoVerdaderoDeArchivo } from '../audio/ffmpeg';
 import { launchChromium, type PwBrowser, type PwPage } from './browser';
 import { FileHashCache } from './filehash';
 import { trackChild, trackCloser, trackPath, untrackPath } from './cleanup';
-import { digestFiles, ENCODER_SETTINGS, frameFile, planCheckFrames, framePattern, planSegments, planShards, segmentKey } from './plan';
-import { serveStatic } from './server';
+import { ENCODER_SETTINGS, frameFile, planCheckFrames, framePattern, planSegments, planShards, segmentKey, stableStringify } from './plan';
+import { serveStatic, SUBCARPETA_SIN_SERVIR } from './server';
 import { assetDirsFor, esArchivoDeAudio, explicitAssetDirs } from './assets';
+import { escribirManifiesto, leerManifiesto, manifiestoDe, RegistroEstaticos, validarManifiesto, type RaicesEstaticos } from './estaticos';
+import { archivoDeRegistro, explicarCambio, guardarRegistro, leerRegistro, type RegistroClave } from './motivos';
+import { crearProgreso } from './progreso';
+import { copiaLiviana, LIVIANO_MB_POR_DEFECTO, type ResultadoLiviano } from './liviano';
 import { comprobarFuentesDelSistema, strictFonts } from './fuentesSistema';
 import { cacheDirPorDefecto, resolverSalida, salidaPorDefecto } from './dirs';
 import { cleanPageError, metaForFormat, NOSTAGE_QUERY, pageQuery, resolveScene, sceneRange, type VideoMeta } from './meta';
@@ -63,13 +67,15 @@ export type RenderOptions = {
   audioPeakStrict?: boolean;
   /** `false`: no medir el pico del audio codificado. */
   audioPeakCheck?: boolean;
+  /** Deja al lado `<salida>-liviano.mp4` de como mucho estos MB (`true` = 25). Ver render/liviano.ts. */
+  liviano?: number | true;
   /** Project root (default: parent of render/). */
   root?: string;
   cacheDir?: string;
   log?: (msg: string) => void;
 };
 
-export type RenderResult = { out: string; frames: number; seconds: number; renderedSegments: number; cachedSegments: number; /** Pico verdadero (dBTP) del audio ya codificado del mp4; ausente sin audio o sin medir. */ audioPeakDbtp?: number };
+export type RenderResult = { out: string; frames: number; seconds: number; renderedSegments: number; cachedSegments: number; /** Pico verdadero (dBTP) del audio ya codificado del mp4; ausente sin audio o sin medir. */ audioPeakDbtp?: number; /** Copia liviana (`--liviano`). */ liviano?: ResultadoLiviano };
 export type CheckResult = { ok: boolean; frames: number[]; determinism: { frame: number; ok: boolean; reordered?: boolean }[]; mismatches: number[]; diffs: Record<number, string> };
 
 /** `--allow-missing-fonts` o `VE_ALLOW_MISSING_FONTS=1`: una fuente que no carga avisa y sigue en vez de fallar. */
@@ -96,9 +102,12 @@ export function run(cmd: string, args: string[], cwd?: string): Promise<string> 
   });
 }
 
+/** `audio/fuentes/`: pistas originales e intermedios; no se sirve, no entra a la clave de la caché ni al hash del bundle (ver SUBCARPETA_SIN_SERVIR). */
+const esFuentesDeAudio = (nombre: string, padre: string) => nombre === SUBCARPETA_SIN_SERVIR && padre === 'audio';
+
 const walk = (dir: string, acc: string[] = [], skip: (name: string, depth: number) => boolean = () => false, depth = 0): string[] => {
   for (const e of readdirSync(dir, { withFileTypes: true })) {
-    if (skip(e.name, depth)) continue;
+    if (skip(e.name, depth) || (e.isDirectory() && esFuentesDeAudio(e.name, basename(dir)))) continue;
     const p = join(dir, e.name);
     if (e.isDirectory()) walk(p, acc, skip, depth + 1);
     else if (e.isFile()) acc.push(p);
@@ -114,17 +123,6 @@ const hashFiles = async (base: string, files: string[], cache: FileHashCache = n
 
 /** Content hash of every file of a directory (the built bundle). Con `sinAudio`, los archivos de audio no cuentan (no cambian ningún cuadro). */
 export const hashDir = (dir: string, cache?: FileHashCache, opts: { sinAudio?: boolean } = {}) => hashFiles(dir, walk(dir).filter((f) => !opts.sinAudio || !esArchivoDeAudio(f)), cache);
-
-/**
- * path+size+mtime digest of extra asset directories. Los archivos de audio no entran: el audio se mezcla al final sobre las
- * partes de video en cache y no cambia ningún cuadro, así que cambiarlo no tiene que re-renderizar el video.
- */
-export function assetsDigest(dirs: string[]): string {
-  const entries = dirs.flatMap((d) =>
-    existsSync(d) ? walk(d).filter((f) => !esArchivoDeAudio(f)).map((f) => ({ path: `${d}::${relative(d, f)}`, size: statSync(f).size, mtimeMs: statSync(f).mtimeMs })) : [],
-  );
-  return digestFiles(entries);
-}
 
 // eslint-disable-next-line no-control-regex
 const stripAnsi = (t: string) => t.replace(/\u001b\[[0-9;]*m/g, '');
@@ -232,16 +230,24 @@ export async function ensureBundle(root: string, cacheDir: string, runId: string
   return dir;
 }
 
+/** Huella del código de un video: el hash total y el de cada archivo que entra (para decir qué cambió; ver render/motivos.ts). */
+export type HuellaCodigo = { hash: string; archivos: Record<string, string> };
+
 /**
  * Huella del código que puede cambiar los cuadros de UN video: los fuentes que usa el runtime y la carpeta del video
  * (`ve-deps.json`, que arma vite.config.ts siguiendo imports estáticos y dinámicos, `import.meta.glob` y los
- * `new URL('...', import.meta.url)` con literal, estén donde estén), todos los archivos de la carpeta del video,
- * `public/` entero y la configuración de compilación. Un cambio en otro video no la toca.
+ * `new URL('...', import.meta.url)` con literal, estén donde estén), los archivos de la carpeta del video y la configuración de
+ * compilación. Un cambio en otro video no la toca.
+ *
+ * NO entran `public/` ni las subcarpetas `assets/` y `audio/` del video (las que se sirven solas): son estáticos, y de ellos solo
+ * cuentan los que el render pidió de verdad, anotados en el manifiesto de cada parte (render/estaticos.ts). Si el video importa un
+ * archivo de ahí (`import logo from "./assets/logo.svg"`), igual entra: figura en `ve-deps.json`.
+ *
  * Devuelve `null` (se usa el hash de todo el bundle) si falta `ve-deps.json`, si la carpeta no figura o si el video (o el
  * runtime) usa algo que no se puede seguir (`new URL(variable, import.meta.url)`, `import(variable)`): ante la duda, todo.
- * El contenido se hashea con una cache por tamaño+mtime+ctime+inodo (ver render/filehash.ts), así que no se relee `public/`.
+ * El contenido se hashea con una cache por tamaño+mtime+ctime+inodo (ver render/filehash.ts).
  */
-export async function videoCodeHash(root: string, bundleDir: string, source: string | null | undefined, opts: { videosDir?: string | null; cache?: FileHashCache } = {}): Promise<string | null> {
+export async function videoCodeFiles(root: string, bundleDir: string, source: string | null | undefined, opts: { videosDir?: string | null; cache?: FileHashCache } = {}): Promise<HuellaCodigo | null> {
   if (!source) return null;
   let deps: { runtime: string[]; videos: Record<string, string[]>; opaque?: string[] };
   try {
@@ -255,13 +261,27 @@ export async function videoCodeHash(root: string, bundleDir: string, source: str
   const at = (f: string) => (videosDir && (f === 'videos' || f.startsWith('videos/')) ? join(videosDir, f.slice('videos/'.length)) : join(root, f));
   const files = new Set<string>();
   for (const f of [...deps.runtime, ...own, 'package-lock.json', 'tsconfig.json', 'vite.config.ts', 'engine/runtime/index.html']) files.add(at(f));
-  for (const dir of [at(source), join(root, 'public')]) if (existsSync(dir)) for (const f of statSync(dir).isDirectory() ? walk(dir) : [dir]) files.add(f);
+  // `referencias/` (capturas y notas de la persona, ver la skill) no es código del video: agregar una captura no puede invalidar las partes. Si el código importa un archivo de ahí, entra por `own`.
+  const carpeta = at(source);
+  if (existsSync(carpeta)) for (const f of statSync(carpeta).isDirectory() ? walk(carpeta, [], (nombre, depth) => depth === 0 && (nombre === 'assets' || nombre === 'audio' || nombre === 'referencias')) : [carpeta]) files.add(f);
   // El audio no entra en la huella: se mezcla al final sobre las partes de video en cache y no cambia ningún cuadro.
   const present = [...files].filter((f) => existsSync(f) && statSync(f).isFile() && !esArchivoDeAudio(f));
   const h = createHash('sha256');
   const cache = opts.cache ?? new FileHashCache();
-  for (const f of present.sort()) h.update(relative(root, f)).update('\0').update(await cache.hashOf(f)).update('\0');
-  return h.digest('hex').slice(0, 32);
+  const archivos: Record<string, string> = {};
+  for (const f of present.sort()) {
+    // los archivos de VE_VIDEOS_DIR se nombran `videos/...` (como en `ve-deps.json` y en los mensajes)
+    const rel = (videosDir && f.startsWith(videosDir + sep) ? ['videos', relative(videosDir, f)].join(sep) : relative(root, f)).split(sep).join('/');
+    const hf = await cache.hashOf(f);
+    h.update(relative(root, f)).update('\0').update(hf).update('\0');
+    archivos[rel] = hf.slice(0, 12);
+  }
+  return { hash: h.digest('hex').slice(0, 32), archivos };
+}
+
+/** Solo el hash de `videoCodeFiles`. */
+export async function videoCodeHash(root: string, bundleDir: string, source: string | null | undefined, opts: { videosDir?: string | null; cache?: FileHashCache } = {}): Promise<string | null> {
+  return (await videoCodeFiles(root, bundleDir, source, opts))?.hash ?? null;
 }
 
 type Shared = { error: Error | null };
@@ -350,19 +370,6 @@ async function captureFrames(
   if (shared.error) throw shared.error;
 }
 
-function makeProgress(log: (m: string) => void, label: string) {
-  let lastPct = -1;
-  const t0 = Date.now();
-  return (done: number, total: number) => {
-    const pct = Math.floor((done / total) * 20) * 5;
-    if (pct > lastPct) {
-      lastPct = pct;
-      const s = (Date.now() - t0) / 1000;
-      log(`${label}: ${pct}% (${done}/${total} cuadros, ${(done / Math.max(s, 0.001)).toFixed(1)} fps)`);
-    }
-  };
-}
-
 async function setup(o: RenderOptions, needAudio: boolean) {
   const log = o.log ?? (() => {});
   const root = o.root ?? defaultRoot;
@@ -378,7 +385,10 @@ async function setup(o: RenderOptions, needAudio: boolean) {
   const explicit = explicitAssetDirs(o.assets);
   let assets = assetDirsFor(root, explicit, undefined).filter((d) => explicit.includes(d));
   const roots = [...assets, bundleDir, join(root, 'public')];
-  const server = await serveStatic(roots, bundleDir);
+  // Estáticos que el render realmente pide (render/estaticos.ts): la clave de las partes no incluye las carpetas, sino esta lista.
+  const raices = (): RaicesEstaticos => ({ assets, bundleDir, publico: join(root, 'public') });
+  const registro = new RegistroEstaticos(raices);
+  const server = await serveStatic(roots, bundleDir, { onPedido: registro.registrar });
   const browser = await launchChromium().catch(async (e) => {
     await server.close();
     throw e;
@@ -432,7 +442,6 @@ async function setup(o: RenderOptions, needAudio: boolean) {
         chromium: browser.version(),
         chromiumArgs: process.env.VE_CHROMIUM_ARGS ?? '',
         chromiumBin: process.env.VE_CHROMIUM ?? '',
-        assets: assetsDigest(assets),
         fps: meta.fps,
         width: meta.width,
         height: meta.height,
@@ -443,11 +452,12 @@ async function setup(o: RenderOptions, needAudio: boolean) {
       };
       // La clave de las partes usa la huella de ESTE video (no la de todo el bundle) cuando se puede calcular.
       // Solo si hace falta se hashea todo el bundle (con la cache de hashes, no se relee lo que no cambió).
-      const codeHash = (await videoCodeHash(root, bundleDir, found.source, { cache: hashes })) ?? (await hashDir(bundleDir, hashes, { sinAudio: true }));
+      const huella = await videoCodeFiles(root, bundleDir, found.source, { cache: hashes });
+      const codeHash = huella?.hash ?? (await hashDir(bundleDir, hashes, { sinAudio: true }));
       hashes.save();
       const loadErrors = (await page.evaluate(() => (window as any).__ve.loadErrors)) as { message: string }[];
       for (const e of loadErrors) log(`aviso: ${e.message.split('\n')[0]} (no afecta a este video)`);
-      return { env, tracks, bundleHash: codeHash, keyEnv, root, bundleDir, cacheDir, runId, assets, cleanup, page, context, log, props, scenes };
+      return { env, tracks, bundleHash: codeHash, codigoArchivos: huella?.archivos, keyEnv, root, bundleDir, cacheDir, runId, assets, cleanup, page, context, log, props, scenes, registro, raices, hashes };
     } catch (e) {
       await context.close().catch(() => {});
       throw e;
@@ -541,8 +551,37 @@ export async function renderVideo(options: RenderOptions): Promise<RenderResult>
       ...seg,
       file: join(s.cacheDir, `seg-${segmentKey({ bundleHash: s.bundleHash, videoId: options.videoId, props: s.props, start: seg.start, end: seg.end, scale, crf, env: s.keyEnv })}.mp4`),
     }));
-    const todo = segments.filter((seg) => !useCache || !existsSync(seg.file));
+    // Una parte en caché se reutiliza solo si existe Y los estáticos que usó siguen igual (render/estaticos.ts). Si no, se rehace y
+    // se dice por qué (render/motivos.ts).
+    const actual: RegistroClave = { codigo: s.bundleHash, archivos: s.codigoArchivos, props: stableStringify(s.props), scale, crf, segment: segSize, env: s.keyEnv as Record<string, unknown> };
+    const archivoRegistro = archivoDeRegistro(s.cacheDir, options.videoId, options.format);
+    const previo = leerRegistro(archivoRegistro);
+    guardarRegistro(archivoRegistro, actual);
+    const todo: typeof segments = [];
+    const invalidadas: string[] = [];
+    let sinEntrada = 0;
+    const memo = new Map();
+    for (const seg of segments) {
+      if (useCache && existsSync(seg.file)) {
+        const v = await validarManifiesto(leerManifiesto(manifiestoDe(seg.file)), s.raices(), s.hashes, memo);
+        if (v.ok) continue;
+        invalidadas.push(v.motivo);
+      } else if (useCache) sinEntrada++;
+      // la parte vieja se borra ANTES de rehacerla: si el render se corta entre el manifiesto nuevo y el mp4 nuevo no puede quedar un mp4 viejo con un manifiesto que lo da por bueno
+      rmSync(seg.file, { force: true });
+      rmSync(manifiestoDe(seg.file), { force: true });
+      todo.push(seg);
+    }
     const cachedSegments = segments.length - todo.length;
+    const partes = (n: number) => `${n} ${n === 1 ? 'parte' : 'partes'}`;
+    if (!useCache) log('caché: desactivada (--no-cache); se rehacen todas las partes');
+    else {
+      if (sinEntrada) {
+        const m = explicarCambio(previo, actual);
+        log(`caché: ${partes(sinEntrada)} sin entrada: ${m.length ? m.join('; ') : 'no había entrada para este rango de cuadros (nunca se renderizó, o se borró de la caché)'}`);
+      }
+      if (invalidadas.length) log(`caché: ${partes(invalidadas.length)} invalidadas: ${[...new Set(invalidadas)].slice(0, 3).join('; ')}`);
+    }
     log(`${meta.id}: ${meta.width}x${meta.height}@${meta.fps} ${total} cuadros, ${segments.length} partes (${cachedSegments} en cache, ${todo.length} por renderizar)`);
 
     if (todo.length) {
@@ -569,6 +608,11 @@ export async function renderVideo(options: RenderOptions): Promise<RenderResult>
           '-r', String(meta.fps), '-an', tmp,
         ];
         await run('ffmpeg', args, framesRoot); // cwd = frames dir: the pattern is relative
+        // Primero el manifiesto de estáticos y después el mp4: una parte sin manifiesto nunca se reutiliza. Si algún estático cambió
+        // mientras se renderizaba no se puede saber con cuál contenido se dibujó: queda sin manifiesto (se rehace la próxima vez).
+        const manifiesto = await s.registro.instantanea(s.hashes);
+        if (manifiesto) escribirManifiesto(manifiestoDe(seg.file), manifiesto);
+        else log(`aviso: un estático cambió mientras se renderizaba; la parte ${seg.start}-${seg.end} no se va a reutilizar`);
         renameSync(tmp, seg.file);
         if (!options.keepFrames) {
           for (let n = seg.start; n <= seg.end; n++) rmSync(join(framesRoot, frameFile(n, ext)), { force: true });
@@ -590,7 +634,7 @@ export async function renderVideo(options: RenderOptions): Promise<RenderResult>
             remaining.set(seg, left);
             if (left === 0) encodeChain = encodeChain.then(() => encode(seg)).catch((e) => void (encodeError ??= e as Error));
           },
-          makeProgress(log, 'render'),
+          crearProgreso(log, 'render'),
         );
       } finally {
         await encodeChain;
@@ -632,9 +676,12 @@ export async function renderVideo(options: RenderOptions): Promise<RenderResult>
       }
     }
     renameSync(outTmp, out);
+    s.hashes.save();
+    let liviano: ResultadoLiviano | undefined;
+    if (options.liviano !== undefined) liviano = await copiaLiviana(out, options.liviano === true ? LIVIANO_MB_POR_DEFECTO : options.liviano, log);
     const seconds = (Date.now() - t0) / 1000;
     log(`listo: ${out} (${total} cuadros, ${seconds.toFixed(1)} s, ${todo.length} partes renderizadas, ${cachedSegments} en cache)`);
-    return { out, frames: total, seconds, renderedSegments: todo.length, cachedSegments, ...(audioPeakDbtp !== undefined ? { audioPeakDbtp } : {}) };
+    return { out, frames: total, seconds, renderedSegments: todo.length, cachedSegments, ...(audioPeakDbtp !== undefined ? { audioPeakDbtp } : {}), ...(liviano ? { liviano } : {}) };
   } finally {
     rmSync(tmpDir, { recursive: true, force: true });
     if (outTmp) rmSync(outTmp, { force: true });

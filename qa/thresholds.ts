@@ -11,6 +11,8 @@ export const DEFAULT_THRESHOLDS: Thresholds = {
   contrast: { error: 3, warn: 4.5, largePx1080: 24, minOpacity: 0.35 },
   covered: { minOpacity: 0.2, maxCoverFraction: 0.9, hiddenFully: 0.97 },
   unjudged: { minFraction: 0.02 },
+  salto: { px: 24, ratio: 0.25, fade: 0.02, minOpacity: 0.35 },
+  'foco-centro': { zone: 0.6, error: 0.85, minOpacity: 0.35 },
   motion: { px: 12, crossPx: 4 },
 };
 

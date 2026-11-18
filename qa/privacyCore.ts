@@ -126,6 +126,12 @@ export function detectDomains(text: string): string[] {
   return out;
 }
 
+/**
+ * Número de comprobante (punto de venta y número: cuatro dígitos, guion, ocho dígitos, p. ej. `0001-00001234`). Se reconoce ANTES de clasificar un número como
+ * teléfono: tiene 12 dígitos y sin esto pasaba por teléfono. No es un dato de contacto; si hay comprobantes reales que no pueden salir, van en la lista `--deny`.
+ */
+export const COMPROBANTE_RE = /^\d{4}-\d{8}$/;
+
 const DATE_RE = /^(?:\d{4}[-/.]\d{1,2}[-/.]\d{1,2}|\d{1,2}[-/.]\d{1,2}[-/.]\d{2,4})$/;
 
 export function detectPhones(text: string): string[] {
@@ -134,6 +140,7 @@ export function detectPhones(text: string): string[] {
     const s = m[0].trim().replace(/[\s.-]+$/, '');
     const digits = s.replace(/\D/g, '');
     if (digits.length < 7 || digits.length > 15) continue;
+    if (COMPROBANTE_RE.test(s)) continue; // comprobante, no teléfono
     if (DATE_RE.test(s) || /^\d{1,3}(?:\.\d{3})+$/.test(s)) continue;
     if (/^\(?555\)?[\s.-]*01\d\d$/.test(s) || /555[\s.-]*01\d\d$/.test(s)) continue; // fictional range
     const plus = s.startsWith('+');

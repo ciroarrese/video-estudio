@@ -1,5 +1,5 @@
 import { execFileSync } from "node:child_process";
-import { cpSync, existsSync, mkdtempSync, readFileSync, readdirSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
+import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { afterAll, describe, expect, it } from "vitest";
@@ -19,6 +19,9 @@ for (const d of ["engine", "kit", "themes", "stories", "fx", "qa", "audio", "exa
   if (existsSync(path.join(raiz, d))) symlinkSync(path.join(raiz, d), path.join(proyecto, d), "junction") // junction: en Windows no pide permisos de administrador;
 }
 cpSync(path.join(raiz, "templates"), path.join(proyecto, "templates"), { recursive: true });
+// nuevo.mjs lee la configuración local con render/config-local.mjs (JavaScript plano, sin dependencias): hace falta al lado.
+mkdirSync(path.join(proyecto, "render"));
+cpSync(path.join(raiz, "render", "config-local.mjs"), path.join(proyecto, "render", "config-local.mjs"));
 // typecheck limitado a lo generado: misma configuración que el proyecto pero solo `videos/` de la copia
 writeFileSync(
   path.join(proyecto, "tsconfig.json"),
