@@ -11,7 +11,7 @@ import { pistaDeClics } from './pistas-de-prueba';
 
 describe('destinoDeConversion', () => {
   it('en una carpeta audio/ cae en audio/fuentes; fuera, en una carpeta temporal estable', () => {
-    expect(destinoDeConversion('/v/videos/demo/audio/tema.mp3')).toBe(join('/v/videos/demo/audio', 'fuentes', 'tema.wav'));
+    expect(destinoDeConversion('/v/videos/demo/audio/tema.mp3')).toBe(join(resolve('/v/videos/demo/audio'), 'fuentes', 'tema.wav'));
     const a = destinoDeConversion('/musica/tema.mp3', '/tmp', 10, 5);
     expect(a).toBe(destinoDeConversion('/musica/tema.mp3', '/tmp', 10, 5));
     expect(a).not.toBe(destinoDeConversion('/musica/tema.mp3', '/tmp', 11, 5));
