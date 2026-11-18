@@ -137,3 +137,55 @@ export function leerListaPositiva(op: Map<string, string>, k: string): number[] 
     return n;
   });
 }
+
+export interface PistaArg {
+  nombre: string;
+  archivo: string;
+  enSec?: number;
+}
+
+/**
+ * `--pista nombre=archivo[@seg],otra=archivo2`: pistas extra a analizar (`informe`); `@seg` es el segundo del video en que entra.
+ * Devuelve undefined si no se pasó; los nombres no se repiten ni pueden ser `musica`, `voz` o `mezcla` (los usa el informe).
+ */
+export function leerPistas(op: Map<string, string>): PistaArg[] | undefined {
+  const v = op.get('pista');
+  if (v === undefined) return undefined;
+  if (v.trim() === '') throw new Error('--pista necesita pares nombre=archivo[@seg] (por ejemplo --pista cierre=cierre.wav@12.5)');
+  const out: PistaArg[] = [];
+  for (const par of v.split(',')) {
+    const m = /^\s*([^=\s]+)\s*=\s*(.+?)(?:@([0-9.]+))?\s*$/.exec(par);
+    if (!m) throw new Error(`--pista: "${par.trim()}" no es un par nombre=archivo[@seg]`);
+    if (['musica', 'voz', 'mezcla'].includes(m[1]!)) throw new Error(`--pista: el nombre "${m[1]}" está reservado (usá otro)`);
+    if (out.some((p) => p.nombre === m[1])) throw new Error(`--pista: "${m[1]}" aparece más de una vez`);
+    const en = m[3] === undefined ? undefined : Number(m[3]);
+    if (en !== undefined && !Number.isFinite(en)) throw new Error(`--pista: "@${m[3]}" no es un segundo válido`);
+    out.push({ nombre: m[1]!, archivo: m[2]!, ...(en !== undefined ? { enSec: en } : {}) });
+  }
+  return out;
+}
+
+/**
+ * `--audio-propio 12.5-15,f400-f450`: tramos del video (segundos, o cuadros con prefijo `f`) donde suena un audio propio que no pasa por la mezcla.
+ * Devuelve undefined si no se pasó. Cada tramo es `desde-hasta` con desde < hasta.
+ */
+export function leerTramosPropios(op: Map<string, string>, fps: number): Array<{ desdeSec: number; hastaSec: number }> | undefined {
+  const v = op.get('audio-propio');
+  if (v === undefined) return undefined;
+  if (v.trim() === '') throw new Error('--audio-propio necesita tramos desde-hasta (segundos o f<cuadro>; por ejemplo --audio-propio 12.5-15,f400-f450)');
+  const aSec = (t: string): number => {
+    const txt = t.trim();
+    const esCuadro = txt.startsWith('f');
+    const n = Number(esCuadro ? txt.slice(1) : txt);
+    if (txt === '' || txt === 'f' || !Number.isFinite(n) || n < 0) throw new Error(`--audio-propio: "${txt}" no es un segundo ni un cuadro (f<n>) válido`);
+    return esCuadro ? n / fps : n;
+  };
+  return v.split(',').map((par) => {
+    const p = par.split('-');
+    if (p.length !== 2) throw new Error(`--audio-propio: "${par.trim()}" no es un tramo desde-hasta`);
+    const d = aSec(p[0]!);
+    const h = aSec(p[1]!);
+    if (!(h > d)) throw new Error(`--audio-propio: en "${par.trim()}" el final tiene que ser mayor que el comienzo`);
+    return { desdeSec: d, hastaSec: h };
+  });
+}

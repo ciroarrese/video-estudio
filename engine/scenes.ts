@@ -1,5 +1,18 @@
 import type { Stage } from './stage';
 
+/**
+ * Un sonido de una escena. `frame` es RELATIVO al inicio de la escena (0 = primer cuadro de la escena): lo normal es derivarlo de la tabla
+ * de tiempos de la propia escena, así que si la escena cambia de lugar o de duración el sonido la sigue. `npm run audio -- mezcla --video <id>`
+ * lo suma al `from` de la escena. Es el mismo formato que un cue de `--cues` (`sfx`, `gain`, `ancla`).
+ */
+export type SceneCue = { frame: number; sfx: string; gain?: number; ancla?: 'inicio' | 'pico' };
+
+/**
+ * Audio propio de una escena (una locución, un efecto incrustado, una música que trae la escena): `true` es toda la escena; `{ desde, hasta }`
+ * un tramo en cuadros relativos a la escena (`hasta` excluido). `audio` (mezcla, empalme, informe) lo usa para terminar o bajar la música antes.
+ */
+export type SceneOwnAudio = boolean | { desde?: number; hasta?: number };
+
 /** Una escena nombrada de un video: rango de cuadros absolutos [from, from + durationInFrames). */
 export type SceneInfo = {
   id: string;
@@ -7,6 +20,10 @@ export type SceneInfo = {
   name?: string;
   from: number;
   durationInFrames: number;
+  /** Sonidos de la escena en cuadros relativos a ella (ver `SceneCue`); opcional. */
+  cues?: SceneCue[];
+  /** La escena trae audio propio (ver `SceneOwnAudio`); opcional. */
+  audioPropio?: SceneOwnAudio;
 };
 
 const found = new Map<string, SceneInfo>();

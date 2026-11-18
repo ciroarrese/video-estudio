@@ -1,5 +1,6 @@
 import { describe, hiddenFraction, ignored, intersect, isHuge, protrusion, visibleLine } from '../geometry';
 import type { Finding, Rule } from '../types';
+import { isWorldText, worldZoomed } from '../world';
 
 /**
  * Text partly outside the frame. The decision, spelled out in every message:
@@ -10,6 +11,8 @@ import type { Finding, Rule } from '../types';
  *           APPEARS/fades while cropped (the camera is still: the viewer sees text pop in already cut).
  *  - warn:  under a camera/zoom, still and steady, cropped more than `slipPct` %: framing (the camera holds on a part of a larger layout).
  * Fully outside, huge or nearly transparent text is exempt.
+ * Interfaz recreada bajo una cámara (`data-qa-world`, ver `qa/world.ts`): con el mundo ACERCADO, el texto de la interfaz que el borde del cuadro corta baja a `info` (es el encuadre).
+ * El objetivo de la señal activa (`data-qa-target`) nunca se exceptúa: cortado es error, salvo mientras la cámara todavía viaja hacia él (se mueve y el mundo no está asentado).
  */
 const FADING = 0.02;
 
@@ -36,7 +39,13 @@ export const offscreenRule: Rule = {
         const big = pct > t.slipPct;
         let severity: Finding['severity'];
         let why: string;
-        if (moving) {
+        if (isWorldText(r) && worldZoomed(r)) {
+          severity = 'info';
+          why = `info porque el mundo (data-qa-world) esta acercado (x${r.world!.zoom.toFixed(2)}) y el borde del cuadro corta la interfaz a proposito; se juzga lo que queda entero dentro del encuadre`;
+        } else if (r.target && (!moving || r.world?.settled)) {
+          severity = 'error';
+          why = `error porque es el objetivo de la señal activa (data-qa-target) y el borde del cuadro lo corta${r.world?.settled ? ' con la camara ya asentada' : ''}: el objetivo nunca se exceptua. Arreglo: centrar el objetivo o acercar menos`;
+        } else if (moving) {
           severity = 'info';
           why = 'info porque el texto se mueve entre cuadros (camara o transicion): entra o sale del cuadro';
         } else if (r.transformed && px <= t.sliverPx && (r.motion ?? 0) > t.cameraPx) {

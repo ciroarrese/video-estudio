@@ -9,6 +9,9 @@ import { colocarVoz, type VozOpts } from './voz';
 import { avisoMp3SinEtiqueta, codificar, decodificar, runFfmpeg, sondear } from './ffmpeg';
 import { picoVerdaderoDb } from './medidas';
 import { sonoridadIntegrada } from './sonoridad';
+import { curvaDeHuecos, type HuecoMusica } from './huecos';
+
+export type { HuecoMusica } from './huecos';
 
 export interface Cue {
   frame: number;
@@ -32,6 +35,15 @@ export interface MusicaOpts {
   fadeInSec?: number;
   /** Caída al final del video (1 s por defecto). */
   fadeOutSec?: number;
+  /**
+   * Relación con los efectos: la sonoridad integrada (LUFS, BS.1770) de la música sola es esta cantidad de dB MENOR que la sonoridad integrada de los efectos
+   * solos (los dos como salen del plan: con sus ganancias y fundidos, antes del ducking y de los huecos). 12 deja la música 12 LU bajo el conjunto de los efectos.
+   * Fija el nivel de la música: `gain` queda sin efecto. Se mide sobre los bloques de 400 ms con sonido (compuerta relativa de -10 LU), así que un efecto
+   * suelto cuenta por lo que suena, no por el silencio entre cues. Exige música y cues; sin efectos no se aplica y avisa.
+   */
+  bajoEfectosDb?: number;
+  /** Tramos donde la música se calla o baja (por ejemplo, una escena con audio propio); ver `huecos.ts`. */
+  huecos?: HuecoMusica[];
 }
 
 export type { VozOpts } from './voz';
@@ -253,6 +265,32 @@ export interface InfoMezcla {
   ventanasVoz: VentanaDuck[];
   /** Los mismos tramos en segundos, para cruzar con los subtítulos y los cortes de escena (`locucion` en la CLI). */
   tramosVozSec: Array<{ desde: number; hasta: number }>;
+  /** Con `musica.bajoEfectosDb`: lo pedido, lo medido de cada lado y la ganancia (dB) que se le aplicó a la música para llegar ahí. */
+  relacionMusicaEfectos?: { pedidoDb: number; lufsMusica: number; lufsEfectos: number; gananciaMusicaDb: number };
+}
+
+/** Las capas de la mezcla ya armadas (música, efectos y voz por separado, sin sumar): lo que usan `mezclar` y el informe. */
+export interface Capas {
+  plan: PlanMezcla;
+  /** Cues que suenan (con la ganancia por efecto aplicada y sin los que caen fuera del video). */
+  cues: Cue[];
+  sr: number;
+  /** Muestras por canal. */
+  n: number;
+  /** Música estéreo entrelazada con el relativo a los efectos, los huecos y el ducking ya aplicados; null sin música. */
+  mus: Float32Array | null;
+  /** Igual que `mus` pero antes del ducking (con los huecos). */
+  musSinDuck: Float32Array | null;
+  /** Efectos estéreo entrelazados; null sin cues. */
+  sfx: Float32Array | null;
+  /** Voz estéreo entrelazada ya ubicada; null sin voz. */
+  voz: Float32Array | null;
+  /** Cada efecto decodificado en mono, por ruta de archivo. */
+  monos: Map<string, Float32Array>;
+  sfxDir: string;
+  ventanasDuck: VentanaDuck[];
+  ventanasVoz: VentanaDuck[];
+  relacionMusicaEfectos?: InfoMezcla['relacionMusicaEfectos'];
 }
 
 /** Falla de entrada, nombrando el cue, si falta algún archivo. */
@@ -270,14 +308,20 @@ export function verificarArchivos(o: MezclaOpts): void {
   });
 }
 
-/** Renderiza la mezcla a `salida` (el formato lo da la extensión). */
-export async function mezclar(opts: MezclaOpts & { salida: string }): Promise<PlanMezcla & { info: InfoMezcla }> {
+/** Arma las capas de la mezcla (música, efectos, voz) y les aplica la relación música/efectos, los huecos y el ducking; no suma ni normaliza. */
+export async function construirCapas(opts: MezclaOpts): Promise<Capas> {
   const sinUsar: string[] = [];
   const o = { ...opts, cues: aplicarGainPorEfecto(opts.cues, opts.gainPorEfecto, sinUsar) };
   verificarArchivos(o);
   const sr = o.sr ?? 48000;
   const dir = o.sfxDir ?? 'public/sfx';
   const avisos: string[] = [];
+  if (o.musica && o.lufs !== undefined && o.musica.gain !== undefined && o.musica.bajoEfectosDb === undefined) {
+    avisos.push(`--lufs ${o.lufs} y --musica-gain ${o.musica.gain} a la vez: el objetivo de sonoridad fija el nivel de TODA la mezcla, y la música es lo que más pesa en la sonoridad integrada, así que bajar --musica-gain casi no baja la música (la normalización la devuelve al objetivo y sube de paso los efectos). Para bajar la música usá --musica-bajo-efectos <dB> (relación con los efectos) y dejá --lufs para el nivel general; o sacá --lufs.`);
+  }
+  if (o.musica && o.musica.bajoEfectosDb !== undefined && o.musica.gain !== undefined) {
+    avisos.push('--musica-gain se ignora: --musica-bajo-efectos fija el nivel de la música respecto de los efectos.');
+  }
   // Una pasada por cada archivo: canales (ffprobe) y, para los efectos, señal mono para medir pico y duración.
   const info: Record<string, InfoCue> = {};
   const monos = new Map<string, Float32Array>();
@@ -328,6 +372,28 @@ export async function mezclar(opts: MezclaOpts & { salida: string }): Promise<Pl
   } else if (plan.stems === 'musica') mus = todo;
   else sfx = todo;
 
+  // Relación música/efectos: se escala la música para que su sonoridad integrada quede `bajoEfectosDb` bajo la de los efectos.
+  let relacion: InfoMezcla['relacionMusicaEfectos'];
+  if (o.musica?.bajoEfectosDb !== undefined) {
+    const pedido = o.musica.bajoEfectosDb;
+    if (!Number.isFinite(pedido)) throw new Error(`musica.bajoEfectosDb tiene que ser un número (recibió ${pedido})`);
+    if (!mus || !sfx) plan.advertencias.push('--musica-bajo-efectos necesita música y al menos un efecto que suene dentro del video: no se aplica.');
+    else {
+      const lm = sonoridadIntegrada(mus, sr, 2);
+      const ls = sonoridadIntegrada(sfx, sr, 2);
+      if (!Number.isFinite(lm) || !Number.isFinite(ls)) plan.advertencias.push('--musica-bajo-efectos: la música o los efectos están en silencio: no se puede medir la relación y no se aplica.');
+      else {
+        const gDb = ls - pedido - lm;
+        const g = Math.pow(10, gDb / 20);
+        for (let i = 0; i < mus.length; i++) mus[i]! *= g;
+        relacion = { pedidoDb: pedido, lufsMusica: Math.round((lm + gDb) * 100) / 100, lufsEfectos: Math.round(ls * 100) / 100, gananciaMusicaDb: Math.round(gDb * 100) / 100 };
+      }
+    }
+  }
+  // Huecos (audio propio de una escena, etc.): la música se calla o baja en esos tramos.
+  if (mus && o.musica?.huecos && o.musica.huecos.length > 0) aplicarCurva(mus, curvaDeHuecos(o.musica.huecos, plan.totalSamples, sr), 2);
+  const musSinDuck = mus ? new Float32Array(mus) : null;
+
   // Ducking de la música bajo cada efecto: profundidad fija, atack y release previsibles.
   const d = o.duck ?? {};
   let ventanas: VentanaDuck[] = [];
@@ -356,6 +422,13 @@ export async function mezclar(opts: MezclaOpts & { salida: string }): Promise<Pl
     }
   }
   if (mus && curvaSfx) aplicarCurva(mus, curvaSfx, 2);
+  return { plan, cues, sr, n, mus, musSinDuck, sfx, voz, monos, sfxDir: dir, ventanasDuck: ventanas, ventanasVoz, relacionMusicaEfectos: relacion };
+}
+
+/** Renderiza la mezcla a `salida` (el formato lo da la extensión). */
+export async function mezclar(opts: MezclaOpts & { salida: string }): Promise<PlanMezcla & { info: InfoMezcla }> {
+  const o = opts;
+  const { plan, sr, n, mus, sfx, voz, ventanasDuck: ventanas, ventanasVoz, relacionMusicaEfectos } = await construirCapas(o);
   const mix = new Float32Array(n * 2);
   for (let i = 0; i < mix.length; i++) mix[i] = (mus?.[i] ?? 0) + (sfx?.[i] ?? 0) + (voz?.[i] ?? 0);
 
@@ -384,6 +457,7 @@ export async function mezclar(opts: MezclaOpts & { salida: string }): Promise<Pl
       ventanasDuck: ventanas,
       ventanasVoz,
       tramosVozSec: ventanasVoz.map((v) => ({ desde: Math.round((v.iniSample / sr) * 1000) / 1000, hasta: Math.round((v.finSample / sr) * 1000) / 1000 })),
+      ...(relacionMusicaEfectos ? { relacionMusicaEfectos } : {}),
     },
   };
 }

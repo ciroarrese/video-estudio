@@ -8,6 +8,7 @@ import { createRequire } from 'node:module';
 import { accessSync, constants, existsSync, mkdirSync, readFileSync, realpathSync, rmSync, statSync, statfsSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
+import { NOMBRE_CONFIG_LOCAL, resolverConfig } from './config-local.mjs';
 
 const raiz = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 
@@ -168,16 +169,19 @@ function comprobarEscritura(nombre, dir, variable) {
   return ok(nombre, `${dir}${libre}`);
 }
 
-function comprobarVideosDir() {
-  const ext = process.env.VE_VIDEOS_DIR;
-  if (!ext) return null;
-  const dir = resolve(ext);
+/** Dónde se resuelve cada carpeta: variable de entorno, `.video-studio.local.json` o el valor por defecto (render/config-local.mjs). */
+export function comprobarVideosDir(config) {
+  const v = config.VE_VIDEOS_DIR;
+  if (!v.valor) return ok('Carpeta de videos', `videos/ del clon (sin VE_VIDEOS_DIR ni ${NOMBRE_CONFIG_LOCAL}; ejemplos en examples/)`);
+  const dir = resolve(v.valor);
+  const nombre = 'Carpeta de videos';
+  const origen = v.origen === 'variable de entorno' ? 'VE_VIDEOS_DIR' : `${NOMBRE_CONFIG_LOCAL}, clave videosDir`;
   try {
     if (!statSync(dir).isDirectory()) throw new Error('no es una carpeta');
     accessSync(dir, constants.R_OK | constants.W_OK);
-    return ok('Carpeta de videos (VE_VIDEOS_DIR)', dir);
+    return ok(nombre, `${dir} (desde ${origen})`);
   } catch (e) {
-    return falta('Carpeta de videos (VE_VIDEOS_DIR)', `${dir}: ${e?.code === 'ENOENT' ? 'no existe' : e?.message}`, 'Creá la carpeta (en Windows, con el Explorador o "mkdir") o corregí la variable.');
+    return falta(nombre, `${dir} (desde ${origen}): ${e?.code === 'ENOENT' ? 'no existe' : e?.message}`, v.origen === 'variable de entorno' ? 'Creá la carpeta (en Windows, con el Explorador o "mkdir") o corregí la variable.' : `Creá la carpeta o corregí "videosDir" en ${NOMBRE_CONFIG_LOCAL}.`);
   }
 }
 
@@ -209,11 +213,20 @@ export async function diagnosticar(opciones = {}) {
   res.push(...(await comprobarChromium()));
   res.push(...comprobarFfmpeg('ffmpeg'));
   res.push(...comprobarFfmpeg('ffprobe'));
-  const c = carpetasDeSalida(process.env, raiz, process.cwd());
+  let config;
+  try {
+    config = resolverConfig(process.env, raiz);
+  } catch (e) {
+    res.push(falta('Configuración local', e.message, `Corregí o borrá ${join(raiz, NOMBRE_CONFIG_LOCAL)}.`));
+    config = resolverConfig({ ...process.env, VE_VIDEOS_DIR: process.env.VE_VIDEOS_DIR ?? '' }, join(raiz, 'sin-config'));
+  }
+  // Mismo criterio que los comandos: la variable gana; si no está, vale lo que dice el archivo.
+  const entorno = { ...process.env };
+  for (const [variable, { valor }] of Object.entries(config)) if (valor) entorno[variable] = valor;
+  const c = carpetasDeSalida(entorno, raiz, process.cwd());
+  res.push(comprobarVideosDir(config));
   res.push(comprobarEscritura('Carpeta de salidas', c.salida, 'VE_OUT_DIR'));
   res.push(comprobarEscritura('Carpeta de caché', c.cache, 'VE_CACHE_DIR'));
-  const v = comprobarVideosDir();
-  if (v) res.push(v);
   if (opciones.rapido) res.push(aviso('Descubrimiento de videos', 'omitido (--rapido)'));
   else if (res.some((r) => r.estado === 'falta')) {
     res.push(aviso('Descubrimiento de videos', 'omitido: antes hay que arreglar lo de arriba'));

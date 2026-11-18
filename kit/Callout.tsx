@@ -2,8 +2,8 @@ import type React from "react";
 import { annotationLook, borderWidth, cornerRadius, entrance, readableOn, surfaceStyle, textStyle, useTheme, withAlpha } from "../themes";
 import type { AnnotationMark, AnnotationMarkSetting, Theme } from "../themes";
 import { arrowPoints, circlePoints, pointsToString } from "./doodle";
-import { calloutState, placeBeside } from "./layout";
-import type { Placement, Rect, Side } from "./layout";
+import { calloutState, decideBeside, placeBeside } from "./layout";
+import type { BesideDecision, Placement, Rect, Side } from "./layout";
 import { signalAttrs } from "./signal";
 import { textWidth } from "./text";
 import { clamp, useFrameOr } from "./util";
@@ -20,6 +20,12 @@ export interface CalloutLayoutOptions {
   /** Zona donde tiene que quedar completa (el área segura, o lo que ve la cámara: `cameraView`). */
   within?: Rect;
   prefer?: Side[];
+  /**
+   * Lado y alineación **ya decididos** (`calloutDecision`, una sola vez): la pastilla ocupa siempre ese lado y esa alineación y solo sigue al objetivo,
+   * en vez de elegir de nuevo en cada cuadro según el lugar libre. Con la cámara en movimiento el lugar libre cambia cuadro a cuadro y una etiqueta
+   * que decide siempre salta de lado. Sin `fixed` el comportamiento es el de siempre.
+   */
+  fixed?: BesideDecision;
   /** Separación con el objetivo. Por defecto la de la señal (la flecha pide más aire que la etiqueta pegada). */
   gap?: number;
   /**
@@ -58,8 +64,24 @@ export function calloutPlacement(theme: Theme, o: CalloutLayoutOptions): Placeme
   const mark = effectiveMark(theme, o);
   if (!o.text) return { x: o.target.x, y: o.target.y, side: "right", overlap: 0, covers: [], w: 0, h: 0, mark };
   const box = calloutBox(theme, o.text, o.size);
-  const p = placeBeside(o.target, box, { avoid: o.avoid, within: o.within, prefer: o.prefer, gap: o.gap ?? MARK_GAP[mark] });
+  const p = placeBeside(o.target, box, {
+    avoid: o.avoid, within: o.within, gap: o.gap ?? MARK_GAP[mark],
+    ...(o.fixed ? { prefer: [o.fixed.side], align: o.fixed.align } : { prefer: o.prefer }),
+  });
   return { ...p, w: box.w, h: box.h, mark };
+}
+
+/**
+ * Decide lado y alineación de un `Callout` **una sola vez**, con el objetivo donde va a quedar asentado (por ejemplo, proyectado con la cámara final
+ * de su señal; ver `projectRect`) y el lugar libre de ese momento. Se pasa el resultado a `fixed` en cada cuadro: la pastilla ya no cambia de lado
+ * mientras la cámara viaja. Con las mismas opciones que `calloutPlacement` (menos `fixed`). Sin texto no hay pastilla que ubicar: devuelve `right` y 0,5.
+ */
+export function calloutDecision(theme: Theme, o: Omit<CalloutLayoutOptions, "fixed">): BesideDecision {
+  if (!o.text) return { side: "right", align: 0.5 };
+  const mark = effectiveMark(theme, o);
+  const box = calloutBox(theme, o.text, o.size);
+  const d = decideBeside(o.target, box, { avoid: o.avoid, within: o.within, prefer: o.prefer, gap: o.gap ?? MARK_GAP[mark] });
+  return { side: d.side, align: d.align };
 }
 
 /**
@@ -120,7 +142,11 @@ function roundRectPath(x: number, y: number, w: number, h: number, rx: number): 
  * (1 con la señal apagada, `1 - annotation.dim` con ella puesta). La pieza no dibuja una capa translúcida encima: tapa el objetivo y hay que recortarle un hueco; una opacidad en
  * el contenedor, sin `isolation`, `will-change` ni `filter`, pasa `render --check --check-all`. Con las otras señales vale 1.
  */
-export function Callout({ frame, range, ramp, ...o }: CalloutLayoutOptions & { range: [number, number]; frame?: number; ramp?: number }) {
+export function Callout({ frame, range, ramp, overlay, ...o }: CalloutLayoutOptions & {
+  range: [number, number]; frame?: number; ramp?: number;
+  /** La pieza es una capa fija en espacio de pantalla (fuera de `World`): agrega `data-qa-overlay` a la pastilla y al trazo (ver `kit/README.md`). */
+  overlay?: boolean;
+}) {
   const theme = useTheme();
   const f = useFrameOr(frame);
   const p = calloutState(f, range, { ramp });
@@ -135,13 +161,15 @@ export function Callout({ frame, range, ramp, ...o }: CalloutLayoutOptions & { r
   const seed = o.id ?? o.text ?? "callout";
   return (
     <>
-      <CalloutMark theme={theme} mark={mark} target={o.target} pill={showPill ? pill : null} side={at.side} p={p} frame={f} seed={seed} look={look} />
-      {showPill && <CalloutPill theme={theme} text={o.text!} size={size} at={at} p={p} forced={look.forced} />}
+      <CalloutMark ov={overlay} theme={theme} mark={mark} target={o.target} pill={showPill ? pill : null} side={at.side} p={p} frame={f} seed={seed} look={look} />
+      {showPill && <CalloutPill ov={overlay} theme={theme} text={o.text!} size={size} at={at} p={p} forced={look.forced} />}
     </>
   );
 }
 
-function CalloutPill({ theme, text, size, at, p, forced }: { theme: Theme; text: string; size: number; at: { x: number; y: number }; p: number; forced: boolean }) {
+const OV = { "data-qa-overlay": "true" } as const;
+
+function CalloutPill({ ov, theme, text, size, at, p, forced }: { ov?: boolean; theme: Theme; text: string; size: number; at: { x: number; y: number }; p: number; forced: boolean }) {
   const box = calloutBox(theme, text, size);
   const surf = surfaceStyle(theme, "chip", { on: true });
   const ent = entrance(theme, p, 0, { native: "rise", distance: 16 });
@@ -150,6 +178,7 @@ function CalloutPill({ theme, text, size, at, p, forced }: { theme: Theme; text:
     <div
       key={Object.keys(ent).join("-")}
       {...signalAttrs(theme, "callout", "Callout", forced)}
+      {...(ov ? OV : {})}
       style={{
         position: "absolute", left: at.x, top: at.y, minWidth: box.w, height: box.h, boxSizing: "border-box",
         display: "flex", alignItems: "center", justifyContent: "center", whiteSpace: "nowrap", padding: `0 ${box.padX}px`,
@@ -163,8 +192,8 @@ function CalloutPill({ theme, text, size, at, p, forced }: { theme: Theme; text:
 }
 
 /** El trazo de la señal. `p` (0 a 1) es el progreso de `calloutState`: dibuja el trazo. */
-function CalloutMark({ theme, mark, target, pill, side, p, frame, seed, look }: {
-  theme: Theme; mark: AnnotationMark; target: Rect; pill: Rect | null; side: Side; p: number; frame: number; seed: string; look: ReturnType<typeof annotationLook>;
+function CalloutMark({ ov, theme, mark, target, pill, side, p, frame, seed, look }: {
+  ov?: boolean; theme: Theme; mark: AnnotationMark; target: Rect; pill: Rect | null; side: Side; p: number; frame: number; seed: string; look: ReturnType<typeof annotationLook>;
 }) {
   const accent = theme.color.accent;
   const sw = Math.max(2, Math.round(4 * look.widthK));
@@ -177,7 +206,7 @@ function CalloutMark({ theme, mark, target, pill, side, p, frame, seed, look }: 
   );
   const halo = (d: string) => (look.glow > 0 ? <path d={d} fill="none" stroke={withAlpha(accent, 0.35 * look.glow)} strokeWidth={sw * 3.2} strokeLinecap={cap} strokeLinejoin={join} {...draw} /> : null);
   const svg = (children: React.ReactNode, z = 79) => (
-    <svg key={full ? "full" : "part"} {...signalAttrs(theme, "callout", "Callout", look.forced)} style={{ position: "absolute", left: 0, top: 0, overflow: "visible", pointerEvents: "none", zIndex: z }} width={1} height={1}>{children}</svg>
+    <svg key={full ? "full" : "part"} {...signalAttrs(theme, "callout", "Callout", look.forced)} {...(ov ? OV : {})} style={{ position: "absolute", left: 0, top: 0, overflow: "visible", pointerEvents: "none", zIndex: z }} width={1} height={1}>{children}</svg>
   );
   const A = pill ? pillAnchor(side, pill) : null;
 

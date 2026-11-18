@@ -12,7 +12,7 @@ export function looseKey(r: Pick<TextRun, 'key' | 'text'>): string | null {
 }
 
 /** Firma sin la ruta del DOM (etiqueta|testid|texto): empareja un texto cuya ruta cambió entre cuadros (p. ej. un hermano que se monta o se desmonta corre los índices). */
-const sigOf = (r: Pick<TextRun, 'tag' | 'testid' | 'text'>) => `${r.tag}|${r.testid ?? ''}|${r.text}`;
+export const sigOf = (r: Pick<TextRun, 'tag' | 'testid' | 'text'>) => `${r.tag}|${r.testid ?? ''}|${r.text}`;
 
 /**
  * Sets `run.motion` / `run.fade` / `run.cover.motion` / `run.veil.fade`: the largest edge displacement (px) of the same element (same key)

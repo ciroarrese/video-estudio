@@ -8,7 +8,15 @@ export type CameraKey = { f: number; x: number; y: number; scale: number };
 /** Estado de cámara en un cuadro. `rx`/`ry` son grados de inclinación; `blur` en px. */
 export type Camera = { x: number; y: number; scale: number; rx: number; ry: number; blur: number };
 
+/** Perfiles de cámara con nombre (`CAMERA_PROFILES`): `plana` apaga inclinación y desenfoque de movimiento. */
+export type CameraProfileName = "plana";
+
 export type CameraOptions = {
+  /**
+   * Perfil con nombre: un conjunto de opciones que se aplica debajo de las explícitas (lo que se pase en `opts` siempre gana).
+   * `plana`: sin inclinación ni desenfoque (la cámara de un recorrido de interfaz: lo que se señala se proyecta con una cuenta plana exacta, ver `projectRect`).
+   */
+  profile?: CameraProfileName;
   /** Inclinación en reposo (grados). Por defecto 0: cámara quieta = sin inclinación. */
   baseTilt?: { rx: number; ry: number };
   /** Grados de inclinación por px/cuadro de velocidad en pantalla. Por defecto 0.05. */
@@ -26,6 +34,19 @@ export type CameraOptions = {
   /** Transforma la cámara base (p. ej. `zoomThrough`); la velocidad se mide sobre el resultado. */
   map?: (frame: number, cam: { x: number; y: number; scale: number }) => { x: number; y: number; scale: number };
 };
+
+/** Opciones de cada perfil. `plana`: el mundo nunca se inclina (`rx = ry = 0`) y no hay desenfoque por velocidad. */
+export const CAMERA_PROFILES: Record<CameraProfileName, Omit<CameraOptions, "profile" | "map" | "noBlurFrom">> = {
+  plana: { baseTilt: { rx: 0, ry: 0 }, tiltGain: 0, maxTilt: 0, maxBlur: 0 },
+};
+
+/** Opciones con el perfil ya resuelto: lo explícito pisa al perfil. Sin `profile` devuelve las mismas opciones. */
+export function resolveCameraProfile(opts: CameraOptions): CameraOptions {
+  if (!opts.profile) return opts;
+  const prof = CAMERA_PROFILES[opts.profile];
+  if (!prof) throw new Error(`cameraAt: perfil de cámara desconocido "${String(opts.profile)}" (los que hay: ${Object.keys(CAMERA_PROFILES).join(", ")})`);
+  return { ...prof, ...opts };
+}
 
 function base(frame: number, keys: CameraKey[], map?: CameraOptions["map"]) {
   const t = keys.map((k) => k.f);
@@ -45,7 +66,7 @@ export function cameraAt(frame: number, keys: CameraKey[], opts: CameraOptions =
       throw new Error(`cameraAt: los cuadros clave deben ser estrictamente crecientes (cuadro ${keys[i - 1]!.f} seguido de ${keys[i]!.f}, posiciones ${i - 1} y ${i})`);
     }
   }
-  const { baseTilt = { rx: 0, ry: 0 }, tiltGain = 0.05, maxTilt = 8, maxBlur = 7, blurThreshold = 12, blurRange = 14, noBlurFrom, map } = opts;
+  const { baseTilt = { rx: 0, ry: 0 }, tiltGain = 0.05, maxTilt = 8, maxBlur = 7, blurThreshold = 12, blurRange = 14, noBlurFrom, map } = resolveCameraProfile(opts);
   const c = base(frame, keys, map);
   const p = base(frame - 1, keys, map);
   const vx = (c.x - p.x) * c.scale;

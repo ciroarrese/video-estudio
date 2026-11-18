@@ -3,6 +3,7 @@
 // `renderizarPlan` mezcla PCM en memoria (sin ffmpeg) y `empalmar` conecta con archivos.
 import { detectarCuerpo, type Cuerpo } from './cuerpo';
 import { codificar, decodificar } from './ffmpeg';
+import { silenciosInternos, type TramoSilencio } from './silencios';
 
 export interface PlanOpts {
   /** Pulsos de la pista original, en segundos, ascendentes. */
@@ -390,6 +391,11 @@ export interface EmpalmeResult {
   cortes: (CortePlanificado & { outFrame?: number })[];
   /** Ganancia (dB, negativa) que hubo que aplicar para que la salida no pase de 0 dBFS; 0 si no hizo falta. */
   headroomDb: number;
+  /**
+   * Pausas propias de la pista FUENTE (segundos del archivo de entrada, no de la salida): tramos de más de 0,3 s bajo -50 dBFS entre sonido y sonido,
+   * sin la intro ni la cola. Sirven para no confundir una pausa de la música con un corte de la mezcla.
+   */
+  silenciosInternos: TramoSilencio[];
 }
 
 /** Tope de pico de la salida (lineal): lo que pasa de esto se baja con una ganancia fija, sin recortar. */
@@ -414,11 +420,10 @@ export async function empalmar(o: EmpalmeOpts): Promise<EmpalmeResult> {
   const trackDurSec = src.length / 2 / sr;
   const targetSec = o.frames / o.fps;
   let cuerpo: Cuerpo | null = null;
-  if (!o.sinCuerpo) {
-    const mono = new Float32Array(src.length / 2);
-    for (let i = 0; i < mono.length; i++) mono[i] = 0.5 * (src[2 * i] + src[2 * i + 1]);
-    cuerpo = detectarCuerpo(mono, sr);
-  }
+  const mono = new Float32Array(src.length / 2);
+  for (let i = 0; i < mono.length; i++) mono[i] = 0.5 * (src[2 * i] + src[2 * i + 1]);
+  if (!o.sinCuerpo) cuerpo = detectarCuerpo(mono, sr);
+  const silenciosInternosFuente = silenciosInternos(mono, sr).map((t) => ({ desde: Math.round(t.desde * 1000) / 1000, hasta: Math.round(t.hasta * 1000) / 1000 }));
   const plan = planEmpalme({ ...o, trackDurSec, targetSec, cuerpo: cuerpo ?? undefined });
   const total = Math.round(targetSec * sr);
   const y = renderizarPlan(src, plan, sr, total);
@@ -437,5 +442,6 @@ export async function empalmar(o: EmpalmeOpts): Promise<EmpalmeResult> {
     spliceFrames: plan.splices.map((s) => r3(s.outSec * o.fps)),
     cortes: plan.cortes.map((c) => ({ ...c, ...(c.outSec !== undefined ? { outFrame: r3(c.outSec * o.fps) } : {}) })),
     headroomDb,
+    silenciosInternos: silenciosInternosFuente,
   };
 }

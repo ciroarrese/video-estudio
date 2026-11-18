@@ -2,6 +2,7 @@ import { intersect } from '../geometry';
 import type { JudgedSummary, RuleContext } from '../types';
 import { ALL_RULES } from '../types';
 import { ignoresEverything, inkVisible, looksHidden, visibleRuns } from './visible';
+import { edgeCut, isWorldText } from '../world';
 
 export const emptyJudged = (): JudgedSummary => ({
   texts: 0, judged: 0, notJudged: { total: 0, hidden: 0, ignoredAll: 0, outside: 0, invisible: 0 },
@@ -12,7 +13,10 @@ export const emptyJudged = (): JudgedSummary => ({
 export function addJudged(a: JudgedSummary, b: JudgedSummary): void {
   a.texts += b.texts; a.judged += b.judged;
   for (const k of Object.keys(a.notJudged) as (keyof JudgedSummary['notJudged'])[]) a.notJudged[k] += b.notJudged[k];
-  for (const k of Object.keys(a.partial) as (keyof JudgedSummary['partial'])[]) a.partial[k] += b.partial[k];
+  for (const k of ['decor', 'veil', 'ignoredSome', 'gradientText'] as const) a.partial[k] += b.partial[k];
+  // contadores de las marcas del mundo: solo aparecen en el informe si el video las usa (los informes de los demas videos no cambian)
+  for (const k of ['worldText', 'worldCut'] as const) if (b.partial[k]) a.partial[k] = (a.partial[k] ?? 0) + b.partial[k]!;
+  if (b.overlayCoverSkipped) a.overlayCoverSkipped = (a.overlayCoverSkipped ?? 0) + b.overlayCoverSkipped;
   for (const [k, v] of Object.entries(b.ignoredByRule)) a.ignoredByRule[k] = (a.ignoredByRule[k] ?? 0) + v;
   a.coverMarkerSkipped += b.coverMarkerSkipped; a.hiddenButVisible += b.hiddenButVisible; a.unjudgedVisible += b.unjudgedVisible;
 }
@@ -30,6 +34,7 @@ export function judgement(ctx: RuleContext): JudgedSummary {
   for (const r of ctx.runs) {
     s.texts++;
     if (r.skippedCovers) s.coverMarkerSkipped++;
+    if (r.skippedOverlay) s.overlayCoverSkipped = (s.overlayCoverSkipped ?? 0) + 1;
     if (looksHidden(r, ctx) && inkVisible(r, minFrac) === true) s.hiddenButVisible++;
     if (!intersect(r.rect, frame)) { s.notJudged.outside++; s.notJudged.total++; continue; }
     if (r.opacity < 0.05) { s.notJudged.invisible++; s.notJudged.total++; continue; }
@@ -43,6 +48,10 @@ export function judgement(ctx: RuleContext): JudgedSummary {
     if (r.decor) s.partial.decor++;
     if (r.veil) s.partial.veil++;
     if (r.transparentFill) s.partial.gradientText++;
+    if (isWorldText(r)) {
+      s.partial.worldText = (s.partial.worldText ?? 0) + 1;
+      if (edgeCut(r, ctx.width, ctx.height, ctx.thresholds.offscreen.tolerancePx)) s.partial.worldCut = (s.partial.worldCut ?? 0) + 1;
+    }
     const some = ALL_RULES.filter((x) => x !== 'unjudged' && (r.ignore.includes(x) || r.ignore.includes('all')));
     if (some.length) { s.partial.ignoredSome++; for (const x of some) s.ignoredByRule[x] = (s.ignoredByRule[x] ?? 0) + 1; }
   }

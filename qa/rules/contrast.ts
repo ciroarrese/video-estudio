@@ -1,6 +1,8 @@
 import { contrastRatio } from '../../themes/contrast';
 import { describe, ignored } from '../geometry';
+import { intersect } from '../geometry';
 import type { Finding, Rule, Severity, Thresholds } from '../types';
+import { edgeCut, isWorldText } from '../world';
 
 /** Pure classification of a contrast ratio: error below `error`, warning below `warn` for small text. */
 export function classifyContrast(ratio: number, large: boolean, t: Thresholds['contrast']): Severity | null {
@@ -27,8 +29,9 @@ const VEIL_FADE = 0.02;
 export const contrastRule: Rule = {
   id: 'contrast',
   description: 'Contraste insuficiente entre el texto y el fondo real',
-  check({ frame, width, height, runs, thresholds }) {
+  check({ frame, width, height, runs, thresholds, overlays }) {
     const t = thresholds.contrast;
+    const paint = (overlays ?? []).filter((o) => o.opacity >= 0.05).flatMap((o) => o.paint ?? []);
     const out: Finding[] = [];
     const seen = new Set<number>();
     for (const r of runs) {
@@ -63,10 +66,15 @@ export const contrastRule: Rule = {
       if (crossing) sev = 'info';
       // Atenuado a propósito por una señal `focus` (`FocusGroup`): el contraste bajo es el efecto, no un defecto; queda como info.
       if (r.focusDim) sev = 'info';
+      // Interfaz bajo una camara (`data-qa-world`, qa/world.ts): el borde del cuadro corta el texto (encuadre) o una capa fija (`data-qa-overlay`) pinta sobre el fondo que se muestreo.
+      // El objetivo (`data-qa-target`) y el texto de las capas se siguen juzgando.
+      const worldCut = edgeCut(r, width, height, thresholds.offscreen.tolerancePx);
+      const underOverlay = isWorldText(r) && paint.some((p) => intersect(p, r.rect));
+      if (worldCut || underOverlay) sev = 'info';
       seen.add(r.elId);
       out.push({
         rule: 'contrast', severity: sev, frame,
-        message: `contraste ${ratio.toFixed(2)}:1 (${ratio < t.error ? `minimo ${t.error}` : `recomendado ${t.warn}`}:1)${r.opacity < t.minOpacity ? ` con opacidad ${r.opacity.toFixed(2)} (muy tenue)` : still && r.opacity < 0.99 ? ` con opacidad ${r.opacity.toFixed(2)} (quieto, se juzga como se ve)` : ''} ${r.color} sobre ${toRgb(r.bg)}${r.focusDim ? '; atenuado a propósito por una señal focus (FocusGroup), no se juzga' : ''}${crossing ? '; el texto se mueve entre cuadros (transicion), no se juzga' : ''}${surfaceFading ? '; el texto y la superficie de su fondo estan en fundido a la vez: transicion, no se juzga' : ''}${veilCrossing ? `; bajo un velo de cuadro completo que cruza (opacidad ${r.veil!.opacity.toFixed(2)}, cambia ${(r.veil!.fade ?? 0).toFixed(2)} por cuadro): transicion, no se juzga` : r.veil ? `; bajo un velo de cuadro completo QUIETO (opacidad ${r.veil.opacity.toFixed(2)}): el texto se ve asi; aclarar el velo, subir el contraste o quitarlo` : ''}`,
+        message: `contraste ${ratio.toFixed(2)}:1 (${ratio < t.error ? `minimo ${t.error}` : `recomendado ${t.warn}`}:1)${r.opacity < t.minOpacity ? ` con opacidad ${r.opacity.toFixed(2)} (muy tenue)` : still && r.opacity < 0.99 ? ` con opacidad ${r.opacity.toFixed(2)} (quieto, se juzga como se ve)` : ''} ${r.color} sobre ${toRgb(r.bg)}${worldCut ? '; el borde del cuadro corta el texto con el mundo (data-qa-world) acercado: encuadre, no se juzga' : ''}${underOverlay ? '; una capa fija (data-qa-overlay) pinta sobre este texto: no cuenta como defecto del texto' : ''}${r.focusDim ? '; atenuado a propósito por una señal focus (FocusGroup), no se juzga' : ''}${crossing ? '; el texto se mueve entre cuadros (transicion), no se juzga' : ''}${surfaceFading ? '; el texto y la superficie de su fondo estan en fundido a la vez: transicion, no se juzga' : ''}${veilCrossing ? `; bajo un velo de cuadro completo que cruza (opacidad ${r.veil!.opacity.toFixed(2)}, cambia ${(r.veil!.fade ?? 0).toFixed(2)} por cuadro): transicion, no se juzga` : r.veil ? `; bajo un velo de cuadro completo QUIETO (opacidad ${r.veil.opacity.toFixed(2)}): el texto se ve asi; aclarar el velo, subir el contraste o quitarlo` : ''}`,
         element: describe(r), data: { ratio: Math.round(ratio * 100) / 100 },
       });
     }

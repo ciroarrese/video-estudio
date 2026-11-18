@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { collectStrings, detectDomains, detectEmails, detectPhones, fold, isSafeDomain, matchTerms, parseTermList, scanJoined, scanText } from './privacyCore';
+import { COMPROBANTE_RE, collectStrings, detectDomains, detectEmails, detectPhones, fold, isSafeDomain, matchTerms, parseTermList, scanJoined, scanText } from './privacyCore';
 
 describe('deny list', () => {
   it('parses terms, regexes and comments', () => {
@@ -25,6 +25,26 @@ describe('deny list', () => {
     expect(matchTerms('el estudio\nfantasma cierra', t)).toHaveLength(1);
     expect(matchTerms('ref PROY-123', t)).toHaveLength(1);
     expect(matchTerms('proy-12', t)).toHaveLength(0);
+  });
+});
+
+describe('comprobantes y lista de permitidos con patrones', () => {
+  it('un número de comprobante (4 dígitos, guion, 8 dígitos) no se clasifica como teléfono; un teléfono parecido, sí', () => {
+    expect(detectPhones('Comprobante 0001-00001234')).toEqual([]);
+    expect(detectPhones('Nº 1234-56789012 emitido')).toEqual([]);
+    expect(COMPROBANTE_RE.test('0001-00001234')).toBe(true);
+    expect(detectPhones('Llamá al +54 11 5555-1234')).toHaveLength(1);
+    expect(detectPhones('Ref 1234-5678901')).toHaveLength(1); // 7 dígitos después del guion: no es el formato
+    expect(detectPhones('Ref 12345-56789012')).toHaveLength(1); // 5 dígitos antes del guion
+    expect(detectPhones('Ref 1234-56789012-3')).toHaveLength(1); // con un tercer tramo ya no es el formato
+  });
+  it('la lista de permitidos acepta /patrones/ además de valores: un patrón permite todo un formato, un valor solo ese', () => {
+    const num = '+54 11 5555-1234';
+    expect(scanText(`Tel ${num}`, [], [])).toHaveLength(1);
+    expect(scanText(`Tel ${num}`, [], parseTermList('/^\\+54 11 5555-\\d{4}$/'))).toEqual([]);
+    expect(scanText(`Tel ${num}`, [], parseTermList(num))).toEqual([]);
+    expect(scanText('Tel +54 11 5555-9999', [], parseTermList(num))).toHaveLength(1);
+    expect(() => parseTermList('/(/')).toThrow(/Regex invalida/);
   });
 });
 

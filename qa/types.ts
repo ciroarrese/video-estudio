@@ -2,12 +2,12 @@ export type Rect = { x: number; y: number; w: number; h: number };
 
 /** `info`: probably intentional (element in motion, faded out); hidden by default, shown with --verbose. */
 export type Severity = 'error' | 'warn' | 'info';
-export type RuleId = 'clip' | 'offscreen' | 'safe-area' | 'overlap' | 'min-size' | 'texto-chico' | 'contrast' | 'covered' | 'unjudged' | 'signal' | 'vacio' | 'story-fit' | 'svg-escala';
+export type RuleId = 'clip' | 'offscreen' | 'safe-area' | 'overlap' | 'min-size' | 'texto-chico' | 'contrast' | 'covered' | 'unjudged' | 'signal' | 'vacio' | 'story-fit' | 'svg-escala' | 'salto' | 'foco-centro';
 /** Las reglas que juzgan el texto de cada cuadro. `story-fit` no mira cuadros (mide los largos del guion de una historia): va aparte, ver `QA_RULES`. */
 export const ALL_RULES: RuleId[] = ['clip', 'offscreen', 'safe-area', 'overlap', 'min-size', 'texto-chico', 'contrast', 'covered', 'unjudged', 'signal', 'svg-escala'];
 /** Todas las reglas que corre `qa` por defecto: las de cada cuadro y `story-fit` (largos de títulos, nombres y bajadas de una historia por formato; solo para videos hechos con `defineStory`). */
-/** `vacio` no juzga texto sino la composición del cuadro (franjas sin nada): va aparte de `ALL_RULES`. */
-export const QA_RULES: RuleId[] = [...ALL_RULES, 'vacio', 'story-fit'];
+/** `vacio`, `salto` y `foco-centro` no juzgan texto sino la composición del cuadro o el paso de un cuadro al siguiente: van aparte de `ALL_RULES`. `salto` y `foco-centro` solo miran videos que usan `data-qa-world`, `data-qa-overlay` o `data-qa-target`. */
+export const QA_RULES: RuleId[] = [...ALL_RULES, 'vacio', 'salto', 'foco-centro', 'story-fit'];
 
 /** Short, serialisable description of an element (tag, test id, text excerpt, on-screen box). */
 export type ElementInfo = { tag: string; testid: string | null; text: string; rect: Rect; /** DOM child-index path from the stage ("0.2.1"), a fallback id when there is no test id. */ path?: string };
@@ -59,6 +59,17 @@ export type TextRun = {
   svgPrecise?: boolean;
   /** El texto está bajo un `FocusGroup` que lo atenúa a propósito (`data-qa-focus`, kit/FocusGroup.tsx): su contraste bajo es el efecto buscado (`contrast` lo baja a info). */
   focusDim?: boolean;
+  /**
+   * Está dentro de un `data-qa-world` (el mundo que la cámara transforma): `zoom` es la escala de ese mundo en pantalla (ancho en pantalla / ancho de diseño),
+   * `settled` que el mundo lleva `data-qa-settled` (cámara asentada sobre una señal), `key` lo identifica entre cuadros. `null`/ausente: fuera de un mundo marcado.
+   */
+  world?: { key: string; zoom: number; settled: boolean } | null;
+  /** Está dentro de un `data-qa-overlay` (capa fija en espacio de pantalla que es anotación del video). */
+  overlay?: boolean;
+  /** Está dentro del `data-qa-target` (objetivo de la señal activa): nunca se exceptúa del corte de borde ni del tapado. */
+  target?: boolean;
+  /** Se descartó como tapa una capa `data-qa-overlay` (este texto es del mundo y no es el objetivo): se cuenta en el resumen. */
+  skippedOverlay?: number;
   clips: ClipBox[];
   own: { sw: number; cw: number; sh: number; ch: number; ox: string; oy: string; ellipsis: boolean };
   /**
@@ -97,7 +108,12 @@ export type SignalMark = { kind: 'callout' | 'doodle' | 'marker' | string; piece
  */
 export type Occupancy = { bands: number[][]; veil: number };
 
-export type PageData = { frame: number; width: number; height: number; runs: TextRun[]; /** Ocupación del cuadro (solo si la regla `vacio` está activa y el formato es angosto). */ occupancy?: Occupancy; elems: Record<string, Rect>; /** Cajas de los elementos `data-qa-fixed-scale` del cuadro. */ fixedRoots?: Rect[]; /** Coverage alpha of the elements in `elems` (same keys). */ opac?: Record<string, number>; /** Piezas que señalan algo en el cuadro (regla `signal`). */ signals?: SignalMark[] };
+/** Un `data-qa-world`: su caja en pantalla, la escala (zoom de cámara) y si la cámara está asentada (`data-qa-settled`). */
+export type WorldInfo = { key: string; rect: Rect; zoom: number; settled: boolean };
+/** Un `data-qa-overlay` o un `data-qa-target`: su caja, su opacidad efectiva y (overlay) las cajas de lo que pinta (sin los envoltorios de cuadro completo). */
+export type AnchorInfo = { key: string; tag: string; testid: string | null; text: string; rect: Rect; opacity: number; ignore: string[]; paint?: Rect[]; /** Valor de `data-qa-overlay` (`progreso`: barra fija, sin ancla). */ kind?: string };
+
+export type PageData = { frame: number; width: number; height: number; runs: TextRun[]; /** Ocupación del cuadro (solo si la regla `vacio` está activa y el formato es angosto). */ occupancy?: Occupancy; elems: Record<string, Rect>; /** Cajas de los elementos `data-qa-fixed-scale` del cuadro. */ fixedRoots?: Rect[]; /** Coverage alpha of the elements in `elems` (same keys). */ opac?: Record<string, number>; /** Piezas que señalan algo en el cuadro (regla `signal`). */ signals?: SignalMark[]; /** Mundos, capas fijas y objetivos marcados del cuadro (solo si hay alguno). */ worlds?: WorldInfo[]; overlays?: AnchorInfo[]; targets?: AnchorInfo[] };
 
 /**
  * Resumen de lo que `min-size` reclasificó como "detalle que se lee al acercar" (info): textos por debajo del mínimo en el cuadro
@@ -120,11 +136,13 @@ export type JudgedSummary = {
   /** Los que NO juzgo ninguna regla, por motivo. `total` es la suma. */
   notJudged: { total: number; hidden: number; ignoredAll: number; outside: number; invisible: number };
   /** Juzgados solo en parte: adorno (sin min-size ni contrast), bajo un velo de transicion (contrast baja a info), con una marca `data-qa-ignore` de algunas reglas, o con relleno de degradado (sin contrast). */
-  partial: { decor: number; veil: number; ignoredSome: number; /** Texto con relleno transparente (degradado): `contrast` no lo puede juzgar. */ gradientText: number };
+  partial: { decor: number; veil: number; ignoredSome: number; /** Texto con relleno transparente (degradado): `contrast` no lo puede juzgar. */ gradientText: number; /** Solo con marcas `data-qa-world`: texto del mundo que no es el objetivo (`texto-chico` solo juzga el objetivo). */ worldText?: number; /** De esos, los que el borde del cuadro corta con el mundo acercado: sus hallazgos de offscreen, covered, overlap y contrast bajan a info. */ worldCut?: number };
   /** Cuantos textos x cuadros esquivo cada regla por una marca `data-qa-ignore` (propia o heredada; `all` cuenta en todas). */
   ignoredByRule: Record<string, number>;
   /** Tapas solidas descartadas por llevar `data-qa-ignore="covered"` (textos x cuadros): la marca callo un `covered` posible. */
   coverMarkerSkipped: number;
+  /** Textos del mundo con una capa `data-qa-overlay` encima que no se cuenta como tapa (textos x cuadros). */
+  overlayCoverSkipped?: number;
   /** Textos que la heuristica daba por tapados de cuadro completo pero que se ven en pantalla (se juzgaron igual): no deberia pasar. */
   hiddenButVisible: number;
   /** Textos que se ven en pantalla y no los juzgo ninguna regla (cada uno es un error de la regla `unjudged`). */
@@ -163,10 +181,19 @@ export type Thresholds = {
   covered: { minOpacity: number; maxCoverFraction: number; hiddenFully: number };
   /** `minFraction`: parte de los pixeles de un texto que tiene que cambiar al ocultarlo para decir que se ve (qa/png.ts); `minDiff` esta fijo en png.ts. */
   unjudged: { minFraction: number };
+  /** `px` (a 1080 de lado corto): salto mínimo de un elemento en un solo cuadro, medido contra lo que explica la cámara; `ratio`: el cuadro vecino tiene que moverse menos que `ratio` veces el salto (si no es un movimiento continuo, no un salto); `fade`: cambio de opacidad por cuadro desde el que el elemento entra o sale (no se juzga); `minOpacity`: opacidad mínima para juzgarlo. */
+  salto: { px: number; ratio: number; fade: number; minOpacity: number };
+  /** `zone`: parte central del cuadro (por eje) donde tiene que caer el centro del objetivo asentado (0.6 = el 60 % central); `error`: pasado este desvío (0 = centro, 1 = borde) es error en vez de aviso; `minOpacity`: opacidad mínima del objetivo. */
+  'foco-centro': { zone: number; error: number; minOpacity: number };
   /** `px`: movimiento que baja a info los recortes del cuadro y el tamaño; `crossPx` (menor): movimiento con el que dos elementos que se cruzan (superposición, tapado, contraste) son una transición. */
   motion: { px: number; crossPx: number };
 };
 
-export type RuleContext = { frame: number; width: number; height: number; runs: TextRun[]; thresholds: Thresholds; signals?: SignalMark[]; /** Ocupación de este cuadro y la de los vecinos (regla `vacio`). */ occupancy?: Occupancy; neighbourOccupancy?: Occupancy[] };
+/** Lo geométrico de un cuadro vecino que necesita la regla `salto` (lo mismo que `PageData`, sin lo demás). */
+export type Geom = Pick<PageData, 'runs' | 'worlds' | 'overlays' | 'targets'>;
+/** Los cuadros f-1 y f+1 de un cuadro f, y si el paso (f-1, f) o (f, f+1) cruza el inicio de una escena (un corte: no es un salto). */
+export type Around = { prev?: Geom; next?: Geom; cutPrev?: boolean; cutNext?: boolean };
+
+export type RuleContext = { frame: number; width: number; height: number; runs: TextRun[]; thresholds: Thresholds; signals?: SignalMark[]; /** Mundos, capas fijas y objetivos marcados de este cuadro. */ worlds?: WorldInfo[]; overlays?: AnchorInfo[]; targets?: AnchorInfo[]; /** Cuadros vecinos (regla `salto`). */ around?: Around; /** Ocupación de este cuadro y la de los vecinos (regla `vacio`). */ occupancy?: Occupancy; neighbourOccupancy?: Occupancy[] };
 
 export type Rule = { id: RuleId; description: string; check(ctx: RuleContext): Finding[] };

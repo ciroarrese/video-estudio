@@ -33,7 +33,10 @@ export function defineStory({
   subtitles?: StorySubtitles } & ComposeOptions) {
   const { component: Story, durationInFrames, timeline } = composeStory(spec, scenes, opts);
   // Cada bloque (apertura, temas, vueltas, cierre) es una escena: `--scene <id|índice>` y `--list-scenes`.
-  const sceneList = timeline.map((e) => ({ id: e.id, name: e.kind === "topic" && e.topic !== undefined ? spec.topics[e.topic]?.name : undefined, from: e.from, durationInFrames: e.durationInFrames }));
+  const sceneList = timeline.map((e) => {
+    const own = e.kind === "topic" && e.topic !== undefined ? scenes[e.topic] : null; // `cues` y `audioPropio` de la escena de tema (cuadros relativos)
+    return { id: e.id, name: e.kind === "topic" && e.topic !== undefined ? spec.topics[e.topic]?.name : undefined, from: e.from, durationInFrames: e.durationInFrames, ...(own?.cues ? { cues: own.cues } : {}), ...(own?.audioPropio !== undefined ? { audioPropio: own.audioPropio } : {}) };
+  });
   const Video: React.FC<StoryProps> = ({ theme: t }) => (
     <ThemeProvider theme={resolveTheme(t ?? theme)}>
       {subtitles ? <SubtitleLayer subtitles={subtitles}><Story /></SubtitleLayer> : <Story />}

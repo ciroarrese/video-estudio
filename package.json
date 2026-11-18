@@ -19,6 +19,7 @@
     "sheet": "tsx qa/cli.ts sheet",
     "privacy": "tsx qa/cli.ts privacy",
     "clean": "tsx render/clean.ts",
+    "limpiar": "tsx render/limpiar.ts",
     "audio": "tsx audio/cli.ts",
     "exec": "node render/exec.mjs",
     "doctor": "node render/doctor.mjs",

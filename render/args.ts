@@ -1,6 +1,7 @@
 import { parseArgs } from 'node:util';
 import type { FormatName } from '../engine';
 import { parseFormat } from './meta';
+import { LIVIANO_MB_POR_DEFECTO } from './liviano';
 
 export type CliOptions = {
   videoId: string;
@@ -34,6 +35,8 @@ export type CliOptions = {
   audioPeakMax: number;
   audioPeakStrict: boolean;
   audioPeakCheck: boolean;
+  /** `--liviano [MB]`: copia `<salida>-liviano.mp4` de como mucho estos MB. */
+  liviano?: number;
   list: boolean;
   listScenes: boolean;
   help: boolean;
@@ -60,6 +63,7 @@ export const USAGE = `Uso: ve-render <videoId> [opciones]
   --audio-peak-max=<dB>  Pico verdadero maximo del audio YA codificado (por defecto -1 dBTP); si lo supera, avisa. Con el signo menos va con "="
   --audio-peak-strict    Si el pico del audio codificado supera el maximo, falla (no deja el mp4)
   --no-audio-peak-check  No medir el pico del audio codificado
+  --liviano [MB]         Ademas deja <salida>-liviano.mp4 de como mucho MB mebibytes (por defecto 25; el audio se copia, el video se recodifica). Con un id numerico va con "=": --liviano=25
   --no-cache             Ignorar y reescribir la cache de partes
   --keep-frames          Conservar los PNG junto a la salida
   --frame-format png|jpeg  Formato de captura (png sin perdida, por defecto; jpeg mas rapido)
@@ -96,10 +100,12 @@ const int = (name: string, v: string, min: number): number => {
 export function parseCliArgs(argvIn: string[]): CliOptions {
   // `--audio-peak-max -1`: node:util toma "-1" por una opción; se junta con "=" para que se lea como valor.
   const argv = argvIn.flatMap((a, i) => (i > 0 && argvIn[i - 1] === '--audio-peak-max' && /^-\d/.test(a) ? [] : a === '--audio-peak-max' && /^-\d/.test(argvIn[i + 1] ?? '') ? [`--audio-peak-max=${argvIn[i + 1]}`] : [a]));
+  // `--liviano` lleva un valor opcional: parseArgs no lo admite, así que se lo junta con "=" (sin valor numérico a continuación, vale el de por defecto).
+  const conLiviano = argv.flatMap((a, i) => (a === '--liviano' ? [`--liviano=${/^\d+(?:\.\d+)?$/.test(argv[i + 1] ?? '') ? argv[i + 1] : LIVIANO_MB_POR_DEFECTO}`] : i > 0 && argv[i - 1] === '--liviano' && /^\d+(?:\.\d+)?$/.test(a) ? [] : [a]));
   let parsed;
   try {
     parsed = parseArgs({
-      args: argv,
+      args: conLiviano,
       allowPositionals: true,
       options: {
         out: { type: 'string' },
@@ -115,6 +121,7 @@ export function parseCliArgs(argvIn: string[]): CliOptions {
         'audio-peak-max': { type: 'string' },
         'audio-peak-strict': { type: 'boolean' },
         'no-audio-peak-check': { type: 'boolean' },
+        liviano: { type: 'string' },
         'no-cache': { type: 'boolean' },
         'keep-frames': { type: 'boolean' },
         'frame-format': { type: 'string' },
@@ -171,6 +178,11 @@ export function parseCliArgs(argvIn: string[]): CliOptions {
     if (!Number.isFinite(audioPeakMax) || audioPeakMax > 3 || audioPeakMax < -60) throw new Error(`--audio-peak-max debe ser un valor en dBTP entre -60 y 3 (recibido "${v['audio-peak-max']}")`);
   }
   if (v['audio-peak-strict'] && v['no-audio-peak-check']) throw new Error('--audio-peak-strict y --no-audio-peak-check se contradicen');
+  let liviano: number | undefined;
+  if (v.liviano !== undefined) {
+    liviano = Number(v.liviano);
+    if (!Number.isFinite(liviano) || liviano <= 0 || liviano > 100_000) throw new Error(`--liviano debe ser un tamaño máximo en MB mayor que 0 (recibido "${v.liviano}")`);
+  }
   let props: Record<string, unknown> = {};
   if (v.props !== undefined) {
     let p: unknown;
@@ -244,6 +256,7 @@ export function parseCliArgs(argvIn: string[]): CliOptions {
     audioPeakMax,
     audioPeakStrict: !!v['audio-peak-strict'],
     audioPeakCheck: !v['no-audio-peak-check'],
+    liviano,
     list: false,
     listScenes: !!v['list-scenes'],
     help: false,

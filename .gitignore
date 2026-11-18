@@ -5,3 +5,4 @@ out
 videos/
 public/sfx/
 public/audio-*
+.video-studio.local.json

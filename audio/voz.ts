@@ -3,6 +3,7 @@
 // Núcleo puro: trabaja sobre PCM en memoria, sin ffmpeg. La voz propia, o con una licencia que permita usarla donde se muestra el video, es
 // responsabilidad de quien la trae (ver docs/audio.md, "Locución").
 import type { VentanaDuck } from './dinamica';
+import { fft } from './medidas';
 
 export interface VozOpts {
   /** Ruta al archivo de voz (wav, mp3...). Lo trae la persona; no se versiona. */
@@ -201,4 +202,161 @@ export function verificarVozEscenas(tramos: readonly TramoDeVoz[], cortesSec: re
     }
   }
   return avisos.sort((a, b) => a.en - b.en);
+}
+
+// ------------------------------------------------------------------------------------------ voz probable en cualquier pista
+
+export interface TramoVozProbable {
+  /** Segundos de la pista. */
+  desde: number;
+  hasta: number;
+  /** 0 a 1: qué tanto se parece a una voz hablada (promedio de tres rasgos, ver `rasgosDeVoz`). */
+  puntaje: number;
+  rasgos: RasgosDeVoz;
+}
+
+export interface RasgosDeVoz {
+  /** Fracción de la modulación de la envolvente (0,5 a 20 Hz) que cae en 2,5 a 7 Hz, el ritmo de las sílabas. */
+  silabico: number;
+  /** Fracción de bloques de 40 ms con sonido que tienen un tono periódico entre 70 y 350 Hz (habla sonora). */
+  periodico: number;
+  /** Fracción de la energía entre 80 Hz y 4 kHz (la banda de la voz; una batería o un bajo quedan abajo). */
+  banda: number;
+}
+
+/** Puntaje a partir del cual un tramo se considera voz probable. */
+export const UMBRAL_VOZ_PROBABLE = 0.75;
+const REF_SILABICO = 0.5;
+const REF_PERIODICO = 0.4;
+const REF_BANDA = 0.6;
+
+/** Rasgos de voz de un tramo mono (ver `RasgosDeVoz`). Función pura y determinista. */
+export function rasgosDeVoz(x: Float32Array, sr: number): RasgosDeVoz {
+  // 1) ritmo silábico: espectro de la envolvente (RMS cada 10 ms)
+  const b = Math.max(1, Math.round(sr / 100));
+  const nb = Math.floor(x.length / b);
+  let silabico = 0;
+  if (nb >= 32) {
+    const env = new Float64Array(nb);
+    let m = 0;
+    for (let k = 0; k < nb; k++) {
+      let e = 0;
+      for (let i = k * b; i < (k + 1) * b; i++) e += x[i]! * x[i]!;
+      env[k] = Math.sqrt(e / b);
+      m += env[k]!;
+    }
+    m /= nb;
+    let n = 1;
+    while (n < nb) n <<= 1;
+    const re = new Float64Array(n);
+    const im = new Float64Array(n);
+    for (let k = 0; k < nb; k++) re[k] = (env[k]! - m) * (0.5 - 0.5 * Math.cos((2 * Math.PI * (k + 0.5)) / nb));
+    fft(re, im);
+    const df = 100 / n;
+    let sil = 0;
+    let tot = 0;
+    for (let k = 1; k <= n / 2; k++) {
+      const f = k * df;
+      const p = re[k]! * re[k]! + im[k]! * im[k]!;
+      if (f >= 0.5 && f <= 20) tot += p;
+      if (f >= 2.5 && f <= 7) sil += p;
+    }
+    silabico = tot > 0 ? sil / tot : 0;
+  }
+  // 2) periodicidad (autocorrelación normalizada) en como máximo 300 bloques repartidos parejo
+  const w = Math.round(0.04 * sr);
+  const lmin = Math.max(1, Math.round(sr / 350));
+  const lmax = Math.round(sr / 70);
+  const hop = Math.max(Math.round(0.02 * sr), Math.floor((x.length - w - lmax) / 300));
+  let con = 0;
+  let sonora = 0;
+  for (let i0 = 0; i0 + w + lmax < x.length; i0 += hop) {
+    let e0 = 0;
+    for (let i = 0; i < w; i++) e0 += x[i0 + i]! * x[i0 + i]!;
+    if (e0 / w < 1e-6) continue;
+    con++;
+    let mejor = 0;
+    for (let l = lmin; l <= lmax; l++) {
+      let c = 0;
+      let e1 = 0;
+      for (let i = 0; i < w; i++) {
+        c += x[i0 + i]! * x[i0 + i + l]!;
+        e1 += x[i0 + i + l]! * x[i0 + i + l]!;
+      }
+      const r = c / Math.sqrt(e0 * e1 + 1e-12);
+      if (r > mejor) mejor = r;
+    }
+    if (mejor > 0.6) sonora++;
+  }
+  const periodico = con > 0 ? sonora / con : 0;
+  // 3) banda de la voz: espectro promedio (ventanas de 2048 con Hann, hasta 24 repartidas)
+  const N = 2048;
+  let tot = 0;
+  let voz = 0;
+  if (x.length >= N) {
+    const paso = Math.max(N, Math.floor((x.length - N) / 24));
+    for (let i0 = 0; i0 + N <= x.length; i0 += paso) {
+      const re = new Float64Array(N);
+      const im = new Float64Array(N);
+      for (let i = 0; i < N; i++) re[i] = x[i0 + i]! * (0.5 - 0.5 * Math.cos((2 * Math.PI * (i + 0.5)) / N));
+      fft(re, im);
+      for (let k = 1; k < N / 2; k++) {
+        const f = (k * sr) / N;
+        const p = re[k]! * re[k]! + im[k]! * im[k]!;
+        tot += p;
+        if (f >= 80 && f <= 4000) voz += p;
+      }
+    }
+  }
+  return { silabico, periodico, banda: tot > 0 ? voz / tot : 0 };
+}
+
+/** Puntaje 0 a 1 de un conjunto de rasgos: promedio de cada uno contra su referencia (cada uno topado en 1). */
+export function puntajeDeVoz(r: RasgosDeVoz): number {
+  return (Math.min(1, r.silabico / REF_SILABICO) + Math.min(1, r.periodico / REF_PERIODICO) + Math.min(1, r.banda / REF_BANDA)) / 3;
+}
+
+export interface OpcionesVozProbable extends OpcionesDeteccion {
+  /** Tramos más cortos que esto (s) no se evalúan: no alcanzan para medir el ritmo silábico; 1 por defecto. */
+  minSec?: number;
+  /** Puntaje desde el cual un tramo cuenta como voz; `UMBRAL_VOZ_PROBABLE` por defecto. */
+  umbralPuntaje?: number;
+}
+
+/**
+ * Busca voz en cualquier pista mono (música, audio propio de una escena, un efecto): primero los tramos con nivel (`ventanasDeVoz`) y después, en
+ * cada uno, se miden tres rasgos del habla (ritmo silábico, tono periódico, banda de voz). Devuelve solo los tramos con puntaje de voz probable.
+ * Es una heurística de nivel y espectro, no un reconocedor: un canto, un sintetizador rítmico o un ruido de sala pueden dar falsos positivos, y una
+ * voz muy procesada o muy baja bajo música, falsos negativos. Sirve para avisar "revisá este tramo", no para asegurar que no hay voz.
+ */
+export function vozProbable(x: Float32Array, sr: number, o: OpcionesVozProbable = {}): TramoVozProbable[] {
+  const minSec = o.minSec ?? 1;
+  const umbral = o.umbralPuntaje ?? UMBRAL_VOZ_PROBABLE;
+  const out: TramoVozProbable[] = [];
+  const CHUNK = 6; // los tramos largos (una música entera) se miran de a 6 s, para ubicar dónde está la voz
+  for (const t of ventanasDeVoz(x, sr, o)) {
+    const largo = (t.finSample - t.iniSample) / sr;
+    if (largo < minSec) continue;
+    const n = Math.max(1, Math.floor(largo / CHUNK));
+    const paso = Math.floor((t.finSample - t.iniSample) / n);
+    let previo: TramoVozProbable | null = null;
+    for (let k = 0; k < n; k++) {
+      const ini = t.iniSample + k * paso;
+      const fin = k === n - 1 ? t.finSample : ini + paso;
+      const rasgos = rasgosDeVoz(x.subarray(ini, fin), sr);
+      const puntaje = Math.round(puntajeDeVoz(rasgos) * 100) / 100;
+      if (puntaje < umbral) {
+        previo = null;
+        continue;
+      }
+      if (previo) {
+        previo.hasta = fin / sr;
+        previo.puntaje = Math.max(previo.puntaje, puntaje);
+      } else {
+        previo = { desde: ini / sr, hasta: fin / sr, puntaje, rasgos };
+        out.push(previo);
+      }
+    }
+  }
+  return out;
 }

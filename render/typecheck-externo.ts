@@ -6,6 +6,7 @@ import { spawnSync } from 'node:child_process';
 import { existsSync, readFileSync, statSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import './dirs'; // completa VE_VIDEOS_DIR desde .video-studio.local.json si la variable no está (render/config-local.mjs)
 
 const repo = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const opcional = process.argv.includes('--opcional');

@@ -1,4 +1,5 @@
 import type React from "react";
+import type { SceneCue, SceneOwnAudio } from "../engine";
 import type { CloudOptions } from "../kit";
 import { MIN_COMPACT_FRAMES, MIN_REVEAL_FRAMES } from "./durations";
 
@@ -9,6 +10,10 @@ export type TopicScene = {
   durationInFrames: number;
   /** Panel pequeño (560x340 de lienzo) que se muestra en el cierre. Por defecto, una tarjeta neutra con el nombre del tema. */
   thumbnail?: React.FC;
+  /** Sonidos de la escena en cuadros relativos a su inicio (ver `SceneCue`): `audio -- mezcla --video <id>` los suma al `from` de la escena. */
+  cues?: SceneCue[];
+  /** La escena trae audio propio (ver `SceneOwnAudio`): la mezcla termina o baja la música antes. */
+  audioPropio?: SceneOwnAudio;
 };
 
 export type StoryTopic = {

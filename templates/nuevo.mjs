@@ -2,6 +2,7 @@
 // Crea archivos de un video a partir de las plantillas, con los imports ya corregidos. Es la única implementación
 // (`templates/nuevo.sh` es un envoltorio que la llama) y corre igual en Windows (PowerShell o cmd), macOS y Linux.
 //   npm run nuevo -- escena <slug> <nombre-de-escena>     -> videos/<slug>/<nombre-de-escena>/
+//   npm run nuevo -- paso <slug> <nombre-del-paso>        -> videos/<slug>/<nombre-del-paso>/ (un paso de tutorial de interfaz: StepFrame, cámara guiada, tabla de tiempos)
 //   npm run nuevo -- historia <slug> <escena-de-ejemplo>  -> videos/<slug>/historia/
 //   npm run nuevo -- externo                              -> solo prepara tsconfig.json y env.d.ts de VE_VIDEOS_DIR
 // También crea videos/<slug>/theme.ts (tema neutro) si todavía no existe.
@@ -35,8 +36,8 @@ export const reescribirImports = (texto, pref) => texto.replace(/"\.\.\/\.\.\/(e
 /** tsconfig.json de la carpeta externa: `__REPO__` pasa a la ruta del repo (con barras normales). */
 export const reescribirTsconfig = (texto, repo) => texto.replace(/__REPO__/g, () => conBarras(repo));
 
-/** index.ts de la escena: el id de la plantilla pasa a `<slug>-<nombre>`. */
-export const indiceDeEscena = (texto, slug, nombre) => texto.replace('"plantilla-escena"', () => `"${slug}-${nombre}"`);
+/** index.ts de la escena o del paso: el id de la plantilla (`plantilla-escena` o `plantilla-paso`) pasa a `<slug>-<nombre>`. */
+export const indiceDeEscena = (texto, slug, nombre) => texto.replace(/"plantilla-(escena|paso)"/, () => `"${slug}-${nombre}"`);
 
 /** index.ts de la historia: apunta a la escena elegida y el id pasa a `<slug>`. */
 export const indiceDeHistoria = (texto, slug, nombre) =>
@@ -44,6 +45,7 @@ export const indiceDeHistoria = (texto, slug, nombre) =>
 
 export const USO = [
   'Uso: npm run nuevo -- escena <slug> <nombre-de-escena>',
+  '     npm run nuevo -- paso <slug> <nombre-del-paso>       (un paso de tutorial de interfaz)',
   '     npm run nuevo -- historia <slug> <nombre-de-una-escena>',
   '     npm run nuevo -- externo        (con VE_VIDEOS_DIR: prepara tsconfig.json y env.d.ts)',
 ];
@@ -97,7 +99,7 @@ export function nuevo(args, log = console.log, err = console.error, opciones = {
       log(`revision de tipos: VE_VIDEOS_DIR=${externa} npm run typecheck`);
       return 0;
     }
-    if (!modo || !slug || !nombre || (modo !== 'escena' && modo !== 'historia')) {
+    if (!modo || !slug || !nombre || (modo !== 'escena' && modo !== 'paso' && modo !== 'historia')) {
       for (const l of USO) err(l);
       return 2;
     }
@@ -127,14 +129,15 @@ export function nuevo(args, log = console.log, err = console.error, opciones = {
       log(`creado ${basePublica}/theme.ts`);
     }
 
-    if (modo === 'escena') {
+    if (modo === 'escena' || modo === 'paso') {
       const dest = join(base, nombre);
       if (existsSync(dest)) throw new Salida(1, `Ya existe ${basePublica}/${nombre}`);
-      cpSync(join(plantillas, 'scene'), dest, { recursive: true });
+      cpSync(join(plantillas, modo === 'paso' ? 'paso' : 'scene'), dest, { recursive: true });
       reescribirArchivos(dest, ['.ts', '.tsx'], (t) => reescribirImports(t, prefNivel));
       const indice = join(dest, 'index.ts');
       writeFileSync(indice, indiceDeEscena(readFileSync(indice, 'utf8'), slug, nombre));
       log(`creado ${basePublica}/${nombre} (id de video: ${slug}-${nombre})`);
+      if (modo === 'paso') log('falta: reemplazar la interfaz de ejemplo y la tabla de tiempos (T y SENALES) por las del paso real');
       log(`ya se descubre solo (${env.VE_VIDEOS_DIR ? `VE_VIDEOS_DIR=${env.VE_VIDEOS_DIR} ` : ''}npm run render -- --list); no hay que registrarla`);
     } else {
       const dest = join(base, 'historia');

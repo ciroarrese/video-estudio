@@ -2,6 +2,7 @@
 import { describe, expect, it } from 'vitest';
 import { launchChromium } from '../render/browser';
 import { QA_DEFECT_FRAMES as F } from '../examples/qa-defects/QaDefects';
+import { QA_MUNDO as M } from '../examples/qa-mundo/QaMundo';
 import { runQa } from './run';
 import { runPrivacy } from './privacy';
 import { canonicalReport, diffReports } from './repeat';
@@ -291,4 +292,60 @@ describe.skipIf(!chromium)('qa on the qa-defects video (e2e)', () => {
     const d = await runQa(o);
     expect(diffReports(c, d)).toEqual([]);
   }, 300_000);
+
+  // Interfaz recreada bajo una cámara (`data-qa-world`, `-overlay`, `-target`, `-settled`): cada caso de `qa-mundo` ocupa tres cuadros y se mira el del medio.
+  it('qa-mundo: zoom, capas fijas, objetivo, texto-chico y foco centrado (cada excepción con su contrapunto estricto)', async () => {
+    const { findings, summary } = await runQa({ videoId: 'qa-mundo', frames: Object.values(M), perScene: 0, pares: 0 });
+    const at = (fr: number, ...rules: string[]) => findings.filter((f) => f.frame === fr && (!rules.length || rules.includes(f.rule))).map((f) => `${f.rule}:${f.severity}`).sort();
+    expect(at(M.zoomCut, 'offscreen')).toEqual(['offscreen:info']); // el borde corta la interfaz acercada: info
+    expect(at(M.zoomCut).filter((x) => x.endsWith(':error'))).toEqual([]);
+    expect(at(M.zoomOne, 'offscreen')).toEqual(['offscreen:error']); // el mismo corte a escala 1: error
+    expect(at(M.targetCut, 'offscreen')).toEqual(['offscreen:error']); // el objetivo cortado nunca se exceptua
+    expect(at(M.coveredCut, 'covered', 'offscreen')).toEqual(['covered:info', 'offscreen:info']);
+    expect(at(M.coveredWhole, 'covered')).toEqual(['covered:error']);
+    expect(at(M.targetCovered, 'covered')).toEqual(['covered:error']);
+    expect(at(M.overlayOverWorld)).toEqual([]); // la capa fija no cuenta como tapa del mundo
+    expect(at(M.overlayOverTarget, 'covered')).toEqual(['covered:error']); // salvo sobre el objetivo
+    expect(at(M.overlayClip, 'clip')).toEqual(['clip:error']); // el texto propio de la capa se juzga entero
+    expect(at(M.overlayContrast, 'contrast')).toEqual(['contrast:info']);
+    expect(at(M.contrastNoMark, 'contrast')).toEqual(['contrast:error']);
+    expect(at(M.chicoOther, 'texto-chico')).toEqual([]);
+    expect(at(M.chicoTarget, 'texto-chico')).toEqual(['texto-chico:warn']);
+    expect(at(M.chicoUnsettled, 'texto-chico')).toEqual([]);
+    expect(at(M.saltoJump, 'salto')).toEqual(['salto:warn']);
+    for (const n of ['saltoContinuous', 'saltoCamera', 'saltoEntry', 'overlayGlued'] as const) expect(at(M[n], 'salto'), n).toEqual([]);
+    expect(at(M.sideFlip, 'salto')).toEqual(['salto:warn', 'salto:warn']); // el salto y el cambio de lado
+    expect(findings.find((f) => f.frame === M.sideFlip && f.message.includes('cambia de lado'))).toBeTruthy();
+    expect(at(M.overlayJump, 'salto')).toEqual(['salto:warn']);
+    expect(at(M.focoCenter, 'foco-centro')).toEqual([]);
+    expect(at(M.foco70, 'foco-centro')).toEqual(['foco-centro:warn']);
+    expect(at(M.foco95, 'foco-centro')).toEqual(['foco-centro:error']);
+    expect(at(M.focoTraveling, 'foco-centro')).toEqual([]);
+    expect(at(M.focoOutside, 'foco-centro')).toEqual(['foco-centro:error']);
+    // lo que baja a info por el borde y lo que no cuenta como tapa se nombra en el resumen
+    expect(summary.judged.partial.worldText).toBeGreaterThan(0);
+    expect(summary.judged.partial.worldCut).toBeGreaterThan(0);
+    expect(summary.judged.overlayCoverSkipped).toBeGreaterThan(0);
+    expect(summary.pares?.juzgados).toBeGreaterThan(0);
+  }, 300_000);
+
+  it('qa-mundo: los pares alrededor de los cambios de data-qa-settled/data-qa-target se suman solos (acotados por --pares) y el informe es reproducible', async () => {
+    const base = { videoId: 'qa-mundo', count: 6, perScene: 0 };
+    const none = await runQa({ ...base, pares: 0 });
+    expect(none.summary.pares?.porTransicion ?? 0).toBe(0);
+    const auto = await runQa(base);
+    expect(auto.summary.pares!.cambios).toBeGreaterThan(5); // cada caso cambia el objetivo o el asentado
+    expect(auto.summary.pares!.porTransicion).toBeGreaterThan(0);
+    expect(auto.summary.frames.length).toBeGreaterThan(none.summary.frames.length);
+    const few = await runQa({ ...base, pares: 3 });
+    expect(few.summary.pares!.porTransicion).toBeLessThanOrEqual(3);
+    expect(diffReports(auto, await runQa(base))).toEqual([]);
+  }, 400_000);
+
+  it('un video sin marcas no usa salto ni foco-centro: ni pares en el resumen ni hallazgos de esas reglas', async () => {
+    const r = await runQa({ videoId: 'qa-defects', frames: '0-24' });
+    expect(r.summary.pares).toBeUndefined();
+    expect(r.findings.filter((f) => f.rule === 'salto' || f.rule === 'foco-centro')).toEqual([]);
+    expect(r.summary.judged.partial).toEqual({ decor: expect.any(Number), veil: expect.any(Number), ignoredSome: expect.any(Number), gradientText: expect.any(Number) });
+  }, 180_000);
 });
