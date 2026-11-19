@@ -125,6 +125,22 @@ import { Opening, Closing, Interlude, TopicProvider, StoryStage, openingFrames, 
 
 Piezas exportadas: `Opening`, `Interlude`, `InterludeCompact`, `Closing` (y sus `*Frames`), `TopicProvider`/`TopicContext`, `StoryStage`, `Chip`, `Pill`, `CheckMark`, `HeadlineRow`, `HighlightedTitle`, `RichText`, `listLayout`, `nextTopic`. Cada pieza es una función pura del cuadro local de su `Sequence`. `Opening` dura `openingFrames(spec)` (300 por defecto): con otra duración los tiempos se escalan, pero fuera de esa duración no hay garantía.
 
+## Capa de fondo global (`spec.backdrop`)
+
+Una decoración que tiene que ser continua durante TODO el video (partículas que flotan, una grilla que respira) no se puede montar por bloque (se corta en cada cambio y se tapa bajo los velos) ni encima de todo (tapa el contenido). Para eso `StorySpec` tiene la ranura opcional `backdrop`: un nodo o un componente sin props.
+
+```tsx
+const spec: StorySpec = { /* ... */, backdrop: Puntos };   // Puntos: componente que usa useFrame(), useTheme() y useVideoConfig()
+```
+
+- **Dónde se dibuja**: en cada bloque (apertura, escenas de tema, vueltas, cierre), justo sobre el fondo del escenario (color, nubes, patrón del tema) y bajo todo el contenido (escenas, píldoras, titulares, interfaces recreadas). Las escenas de tema deben tener fondo transparente (no poner su propio `Stage` opaco) y contenido posicionado (`position: absolute`, `Fill`).
+- **Cuadro absoluto**: la ranura se monta con el reloj del video entero (`AbsoluteFrame` de `engine`): adentro `useFrame()` devuelve el cuadro del video, no el del bloque, así que una partícula está en el mismo lugar antes y después de un corte. `useAbsoluteFrame()` hace lo mismo desde cualquier componente. Tiene que seguir siendo función pura del cuadro (pseudoazar por índice con `random`, nada de estado ni `Math.random`).
+- **Velos**: todo `Wash` (el de la apertura y las vueltas, el telón de la firma del cierre y el que una escena de tema pone al final) lleva la ranura DENTRO de su velo, sobre su color y con su misma opacidad o cortina (`VeilContentContext` de `kit`). Con el velo a medias la capa se suma sobre el fondo ya velado; con el velo cerrado queda sobre el color: no desaparece ni parpadea. Durante el cruce la capa se ve apenas por encima del contenido que se está tapando; es lo esperado.
+- **Fuera de la historia**: una intro o un cierre propios (fuera de `composeStory`) montan la misma capa con `<BackdropLayer>{Puntos}</BackdropLayer>` como primer hijo de su `Stage` o `StoryStage`, dentro de la `Sequence` que corresponda. Como el cuadro es el absoluto del video, hay continuidad con la historia si la historia vive en una `Sequence` posterior. Para que los `Wash` de esas piezas también la lleven, envolvelas con `<StoryBackdropProvider backdrop={Puntos}>`: con el proveedor, cada `StoryStage` ya dibuja la capa (no pongas además `BackdropLayer`).
+- **`qa`**: la capa lleva `data-qa-decor` (su texto no se juzga con `min-size` ni `contrast`) y `data-qa-ignore="covered vacio"`. El contraste del contenido sobre los puntos sí se juzga (se mide el color que se ve detrás); mantené los puntos tenues (opacidad baja, colores del tema).
+- **Sin ranura** el marcado es idéntico al de siempre. Una escena renderizada sola (fuera de la historia) no la tiene.
+- Ejemplo: `examples/story-demo-fondo` (puntos que derivan con colores del tema).
+
 ## Opciones de diseño (`spec.design`: ajuste por video)
 
 Todas van en `spec.design` y son opcionales: lo que no se indica sale del design system (`theme.style.story`; con `neutral` y `dark`, el aspecto de siempre). Lo que se indica gana sobre el tema. Todo sale del tema.

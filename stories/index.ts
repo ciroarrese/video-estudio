@@ -9,6 +9,8 @@ export { Interlude, INTERLUDE_FRAMES, interludeFrames, INTERLUDE_REVEAL_FRAMES, 
 export { InterludeCompact, INTERLUDE_COMPACT_FRAMES, interludeCompactFrames } from "./InterludeCompact";
 export { MIN_COMPACT_FRAMES, MIN_REVEAL_FRAMES } from "./durations";
 export { Closing, CLOSING_FRAMES, closingFrames, DefaultThumbnail } from "./Closing";
+export { BackdropLayer, StoryBackdropProvider, useStoryBackdrop } from "./backdrop";
+export type { StoryBackdrop } from "./backdrop";
 export { composeStory } from "./compose";
 export type { ComposeOptions, TimelineEntry } from "./compose";
 export { defineStory, resolveTheme } from "./define";

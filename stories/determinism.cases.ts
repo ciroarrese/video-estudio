@@ -14,6 +14,8 @@ export type Case = {
   noScene?: number[];
   /** Pone un `signoff.slot` propio (un nodo no se puede guardar en el JSON del spec). */
   slot?: boolean;
+  /** Pone una ranura `spec.backdrop` (puntos que derivan con el cuadro absoluto): el `--check` verifica que la capa no rompe el determinismo en los velos. */
+  backdrop?: boolean;
   /** Design system con el que se renderiza (`neutral` por defecto): los de estilo propio cambian el cartel, la lista, el fondo y el movimiento. */
   theme?: "neutral" | "dark" | "editorial" | "neon" | "papel";
   /** Formatos extra que se verifican además del horizontal. */
@@ -49,6 +51,7 @@ export const CASES: Case[] = [
   { id: "e-editorial", theme: "editorial", formats: ["vertical"], spec: { title: { text: "Un día en la oficina", highlight: "la oficina" }, topics: T(3), labels: ["Resumen diario", "Metas del mes", "Pedidos nuevos"], signoff: { text: "Gracias por mirar", tagline: "Datos ficticios" } } },
   { id: "e-neon", theme: "neon", formats: ["cuadrado"], spec: { title: { text: "Atravesamos y brillamos", highlight: "brillamos" }, topics: T(4, true), labels: ["Alfa", "Beta", "Gamma", "Delta"], signoff: { text: "Hasta pronto", tagline: "Nota al pie" } } },
   { id: "e-papel", theme: "papel", noScene: [0], spec: { title: { text: "Papel con marcador", highlight: "marcador" }, topics: T(3), labels: ["Uno", "Dos", "Tres"], signoff: { text: "Fin" }, design: { closing: { bar: true } } } },
+  { id: "o-fondo", backdrop: true, formats: ["vertical"], spec: { title: { text: "Una capa de fondo continua", highlight: "continua" }, topics: T(3), labels: ["Alfa", "Beta", "Gamma"], signoff: { text: "Fin" } } },
   { id: "o-sin-escenas", noScene: [0, 1, 2], spec: { title: { text: "Solo apertura y cierre" }, topics: T(3), labels: [], signoff: { text: "Fin" } } },
 ];
 
@@ -67,6 +70,7 @@ import { useFrame } from ${JSON.stringify(engineDir)};
 import { defineStory, TopicHeadline } from ${JSON.stringify(storiesDir)};
 ${sceneSource}
 const spec = ${JSON.stringify(spec)};
+${c.backdrop ? 'spec.backdrop = () => { const f = useFrame(); return React.createElement(React.Fragment, null, ...Array.from({ length: 24 }, (_, i) => React.createElement("div", { key: i, style: { position: "absolute", left: (i * 97 + f * 0.6) % 1900, top: (i * 53) % 1000, width: 8, height: 8, borderRadius: 4, background: "rgba(80,90,200,0.35)" } }))); };' : ""}
 ${c.slot ? 'spec.signoff.slot = React.createElement("div", { style: { width: 220, height: 220, borderRadius: 40, background: "#3b5bdb" } });' : ""}
 const none = ${JSON.stringify(c.noScene ?? [])};
 const scenes = spec.topics.map((t, i) => (none.includes(i) ? null : { id: t.id, component: Scene, durationInFrames: 60 }));

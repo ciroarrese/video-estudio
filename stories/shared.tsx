@@ -9,6 +9,7 @@ import {
 } from "../themes";
 import type { Theme } from "../themes";
 import { fade, styleKey, svgScale, xform } from "../fx/core/math";
+import { BackdropLayer, useStoryBackdrop } from "./backdrop";
 import type { ListLayout } from "./layout";
 import { INLINE_SEP, ROW_GAP, fitText, pillFit } from "./layout";
 import { parseRich } from "./types";
@@ -64,9 +65,11 @@ export function StoryStage({ frame, cloud, children }: { frame?: number; /** Nub
   // nubes: las del tema solo con `background.kind: "clouds"`; con la intensidad por defecto no se pisa la opacidad (queda la del tema, como siempre)
   const clouds = layer.clouds || cloud !== undefined;
   const opacity = cloud?.opacity ?? (layer.clouds && intensity !== 1 ? layer.cloudOpacity : undefined);
+  const backdrop = useStoryBackdrop(); // ranura de fondo de la historia (`spec.backdrop`): sobre el fondo y las nubes, bajo el contenido
   return (
     <Stage clouds={false} frame={frame}>
       {clouds && <CloudBackground {...cloud} opacity={opacity} frame={frame ?? cur} width={width} height={height} />}
+      {backdrop !== null && <BackdropLayer>{backdrop}</BackdropLayer>}
       {children}
     </Stage>
   );

@@ -1,6 +1,7 @@
 import type React from "react";
 import type { SceneCue, SceneOwnAudio } from "../engine";
 import type { CloudOptions } from "../kit";
+import type { StoryBackdrop } from "./backdrop";
 import { MIN_COMPACT_FRAMES, MIN_REVEAL_FRAMES } from "./durations";
 
 /** Una escena de tema que entra en la historia. */
@@ -172,6 +173,14 @@ export type StorySpec = {
   signoff: { logo?: string; slot?: React.ReactNode; tagline?: string; text?: string };
   timing?: StoryTiming;
   design?: StoryDesign;
+  /**
+   * Capa de fondo global (opcional): un nodo o un componente sin props que se dibuja en TODOS los bloques (apertura, escenas de tema, vueltas al
+   * listado, cierre), justo sobre el fondo del escenario (color, nubes) y bajo todo el contenido; también bajo la escena de cada tema que arma
+   * `composeStory`. Se monta con el reloj del video entero (adentro `useFrame()` devuelve el cuadro absoluto), así que es continua al cruzar un
+   * corte, y los velos de transición (`Wash`) la llevan por encima de su color: no se corta ni parpadea. Es decoración (`qa` no juzga su texto).
+   * Sin ella, la historia se dibuja exactamente igual que siempre. Para una intro o un cierre propios fuera de la historia: `BackdropLayer`.
+   */
+  backdrop?: StoryBackdrop;
 };
 
 export const MIN_TOPICS = 2;
