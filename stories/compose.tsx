@@ -1,5 +1,6 @@
 import React from "react";
 import { Audio, Fill, Sequence } from "../engine";
+import { StoryBackdropProvider } from "./backdrop";
 import { StoryStage, useStorySpec } from "./shared";
 import { Closing, closingFrames } from "./Closing";
 import { Interlude, interludeFrames, interludeRevealFrames, nextTopic } from "./Interlude";
@@ -109,36 +110,38 @@ export function composeStory(
     // diseño del video sobre el del design system: acople, nubes y titular de las escenas salen de acá (los bloques lo mezclan por su cuenta)
     const rs = useStorySpec(spec);
     return (
-      <Fill>
-        {timeline.map((e, k) => {
-          let body: React.ReactNode;
-          if (e.kind === "opening") body = <Opening spec={spec} first={Math.max(0, first)} dock={first >= 0 && rs.design?.handoff === "dock"} through={first >= 0 && rs.design?.handoff === "through"} />;
-          else if (e.kind === "closing") body = <Closing spec={spec} scenes={scenes} />;
-          else if (e.kind === "interlude") {
-            const done = topicOf[k]!;
-            const next = nextTopic(withoutLate(spec).topics.length, done, skip);
-            body = compact ? <InterludeCompact spec={spec} done={done} skip={skip} next={next} /> : <Interlude spec={spec} done={done} skip={skip} next={next} ticks={ticksOf[k]} thumbnail={e.reveal === true ? scenes[done - 1]?.thumbnail ?? spec.topics[done - 1]?.thumbnail : undefined} />;
-          }
-          else {
-            const topic = topicOf[k]!;
-            const t = spec.topics[topic]!;
-            const Scene = scenes[topic]!.component;
-            body = (
-              <TopicContext.Provider value={{ index: topic, name: t.name, line: t.line, docked: topic === first && rs.design?.handoff === "dock", headline: headlineDefaults(rs), handoff: planOf.get(topic)!.handoff, arrival: planOf.get(topic)!.arrival }}>
-                <StoryStage cloud={rs.design?.clouds}>
-                  <Scene />
-                </StoryStage>
-              </TopicContext.Provider>
+      <StoryBackdropProvider backdrop={spec.backdrop}>
+        <Fill>
+          {timeline.map((e, k) => {
+            let body: React.ReactNode;
+            if (e.kind === "opening") body = <Opening spec={spec} first={Math.max(0, first)} dock={first >= 0 && rs.design?.handoff === "dock"} through={first >= 0 && rs.design?.handoff === "through"} />;
+            else if (e.kind === "closing") body = <Closing spec={spec} scenes={scenes} />;
+            else if (e.kind === "interlude") {
+              const done = topicOf[k]!;
+              const next = nextTopic(withoutLate(spec).topics.length, done, skip);
+              body = compact ? <InterludeCompact spec={spec} done={done} skip={skip} next={next} /> : <Interlude spec={spec} done={done} skip={skip} next={next} ticks={ticksOf[k]} thumbnail={e.reveal === true ? scenes[done - 1]?.thumbnail ?? spec.topics[done - 1]?.thumbnail : undefined} />;
+            }
+            else {
+              const topic = topicOf[k]!;
+              const t = spec.topics[topic]!;
+              const Scene = scenes[topic]!.component;
+              body = (
+                <TopicContext.Provider value={{ index: topic, name: t.name, line: t.line, docked: topic === first && rs.design?.handoff === "dock", headline: headlineDefaults(rs), handoff: planOf.get(topic)!.handoff, arrival: planOf.get(topic)!.arrival }}>
+                  <StoryStage cloud={rs.design?.clouds}>
+                    <Scene />
+                  </StoryStage>
+                </TopicContext.Provider>
+              );
+            }
+            return (
+              <Sequence key={e.id} from={e.from} durationInFrames={e.durationInFrames}>
+                {body}
+              </Sequence>
             );
-          }
-          return (
-            <Sequence key={e.id} from={e.from} durationInFrames={e.durationInFrames}>
-              {body}
-            </Sequence>
-          );
-        })}
-        {opts.audio && <Audio src={opts.audio.src} startFrom={opts.audio.startFrom} volume={opts.audio.volume} />}
-      </Fill>
+          })}
+          {opts.audio && <Audio src={opts.audio.src} startFrom={opts.audio.startFrom} volume={opts.audio.volume} />}
+        </Fill>
+      </StoryBackdropProvider>
     );
   };
   return { component: Story, durationInFrames: at, timeline };

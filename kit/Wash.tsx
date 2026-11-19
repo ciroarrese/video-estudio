@@ -1,7 +1,21 @@
+import { createContext, useContext } from "react";
+import type { ReactNode } from "react";
 import { Easing } from "../engine";
 import { transitionVeil, useTheme } from "../themes";
 import { kf } from "./kf";
 import { useFrameOr } from "./util";
+
+/**
+ * Contenido que todo `Wash` dibuja DENTRO de su velo, por encima del color (y con su misma opacidad o recorte de cortina). Lo provee quien tiene una
+ * capa de fondo que no puede desaparecer bajo la transición (la ranura `backdrop` de una historia: `stories/`): con el velo a medias, la capa se ve por
+ * encima del fondo ya velado, y con el velo cerrado queda sobre el color, así que es continua de punta a punta. Sin proveedor (`null`) el marcado es el de siempre.
+ */
+export const VeilContentContext = createContext<ReactNode>(null);
+
+/** Lo que el contexto pone dentro del velo; un componente aparte para que quien arma su propio velo (el telón del cierre) lo pueda sumar. */
+export function VeilContent() {
+  return <>{useContext(VeilContentContext)}</>;
+}
 
 /**
  * Velo a cuadro completo que sube de 0 a 1 en `range`; se usa al final de las escenas.
@@ -23,5 +37,5 @@ export function Wash({ frame, range, color }: { frame?: number; range: [number, 
   if (!veil) return null;
   // El velo cerrado del todo no lleva `opacity` ni `clipPath` (igual que en reposo); `key` cambia cuando cambia el conjunto de propiedades.
   const full = o >= 1;
-  return <div key={`${veil.kind}-${full ? "full" : "part"}`} data-qa-veil={o.toFixed(3)} data-qa-ignore="covered" style={{ position: "absolute", inset: 0, ...veil.style, pointerEvents: "none", zIndex: 100 }} />;
+  return <div key={`${veil.kind}-${full ? "full" : "part"}`} data-qa-veil={o.toFixed(3)} data-qa-ignore="covered" style={{ position: "absolute", inset: 0, ...veil.style, pointerEvents: "none", zIndex: 100 }}><VeilContent /></div>;
 }

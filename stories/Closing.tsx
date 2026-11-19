@@ -1,7 +1,7 @@
 import { useStoryReserve } from "./subtitles";
 import React from "react";
 import { Easing, random, useFrame, useVideoConfig } from "../engine";
-import { GradientText, Highlight, kf } from "../kit";
+import { GradientText, Highlight, VeilContent, VeilContentContext, kf } from "../kit";
 import { accentMark, chartStyle, cornerRadius, numeralStyle, resolveColor, resolveStyle, staggerFrames, surfaceStyle, textStyle, transitionVeil, useTheme, withAlpha } from "../themes";
 import type { Theme } from "../themes";
 import { fade, styleKey, xform } from "../fx/core/math";
@@ -274,7 +274,7 @@ export function Closing({ spec: specIn, scenes = [] }: { spec: StorySpec; scenes
               <div style={{ width: PANEL.w, height: PANEL.h, transform: xform({ scaleX: c.k, scaleY: Math.max(0.001, c.k * (1 - fold)) }), transformOrigin: "0 0" }}>
                 {/* miniatura de la escena a escala de panel: su texto es detalle que se lee al acercar, no se le pide el tamaño mínimo (`min-size`); tampoco el recorte de sus rótulos de `<svg>` (`clip`): la miniatura la dibuja el video y con una fuente de reemplazo más ancha el centro de un gráfico de anillo se pasa de su `<svg>` sin que sea un defecto del cierre; el resto de las reglas sí */}
                 <div data-qa-ignore="min-size clip" style={{ width: PANEL.w, height: PANEL.h, ...panelSurface }}>
-                  {Thumb ? <Thumb /> : <DefaultThumbnail index={i} name={spec.topics[i]!.name} />}
+                  {Thumb ? <VeilContentContext.Provider value={null}><Thumb /></VeilContentContext.Provider> : <DefaultThumbnail index={i} name={spec.topics[i]!.name} />}
                 </div>
               </div>
               {!titleGone && (
@@ -320,7 +320,7 @@ export function Closing({ spec: specIn, scenes = [] }: { spec: StorySpec; scenes
       {/* firma: cada pieza se pinta recién cuando empieza a entrar (en reposo sin `opacity` ni `transform`) y, mientras vale 0, queda
           con `visibility: hidden`: ocupa su lugar (la columna no se corre al entrar la siguiente) pero no tapa ni cuenta como texto */}
       {/* el telón es una transición, como `Wash`: lleva `data-qa-veil` y `covered` callado (tapar el muro es su trabajo; el texto del muro es adorno) */}
-      {wash > 0 && cover && <div key={`${cover.kind}-${wash >= 1 ? "full" : "part"}`} data-qa-veil={Math.min(1, wash).toFixed(3)} data-qa-ignore="covered" style={{ position: "absolute", inset: 0, ...cover.style, zIndex: 500 }} />}
+      {wash > 0 && cover && <div key={`${cover.kind}-${wash >= 1 ? "full" : "part"}`} data-qa-veil={Math.min(1, wash).toFixed(3)} data-qa-ignore="covered" style={{ position: "absolute", inset: 0, ...cover.style, zIndex: 500 }}><VeilContent /></div>}
       <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", flexDirection: "column", gap: 40, zIndex: 600, ...(reserve ? { paddingBottom: reserve } : {}) }}>
         {signLines.slot && <div key={`slot-${styleKey({ ...fadeIn(logo), t: xform({ scale: 0.92 + logo * 0.08 }) })}`} style={{ ...fadeIn(logo), transform: xform({ scale: 0.92 + logo * 0.08 }), maxWidth: signW, display: "flex", justifyContent: "center" }}>{signLines.slot}</div>}
         {!signLines.slot && signLines.logo && (

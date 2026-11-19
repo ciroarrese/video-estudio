@@ -4,7 +4,7 @@ export { exitThrough } from "./exit";
 export type { CameraKey, Camera, CameraOptions, CameraProfileName } from "./camera";
 export { useCameraAt } from "./useCameraAt";
 export { World } from "./World";
-export { Wash } from "./Wash";
+export { Wash, VeilContent, VeilContentContext } from "./Wash";
 export { Cursor } from "./Cursor";
 export { Vignette } from "./Vignette";
 export { DoodleCircle, DoodleArrow, DoodleUnderline } from "./Doodles";

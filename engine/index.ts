@@ -13,6 +13,7 @@ export { Easing, bezier, back } from './Easing';
 export type { EasingFn } from './Easing';
 export { random } from './random';
 export { Sequence, Series } from './Sequence';
+export { AbsoluteFrame, useAbsoluteFrame } from './AbsoluteFrame';
 export { Fill } from './Fill';
 export { holdRender, releaseRender, pendingHolds, waitForHolds } from './holds';
 export { asset } from './asset';
